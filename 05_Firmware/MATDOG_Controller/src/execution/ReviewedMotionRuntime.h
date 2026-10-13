@@ -11,6 +11,7 @@ struct ReviewedMotionRuntime {
  motion::FeedbackPolicy feedback{};
  motion::WalkSpecification walk{};
  ExecutionEnvelope execution{};
+ double stand_time_scale=1;
  uint32_t max_imu_age_ms=0;
  int max_servo_temperature_c=0,min_servo_voltage_dv=0,max_servo_voltage_dv=0;
  bool fixture_bus_timing_qualified=false,autonomous_bus_timing_qualified=false;

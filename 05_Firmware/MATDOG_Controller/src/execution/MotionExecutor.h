@@ -11,6 +11,7 @@ struct MotionExecutionFacts {
   bool calibration_accepted=false, envelopes_approved=false, hardware_qualified=false;
   bool operator_permit=false, bms_ok=false, power_ok=false, fault=false;
   bool sequential_bus_qualified=false;
+  bool prime_profiles_verified=false; // twelve live GoalSpeed/ACC readbacks
   uint32_t permit_generation=0, permit_expires_at_ms=0;
 };
 // These limits must come from an approved artifact; zero defaults approve nothing.

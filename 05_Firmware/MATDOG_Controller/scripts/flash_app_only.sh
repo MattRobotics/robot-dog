@@ -52,6 +52,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKETCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKETCH_DIR/../.." && pwd)"
 BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
+# Explicit designated-candidate path; offline proof still requires a clean tree
+# and byte-identical compiled firmware/tools. Documentation HEAD is not source.
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  BUILD_DIR="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field directory)"
+fi
 
 ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
 ESPTOOL="${ESPTOOL_BIN:-$HOME/.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool}"
@@ -113,6 +118,10 @@ inspectable commit rather than an untracked mix of edits."
 fi
 SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 SOURCE_COMMIT_SHORT="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  SOURCE_COMMIT="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field source)"
+  SOURCE_COMMIT_SHORT="${SOURCE_COMMIT:0:12}"
+fi
 
 # --- Gate: application binary present and matches this exact commit -------
 [ -f "$APPLICATION_BINARY" ] || refuse "application binary not found: $APPLICATION_BINARY \

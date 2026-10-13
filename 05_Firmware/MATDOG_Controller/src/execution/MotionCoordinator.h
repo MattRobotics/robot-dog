@@ -12,6 +12,8 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void begin(MotionExecutor*,actuator::SafeActuatorPolicy*);
   bool configure(const motion::FeedbackPolicy&,const motion::WalkSpecification&,const motion::AcquisitionRoute*);
   void bindSession(MotionSession* session){session_=session;}
+  unsigned proneSegment() const{return stand_.proneSegment();}
+  bool approveProneSegment(unsigned s){return stand_.approveProneSegment(s);}
   void observe(const motion::AdaptiveObservation&);
   bool assess(const motion::SegmentAssessment&,uint32_t now_ms);
   const char* accept(const motion::MotionCommand&,uint32_t now_ms) override;

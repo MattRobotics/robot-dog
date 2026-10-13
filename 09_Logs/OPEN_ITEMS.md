@@ -1,5 +1,9 @@
 # Open items and blockers
 
+## Aggiornamento release 2026-10-13
+
+Implementati e provati offline SOC con isteresi/UNKNOWN e breathing charging continuo; LAN MAINTENANCE con cinque GET read-only, ADMIN_AP e RUN_STA separati. RESTORE e Motion hanno ora admission locale RAM-only; nessuna prova hardware nuova. Stato corrente, limiti e gate fisici: [release finale](Validation_Reports/Final_Release_Candidate_2026-10-13/README.md). Le righe DEFERRED del closeout sotto sono la baseline storica dell’11 ottobre.
+
 ## Closeout 2026-10-11 — fase successiva
 
 Aggiornamento della sola baseline non-motion sulla branch di lavoro:

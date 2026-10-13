@@ -150,7 +150,7 @@ function renderStatus(){
  rows('#otaList',[['Build in esecuzione',s.ota_running_build_id],['Stato',s.ota_state],['Ingest compilato',yn(s.ota_ingest_compiled)],['Rollback possibile',yn(s.ota_rollback_possible)]]);
 }
 // ---- Network ---------------------------------------------------------------
-const ROLE={MAINTENANCE_AP:['','MAINTENANCE · AP amministrativo, sempre attivo'],RUN_STA:['','RUN · router'],RUN_NO_PROFILE_AP:['warn','RUN · AP di recupero: nessun router configurato'],RUN_RECOVERY_AP:['warn','RUN · AP di recupero: router non raggiungibile']};
+const ROLE={MAINTENANCE_STA_READONLY:['lock','MAINTENANCE · LAN sola lettura, nessuna autorità Motion'],MAINTENANCE_AP:['','MAINTENANCE · AP amministrativo, sempre attivo'],RUN_STA:['','RUN · router'],RUN_NO_PROFILE_AP:['warn','RUN · AP di recupero: nessun router configurato'],RUN_RECOVERY_AP:['warn','RUN · AP di recupero: router non raggiungibile']};
 const TEST={CONNECTED:['ok','Connessione riuscita: il router ha accettato le credenziali e ha assegnato un indirizzo IP.'],AUTH_REJECTED:['bad','Credenziali rifiutate dal router: password errata, oppure handshake WPA2 non completato.'],AP_NOT_FOUND:['bad','Router non trovato: nessuna rete con questo nome e sicurezza compatibile a portata (solo 2,4 GHz).'],NO_IP:['bad','Associazione riuscita, ma nessun indirizzo IP: DHCP del router non ha risposto, o IP statico non valido.'],TIMEOUT:['bad','Tempo scaduto: la connessione non si è completata entro 30 secondi.'],ABORTED:['warn','Prova interrotta prima del termine (contesto critico o fault radio).'],STORAGE_ERROR:['bad','Errore di memoria: la configurazione non è stata scritta in NVS.'],RUNNING:['warn','Prova in corso…']};
 const CONFIG_ERR={4:'indirizzo IP statico rifiutato dal driver',5:'richiesta non ammessa (amministrazione chiusa o controller occupato)',6:'cambiando SSID serve anche la nuova password',8:'configurazione non valida, oppure il profilo da provare non è attivo',9:'scrittura NVS fallita',10:'lettura NVS fallita',11:'fault radio',12:'profilo AP non coerente'};
 const REASON={2:'autenticazione scaduta',3:'uscita volontaria',8:'uscita volontaria',15:'handshake WPA2 non completato',200:'segnale del router perso',201:'rete non trovata',202:'autenticazione rifiutata',203:'associazione rifiutata',204:'handshake WPA2 non completato',205:'connessione fallita',210:'rete non trovata con sicurezza compatibile',211:'rete non trovata con sicurezza compatibile',212:'segnale troppo debole'};
@@ -161,6 +161,10 @@ function testText(t){const d=TEST[t.outcome];if(!d)return null;let x='Ultima pro
  return [d[0],x]}
 function renderWifi(){
  const s=wf;if(!s)return;
+ const readonly=s.read_only===true;
+ for(const form of document.querySelectorAll('#wifiForm,#apForm,#performanceForm'))for(const control of form.elements)control.disabled=readonly;
+ if(readonly){csrf='';authUi();$('#loginOpen').hidden=true;$('#login').hidden=true;$('#staNote').textContent='LAN MAINTENANCE · sola consultazione. Amministrazione tramite AP protetto; STOP attraverso console USB locale.';}
+
  chip('#apBadge',s.ap_active?'ATTIVO':'NON ATTIVO',s.ap_active?'ok':'warn');
  const pol=s.policy||{},why=ROLE[pol.role]||['',pol.role||'N/D'];
  rows('#apList',[['SSID',s.ap_ssid],['Indirizzo',s.ap_ip],['Client collegati',s.ap_clients],['Amministrazione',s.network_phase],['Policy radio',why[1],why[0]],
@@ -172,7 +176,7 @@ function renderWifi(){
   ['IP assegnato',s.connected?s.ip:'—','na'],['RSSI',s.connected?s.rssi+' dBm':'—','na'],s.disconnect_reason?['Ultima disconnessione STA',reason(s.disconnect_reason),admin?'na':'warn']:null,
   s.sta_test.seq?['Ultima prova router',s.sta_test.outcome+(s.sta_test.outcome==='CONNECTED'?' · '+s.sta_test.ip:''),(TEST[s.sta_test.outcome]||[''])[0]]:null]);
  $('#legacyNote').hidden=!s.ap_always;
- $('#staNote').textContent=admin?(pol.run?'Il router viene riprovato dall\'AP di recupero secondo la policy; qui sopra lo stato.':'In MAINTENANCE il client STA è sospeso di proposito, anche con un router salvato: «non connesso» e 0.0.0.0 non indicano un guasto. Il router verrà usato in RUN.'):'';
+ $('#staNote').textContent=readonly?'LAN MAINTENANCE · sola lettura. Amministrazione via AP protetto; STOP tramite USB locale.':admin?(pol.run?'Il router viene riprovato dall\'AP di recupero secondo la policy; qui sopra lo stato.':'In MAINTENANCE il client STA è sospeso di proposito, anche con un router salvato: «non connesso» e 0.0.0.0 non indicano un guasto. Il router verrà usato in RUN.'):'';
  const r=$('#testResult'),t=s.sta_test.seq?testText(s.sta_test):null;r.hidden=!t;if(t){r.className='result '+t[0];r.textContent=t[1]}
  $('#details').textContent=JSON.stringify(s,null,2);$('#scanResults').textContent=JSON.stringify(s.scan,null,2);$('#scanResults').hidden=!s.scan.length;
  $('#firmware').textContent='Build '+s.build_id+' · ingest '+s.ota_ingest+' · TLS '+s.tls;
@@ -180,7 +184,7 @@ function renderWifi(){
  if(!editing){s.profiles.forEach((p,i)=>{for(const key of ['ssid','enabled','dhcp','ip','mask','gateway','dns'])$('[name=p'+i+'_'+key+']').value=typeof p[key]==='boolean'?(p[key]?'1':'0'):p[key]});$('[name=ap_name]').value=s.ap_ssid;$('#wifiForm').elements.test_profile.value=s.active_profile;
   for(const key of ['roam_enabled','roam_threshold','roam_hysteresis','scan_interval_ms','roam_dwell_ms','bandwidth_mhz','ap_timeout_ms','ap_always']){const el=$('[name='+key+']');if(el)el.value=typeof s[key]==='boolean'?(s[key]?'1':'0'):s[key]}syncStatic()}
  // A new AP generation ends the old session; a remembered device reopens it.
- if(generation&&s.admin_generation!==generation&&csrf){csrf='';if(store.get('md_remember'))resume();else authUi()}
+ if(!readonly&&generation&&s.admin_generation!==generation&&csrf){csrf='';if(store.get('md_remember'))resume();else authUi()}
  generation=s.admin_generation;
  if(watch){
   const done=text=>{watch=null;store.set('md_watch',null);return text};
@@ -190,7 +194,7 @@ function renderWifi(){
  }else if(s.ap_reload_pending)show('Transizione AP in corso: il portale si chiuderà e riaprirà.','warn');
  // A remembered device that lost its session is reopened quietly, at most
  // once every 30 s; a write also retries on demand.
- if(!csrf&&store.get('md_remember')&&Date.now()-resumeAt>30000)resume();
+ if(!readonly&&!csrf&&store.get('md_remember')&&Date.now()-resumeAt>30000)resume();
 }
 function link(){
  const age=lastOk?Date.now()-lastOk:0,dot=$('#linkDot'),text=$('#linkText');

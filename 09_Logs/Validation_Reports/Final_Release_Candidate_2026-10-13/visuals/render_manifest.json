@@ -1,0 +1,99 @@
+{
+  "schema": "MATDOG_FINAL_VISUAL_EVIDENCE_V1",
+  "runtime_csv_sha256": "ff33aadeab40d303c9f11dad1bd97ec2b067f85109ca1801e12cf5d8626d7f89",
+  "frames": 30009,
+  "public_replay_frames": 2309,
+  "canonical_route_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "fixture_recipe_sha256": "2662856821324bbbb1e7bf2991f7809521edc69d433d2668183bda353cce9ce6",
+  "meshes": {
+    "base_link": {
+      "triangles": 22044,
+      "displayed": 450,
+      "stride": 49
+    },
+    "lf_hip_link": {
+      "triangles": 6016,
+      "displayed": 430,
+      "stride": 14
+    },
+    "lf_upper_leg_link": {
+      "triangles": 3802,
+      "displayed": 423,
+      "stride": 9
+    },
+    "lf_lower_leg_link": {
+      "triangles": 12336,
+      "displayed": 441,
+      "stride": 28
+    },
+    "lf_foot_link": {
+      "triangles": 2248,
+      "displayed": 450,
+      "stride": 5
+    },
+    "rf_hip_link": {
+      "triangles": 6016,
+      "displayed": 430,
+      "stride": 14
+    },
+    "rf_upper_leg_link": {
+      "triangles": 3806,
+      "displayed": 423,
+      "stride": 9
+    },
+    "rf_lower_leg_link": {
+      "triangles": 12352,
+      "displayed": 442,
+      "stride": 28
+    },
+    "rf_foot_link": {
+      "triangles": 2248,
+      "displayed": 450,
+      "stride": 5
+    },
+    "rh_hip_link": {
+      "triangles": 6018,
+      "displayed": 430,
+      "stride": 14
+    },
+    "rh_upper_leg_link": {
+      "triangles": 3806,
+      "displayed": 423,
+      "stride": 9
+    },
+    "rh_lower_leg_link": {
+      "triangles": 12352,
+      "displayed": 442,
+      "stride": 28
+    },
+    "rh_foot_link": {
+      "triangles": 2248,
+      "displayed": 450,
+      "stride": 5
+    },
+    "lh_hip_link": {
+      "triangles": 6018,
+      "displayed": 430,
+      "stride": 14
+    },
+    "lh_upper_leg_link": {
+      "triangles": 3802,
+      "displayed": 423,
+      "stride": 9
+    },
+    "lh_lower_leg_link": {
+      "triangles": 12336,
+      "displayed": 441,
+      "stride": 28
+    },
+    "lh_foot_link": {
+      "triangles": 2248,
+      "displayed": 450,
+      "stride": 5
+    }
+  },
+  "hardware": false,
+  "body_pose": "SYNTHETIC FIXED FIXTURE 300mm; not an operational measurement or preset",
+  "target_values": "actual production planner test export; ideal feedback doubles",
+  "renderer_sha256": "af90aeb73b03e497275202f79824483bc6e34c455d26bbbe2636c50dd0e78c07"
+}

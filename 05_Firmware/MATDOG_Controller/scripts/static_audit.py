@@ -374,10 +374,12 @@ def check_goal_position_register_boundary(files, sketch_dir):
 
 
 def check_servo_id_write(files):
-    """No raw register write may exist in ServoBus EXCEPT the one reviewed RAM
+    """Only the two specifically reviewed RAM 48 writers may exist in ServoBus.
+    The bounded validation reducer is checked independently below. The original
     TorqueLimit write of the 24-contact Full Calibration sequence (LF V25
     prepare_motor(): TorqueLimit 500 before TorqueEnable). That one write:
-      - is the only writeWord() call, and no writeByte() call exists at all;
+      - is the only fixed-value writer; the second can only reduce RAM 48,
+        and no writeByte() call exists at all;
       - lives inside ServoBus::writeReviewedRamTorqueLimit(int id);
       - targets SMS_STS_TORQUE_LIMIT_L (RAM 48) - never EEPROM Max Torque, an
         ID, an offset, a lock or any other register;
@@ -391,8 +393,8 @@ def check_servo_id_write(files):
         if re.search(r"\bwriteByte\(", code):
             fail(f"{path}: raw writeByte() call found - ServoBus has no reviewed byte write")
         words = [m.start() for m in re.finditer(r"\bwriteWord\(", code)]
-        if len(words) != 1:
-            fail(f"{path}: exactly one raw writeWord() (the reviewed RAM TorqueLimit) may "
+        if len(words) != 2:
+            fail(f"{path}: exactly two reviewed raw writeWord() calls (RAM TorqueLimit) may "
                  f"exist in ServoBus, found {len(words)}")
             continue
         body = re.search(r"ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit\(int id\)"
@@ -412,6 +414,13 @@ def check_servo_id_write(files):
                 fail(f"{path}: writeReviewedRamTorqueLimit() lost {required!r}")
         if re.search(r"\bst_\.Error\b", text):
             fail(f"{path}: writeReviewedRamTorqueLimit() must decide by readback only")
+        reducer = re.search(r"ServoWriteVerifyResult ServoBus::reduceValidationOutputWhileOff\(int id,uint16_t ceiling\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not reducer or not (reducer.start() <= words[1] <= reducer.end()):
+            fail(f"{path}: second raw writer must be the reviewed RAM-only output reducer")
+        else:
+            compact=re.sub(r"\s+", "", reducer.group(1))
+            for token in ("id<0||id>253||!ceiling||ceiling>1000", "st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0", "current<0||current>1023||ceiling>current", "if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);", "returnclassifyServoWriteVerify(st_.readWord(id,SMS_STS_TORQUE_LIMIT_L),ceiling);"):
+                if token not in compact:fail(f"{path}: reduceValidationOutputWhileOff() lost {token!r}")
     by_name = {p.name: c for p, c in files}
     header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", ""))
     if header.count("static constexpr uint16_t kReviewedRamTorqueLimit = 500;") != 1:
@@ -2578,6 +2587,13 @@ def check_led_status_boundaries(files):
                 if count != 2:
                     fail(f"{path}: {fact} must have exactly two false defaults")
             elif path.name == "LedStatusPolicy.cpp":
+                level = "2" if fact == "battery_critical" else "1"
+                remaining, count = re.subn(rf"snapshot_\.{fact}\s*=\s*inputs\.{fact}\s*\|\|\s*soc_level_=={level};", "", remaining)
+                if count != 1:
+                    fail(f"{path}: {fact} must consume reviewed hysteretic SOC state and preserve external alarms")
+                compact = re.sub(r"\s+", "", code)
+                for guard in ("if(snapshot_.soc_valid)", "if(!snapshot_.charging)", "if(soc<=15)soc_level_=2;", "soc_level_==2&&soc<18", "soc<=30||(soc_level_!=0&&soc<33)"):
+                    if guard not in compact: fail(f"{path}: missing SOC freshness/hysteresis boundary: {guard}")
                 for allowed in (rf"\bfacts\.{fact}\s*=\s*in\.{fact}\s*;",
                                 rf"\bif\s*\(facts\.{fact}\)\s*return\s+"
                                 rf"LedPresentationState::{state}\s*;"):
@@ -6389,9 +6405,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     # network/ that owns the radio can name the mode manager, the authority
     # arbiter, a permit or an actuator.
     policy=re.sub(r"\s+","",by_name.get("NetworkPolicy.h",(None,""))[1])
-    for token in ("if(!i.run)returnRoleReason::MAINTENANCE_AP;",
+    for token in ("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;",
                   "returni.recovery?RoleReason::RUN_RECOVERY_AP:RoleReason::RUN_STA;",
-                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
+                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA||r==RoleReason::MAINTENANCE_STA_READONLY;}",
                   "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
         if token not in policy:fail("Radio role policy invariant missing: "+token)
     # The stored "AP always" preference of earlier firmware is carried, never
@@ -6399,9 +6415,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     role_unit=policy[policy.find("enumclassRoleReason"):policy.find("constexpruint32_tkRecoveryDwellInitialMs")]
     if not role_unit or "ap_always" in role_unit or "FORCED" in role_unit:
         fail("The legacy AP-always preference must not be an input of the radio role decision")
-    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;};" not in policy:
-        fail("The radio role decision takes exactly: run, sta_profile, recovery")
-    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
+    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;boolmaintenance_lan=false;};" not in policy:
+        fail("The radio role decision takes run, sta_profile, recovery and RAM-only maintenance_lan")
+    if policy.find("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
         fail("MAINTENANCE must outrank everything stored")
     if sorted(re.findall(r"[^;{}]*ap_always[^;{}]*;",compact_manager))!=["c.ap_always=p.config.ap_always;","w.ap_always=config_.ap_always;"]:
         fail("WifiManager may only carry the stored ap_always (form -> record, record -> status), never act on it")

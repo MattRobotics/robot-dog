@@ -99,7 +99,7 @@ private:
   bool dispatch(const HttpTransportRequest &request,
                 HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0);
   void serviceRequest(uint32_t now_ms);
-  void wifiResponse(HttpTransportResponse &response);
+  void wifiResponse(HttpTransportResponse &response,bool redact_network_names=false);
   void statusExtension(HttpTransportResponse &response,
                        const power::DalySample &bms,
                        const calibration::CalibrationSessionStatus &cal);

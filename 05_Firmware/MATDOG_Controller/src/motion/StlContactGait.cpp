@@ -4,21 +4,25 @@ namespace matdog { namespace motion {
 namespace {
 LocomotionFrame adapted(const GaitParameters& p,const CartesianSample& input,const LocomotionFrame* previous){
  auto cart=input;double offsets[4]{};
- for(unsigned iteration=0;iteration<5;++iteration){
+ for(unsigned iteration=0;iteration<(input.stlSmoothing?12u:5u);++iteration){
   for(unsigned i=0;i<4;++i)cart.feet[i].z=input.feet[i].z+offsets[i];
   auto f=solveGait(p,cart,previous);if(!f.target.valid)return f;
   bool converged=true;
-  for(unsigned i=0;i<4;++i){const double error=canonicalFootPlaneMinimum(static_cast<LegId>(i),f.target.legs[i],cart.body)-input.feet[i].z;
+  for(unsigned i=0;i<4;++i){const auto leg=static_cast<LegId>(i);
+   const double hard=canonicalFootPlaneMinimum(leg,f.target.legs[i],cart.body);
+   const double soft=input.stlSmoothing?canonicalFootPlaneSoftMinimum(leg,f.target.legs[i],cart.body,input.stlSmoothing):hard;
+   const double error=soft-input.feet[i].z;
    if(!std::isfinite(error))return {};
-   if(std::abs(error)>1e-10)converged=false;
+   if(std::abs(error)>(input.stlSmoothing?1e-14:1e-10))converged=false;
    offsets[i]-=error;
-   if(std::abs(offsets[i])>canonicalFootRadialCorrectionBound()+1e-8)return {};
+   if(std::abs(offsets[i])>canonicalFootRadialCorrectionBound()+canonicalFootSoftMinimumBound()+1e-8)return {};
   }
   if(converged)return f;
  }return {};
 }
 Vector3 shifted(Vector3 x,Vector3 v,Vector3 a,double t){return {x.x+t*v.x+.5*t*t*a.x,x.y+t*v.y+.5*t*t*a.y,x.z+t*v.z+.5*t*t*a.z};}
 CartesianSample stencil(CartesianSample c,double t){
+ c.stlSmoothing=std::fmax(0.,std::fmin(1.,c.stlSmoothing+t*c.stlSmoothingVelocity+.5*t*t*c.stlSmoothingAcceleration));
  c.body.translationM=shifted(c.body.translationM,c.bodyVelocity,c.bodyAcceleration,t);
  const double yaw=t*c.yawVelocity+.5*t*t*c.yawAcceleration,cos=std::cos(yaw),sin=std::sin(yaw);
  for(unsigned j=0;j<3;++j){const double x=c.body.rotation[0][j],y=c.body.rotation[1][j];c.body.rotation[0][j]=cos*x-sin*y;c.body.rotation[1][j]=sin*x+cos*y;}
@@ -29,7 +33,10 @@ CartesianSample stencil(CartesianSample c,double t){
 LocomotionFrame stlContactPosition(const GaitParameters& p,const CartesianSample& c,const LocomotionFrame* previous){return adapted(p,c,previous);}
 LocomotionFrame solveStlContactGait(const GaitParameters& p,const CartesianSample& c,const LocomotionFrame* previous,double h){
  if(!std::isfinite(h)||h<=0||h>.002)return {};
+ if(!std::isfinite(c.stlSmoothing)||c.stlSmoothing<0||c.stlSmoothing>1)return {};
  auto f=adapted(p,c,previous);if(!f.target.valid)return f;
+ for(unsigned refinement=0;refinement<(c.stlSmoothing?5u:1u);++refinement,h*=.5){
+ bool converged=true;
  const auto left=adapted(p,stencil(c,-h),&f),right=adapted(p,stencil(c,h),&f);
  const auto halfLeft=adapted(p,stencil(c,-h/2),&f),halfRight=adapted(p,stencil(c,h/2),&f);
  if(!left.target.valid||!right.target.valid||!halfLeft.target.valid||!halfRight.target.valid)return {};
@@ -41,10 +48,11 @@ LocomotionFrame solveStlContactGait(const GaitParameters& p,const CartesianSampl
    // A change of the active STL contact vertex can make the complete map
    // nondifferentiable. Reject before submission, rather than declaring the
    // uncorrected G4 derivative qualified or hiding the cusp with a larger h.
-   if(std::abs(v[j]-(d[j]-a[j])/(2*h))>1e-7||std::abs(acc[j]-(d[j]-2*b[j]+a[j])/(h*h))>1e-5)return {};
+   if(std::abs(v[j]-(d[j]-a[j])/(2*h))>1e-7||std::abs(acc[j]-(d[j]-2*b[j]+a[j])/(h*h))>1e-5)converged=false;
   }
   f.velocityRadS[i]={v[0],v[1],v[2]};f.accelerationRadS2[i]={acc[0],acc[1],acc[2]};
  }
- return f;
+ if(converged)return f;
+ }return {};
 }
 } }

@@ -413,3 +413,7 @@ capabilities are integrated into the Controller.
   authorization.
 
 Built and documented by Matt Robotics.
+
+## Release candidata Motion del 13 ottobre 2026
+
+Branch Draft PR #47: [handoff/release](09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/README.md), [galleria offline](09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/visuals/README.md), [sessione supervisionata](09_Logs/Validation_Reports/Final_Release_Candidate_2026-10-13/SUPERVISED_SESSION.md). Il receipt identifica il solo candidato compilato clean; flash e Motion fisico richiedono gate correnti e autorizzazioni separate. Nessuna prova hardware nuova è implicita negli screenshot/simulazioni.

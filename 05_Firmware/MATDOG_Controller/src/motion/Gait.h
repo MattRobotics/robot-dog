@@ -30,6 +30,7 @@ struct CartesianSample {
   Vector3 feet[4]{}, velocity[4]{}, acceleration[4]{};
   LegPhase phases[4]{};
   double cycles=0;
+  double stlSmoothing=0,stlSmoothingVelocity=0,stlSmoothingAcceleration=0;
   bool valid=false;
 };
 // Initial anchors are canonical C4 contacts at world origin. Optional terminal

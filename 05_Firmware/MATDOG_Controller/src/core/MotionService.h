@@ -5,6 +5,7 @@
 namespace matdog { namespace core {
 struct MotionReadiness {
  bool calibration_restored=false, calibration_accepted=false, limits_approved=false;
+ bool walk_qualified=false,first_stride_only=false;double max_vx=0,max_vy=0,max_yaw_rate=0;
  bool hardware_approved=false, operational_permit=false, support_observable=false;
  bool local_fixture_session=false; // local session owns micro-test lifecycle
  bool power_ok=false, bms_ok=false, fault=false, inhibited=false, authority_live=false;
@@ -24,6 +25,9 @@ struct MotionTelemetry {
  uint16_t raw_ticks[12]{};
  uint32_t sampled_at_ms=0, quaternion_at_ms=0;
  double actual_rad[12]{}, quaternion[4]{1,0,0,0}, base_height_m=0;
+ bool validation_capable=false,fixture_scope=false,load_scope=false,foot_load_proven=false;unsigned supervised_segment=0;
+ const char* source="UNKNOWN";
+ const char* session_profile_sha256="";
  const char* session_state="OFF";const char* session_reason="LOCAL_TRIAL_EVIDENCE_REQUIRED";
 };
 // Controller owns this transport-independent intention service. A transport

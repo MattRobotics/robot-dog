@@ -19,8 +19,10 @@ bool validFeedbackPolicy(const FeedbackPolicy& p){
   if(!p.envelopesApproved||!positive(p.maxJointStepRad)||!positive(p.maxTrackingErrorRad)||
     !positive(p.observationMaxAgeS)||!positive(p.assessmentMaxAgeS)||!positive(p.segmentTimeoutS)||
     !positive(p.heightToleranceM)||!positive(p.contactToleranceM)||!positive(p.samplePeriodS))return false;
-  if(p.mode!=FeedbackMode::SIMULATION&&p.mode!=FeedbackMode::PHYSICAL_REVIEW)return false;
+  if(p.mode!=FeedbackMode::SIMULATION&&p.mode!=FeedbackMode::PHYSICAL_REVIEW&&p.mode!=FeedbackMode::FIXTURE_REVIEW)return false;
+  if(p.fixtureLimitVariant&&p.mode!=FeedbackMode::FIXTURE_REVIEW)return false;
   if(p.mode==FeedbackMode::PHYSICAL_REVIEW&&!p.loadedRatesVerified)return false;
+  if(p.mode==FeedbackMode::FIXTURE_REVIEW&&!p.fixtureTrialRatesReviewed)return false;
   for(unsigned i=0;i<4;++i){double v[3],a[3];components(p.maxVelocityRadS[i],v);components(p.maxAccelerationRadS2[i],a);
     const auto* m=legModel(static_cast<LegId>(i));
     for(unsigned j=0;j<3;++j)if(!positive(v[j])||!positive(a[j])||
@@ -54,11 +56,12 @@ FeedbackReason checkSegment(const LocomotionFrame& f,const JointTargetFrame& pre
 }
 FeedbackReason checkAssessment(const SegmentAssessment& a,uint32_t sequence,const FeedbackPolicy& p,double now){
   if(!std::isfinite(now)||a.sequence!=sequence||!std::isfinite(a.stampS)||a.stampS>now||now-a.stampS>p.assessmentMaxAgeS)return FeedbackReason::ASSESSMENT_STALE;
-  if(!evidence(a.source,p.mode)||!a.geometryIdentityVerified)return FeedbackReason::ASSESSMENT_REQUIRED;
+  if((!evidence(a.source,p.mode)&&!(p.mode!=FeedbackMode::SIMULATION&&p.routeTubeReviewed&&a.source==EvidenceSource::OFFLINE_CERTIFIED))||!a.geometryIdentityVerified)return FeedbackReason::ASSESSMENT_REQUIRED;
   if(!a.sweptCollisionClear)return FeedbackReason::COLLISION;
   if(!a.supportCompatible)return FeedbackReason::SUPPORT_INVALID;
   if(!a.continuousBoundsConfirmed)return FeedbackReason::CONTINUOUS_BOUNDS_MISSING;
   if(p.mode==FeedbackMode::PHYSICAL_REVIEW&&!a.loadedTrackingQualified)return FeedbackReason::ASSESSMENT_REQUIRED;
+  if(p.mode==FeedbackMode::FIXTURE_REVIEW&&!a.fixtureTrialEnvelopeReviewed)return FeedbackReason::ASSESSMENT_REQUIRED;
   return FeedbackReason::OK;
 }
 FeedbackReason checkTracking(const AdaptiveObservation& o,const FeedbackFrame& f,const FeedbackPolicy& p){
@@ -66,9 +69,9 @@ FeedbackReason checkTracking(const AdaptiveObservation& o,const FeedbackFrame& f
      o.stampS+1e-9<f.timeS+p.samplePeriodS)return FeedbackReason::FEEDBACK_PENDING;
   for(unsigned i=0;i<4;++i){double actual[3],target[3];components(o.actual.legs[i],actual);components(f.target.legs[i],target);
     for(unsigned j=0;j<3;++j)if(std::abs(actual[j]-target[j])>p.maxTrackingErrorRad)return FeedbackReason::TRACKING_ERROR;}
-  if(std::abs(o.body.translationM.z-f.body.translationM.z)>p.heightToleranceM||
-     std::hypot(o.body.translationM.x-f.body.translationM.x,o.body.translationM.y-f.body.translationM.y)>p.contactToleranceM)return FeedbackReason::TRACKING_ERROR;
-  for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)
+  if(p.mode!=FeedbackMode::FIXTURE_REVIEW && (std::abs(o.body.translationM.z-f.body.translationM.z)>p.heightToleranceM||
+     std::hypot(o.body.translationM.x-f.body.translationM.x,o.body.translationM.y-f.body.translationM.y)>p.contactToleranceM))return FeedbackReason::TRACKING_ERROR;
+  for(unsigned i=0;i<3&&p.mode!=FeedbackMode::FIXTURE_REVIEW;++i)for(unsigned j=0;j<3;++j)
     if(std::abs(o.body.rotation[i][j]-f.body.rotation[i][j])>p.maxTrackingErrorRad)return FeedbackReason::TRACKING_ERROR;
   for(unsigned i=0;i<4;++i)if(f.requiredFeet&(1<<i)){
     const auto fk=contactForwardKinematics(static_cast<LegId>(i),o.actual.legs[i],{o.body.rotation[2][0],o.body.rotation[2][1],o.body.rotation[2][2]});Vector3 world;

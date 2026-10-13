@@ -20,6 +20,8 @@ struct AcquisitionRoute {
   static constexpr uint8_t kMaxWaypoints=32;
   AcquisitionWaypoint waypoints[kMaxWaypoints]{};
   uint8_t count=0;
+  bool supervisedSegments=false;
+  double timeScale=1;
   bool pairedProne=false; // immutable profile, no editable waypoint copy
   bool geometryIdentityVerified=false;
   EvidenceSource source=EvidenceSource::UNKNOWN;
@@ -41,6 +43,8 @@ class AdaptiveStand {
   AdaptiveStandState state() const {return state_;}
   ObservedPoseClass poseClass() const {return poseClass_;}
   FeedbackReason reason() const {return reason_;}
+  unsigned proneSegment() const {return pairedSegment_;}
+  bool approveProneSegment(unsigned segment){if(segment!=pairedSegment_||!route_.supervisedSegments||pendingValid_)return false;approvedSegment_=segment;return true;}
   bool physicalReadiness() const {return physicalReady_;}
  private:
   FeedbackFrame reject(FeedbackReason reason);
@@ -60,7 +64,10 @@ class AdaptiveStand {
   SegmentAssessment assessment_{};
   uint32_t sequence_=0, segmentIndex_=0, segmentIntervals_=0;
   uint8_t routeIndex_=0;
-  uint16_t pairedSegment_=0;
+  uint16_t pairedSegment_=0,approvedSegment_=UINT16_MAX;
+  double entry_progress_=0;
+  LegJointAngles entry_offset_[4]{};
+  uint16_t entry_knot_=UINT16_MAX;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
   bool pendingValid_=false, assessed_=false, physicalReady_=false;
 };

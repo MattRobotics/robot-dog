@@ -70,10 +70,15 @@ class Continuous:
             elif hi-lo<2**-20:raise ValueError('CONTACT_INTERVAL_CERTIFICATE_UNRESOLVED')
             else:stack.extend(((lo,mid),(mid,hi)))
         return True,{'leaves':leaves,'maximum_lift_correction_upper_bound_m':max_correction,'maximum_contact_gap_upper_bound_m':max_contact}
-    def self_proof(self,va,vb,minimum_separation_m=1e-12):
-        qa=self.a.q(va);qb=self.a.q(vb);pairs=self.s.model.clearance_pairs();stack=[(0.,1.,pairs)];leaves=0;minimum=math.inf
+    def self_proof(self,va,vb,minimum_separation_m=1e-12,joint_uncertainty_rad=0.):
+        if not 0<=joint_uncertainty_rad<=.01:raise ValueError("TRACKING_TUBE_DOMAIN")
+        return self.self_proof_q(self.a.q(va),self.a.q(vb),minimum_separation_m,joint_uncertainty_rad)
+    def self_proof_q(self,qa,qb,minimum_separation_m=1e-12,joint_uncertainty_rad=0.):
+        if not 0<=joint_uncertainty_rad<=.01:raise ValueError("TRACKING_TUBE_DOMAIN")
+        pairs=self.s.model.clearance_pairs();stack=[(0.,1.,pairs)];leaves=0;minimum=math.inf
         while stack:
             lo,hi,pending=stack.pop();mid=(lo+hi)/2;q={j:qa[j]+mid*(qb[j]-qa[j]) for j in qa}
+            transforms={n:self.s.collision_transform(n,q) for n in self.mesh}
             remaining=[]
             for na,nb in pending:
                 ca=self.s.model.relevant_actuated_joints_for_link(na);cb=self.s.model.relevant_actuated_joints_for_link(nb)
@@ -82,17 +87,17 @@ class Continuous:
                     if ja!=jb:break
                     common.append(ja)
                 reference=self.s.model.joints[common[-1]].child_link if common else 'base_link'
-                t=self.s.collision_transform(reference,q) if reference!='base_link' else None
+                t=transforms[reference] if reference!='base_link' else None
                 bounds=[];moves=[]
                 for name in (na,nb):
-                    tf=self.s.collision_transform(name,q)
+                    tf=transforms[name]
                     vertices=self.mesh[name]@tf.rotation.T+tf.translation
                     if t is not None:vertices=(vertices-t.translation)@t.rotation
                     total=0.;hip_motion=0.;ul_motion=0.;hip_max=0.
                     for j,radius in self.radii[name].items():
                         if j in common:continue
-                        move=radius*abs(qb[j]-qa[j])*(hi-lo)/2;total+=move
-                        if j.endswith('hip_joint'):hip_motion+=move;hip_max=max(hip_max,abs(qa[j]),abs(qb[j]))
+                        move=radius*(abs(qb[j]-qa[j])*(hi-lo)/2+joint_uncertainty_rad);total+=move
+                        if j.endswith('hip_joint'):hip_motion+=move;hip_max=max(hip_max,abs(qa[j])+joint_uncertainty_rad,abs(qb[j])+joint_uncertainty_rad)
                         else:ul_motion+=move
                     # In a common HIP/UPPER frame, all remaining axes are Y.
                     # In base, nonzero HIP can mix Z into Y; bound that term.

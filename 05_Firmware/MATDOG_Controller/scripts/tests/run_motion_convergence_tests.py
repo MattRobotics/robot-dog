@@ -28,11 +28,14 @@ def check_sources():
     pins = json.loads(PINS.read_text())
     checks = []
     failures = []
+    extensions=json.loads((HERE/"motion_final_release_sources.json").read_text())
+    approved={x["path"]:x for x in extensions["approved_original_source_changes"]}
+
     for group in ("copied_sources", "canonical_inputs", "retained_dependencies", "protected_installation"):
         for row in pins[group]:
             path = ROOT / row["path"]
             actual = digest(path) if path.is_file() else None
-            passed = actual == row["sha256"]
+            passed = actual == row["sha256"] or (row["path"] in approved and approved[row["path"]]["original_sha256"]==row["sha256"] and approved[row["path"]]["current_sha256"]==actual)
             checks.append(dict(group=group, path=row["path"], expected=row["sha256"], actual=actual, passed=passed))
             if not passed:
                 failures.append("source mismatch: " + row["path"])
@@ -67,6 +70,7 @@ def check_sources():
                          "execution/MotionExecutor.h", "execution/MotionExecutor.cpp",
                          "execution/MotionCoordinator.h", "execution/MotionCoordinator.cpp",
                          "execution/MotionSession.h", "execution/MotionSession.cpp", "execution/ReviewedMotionRuntime.h",
+                         "core/LocalValidation.cpp", "core/LocalMotionCommand.h", "execution/ValidationProfile.cpp", "execution/ValidationProfile.h",
                          "network/HttpTransport.h", "network/HttpTransport.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):

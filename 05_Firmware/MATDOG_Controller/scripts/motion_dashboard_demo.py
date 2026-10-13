@@ -55,7 +55,7 @@ def load_trace(path: Path) -> list[dict]:
     for frame in frames:
         if not isinstance(frame, dict) or frame.get("version") != 1 or not isinstance(frame.get("telemetry"), dict):
             raise ValueError("trace must contain MotionService version 1 status frames")
-        telemetry = dict(frame["telemetry"])
+        telemetry = dict(frame["telemetry"]);telemetry["source"]="OFFLINE_SYNTHETIC"
         telemetry.setdefault("sampled_at_ms", telemetry.get("stamp_ms"))
         now, sample = frame.get("now_ms"), telemetry.get("sampled_at_ms")
         if not isinstance(now, (int, float)) or not isinstance(sample, (int, float)) or now < previous_now or sample < previous_sample or sample > now:

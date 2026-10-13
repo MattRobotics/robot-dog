@@ -115,7 +115,7 @@ OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyOperationalLimits(
     const actuator::GeometryProvenance& expected_provenance,
     const OperationalWorkspaceEvidence* evidence, const char* pinned_artifact_sha256,
     const RuntimeRestoreRequest& facts, const actuator::JointTransformTable& transforms,
-    actuator::ActuatorLimitTable& limits) {
+    actuator::ActuatorLimitTable& limits,const char* pinned_route_sha256) {
   auto reject = [&](OperationalAdmissionStatus status) {
     snapshot_.limits_status = status;
     return status;
@@ -142,6 +142,11 @@ OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyOperationalLimits(
   }
   if (evidence->calibration_generation != snapshot_.restored_generation ||
       facts.expected_generation != snapshot_.restored_generation) return reject(OperationalAdmissionStatus::REJECT_GENERATION);
+  if(evidence->scope==OperationalLimitScope::CERTIFIED_ROUTE){
+    if(!pinned_route_sha256||!validSha(pinned_route_sha256)||!validSha(evidence->route_sha256)||
+       strcmp(pinned_route_sha256,evidence->route_sha256)||!validSha(evidence->corridor_proof_sha256))
+      return reject(OperationalAdmissionStatus::REJECT_ARTIFACT_IDENTITY);
+  }else if(evidence->scope!=OperationalLimitScope::FULL_JOINT_BOX)return reject(OperationalAdmissionStatus::REJECT_WORKSPACE_EVIDENCE);
   if (!evidence->workspace_reviewed) return reject(OperationalAdmissionStatus::REJECT_WORKSPACE_EVIDENCE);
   if (!evidence->simultaneous_configuration_checked) return reject(OperationalAdmissionStatus::REJECT_CONFIGURATION_EVIDENCE);
   if (!evidence->collision_clearance_checked) return reject(OperationalAdmissionStatus::REJECT_COLLISION_EVIDENCE);

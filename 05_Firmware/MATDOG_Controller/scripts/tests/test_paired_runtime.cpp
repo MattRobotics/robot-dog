@@ -48,6 +48,10 @@ void sessionLifecycle(){
  for(unsigned i=0;i<24;++i){r.fresh(++now);session.update(e,r.facts,r.feedback,now);}
  CHECK(r.backend.writes.size()==12&&r.backend.torque_calls==12);
  for(auto& on:r.feedback.torque_on)on=true;
+ r.facts.prime_profiles_verified=false;
+ r.fresh(++now);session.update(e,r.facts,r.feedback,now);
+ CHECK(session.state()==MotionSessionState::ARMING&&!r.executor.active());
+ r.facts.prime_profiles_verified=true;
  r.fresh(++now);session.update(e,r.facts,r.feedback,now);
  CHECK(session.state()==MotionSessionState::ARMED&&r.executor.active());r.facts.lease=session.lease();
  MotionCoordinator coordinator;coordinator.begin(&r.executor,&r.policy);coordinator.bindSession(&session);

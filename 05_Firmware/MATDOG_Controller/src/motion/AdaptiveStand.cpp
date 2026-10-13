@@ -41,6 +41,7 @@ bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
 bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& p,double now){
   state_=AdaptiveStandState::IDLE;poseClass_=ObservedPoseClass::UNKNOWN;reason_=FeedbackReason::NOT_REQUESTED;
   previous_={};segmentStart_={};pending_=FeedbackFrame{};assessment_={};pendingValid_=assessed_=physicalReady_=false;
+  entry_progress_=0;approvedSegment_=entry_knot_=UINT16_MAX;for(auto& q:entry_offset_)q={};
   route_.count=0;route_.pairedProne=false;pairedSegment_=0;routeIndex_=0;segmentIndex_=segmentIntervals_=0;
   policy_=p;request_=r;lastNow_=now;verifySince_=now;sequence_=r.firstSequence;
   if(!validFeedbackPolicy(p)){reject(FeedbackReason::INVALID_POLICY);return false;}
@@ -56,7 +57,7 @@ bool AdaptiveStand::assess(const SegmentAssessment& a,double now){
   auto r=checkAssessment(a,pending_.target.sequence,policy_,now);
   if(r!=FeedbackReason::OK){reject(r);return false;}
   assessment_=a;assessed_=true;pending_.executable=true;
-  pending_.physicalReadiness=policy_.mode==FeedbackMode::PHYSICAL_REVIEW&&a.loadedTrackingQualified;
+  pending_.physicalReadiness=policy_.mode==FeedbackMode::FIXTURE_REVIEW?a.fixtureTrialEnvelopeReviewed:policy_.mode==FeedbackMode::PHYSICAL_REVIEW&&a.loadedTrackingQualified;
   return true;
 }
 bool AdaptiveStand::beginSegment(const AcquisitionWaypoint& e){
@@ -76,18 +77,28 @@ bool AdaptiveStand::beginPairedSegment(){
   const AdaptiveStandState states[]={AdaptiveStandState::PRE_ALIGN,AdaptiveStandState::REAR_DEPLOY,
     AdaptiveStandState::FRONT_DEPLOY,AdaptiveStandState::LOAD_TRANSFER,AdaptiveStandState::PAIRED_RISE};
   state_=states[static_cast<unsigned>(pairedPronePhase(pairedSegment_))];
-  endpoint_.durationS=pairedProneDuration(pairedSegment_);
+  endpoint_.durationS=pairedProneDuration(pairedSegment_)*route_.timeScale;
+  if(!std::isfinite(route_.timeScale)||route_.timeScale<1)return false;
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS);
   if(n<1||n>1000000)return false;
   segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
 }
 FeedbackFrame AdaptiveStand::generate(double now){
   if(route_.pairedProne){
-    auto f=pairedProneSample(pairedSegment_,static_cast<double>(segmentIndex_+1)/segmentIntervals_);
+    auto f=pairedProneSample(pairedSegment_,static_cast<double>(segmentIndex_+1)/segmentIntervals_,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
+    for(unsigned i=0;i<4;++i){auto& v=f.velocityRadS[i];v={v.hip/route_.timeScale,v.upper/route_.timeScale,v.lower/route_.timeScale};auto& a=f.accelerationRadS2[i];const double s=route_.timeScale*route_.timeScale;a={a.hip/s,a.upper/s,a.lower/s};}
+    if(policy_.mode==FeedbackMode::FIXTURE_REVIEW&&pairedSegment_==entry_knot_){
+      const auto law=quinticTimeLaw(static_cast<double>(segmentIndex_+1)/segmentIntervals_,endpoint_.durationS);
+      for(unsigned i=0;i<4;++i){const auto d=entry_offset_[i];auto& q=f.target.legs[i];auto& v=f.velocityRadS[i];auto& a=f.accelerationRadS2[i];
+        q={q.hip+d.hip*(1-law.progress),q.upper+d.upper*(1-law.progress),q.lower+d.lower*(1-law.progress)};
+        v={v.hip-d.hip*law.velocity,v.upper-d.upper*law.velocity,v.lower-d.lower*law.velocity};
+        a={a.hip-d.hip*law.acceleration,a.upper-d.upper*law.acceleration,a.lower-d.lower*law.acceleration};}
+    }
     auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
     if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
     pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
     pending_.bellySupportRequired=static_cast<unsigned>(pairedPronePhase(pairedSegment_))<3;
+    if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
     pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
   }
   const double u=static_cast<double>(segmentIndex_+1)/segmentIntervals_;
@@ -159,7 +170,11 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
     if(route_.pairedProne){
       if(request_.targetHeightM!=.150||!route_.geometryIdentityVerified||route_.source==EvidenceSource::UNKNOWN||
         (policy_.mode==FeedbackMode::PHYSICAL_REVIEW&&route_.source!=EvidenceSource::EXTERNAL_MEASURED&&route_.source!=EvidenceSource::OFFLINE_CERTIFIED))return reject(FeedbackReason::ROUTE_REQUIRED);
-      const int knot=pairedProneMatch(o,policy_);if(knot<0)return reject(FeedbackReason::ROUTE_MISMATCH);
+      const auto cursor=pairedProneCursor(o,policy_);
+      const int knot=policy_.mode==FeedbackMode::FIXTURE_REVIEW&&policy_.routeTubeReviewed?cursor.segment:pairedProneMatch(o,policy_);if(knot<0)return reject(FeedbackReason::ROUTE_MISMATCH);
+      entry_knot_=knot;entry_progress_=policy_.mode==FeedbackMode::FIXTURE_REVIEW?cursor.progress:0;
+      const auto nominal=pairedProneSample(knot==static_cast<int>(kPairedProneSegments)?knot-1:knot,knot==static_cast<int>(kPairedProneSegments)?1:0,policy_.fixtureLimitVariant,entry_progress_);
+      for(unsigned i=0;i<4;++i){const auto x=o.actual.legs[i],y=nominal.target.legs[i];entry_offset_[i]={x.hip-y.hip,x.upper-y.upper,x.lower-y.lower};}
       poseClass_=knot==0?ObservedPoseClass::BELLY_FOLDED:ObservedPoseClass::PARTIAL_SUPPORT;
       if(knot==static_cast<int>(kPairedProneSegments)){state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
       else {pairedSegment_=static_cast<uint16_t>(knot);if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}
@@ -186,18 +201,19 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
   }
   if(state_==AdaptiveStandState::VERIFY_STAND||state_==AdaptiveStandState::STAND){
     FeedbackFrame f;
-    if(o.confirmedFeet!=15||o.bellySupported||!o.stationary||std::abs(o.body.translationM.z-request_.targetHeightM)>policy_.heightToleranceM){
+    if((policy_.mode==FeedbackMode::FIXTURE_REVIEW?!o.externalSupportConfirmed:(o.confirmedFeet!=15||o.bellySupported))||!o.stationary||(policy_.mode!=FeedbackMode::FIXTURE_REVIEW&&std::abs(o.body.translationM.z-request_.targetHeightM)>policy_.heightToleranceM)){
       if(state_==AdaptiveStandState::STAND)return reject(o.confirmedFeet!=15||o.bellySupported?FeedbackReason::SUPPORT_INVALID:FeedbackReason::TRACKING_ERROR);
       if(now-verifySince_>policy_.segmentTimeoutS)return reject(FeedbackReason::SEGMENT_TIMEOUT);
       f.reason=FeedbackReason::VERIFY_PENDING;reason_=f.reason;return f;
     }
-    for(unsigned i=0;i<4;++i){auto fk=contactForwardKinematics(static_cast<LegId>(i),o.actual.legs[i]);Vector3 world;
+    for(unsigned i=0;i<4&&policy_.mode!=FeedbackMode::FIXTURE_REVIEW;++i){auto fk=contactForwardKinematics(static_cast<LegId>(i),o.actual.legs[i]);Vector3 world;
       if(fk.status!=ContactStatus::OK||fk.support!=SupportMode::NOMINAL_STRIP||!pointToWorld(o.body,fk.referenceM,world)||std::abs(world.z)>policy_.contactToleranceM)return reject(FeedbackReason::SUPPORT_INVALID);}
     state_=AdaptiveStandState::STAND;reason_=FeedbackReason::OK;f.reason=reason_;f.body=o.body;
     // Nominal confirmation emits NO actuator frame. Existing pose is held by its owner.
     f.physicalReadiness=physicalReady_;return f;
   }
   if(endpoint_.externalSupportRequired&&!o.externalSupportConfirmed)return reject(FeedbackReason::SUPPORT_INVALID);
+  if(route_.pairedProne&&route_.supervisedSegments&&approvedSegment_!=pairedSegment_){FeedbackFrame f;f.reason=FeedbackReason::ASSESSMENT_REQUIRED;return f;}
   return generate(now);
 }
 } }

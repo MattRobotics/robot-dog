@@ -81,6 +81,7 @@ struct Rig {
     facts.mode = OperatingMode::RUN;
     facts.calibration_accepted = facts.envelopes_approved = facts.hardware_qualified = true;
     facts.operator_permit = facts.bms_ok = facts.power_ok = facts.sequential_bus_qualified = true;
+    facts.prime_profiles_verified=true; // explicit synthetic register readbacks
     facts.permit_generation = 1; facts.permit_expires_at_ms = 10000;
     envelope.approved = true; envelope.max_velocity_rad_s = 1;
     envelope.max_acceleration_rad_s2 = 10; envelope.tracking_tolerance_rad = .02;
@@ -110,6 +111,7 @@ struct Rig {
 MotionReadiness ready() {
   MotionReadiness r; r.calibration_restored = r.calibration_accepted = r.limits_approved = true;
   r.hardware_approved = r.operational_permit = r.support_observable = true;
+  r.walk_qualified=true;r.max_vx=.03;r.max_vy=.02;r.max_yaw_rate=.15;
   r.power_ok = r.bms_ok = r.authority_live = true; r.mode = OperatingMode::RUN;
   return r;
 }

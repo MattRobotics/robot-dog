@@ -22,3 +22,7 @@ nessun endpoint di rete deve ottenere authority attuatori. Progetto, review e
 prove isolamento/recovery richiesti prima della nuova funzione. Nessuna patch
 LAN introdotta con questo ADR. Residui e handoff restano nei rispettivi documenti,
 senza una seconda matrice di validazione.
+
+## Implementazione autorizzata 2026-10-13, PR #47
+
+La decisione storica sopra resta riferita al closeout b08322d. La richiesta esplicita del proprietario autorizza ora la LAN MAINTENANCE read-only: un ruolo RAM separato, cinque GET ammessi server-side, nessun login/config/OTA/attuatore, listener vincolato a socket locale e generazione radio. ADMIN_AP WPA2 esclusivo su 192.168.4.1; RUN_STA TLS/autenticato separato, senza grant Motion dalla Web UI. Transizioni revocano listener/sessioni e permit, recovery AP e STA_STOP preservati; nessun AP+STA introdotto. Stato hardware ancora non verificato. Fonti e prove: [report finale](../Validation_Reports/Final_Release_Candidate_2026-10-13/README.md).

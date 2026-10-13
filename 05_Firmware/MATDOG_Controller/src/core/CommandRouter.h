@@ -149,6 +149,8 @@ class CommandRouter {
     const servo::SafeOffResult* first_motion_safe_off_result;
     calibration::StartupRecoveryQualification* startup_qualification=nullptr;
     calibration::CalibrationRuntimeRestore* runtime_restore=nullptr;
+    void* validation_context=nullptr;
+    bool (*validation_command)(void*,const char*,uint32_t,char*,size_t)=nullptr;
   };
 
   void begin(const Modules& modules);
@@ -281,7 +283,7 @@ class CommandRouter {
   // Sequence of an @WIFI AP VERIFY whose worker result is still to be printed.
   uint32_t wifi_verify_pending_seq_ = 0;
 
-  static constexpr size_t kLineBufSize = 96;
+  static constexpr size_t kLineBufSize = 320;
   // LF ends a line; CR is ignored for compatibility. The first framing error
   // discards the whole line, across update() calls, until the next LF.
   enum class LineError : uint8_t { NONE, OVERFLOW, NUL };

@@ -1,0 +1,1452 @@
+{
+  "schema": "MATDOG_TRACKING_TUBE_V1",
+  "route_sha256": "f86ad336ffdaa1bf287f54d8a1a233494bf935156439610fd35ebc25bed411f2",
+  "tube_rad": 0.002,
+  "first_knot": 114,
+  "last_knot": 251,
+  "limits_approved": false,
+  "hardware_qualified": false,
+  "segments": [
+    {
+      "segment": 114,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999992
+      }
+    },
+    {
+      "segment": 115,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 116,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999992
+      }
+    },
+    {
+      "segment": 117,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 118,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 119,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00335215865909891
+      }
+    },
+    {
+      "segment": 120,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.004160451984693919
+      }
+    },
+    {
+      "segment": 121,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0050099124634066135
+      }
+    },
+    {
+      "segment": 122,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 123,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 124,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 125,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 126,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 127,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 128,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999992
+      }
+    },
+    {
+      "segment": 129,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 130,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 131,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 132,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 133,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00301
+      }
+    },
+    {
+      "segment": 134,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.003287517890091499
+      }
+    },
+    {
+      "segment": 135,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0037194485468765113
+      }
+    },
+    {
+      "segment": 136,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.004147376199108287
+      }
+    },
+    {
+      "segment": 137,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.004569426162141843
+      }
+    },
+    {
+      "segment": 138,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.004978570360526548
+      }
+    },
+    {
+      "segment": 139,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.005378641270887611
+      }
+    },
+    {
+      "segment": 140,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.005769183491738744
+      }
+    },
+    {
+      "segment": 141,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00614772734846053
+      }
+    },
+    {
+      "segment": 142,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0065114809804163905
+      }
+    },
+    {
+      "segment": 143,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.006860327846995036
+      }
+    },
+    {
+      "segment": 144,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007192805471134607
+      }
+    },
+    {
+      "segment": 145,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007503358305916245
+      }
+    },
+    {
+      "segment": 146,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007793441024295356
+      }
+    },
+    {
+      "segment": 147,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970601398043016
+      }
+    },
+    {
+      "segment": 148,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970763373270538
+      }
+    },
+    {
+      "segment": 149,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970923889811778
+      }
+    },
+    {
+      "segment": 150,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971081078260271
+      }
+    },
+    {
+      "segment": 151,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971232961587867
+      }
+    },
+    {
+      "segment": 152,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971377460371763
+      }
+    },
+    {
+      "segment": 153,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00797151239812386
+      }
+    },
+    {
+      "segment": 154,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971635506381837
+      }
+    },
+    {
+      "segment": 155,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00797174442920564
+      }
+    },
+    {
+      "segment": 156,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971836726723282
+      }
+    },
+    {
+      "segment": 157,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971909877382659
+      }
+    },
+    {
+      "segment": 158,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00797196127857399
+      }
+    },
+    {
+      "segment": 159,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971988245351676
+      }
+    },
+    {
+      "segment": 160,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00797195718852687
+      }
+    },
+    {
+      "segment": 161,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971753807981298
+      }
+    },
+    {
+      "segment": 162,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971376512710217
+      }
+    },
+    {
+      "segment": 163,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970856835693076
+      }
+    },
+    {
+      "segment": 164,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970225768586574
+      }
+    },
+    {
+      "segment": 165,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007969513611298155
+      }
+    },
+    {
+      "segment": 166,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796875488914333
+      }
+    },
+    {
+      "segment": 167,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007967974835294926
+      }
+    },
+    {
+      "segment": 168,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007967189434777915
+      }
+    },
+    {
+      "segment": 169,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007966427297951377
+      }
+    },
+    {
+      "segment": 170,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007965707793254319
+      }
+    },
+    {
+      "segment": 171,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007965051769458796
+      }
+    },
+    {
+      "segment": 172,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796446405011892
+      }
+    },
+    {
+      "segment": 173,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963955855134007
+      }
+    },
+    {
+      "segment": 174,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963534730515857
+      }
+    },
+    {
+      "segment": 175,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963204198789757
+      }
+    },
+    {
+      "segment": 176,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007962958951353176
+      }
+    },
+    {
+      "segment": 177,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007962803773003978
+      }
+    },
+    {
+      "segment": 178,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007962737017395465
+      }
+    },
+    {
+      "segment": 179,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007962756166224112
+      }
+    },
+    {
+      "segment": 180,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007962858109546507
+      }
+    },
+    {
+      "segment": 181,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963039326163511
+      }
+    },
+    {
+      "segment": 182,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963298102591894
+      }
+    },
+    {
+      "segment": 183,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007963624658689543
+      }
+    },
+    {
+      "segment": 184,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964017985176187
+      }
+    },
+    {
+      "segment": 185,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964473126474962
+      }
+    },
+    {
+      "segment": 186,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964985473229678
+      }
+    },
+    {
+      "segment": 187,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007965547663314719
+      }
+    },
+    {
+      "segment": 188,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007966150334135412
+      }
+    },
+    {
+      "segment": 189,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007966785694591298
+      }
+    },
+    {
+      "segment": 190,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007967443572440398
+      }
+    },
+    {
+      "segment": 191,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007968112360417952
+      }
+    },
+    {
+      "segment": 192,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007968778948584825
+      }
+    },
+    {
+      "segment": 193,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007969428694587243
+      }
+    },
+    {
+      "segment": 194,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970045427194684
+      }
+    },
+    {
+      "segment": 195,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970611474425161
+      }
+    },
+    {
+      "segment": 196,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971107705069251
+      }
+    },
+    {
+      "segment": 197,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971513572301046
+      }
+    },
+    {
+      "segment": 198,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971807150754691
+      }
+    },
+    {
+      "segment": 199,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971965163716961
+      }
+    },
+    {
+      "segment": 200,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971978588351004
+      }
+    },
+    {
+      "segment": 201,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971896199020466
+      }
+    },
+    {
+      "segment": 202,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971740732760836
+      }
+    },
+    {
+      "segment": 203,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971521970183255
+      }
+    },
+    {
+      "segment": 204,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007971249275891802
+      }
+    },
+    {
+      "segment": 205,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00797093159402925
+      }
+    },
+    {
+      "segment": 206,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970577438587471
+      }
+    },
+    {
+      "segment": 207,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007970194879091431
+      }
+    },
+    {
+      "segment": 208,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007969791523111218
+      }
+    },
+    {
+      "segment": 209,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007969374497724148
+      }
+    },
+    {
+      "segment": 210,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007968950432426049
+      }
+    },
+    {
+      "segment": 211,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796852544601543
+      }
+    },
+    {
+      "segment": 212,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007968105139687688
+      }
+    },
+    {
+      "segment": 213,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007967694598016557
+      }
+    },
+    {
+      "segment": 214,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796729839877549
+      }
+    },
+    {
+      "segment": 215,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999992
+      }
+    },
+    {
+      "segment": 216,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 217,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 218,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 219,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.0030099999999999997
+      }
+    },
+    {
+      "segment": 220,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.003006798409729389
+      }
+    },
+    {
+      "segment": 221,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.004396836950308101
+      }
+    },
+    {
+      "segment": 222,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.005828599468806289
+      }
+    },
+    {
+      "segment": 223,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007293726840771442
+      }
+    },
+    {
+      "segment": 224,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964842805776189
+      }
+    },
+    {
+      "segment": 225,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796479960563632
+      }
+    },
+    {
+      "segment": 226,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964800950499125
+      }
+    },
+    {
+      "segment": 227,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007964835297639646
+      }
+    },
+    {
+      "segment": 228,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.00796491241672597
+      }
+    },
+    {
+      "segment": 229,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.007982246170421769
+      }
+    },
+    {
+      "segment": 230,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.008207915788344964
+      }
+    },
+    {
+      "segment": 231,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.008663466470805879
+      }
+    },
+    {
+      "segment": 232,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.009291867848688512
+      }
+    },
+    {
+      "segment": 233,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.010041325926148661
+      }
+    },
+    {
+      "segment": 234,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.010865568671262359
+      }
+    },
+    {
+      "segment": 235,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.011728328172678831
+      }
+    },
+    {
+      "segment": 236,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.01259743117156117
+      }
+    },
+    {
+      "segment": 237,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013449874816497485
+      }
+    },
+    {
+      "segment": 238,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485129471939854
+      }
+    },
+    {
+      "segment": 239,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.01348524582771602
+      }
+    },
+    {
+      "segment": 240,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485368442306155
+      }
+    },
+    {
+      "segment": 241,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485496397129891
+      }
+    },
+    {
+      "segment": 242,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485622641867513
+      }
+    },
+    {
+      "segment": 243,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485746384611079
+      }
+    },
+    {
+      "segment": 244,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.01348586372926152
+      }
+    },
+    {
+      "segment": 245,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013485970689879813
+      }
+    },
+    {
+      "segment": 246,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013486063697272628
+      }
+    },
+    {
+      "segment": 247,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.01348613892593064
+      }
+    },
+    {
+      "segment": 248,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013486192627469827
+      }
+    },
+    {
+      "segment": 249,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013486221138685549
+      }
+    },
+    {
+      "segment": 250,
+      "pass_": true,
+      "certificate": {
+        "pairs": 120,
+        "leaves": 1,
+        "minimum_swept_separation_lower_bound_m": 0.013486226091971663
+      }
+    }
+  ],
+  "adjacent": [
+    {
+      "joint": "lf_hip_joint",
+      "domain_rad": [
+        -0.002,
+        0.002
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "lf_hip_link"
+      ],
+      "checks": 276431,
+      "candidates": 276431,
+      "minimum_projection_bound_m": 0.00010000020497219433,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lf_upper_leg_joint",
+      "domain_rad": [
+        0.4078757733501,
+        1.3512359740557391
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lf_hip_link",
+        "lf_upper_leg_link"
+      ],
+      "checks": 357630,
+      "candidates": 336150,
+      "minimum_projection_bound_m": 9.781467177234177e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lf_lower_leg_joint",
+      "domain_rad": [
+        -1.55247039768864,
+        0.35157295253198556
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lf_upper_leg_link",
+        "lf_lower_leg_link"
+      ],
+      "checks": 1472818,
+      "candidates": 1276202,
+      "minimum_projection_bound_m": 1.0823560948485253e-09,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_hip_joint",
+      "domain_rad": [
+        -0.002,
+        0.002
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "rf_hip_link"
+      ],
+      "checks": 267919,
+      "candidates": 267919,
+      "minimum_projection_bound_m": 0.00010000020497219433,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_upper_leg_joint",
+      "domain_rad": [
+        0.4078757733501,
+        1.3512359740557391
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rf_hip_link",
+        "rf_upper_leg_link"
+      ],
+      "checks": 353800,
+      "candidates": 334670,
+      "minimum_projection_bound_m": 9.781467177234177e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rf_lower_leg_joint",
+      "domain_rad": [
+        -1.55247039768864,
+        0.35157295253198556
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rf_upper_leg_link",
+        "rf_lower_leg_link"
+      ],
+      "checks": 1468573,
+      "candidates": 1276611,
+      "minimum_projection_bound_m": 3.033501817655787e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_hip_joint",
+      "domain_rad": [
+        -0.002,
+        0.002
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "rh_hip_link"
+      ],
+      "checks": 291643,
+      "candidates": 291643,
+      "minimum_projection_bound_m": 0.00010000079215929883,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_upper_leg_joint",
+      "domain_rad": [
+        0.8963379778627721,
+        2.0261522884833676
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rh_hip_link",
+        "rh_upper_leg_link"
+      ],
+      "checks": 566600,
+      "candidates": 523532,
+      "minimum_projection_bound_m": 1.0762462278491758e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "rh_lower_leg_joint",
+      "domain_rad": [
+        -1.3008461272211382,
+        0.0027756156372446272
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "rh_upper_leg_link",
+        "rh_lower_leg_link"
+      ],
+      "checks": 836514,
+      "candidates": 804610,
+      "minimum_projection_bound_m": 1.6874908541994572e-07,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_hip_joint",
+      "domain_rad": [
+        -0.002,
+        0.002
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "base_link",
+        "lh_hip_link"
+      ],
+      "checks": 303850,
+      "candidates": 303850,
+      "minimum_projection_bound_m": 0.00010000078898694756,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_upper_leg_joint",
+      "domain_rad": [
+        0.8963379778627721,
+        2.0261522884833676
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lh_hip_link",
+        "lh_upper_leg_link"
+      ],
+      "checks": 573536,
+      "candidates": 526832,
+      "minimum_projection_bound_m": 1.0762462278491758e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    },
+    {
+      "joint": "lh_lower_leg_joint",
+      "domain_rad": [
+        -1.3008461272211382,
+        0.0027756156372446272
+      ],
+      "status": "PASS_CONTINUOUS",
+      "pair": [
+        "lh_upper_leg_link",
+        "lh_lower_leg_link"
+      ],
+      "checks": 838740,
+      "candidates": 806454,
+      "minimum_projection_bound_m": 3.03788566450035e-08,
+      "excluded_triangles": 0,
+      "intentional_intersections_assumed": false
+    }
+  ],
+  "status": "PASS_GEOMETRY_TUBE",
+  "scope": "Frozen suffix, rigid self-clearance >=3mm, independent +/-joint tube; ground/fixture/load, limits and bus tracking require separate evidence"
+}

@@ -11,6 +11,8 @@ import re
 SRC = Path(__file__).resolve().parents[2] / "src"
 REQUIRED = {
     "config/BuildConfig.h": ("constexpr bool kOperationalMotionAuthorized = false;",),
+    "execution/ValidationProfile.cpp": ("!open_||sealed_", "!record_||!route_", "CONFIRM_INSTALLATION_WORKSPACE_MARGIN_SWEEP_TRACKING_TIMING_OUTPUT", "update::digestsEqual", "drive_speed*speed_scale*runtime.execution.feedback_max_age_ms/1000", "CONFIRM"),
+    "core/LocalValidation.cpp": ("LOCAL_COMMAND_CLOCK_STALE", "REVIEWED_RECORD_DIGEST_MISMATCH", "BOOT_SAFE_OFF_PENDING", "CONFIRM_CURRENT_INSTALLATION_AND_REVIEWED_PROFILE", "now-validation_presence_ms_>1000", "CURRENT_ACKNOWLEDGED_RECORD_REQUIRED", "CONFIRM_MEASURED_POSE_AND_BEARING_SUPPORT", "!fixture(reviewed_motion_.scope)"),
     "core/Controller.h": ("bool reviewed_motion_bound_=false;", "execution::LocalTrialEvidence local_trial_evidence_{};",),
     "execution/MotionSession.cpp": ("if(!image)", "WALK_DYNAMICS_REQUIRED", "FIXTURE_SUPPORT_REQUIRED", "PRIME_REQUIRES_OFF_AND_LIMITS", "policy_->plan(", "runtime_->execute(",),
     "core/Controller.cpp": (
@@ -27,7 +29,7 @@ REQUIRED = {
     "execution/MotionCoordinator.cpp": (
         "arm_generation_==executor_->status().arm_generation",
         "submitted_sequence_=0;assessment_={};frame_=motion::FeedbackFrame{};walking_=false;",
-        "feedback_policy_.mode!=motion::FeedbackMode::PHYSICAL_REVIEW||!frame_.physicalReadiness",
+        "feedback_policy_.mode==motion::FeedbackMode::SIMULATION||!frame_.physicalReadiness",
         "o.acknowledgedSequence=executor_->status().completed_sequence",
     ),
     "execution/MotionExecutor.cpp": (
@@ -44,7 +46,7 @@ REQUIRED = {
         "if(active_intent_==motion::Intent::STOP)", "SAFE_OFF_VERIFIED",
     ),
     "network/HttpTransport.cpp": (
-        "!socketFacts(req,r) || !self->admitMotion(r)", "req->content_len>1024",
+        "!socketFacts(req,r)||(!self->admitReadOnly(r)&&!self->admitMotion(r))", "req->content_len>1024",
         "r.motion_command.owner!=motion::ClientOwner::DASHBOARD",
         "req.peer,req.cookie,req.csrf))",
         "service_->motionCommand(req.motion_command,now_ms)",

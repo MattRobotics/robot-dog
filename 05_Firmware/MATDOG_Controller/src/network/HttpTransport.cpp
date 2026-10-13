@@ -1,4 +1,5 @@
 #include "HttpTransport.h"
+#include "NetworkPublicView.h"
 
 #include <esp_heap_caps.h>
 #include <esp_https_server.h>
@@ -318,7 +319,7 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
   if (request.kind >= HttpRequestKind::WIFI_STATUS &&
-      !(request.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(request)) && !readOnlyAdmitted(request) &&
+      !((request.kind>=HttpRequestKind::MOTION_STATUS||request.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(request)) && !readOnlyAdmitted(request) &&
       (!service_->networkAdminAccess().allowed(request.admin_generation) ||
        !WifiManager::verifyAdminRadio())) {
     xSemaphoreGive(slot_free_); return false;
@@ -397,7 +398,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   auto &gate = service_->networkAdminAccess();
   const bool readonly=readOnlyAdmitted(req);
   if(req.kind>=HttpRequestKind::OTA_CHALLENGE&&req.kind<=HttpRequestKind::OTA_ABORT&&static_cast<RoleReason>(service_->wifiStatus().role_reason)==RoleReason::MAINTENANCE_STA_READONLY){resp.message="OTA_DENIED_MAINTENANCE_LAN";return;}
-  const bool sta_motion=req.kind>=HttpRequestKind::MOTION_STATUS&&motionStaAdmitted(req);
+  const bool sta_motion=(req.kind>=HttpRequestKind::MOTION_STATUS||req.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(req);
   const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
   AdminLease lease(gate);
   if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
@@ -499,10 +500,12 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
 
   case HttpRequestKind::MOTION_STATUS:
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
+    if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
     resp.message=resp.ok?"OK":"MOTION_STATUS_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(resp.text):0;break;
   case HttpRequestKind::MOTION_CAPABILITIES:
     resp.ok=service_->motionCapabilities(motion_capabilities_,sizeof(motion_capabilities_));
+    if(resp.ok&&readonly){const size_t n=strlen(motion_capabilities_);if(n&&n+28<sizeof(motion_capabilities_))strcpy(motion_capabilities_+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
     resp.message=resp.ok?"OK":"MOTION_CAPABILITIES_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(motion_capabilities_):0;break;
   case HttpRequestKind::MOTION_COMMAND: {
@@ -518,7 +521,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     resp.text_len=resp.ok?strlen(resp.text):0;break;
   }
   case HttpRequestKind::WIFI_STATUS: {
-    wifiResponse(resp);
+    wifiResponse(resp,readonly||sta_motion||!portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie));
     break;
   }
   case HttpRequestKind::MOTION_LOGIN:
@@ -944,8 +947,11 @@ esp_err_t HttpTransport::handleOtaUpdate(httpd_req_t *req) {
   return httpd_resp_sendstr(req, finish_resp.message);
 }
 
-void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
-  const auto &w = service_->wifiStatus();
+void HttpTransport::wifiResponse(HttpTransportResponse &resp,bool redact_network_names) {
+  auto w = service_->wifiStatus();
+  const bool readonly=static_cast<RoleReason>(w.role_reason)==RoleReason::MAINTENANCE_STA_READONLY;
+  if(redact_network_names)redactNetworkNames(w);
+
   char ip[16], ssid[67], bssid[37], ap[67], test_ip[16], test_ssid[67];
   formatIpv4(w.sta_test.ipv4, test_ip, 16);
   jsonString(w.sta_test.ssid, test_ssid, sizeof(test_ssid));
@@ -1066,7 +1072,7 @@ void HttpTransport::wifiResponse(HttpTransportResponse &resp) {
     }
     used += n;
   }
-  n = snprintf(resp.text + used, sizeof(resp.text) - used, "]}");
+  n = snprintf(resp.text + used, sizeof(resp.text) - used, "],\"read_only\":%s}",readonly?"true":"false");
   if (n < 0 || static_cast<size_t>(n) >= sizeof(resp.text) - used) {
     resp.message = "STATUS_OVERFLOW";
     return;
@@ -1144,7 +1150,7 @@ esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   const bool motion_auth=!strcmp(req->uri,"/api/motion/login")||!strcmp(req->uri,"/api/motion/session")||!strcmp(req->uri,"/api/motion/logout");
   const bool ro=req->method==HTTP_GET&&!strcmp(req->uri,"/wifi/status");
   if(ro)r.kind=HttpRequestKind::WIFI_STATUS;
-  if(!(ro&&self->admitReadOnly(r)) && (motion_auth?!self->admitMotion(r):!self->admitAdmin(r)))
+  if(!(ro&&(self->admitReadOnly(r)||self->admitMotion(r))) && (motion_auth?!self->admitMotion(r):!self->admitAdmin(r)))
     return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_OR_MOTION_TLS_REQUIRED");
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;

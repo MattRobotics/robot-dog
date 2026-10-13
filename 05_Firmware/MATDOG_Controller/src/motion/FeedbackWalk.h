@@ -10,6 +10,10 @@ struct PlanarVelocityCommand {
 struct WalkSpecification {
   double periodS=0, rampDurationS=0, liftM=0, duty=0;
   double swayXM=0,standShiftDurationS=0;
+  bool firstStrideOnly=false; // explicit suspended one-cycle clock adapter, G4 unchanged
+  double firstStrideTimeScale=1,maxJointStepRad=0;
+  bool compiledFirstStride=false;
+  bool smoothStlReference=false; // C2 reference; requires separate bearing-contact qualification
   bool stlContactReference=false; // explicit qualification axis, not authority
   double maxVxMps=0, maxVyMps=0, maxYawRateRadS=0;
   double maxCommandTtlS=0;

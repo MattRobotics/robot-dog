@@ -1,4 +1,5 @@
 #include "Controller.h"
+#include <esp_random.h>
 
 #include <esp_ota_ops.h>
 #include <esp_system.h>
@@ -242,6 +243,11 @@ void Controller::begin() {
       &first_motion_safe_off_result_,
       &startup_qualification_,
       &runtime_restore_,
+  };
+  validation_nonce_=esp_random();if(!validation_nonce_)validation_nonce_=1;
+  modules.validation_context=this;
+  modules.validation_command=[](void* context,const char* line,uint32_t now,char* out,size_t size){
+    return static_cast<Controller*>(context)->localValidationCommand(line,now,out,size);
   };
   service_.begin(modules);
   service_.bindMotionService(&motion_service_);
@@ -956,8 +962,9 @@ bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntim
      r.max_servo_temperature_c<=0||r.max_servo_temperature_c>70||r.min_servo_voltage_dv<=0||
      r.max_servo_voltage_dv<=r.min_servo_voltage_dv)return false;
   if(r.scope!=execution::TrialScope::FIXTURE_MICRO){
-    if((r.scope!=execution::TrialScope::AUTONOMOUS_STAND&&r.scope!=execution::TrialScope::AUTONOMOUS_WALK)||
-       memcmp(r.route_sha256,motion::pairedProneDigest(),65)!=0||r.feedback.mode!=motion::FeedbackMode::PHYSICAL_REVIEW||
+    const bool fixture=r.scope==execution::TrialScope::SUPERVISED_FIXTURE_STAND||r.scope==execution::TrialScope::SUPERVISED_FIXTURE_WALK;
+    if((!fixture&&r.scope!=execution::TrialScope::AUTONOMOUS_STAND&&r.scope!=execution::TrialScope::AUTONOMOUS_WALK)||
+       memcmp(r.route_sha256,motion::pairedProneDigest(r.feedback.fixtureLimitVariant),65)!=0||r.feedback.mode!=(fixture?motion::FeedbackMode::FIXTURE_REVIEW:motion::FeedbackMode::PHYSICAL_REVIEW)||
        !motion::validFeedbackPolicy(r.feedback))return false;
   }
   for(unsigned i=0;i<12&&r.scope!=execution::TrialScope::FIXTURE_MICRO;++i){
@@ -975,6 +982,7 @@ bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntim
     }
   }
   if(r.scope!=execution::TrialScope::FIXTURE_MICRO){motion::AcquisitionRoute route;route.pairedProne=true;
+    route.supervisedSegments=true;route.timeScale=r.stand_time_scale;
     route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
     if(!motion_coordinator_.configure(r.feedback,r.walk,&route))return false;}
   reviewed_motion_=r;reviewed_motion_bound_=true;return true;
@@ -987,10 +995,10 @@ bool Controller::requestLocalMotionTrial(const execution::LocalTrialEvidence& e,
       motion::pairedProneMatch(local_motion_observation_,reviewed_motion_.feedback)<0))return false;
   operational_facts_.operator_permit=true;operational_facts_.permit_generation=generation;operational_facts_.permit_expires_at_ms=expires;
   local_trial_evidence_=e;
-  const bool bus=e.scope==execution::TrialScope::FIXTURE_MICRO?reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified;
+  const bool bus=(e.scope==execution::TrialScope::FIXTURE_MICRO||e.scope==execution::TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==execution::TrialScope::SUPERVISED_FIXTURE_WALK)?reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified;
   operational_facts_.hardware_qualified=operational_facts_.hardware_qualified&&bus;
   operational_facts_.sequential_bus_qualified=operational_facts_.hardware_qualified;
-  const bool ok=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,build::kOperationalMotionAuthorized,now);
+  const bool ok=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,(build::kOperationalMotionAuthorized||(build::kSupervisedValidationCapable&&validation_profile_.sealed()&&validation_present_&&now-validation_presence_ms_<=1000&&e.scope==validation_profile_.runtime.scope)),now);
   if(!ok)operational_facts_.operator_permit=false;
   return ok;
 }
@@ -1011,6 +1019,26 @@ bool Controller::requestLocalFixtureMicro(unsigned joint,double delta,double dur
   return operational_session_.requestFixtureMicro(joint,delta,duration,path,operational_facts_,operational_feedback_,millis());
 }
 void Controller::updateOperationalMotion(uint32_t now_ms) {
+  // Boot de-escalation covers every installed servo including the auxiliary.
+  // Never prime/energize before all OFF readbacks have succeeded. Retry failures.
+  if(build::kServoPowerAvailable&&boot_safe_off_pending_){
+    const auto* s=&servo::kCanonicalServos[boot_safe_off_next_];
+    if(s->current_config!=servo::CurrentConfig::INSTALLED){boot_safe_off_mask_|=1u<<boot_safe_off_next_;}
+    if(s->current_config==servo::CurrentConfig::INSTALLED&&servo_bus_.safeOff(s->bus_id)==servo::SafeOffResult::VERIFIED_OFF)boot_safe_off_mask_|=1u<<boot_safe_off_next_;
+    boot_safe_off_next_=(boot_safe_off_next_+1)%servo::kCanonicalServoCount;
+    if(boot_safe_off_mask_==((1u<<servo::kCanonicalServoCount)-1))boot_safe_off_pending_=false;
+    return;
+  }
+  if(validation_present_&&now_ms-validation_presence_ms_>1000){
+    validation_present_=false;validation_walk_admitted_=false;local_trial_evidence_.local_operator_present=false;
+    operational_session_.revoke("LOCAL_PRESENCE_DEADMAN_EXPIRED");
+  }
+  const auto& radio=wifi_.adminAccess();const uint32_t generation=radio.generation();
+  if((validation_radio_generation_&&validation_radio_generation_!=generation)||radio.closing.load()||radio.radio_fault.load()){
+    if(operational_session_.state()!=execution::MotionSessionState::OFF)operational_session_.revoke("RADIO_TRANSITION_REVOKED_LOCAL_SESSION");
+    operational_facts_.operator_permit=false;
+  }
+  validation_radio_generation_=generation;
   // Same cooperative Controller owns every ServoBus operation. Read only when
   // no calibration/discovery producer is using the bus; at most one ID/tick.
   // SAFE_OFF always precedes polling. 100 ms x two reads is still an OPEN WCET
@@ -1021,11 +1049,15 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
      (startup_qualification_.phase()==calibration::StartupQualificationPhase::IDLE||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::COMPLETE||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::REFUSED||
-      startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=20){
+      startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(validation_profile_.sealed()?2u:20u)){
     const unsigned slot=operational_poll_next_;
     const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
     servo::ServoBus::ControlFeedbackSnapshot t{};execution::RawJointObservation r;
-    r.read_ok=joint&&servo_bus_.readControlFeedback(joint->bus_id,&t);
+    const uint32_t read_started=millis();
+    r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs);
+    r.transaction_ms=millis()-read_started;r.torque_limit=t.torque_limit;r.goal_position=t.goal_position;
+    r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.goal_speed=t.goal_speed;r.goal_acceleration=t.goal_acceleration;
+    if(validation_profile_.sealed()&&r.transaction_ms>2*validation_profile_.transaction_timeout_ms+2)r.read_ok=false;
     r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
     r.torque=t.torque_enable;r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;
     r.sampled_at_ms=millis();
@@ -1033,7 +1065,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     operational_poll_next_=static_cast<uint8_t>((slot+1)%12);operational_poll_at_ms_=r.sampled_at_ms;
   }
   now_ms=millis(); // freshness uses completion time, never the pre-read clock
-  operational_feedback_=operational_producer_.snapshot(now_ms,500);
+  operational_feedback_=operational_producer_.snapshot(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   const auto& calibration = runtime_restore_.snapshot();
   MotionReadiness ready;
   ready.calibration_restored=calibration.restored;
@@ -1043,16 +1075,34 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // observation, prime/torque startup or bounded sequential bus timing.
   const auto imu=imu_.orientationSnapshot();
   bool scoped=reviewed_motion_bound_&&reviewed_motion_.calibration_generation==calibration.restored_generation&&
-      reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&imu.valid&&now_ms-imu.sampled_at_ms<=reviewed_motion_.max_imu_age_ms;
+      reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&!radio.closing.load()&&!radio.radio_fault.load()&&imu.valid&&now_ms-imu.sampled_at_ms<=reviewed_motion_.max_imu_age_ms;
+  bool prime_profiles=true;
   for(unsigned i=0;i<12;++i){const auto& raw=operational_producer_.raw(i);
     scoped=scoped&&raw.read_ok&&raw.temperature<=reviewed_motion_.max_servo_temperature_c&&
-      raw.voltage>=reviewed_motion_.min_servo_voltage_dv&&raw.voltage<=reviewed_motion_.max_servo_voltage_dv;}
-  ready.hardware_approved=scoped&&(local_trial_evidence_.scope==execution::TrialScope::FIXTURE_MICRO?
+      raw.voltage>=reviewed_motion_.min_servo_voltage_dv&&raw.voltage<=reviewed_motion_.max_servo_voltage_dv;
+    if(validation_profile_.sealed()){
+      scoped=scoped&&raw.torque_limit>=0&&raw.torque_limit<=validation_profile_.output_ceiling&&raw.speed>=0&&raw.speed<=validation_profile_.drive_speed;
+      prime_profiles=prime_profiles&&raw.goal_speed==validation_profile_.drive_speed&&raw.goal_acceleration==validation_profile_.drive_acceleration;
+      if(operational_session_.state()==execution::MotionSessionState::ARMED)
+        scoped=scoped&&raw.goal_speed==validation_profile_.drive_speed&&raw.goal_acceleration==validation_profile_.drive_acceleration;
+    }
+  }
+  operational_facts_.prime_profiles_verified=validation_profile_.sealed()&&prime_profiles;
+  ready.hardware_approved=scoped&&((local_trial_evidence_.scope==execution::TrialScope::FIXTURE_MICRO||reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW)?
     reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified);
+  if(validation_walk_admitted_){
+    const char* state=motion_coordinator_.state();
+    if(!strcmp(state,"WALK_STARTING")||!strcmp(state,"WALK")||!strcmp(state,"STOPPING"))validation_walk_started_=true;
+    else if(validation_walk_started_){validation_walk_admitted_=false;validation_walk_started_=false;}
+  }
+  ready.walk_qualified=reviewed_motion_bound_&&validation_walk_admitted_;
+  ready.first_stride_only=reviewed_motion_bound_&&reviewed_motion_.walk.firstStrideOnly;
+  ready.max_vx=reviewed_motion_.walk.maxVxMps;ready.max_vy=reviewed_motion_.walk.maxVyMps;ready.max_yaw_rate=reviewed_motion_.walk.maxYawRateRadS;
   ready.operational_permit=operational_facts_.operator_permit;
   auto observation=local_motion_observation_;observation.actual={};observation.actual.valid=true;
   for(unsigned i=0;i<12;++i)observation.actual.valid=observation.actual.valid&&operational_feedback_.read_ok[i];
   for(unsigned i=0;i<4;++i)observation.actual.legs[i]={operational_feedback_.actual_rad[i*3],operational_feedback_.actual_rad[i*3+1],operational_feedback_.actual_rad[i*3+2]};
+  for(unsigned i=0;i<12;++i)observation.stationary=observation.stationary&&operational_producer_.raw(i).speed==0;
   ready.support_observable=reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
     motion::checkObservation(observation,reviewed_motion_.feedback,now_ms/1000.0)==motion::FeedbackReason::OK;
   ready.local_fixture_session=operational_session_.state()==execution::MotionSessionState::ARMED&&
@@ -1072,6 +1122,12 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_facts_.hardware_qualified=ready.hardware_approved;
   operational_facts_.sequential_bus_qualified=ready.hardware_approved;
   local_trial_evidence_.imu_fresh=scoped;
+  local_trial_evidence_.local_operator_present=validation_present_&&now_ms-validation_presence_ms_<=1000;
+  local_trial_evidence_.support_load_observable=reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW&&ready.support_observable;
+  if(reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW){
+    local_trial_evidence_.local_operator_present=validation_present_&&now_ms-validation_presence_ms_<=1000;
+    local_trial_evidence_.fixture_support_verified=ready.support_observable;
+  }
   operational_facts_.bms_ok=ready.bms_ok;
   operational_facts_.power_ok=ready.power_ok;
   operational_facts_.fault=ready.fault;
@@ -1080,18 +1136,33 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
   if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);
+  if(validation_profile_.sealed()&&validation_present_&&
+     operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
+    const auto& frame=motion_coordinator_.frame();
+    if(frame.target.valid&&!frame.executable){
+      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=local_motion_observation_.stampS;
+      a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;a.geometryIdentityVerified=true;
+      a.sweptCollisionClear=a.continuousBoundsConfirmed=a.supportCompatible=true;
+      a.fixtureTrialEnvelopeReviewed=reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;
+      a.loadedTrackingQualified=reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW;
+      a.dynamicStabilityQualified=reviewed_motion_.scope==execution::TrialScope::AUTONOMOUS_WALK&&local_trial_evidence_.loaded_dynamics_qualified;
+      // These assertions consume the sealed, externally reviewed tube proof,
+      // not an encoder/IMU inference. No profile is distributed pre-approved.
+      publishLocalMotionAssessment(a);
+    }
+  }
   motion_executor_.update(operational_facts_,operational_feedback_,now_ms);
   ready.operational_permit=operational_facts_.operator_permit&&operational_session_.state()==execution::MotionSessionState::ARMED;
   // Terminal service results must use this tick's validated planner/executor.
   motion_service_.refresh(ready,now_ms);
-  MotionTelemetry telemetry;telemetry.session_state=operational_session_.stateName();telemetry.session_reason=operational_session_.reason();
+  MotionTelemetry telemetry;telemetry.validation_capable=build::kSupervisedValidationCapable;telemetry.fixture_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;telemetry.load_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW;telemetry.foot_load_proven=telemetry.load_scope&&ready.support_observable&&observation.confirmedFeet==15;telemetry.supervised_segment=motion_coordinator_.proneSegment();telemetry.session_profile_sha256=validation_profile_.sealed()?validation_profile_.workspace.artifact_sha256:"";telemetry.session_state=operational_session_.stateName();telemetry.session_reason=operational_session_.reason();
   const auto orientation=imu_.orientationSnapshot();
   telemetry.quaternion_valid=orientation.valid;
   telemetry.quaternion_at_ms=orientation.sampled_at_ms;
   telemetry.height_valid=ready.support_observable;
   if(telemetry.height_valid)telemetry.base_height_m=observation.body.translationM.z;
   for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
-  telemetry.joints_valid=true;telemetry.raw_valid=operational_producer_.rawFresh(now_ms,500);
+  telemetry.source="HARDWARE_SERVO_FEEDBACK";telemetry.joints_valid=true;telemetry.raw_valid=operational_producer_.rawFresh(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   telemetry.sampled_at_ms=now_ms;
   for(unsigned i=0;i<12;++i){
     telemetry.joints_valid=telemetry.joints_valid&&operational_feedback_.read_ok[i];

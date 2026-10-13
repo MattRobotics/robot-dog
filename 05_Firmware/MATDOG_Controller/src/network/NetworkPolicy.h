@@ -43,7 +43,8 @@ private:
 // One radio, one role at a time. The controller's operating mode decides it,
 // together with one stored fact: whether a router profile is enabled.
 //
-//   MAINTENANCE  -> ADMIN_AP, always. A stored router profile is not used; the
+//   MAINTENANCE  -> ADMIN_AP by default; explicit RAM-only LAN ON selects
+//                   one STA listener exposing only five read-only routes. The
 //                   only STA activity is the explicit, temporary "Prova e
 //                   salva" transaction, which returns to the AP by itself.
 //   RUN          -> CLIENT_STA when a router profile is enabled, else the

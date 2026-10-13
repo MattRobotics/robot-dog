@@ -2,7 +2,7 @@
 #define MATDOG_EXECUTION_MOTION_SESSION_H
 #include "MotionExecutor.h"
 namespace matdog { namespace execution {
-enum class TrialScope : uint8_t { FIXTURE_MICRO, AUTONOMOUS_STAND, AUTONOMOUS_WALK };
+enum class TrialScope : uint8_t { FIXTURE_MICRO, AUTONOMOUS_STAND, AUTONOMOUS_WALK, SUPERVISED_FIXTURE_STAND, SUPERVISED_FIXTURE_WALK };
 struct LocalTrialEvidence {
  TrialScope scope=TrialScope::FIXTURE_MICRO;
  uint32_t generation=0,expires_at_ms=0;

@@ -10,7 +10,7 @@ const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutio
  if(!policy_||!runtime_||!executor_||!arbiter_||!geometry_||!provenance_)return "NOT_BOUND";
  if(!e.generation||static_cast<int32_t>(now-e.expires_at_ms)>=0||!e.local_operator_present||!e.physical_power_cut_verified||
     !e.installation_verified||!e.servo_output_ceiling_verified||!e.imu_fresh)return "LOCAL_TRIAL_EVIDENCE_REQUIRED";
- if(e.scope==TrialScope::FIXTURE_MICRO){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
+ if(e.scope==TrialScope::FIXTURE_MICRO||e.scope==TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==TrialScope::SUPERVISED_FIXTURE_WALK){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
  else if(e.scope==TrialScope::AUTONOMOUS_STAND||e.scope==TrialScope::AUTONOMOUS_WALK){
    if(!e.support_load_observable)return "AUTONOMOUS_SUPPORT_LOAD_REQUIRED";
    if(e.scope==TrialScope::AUTONOMOUS_WALK&&!e.loaded_dynamics_qualified)return "WALK_DYNAMICS_REQUIRED";
@@ -102,6 +102,9 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
  if(now-started_at_ms_>=envelope_.batch_timeout_ms){revoke("PRIME_ARM_TIMEOUT");return;}
  for(unsigned i=0;i<12;++i)if(std::abs(fb.actual_rad[i]-primed_rad_[i])>envelope_.tracking_tolerance_rad){revoke("PRIME_DRIFT");return;}
  if(state_==MotionSessionState::ARMING){
+  // Old pre-prime snapshots cannot prove the holding drive profile. Wait
+  // within the admission deadline for all twelve post-energize readbacks.
+  if(!input.prime_profiles_verified)return;
   bool fresh=true;for(unsigned i=0;i<12;++i)fresh=fresh&&fb.torque_on[i]&&static_cast<int32_t>(fb.sampled_at_ms[i]-started_at_ms_)>0;
   if(!fresh)return;
   if(!executor_->arm(f,envelope_,fb,now)){revoke(executor_->status().reason);return;}

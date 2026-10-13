@@ -115,7 +115,7 @@ class HttpTransport {
  FakeService service; FakeService*service_=&service; PortalSession portal_;
  struct {bool sessionAuthenticated(){return false;}}session_;
  static esp_err_t handleWifi(httpd_req_t*);
- void wifiResponse(HttpTransportResponse&r){r.ok=true;strcpy(r.text,"{}");r.text_len=2;}
+ void wifiResponse(HttpTransportResponse&r,bool=false){r.ok=true;strcpy(r.text,"{}");r.text_len=2;}
  bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){
   HttpTransportResponse resp{};[[maybe_unused]] const uint32_t now_ms=static_cast<uint32_t>(clock_ms);
   switch(req.kind){

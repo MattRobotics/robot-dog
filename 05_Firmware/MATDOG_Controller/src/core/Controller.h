@@ -14,6 +14,7 @@
 #include "../execution/MotionCoordinator.h"
 #include "../execution/OperationalFeedback.h"
 #include "../execution/MotionSession.h"
+#include "../execution/ValidationProfile.h"
 #include "../execution/ReviewedMotionRuntime.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
@@ -61,6 +62,15 @@ class Controller {
  private:
   void printBootBanner();
   void updateOperationalMotion(uint32_t now_ms);
+  bool localValidationCommand(const char*,uint32_t,char*,size_t);
+  execution::ValidationProfile validation_profile_{};
+ calibration::CalibrationRecord validation_record_{};uint8_t validation_record_bytes_[calibration::kCalibrationRecordV1EncodedBytes]{};
+  uint32_t validation_radio_generation_=0;
+  uint32_t validation_nonce_=0,validation_presence_ms_=0,validation_sequence_=0;
+  bool validation_walk_admitted_=false,validation_walk_started_=false;
+  bool validation_present_=false,boot_safe_off_pending_=true;
+  uint32_t boot_safe_off_mask_=0;
+  uint8_t boot_safe_off_next_=0;
   void updateQ0Capture();
   void updateStartupQualification();
   // Every tick, before any command is processed: rebuilds

@@ -4,7 +4,7 @@
 namespace matdog { namespace motion {
 // This pure boundary contains SI observations and evidence, never actuator authority.
 enum class EvidenceSource : uint8_t { UNKNOWN, SYNTHETIC, EXTERNAL_MEASURED, OFFLINE_CERTIFIED };
-enum class FeedbackMode : uint8_t { SIMULATION, PHYSICAL_REVIEW };
+enum class FeedbackMode : uint8_t { SIMULATION, PHYSICAL_REVIEW, FIXTURE_REVIEW };
 enum class FeedbackReason : uint8_t {
   OK, NOT_REQUESTED, INVALID_POLICY, INVALID_COMMAND, STALE_OBSERVATION,
   UNOBSERVABLE_HEIGHT, UNOBSERVABLE_SUPPORT, INVALID_POSE, UNRECOVERABLE_POSE,
@@ -23,6 +23,11 @@ struct FeedbackPolicy {
   double observationMaxAgeS=0, assessmentMaxAgeS=0, segmentTimeoutS=0;
   double heightToleranceM=0, contactToleranceM=0, samplePeriodS=0;
   bool envelopesApproved=false, loadedRatesVerified=false;
+  bool fixtureTrialRatesReviewed=false; // bounded qualification trial, never loaded-hardware PASS
+  bool routeTubeReviewed=false;
+  bool fixtureLimitVariant=false; // named certified derivative; FIXTURE_REVIEW only
+  unsigned routeFirstKnot=0,routeLastKnot=251;
+  double routeJointTubeRad=0,routePositionTubeM=0,routeRotationTube=0;
 };
 struct AdaptiveObservation {
   JointTargetFrame actual{};
@@ -44,6 +49,7 @@ struct SegmentAssessment {
   bool geometryIdentityVerified=false;
   bool sweptCollisionClear=false, supportCompatible=false;
   bool continuousBoundsConfirmed=false; // sampled kinematics alone is insufficient
+  bool fixtureTrialEnvelopeReviewed=false;
   bool loadedTrackingQualified=false;
   bool dynamicStabilityQualified=false; // independent loaded-hardware WALK evidence
 };

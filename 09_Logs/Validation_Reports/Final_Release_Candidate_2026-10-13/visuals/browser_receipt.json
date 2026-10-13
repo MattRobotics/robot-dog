@@ -1,0 +1,76 @@
+{
+  "result": "PASS",
+  "browser": "155.0.8059.39",
+  "playwright": "1.56.1",
+  "actions": 48,
+  "maintenance_tabs": 6,
+  "mobile_no_horizontal_overflow": true,
+  "lan_disabled_actions": 48,
+  "non_get_display_requests": [],
+  "stages": [
+    {
+      "name": "PRONE",
+      "triangles": 119716,
+      "source_sequence": 1
+    },
+    {
+      "name": "PRE_ALIGN",
+      "triangles": 119716,
+      "source_sequence": 1405
+    },
+    {
+      "name": "REAR_DEPLOY",
+      "triangles": 119716,
+      "source_sequence": 3680
+    },
+    {
+      "name": "FRONT_DEPLOY",
+      "triangles": 119716,
+      "source_sequence": 4772
+    },
+    {
+      "name": "RISE",
+      "triangles": 119716,
+      "source_sequence": 6124
+    },
+    {
+      "name": "STAND_C4",
+      "triangles": 119716,
+      "source_sequence": 5
+    },
+    {
+      "name": "WALK",
+      "triangles": 119716,
+      "source_sequence": 5
+    }
+  ],
+  "hardware": false,
+  "server": "localhost Python visual fixture; enforcement verified separately on production C++ handlers",
+  "portal_sha256": "2e0ba45bf9932cf8ab132791ac2efd5dbc9da5effdfb6630913287d7ab21cd29",
+  "motion_page_sha256": "1cbe3d6b4a8f8ba351d3b67c54d21d53b0ba1b4327c2c26c34b45fc604359b21",
+  "trace_sha256": "efcb5d71895c1eec69ab41e8ff30be469de6df62e30620f32d6ac4982aa40af0",
+  "files": [
+    "admin_ap.png",
+    "dashboard_motion_desktop.png",
+    "dashboard_motion_mobile.png",
+    "fixture_projections_xz_yz.png",
+    "fixture_stl_sequence.png",
+    "lan_motion_gates.png",
+    "lan_readonly.png",
+    "maintenance_ap.png",
+    "maintenance_dashboard.png",
+    "maintenance_diagnostics.png",
+    "maintenance_ota.png",
+    "maintenance_performance.png",
+    "maintenance_wifi.png",
+    "route_joint_comparison.png",
+    "runtime_targets_height_attitude.png",
+    "twin_FRONT_DEPLOY.png",
+    "twin_PRE_ALIGN.png",
+    "twin_PRONE.png",
+    "twin_REAR_DEPLOY.png",
+    "twin_RISE.png",
+    "twin_STAND_C4.png",
+    "twin_WALK.png"
+  ]
+}

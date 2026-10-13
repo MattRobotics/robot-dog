@@ -43,7 +43,11 @@ const char* toString(RuntimeRestoreStatus status);
 // not merely each single-joint path with its neighbours at q=0. If it only
 // covers corridors, it cannot approve this box: use per-segment qualification.
 // No production artifact is fabricated by this implementation.
+enum class OperationalLimitScope : uint8_t { FULL_JOINT_BOX, CERTIFIED_ROUTE };
 struct OperationalWorkspaceEvidence {
+  OperationalLimitScope scope=OperationalLimitScope::FULL_JOINT_BOX;
+  char route_sha256[65]{};
+  char corridor_proof_sha256[65]{};
   uint16_t schema = 1;
   char artifact_sha256[actuator::kSha256HexBytes] = {};
   actuator::GeometryProvenance provenance{};
@@ -115,7 +119,8 @@ class CalibrationRuntimeRestore {
       const actuator::GeometryProvenance& expected_provenance,
       const OperationalWorkspaceEvidence* evidence, const char* pinned_artifact_sha256,
       const RuntimeRestoreRequest& runtime_facts,
-      const actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
+      const actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits,
+      const char* pinned_route_sha256=nullptr);
 
   void invalidate(actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
   const RuntimeCalibrationSnapshot& snapshot() const { return snapshot_; }
