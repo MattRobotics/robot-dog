@@ -1,0 +1,263 @@
+{
+  "certificate": {
+    "schema": "MATDOG_DIRECTED_BELLY_HIP_ENVELOPE_V1",
+    "status": "PASS_SURFACE_SEPARATION",
+    "hardware_authorized": false,
+    "source_sha256": "4b851399aa251c2875f5d8be5b033007f533f37aa930a4fdb52a2701df126f0a",
+    "joint_log_sha256": "d1c2ecbaa965d5ea66f20b9a2d37a700ff135efd90d32c9a985aa1cc22d076ca",
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "mesh_sha256": {
+      "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "lf_hip_link": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "rf_hip_link": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "rh_hip_link": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "lh_hip_link": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da"
+    },
+    "start_rad": [
+      -0.039884,
+      1.398991,
+      -1.601476,
+      0.041417,
+      1.388253,
+      -1.581534,
+      -0.044485,
+      1.440408,
+      -1.59534,
+      0.039884,
+      1.43734,
+      -1.59534
+    ],
+    "head_rad": [
+      -0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532,
+      -0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532
+    ],
+    "source_ventral_triangles": 3052,
+    "extrusion_surface_triangles": 24416,
+    "envelope": "Union of all triangular prisms obtained by moving retained ventral triangles continuously from z to z-3 mm; all faces touching bottom+15 mm retained in full. No lateral enlargement.",
+    "interpretation": "Adjacent assembly clearance must remain positive; the 3 mm non-adjacent margin is in the entry certificate. Initial baseline no-nesting is required separately. Actual cover must be measured to lie inside this directed envelope; current photo does not establish that condition.",
+    "full_symmetric_10mrad_adjacent_lf_lower_collision_witness": [
+      {
+        "q_lower_rad": -1.611476,
+        "q_lower_deg": -92.33077358662385,
+        "surface_distance_m": 0.0,
+        "sampled_collision": true
+      },
+      {
+        "q_lower_rad": -1.60693236053,
+        "q_lower_deg": -92.07044222136379,
+        "surface_distance_m": 1.003508829362858e-09,
+        "sampled_collision": false
+      },
+      {
+        "q_lower_rad": -1.605476,
+        "q_lower_deg": -91.98699890954535,
+        "surface_distance_m": 9.003012505081804e-05,
+        "sampled_collision": false
+      },
+      {
+        "q_lower_rad": -1.601476,
+        "q_lower_deg": -91.75781579149302,
+        "surface_distance_m": 9.003153508188762e-05,
+        "sampled_collision": false
+      }
+    ],
+    "rows": [
+      {
+        "stage": "ENTRY_DISENGAGE",
+        "link": "lf_hip_link",
+        "samples": 1,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.00099793443655464,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.001309169353139582,
+            "lipschitz_and_roundoff_m": 0.0003112349165849421
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005310835616772269,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.001309169353139582,
+            "lipschitz_and_roundoff_m": 0.0007780857914623552
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_DISENGAGE",
+        "link": "rf_hip_link",
+        "samples": 1,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009974675050952362,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0013087024216801783,
+            "lipschitz_and_roundoff_m": 0.0003112349165849421
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005306166302178232,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0013087024216801783,
+            "lipschitz_and_roundoff_m": 0.0007780857914623552
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_DISENGAGE",
+        "link": "rh_hip_link",
+        "samples": 1,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009811267039661817,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012923616205511238,
+            "lipschitz_and_roundoff_m": 0.0003112349165849421
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005142758290887687,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012923616205511238,
+            "lipschitz_and_roundoff_m": 0.0007780857914623552
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_DISENGAGE",
+        "link": "lh_hip_link",
+        "samples": 1,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009841776084800863,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012954125250650285,
+            "lipschitz_and_roundoff_m": 0.0003112349165849421
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005173267336026733,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012954125250650285,
+            "lipschitz_and_roundoff_m": 0.0007780857914623552
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_ALIGN",
+        "link": "lf_hip_link",
+        "samples": 100,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009892079403786534,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.001309169353139582,
+            "lipschitz_and_roundoff_m": 0.0003199614127609286
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005223570655012404,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.001309169353139582,
+            "lipschitz_and_roundoff_m": 0.0007868122876383417
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_ALIGN",
+        "link": "rf_hip_link",
+        "samples": 100,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009881446069265939,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0013087024216801783,
+            "lipschitz_and_roundoff_m": 0.0003205578147535845
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0005212937320491809,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0013087024216801783,
+            "lipschitz_and_roundoff_m": 0.0007874086896309975
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_ALIGN",
+        "link": "rh_hip_link",
+        "samples": 100,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009570300822567246,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012923616205511238,
+            "lipschitz_and_roundoff_m": 0.00033533153829439925
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0004901792073793115,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012923616205511238,
+            "lipschitz_and_roundoff_m": 0.0008021824131718123
+          }
+        ]
+      },
+      {
+        "stage": "ENTRY_ALIGN",
+        "link": "lh_hip_link",
+        "samples": 100,
+        "bounds": [
+          {
+            "tube_rad": 0.004,
+            "certified_lower_bound_m": 0.0009618709708333884,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012954125250650285,
+            "lipschitz_and_roundoff_m": 0.00033354155423164015
+          },
+          {
+            "tube_rad": 0.01,
+            "certified_lower_bound_m": 0.0004950200959559752,
+            "pass_": true,
+            "u": 0.0,
+            "sample_distance_m": 0.0012954125250650285,
+            "lipschitz_and_roundoff_m": 0.0008003924291090532
+          }
+        ]
+      }
+    ],
+    "elapsed_s": 2.200900994001131
+  },
+  "certificate_sha256": "abc7851b21ac46455841635e5b66d04cce3001fd627365ccbd361c650b06eae6"
+}

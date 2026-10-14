@@ -30,6 +30,12 @@ struct MotionTelemetry {
  const char* source="UNKNOWN";
  const char* session_profile_sha256="";
  const char* session_state="OFF";const char* session_reason="LOCAL_TRIAL_EVIDENCE_REQUIRED";
+ // Runtime test policy view (read-only). Distinct reasons, never one badge.
+ const char* runtime_mode="DIAGNOSTIC";const char* limits_scope="NONE";const char* restore="NOT_RUN";
+ const char* pose_class="NOT_EVALUATED";const char* pose_reason="";int pose_joint=-1;
+ double pose_max_dev_rad=-1,pose_rms_dev_rad=-1;
+ const char* entry="NONE";const char* phase="";const char* commissioning_reason="";
+ bool fixture_declared=false;uint8_t approved_joints=0,commissioning_joints=0;uint16_t prime_clamp_mask=0;
 };
 // Controller owns this transport-independent intention service. A transport
 // submits a typed command and receives an ack; it cannot acquire a lease.

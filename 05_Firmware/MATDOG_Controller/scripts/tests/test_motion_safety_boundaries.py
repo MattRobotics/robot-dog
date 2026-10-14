@@ -12,11 +12,14 @@ SRC = Path(__file__).resolve().parents[2] / "src"
 REQUIRED = {
     "config/BuildConfig.h": ("constexpr bool kOperationalMotionAuthorized = false;",),
     "execution/ValidationProfile.cpp": ("!open_||sealed_", "!record_||!route_", "CONFIRM_INSTALLATION_WORKSPACE_MARGIN_SWEEP_TRACKING_TIMING_OUTPUT", "update::digestsEqual", "drive_speed*speed_scale*runtime.execution.feedback_max_age_ms/1000", "CONFIRM"),
-    "core/LocalValidation.cpp": ("LOCAL_COMMAND_CLOCK_STALE", "REVIEWED_RECORD_DIGEST_MISMATCH", "BOOT_SAFE_OFF_PENDING", "CONFIRM_CURRENT_INSTALLATION_AND_REVIEWED_PROFILE", "now-validation_presence_ms_>1000", "CURRENT_ACKNOWLEDGED_RECORD_REQUIRED", "CONFIRM_MEASURED_POSE_AND_BEARING_SUPPORT", "!fixture(reviewed_motion_.scope)"),
+    "core/LocalValidation.cpp": ("LOCAL_COMMAND_CLOCK_STALE", "REVIEWED_RECORD_DIGEST_MISMATCH", "BOOT_SAFE_OFF_PENDING", "CONFIRM_CURRENT_INSTALLATION_AND_REVIEWED_PROFILE", "now-validation_presence_ms_>1000", "CURRENT_ACKNOWLEDGED_RECORD_REQUIRED", "CONFIRM_MEASURED_POSE_AND_BEARING_SUPPORT", "!fixture(reviewed_motion_.scope)", "REVIEWED_RUNTIME_MODE_REQUIRED", "runtimeModeAllowsScope(runtime_mode_,validation_profile_.runtime.scope)"),
+    "core/Commissioning.cpp": ("unbindCommissioning(\"MODE_CHANGED\");validation_profile_.clear()", "runtime_restore_.revokeLimits(actuator_policy_.limits())", "TORQUE_OFF_STATIONARY_FRESH_REQUIRED", "CONFIRM_FIXTURE_PRIME_HOLD_LOWER_INWARD", "prime_clamp_max_ticks=commissioning_params_.prime_clamp_ticks", "operational_session_.request(", "Serial.availableForWrite()>=static_cast<int>(used)", "Serial.write(reinterpret_cast<const uint8_t*>(buffer),used)"),
     "core/Controller.h": ("bool reviewed_motion_bound_=false;", "execution::LocalTrialEvidence local_trial_evidence_{};",),
     "execution/MotionSession.cpp": ("if(!image)", "WALK_DYNAMICS_REQUIRED", "FIXTURE_SUPPORT_REQUIRED", "PRIME_REQUIRES_OFF_AND_LIMITS", "policy_->plan(", "runtime_->execute(",),
     "core/Controller.cpp": (
-        "ready.hardware_approved=scoped", "ready.support_observable=reviewed_motion_bound_",
+        "ready.hardware_approved=scoped", "ready.support_observable=commissioning_bound_?",
+        "local_motion_observation_.externalSupportConfirmed", "reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO",
+        "runtimeModeAllowsScope(runtime_mode_,e.scope)", "runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope)",
         "build::kOperationalMotionAuthorized", "r.policy_epoch!=actuator_policy_.epoch()",
         "motion::pairedProneMatch(local_motion_observation_", "e.scope!=reviewed_motion_.scope",
         "motion_service_.begin(&motion_executor_, &motion_coordinator_);",

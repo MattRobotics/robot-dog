@@ -249,6 +249,10 @@ void Controller::begin() {
   modules.validation_command=[](void* context,const char* line,uint32_t now,char* out,size_t size){
     return static_cast<Controller*>(context)->localValidationCommand(line,now,out,size);
   };
+  modules.commissioning_command=[](void* context,const char* line,uint32_t now,char* out,size_t size){
+    return static_cast<Controller*>(context)->commissioningCommand(line,now,out,size);
+  };
+  boot_nonce_=esp_random();if(!boot_nonce_)boot_nonce_=1;
   service_.begin(modules);
   service_.bindMotionService(&motion_service_);
   // Never starts the listening socket here — see network/HttpTransport.h.
@@ -989,7 +993,7 @@ bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntim
 }
 bool Controller::requestLocalMotionTrial(const execution::LocalTrialEvidence& e,uint32_t generation,uint32_t expires) {
   const uint32_t now=millis();
-  if(!reviewed_motion_bound_||e.scope!=reviewed_motion_.scope||!generation||static_cast<int32_t>(now-expires)>=0)return false;
+  if(!reviewed_motion_bound_||!execution::runtimeModeAllowsScope(runtime_mode_,e.scope)||e.scope!=reviewed_motion_.scope||!generation||static_cast<int32_t>(now-expires)>=0)return false;
   if(e.scope!=execution::TrialScope::FIXTURE_MICRO&&
      (motion::checkObservation(local_motion_observation_,reviewed_motion_.feedback,now/1000.0)!=motion::FeedbackReason::OK||
       motion::pairedProneMatch(local_motion_observation_,reviewed_motion_.feedback)<0))return false;
@@ -1049,15 +1053,16 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
      (startup_qualification_.phase()==calibration::StartupQualificationPhase::IDLE||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::COMPLETE||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::REFUSED||
-      startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(validation_profile_.sealed()?2u:20u)){
+      startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(profileActive()?2u:20u)){
     const unsigned slot=operational_poll_next_;
     const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
     servo::ServoBus::ControlFeedbackSnapshot t{};execution::RawJointObservation r;
     const uint32_t read_started=millis();
-    r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs);
+    const uint32_t transaction_ms=validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:commissioning_bound_?commissioning_params_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs;
+    r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,transaction_ms);
     r.transaction_ms=millis()-read_started;r.torque_limit=t.torque_limit;r.goal_position=t.goal_position;
     r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.goal_speed=t.goal_speed;r.goal_acceleration=t.goal_acceleration;
-    if(validation_profile_.sealed()&&r.transaction_ms>2*validation_profile_.transaction_timeout_ms+2)r.read_ok=false;
+    if(profileActive()&&r.transaction_ms>2*transaction_ms+2)r.read_ok=false;
     r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
     r.torque=t.torque_enable;r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;
     r.sampled_at_ms=millis();
@@ -1071,24 +1076,29 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   ready.local_operator_owns_session=reviewed_motion_bound_&&operational_session_.state()!=execution::MotionSessionState::OFF;
   ready.calibration_restored=calibration.restored;
   ready.calibration_accepted=calibration.calibration_accepted;
-  ready.limits_approved=calibration.operational_limits_approved;
+  ready.limits_approved=calibration.operational_limits_approved||(commissioning_bound_&&calibration.commissioning_limits_active);
   // Offline integration does not qualify physical loaded tracking, contact
   // observation, prime/torque startup or bounded sequential bus timing.
   const auto imu=imu_.orientationSnapshot();
-  bool scoped=reviewed_motion_bound_&&reviewed_motion_.calibration_generation==calibration.restored_generation&&
+  bool scoped=reviewed_motion_bound_&&execution::runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope)&&reviewed_motion_.calibration_generation==calibration.restored_generation&&
       reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&!radio.closing.load()&&!radio.radio_fault.load()&&imu.valid&&now_ms-imu.sampled_at_ms<=reviewed_motion_.max_imu_age_ms;
   bool prime_profiles=true;
+  // Reviewed cards or the commissioning policy: the same drive-profile checks.
+  // Commissioning reduces no output ceiling (ST3215 default 1000 = no claim).
+  const uint16_t drive_speed=validation_profile_.sealed()?validation_profile_.drive_speed:commissioning_params_.drive_speed;
+  const uint8_t drive_acceleration=validation_profile_.sealed()?validation_profile_.drive_acceleration:commissioning_params_.drive_acceleration;
+  const int output_ceiling=validation_profile_.sealed()?validation_profile_.output_ceiling:1000;
   for(unsigned i=0;i<12;++i){const auto& raw=operational_producer_.raw(i);
     scoped=scoped&&raw.read_ok&&raw.temperature<=reviewed_motion_.max_servo_temperature_c&&
       raw.voltage>=reviewed_motion_.min_servo_voltage_dv&&raw.voltage<=reviewed_motion_.max_servo_voltage_dv;
-    if(validation_profile_.sealed()){
-      scoped=scoped&&raw.torque_limit>=0&&raw.torque_limit<=validation_profile_.output_ceiling&&raw.speed>=0&&raw.speed<=validation_profile_.drive_speed;
-      prime_profiles=prime_profiles&&raw.goal_speed==validation_profile_.drive_speed&&raw.goal_acceleration==validation_profile_.drive_acceleration;
+    if(profileActive()){
+      scoped=scoped&&raw.torque_limit>=0&&raw.torque_limit<=output_ceiling&&raw.speed>=0&&raw.speed<=drive_speed;
+      prime_profiles=prime_profiles&&raw.goal_speed==drive_speed&&raw.goal_acceleration==drive_acceleration;
       if(operational_session_.state()==execution::MotionSessionState::ARMED)
-        scoped=scoped&&raw.goal_speed==validation_profile_.drive_speed&&raw.goal_acceleration==validation_profile_.drive_acceleration;
+        scoped=scoped&&raw.goal_speed==drive_speed&&raw.goal_acceleration==drive_acceleration;
     }
   }
-  operational_facts_.prime_profiles_verified=validation_profile_.sealed()&&prime_profiles;
+  operational_facts_.prime_profiles_verified=profileActive()&&prime_profiles;
   ready.hardware_approved=scoped&&((local_trial_evidence_.scope==execution::TrialScope::FIXTURE_MICRO||reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW)?
     reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified);
   if(validation_walk_admitted_){
@@ -1104,7 +1114,12 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   for(unsigned i=0;i<12;++i)observation.actual.valid=observation.actual.valid&&operational_feedback_.read_ok[i];
   for(unsigned i=0;i<4;++i)observation.actual.legs[i]={operational_feedback_.actual_rad[i*3],operational_feedback_.actual_rad[i*3+1],operational_feedback_.actual_rad[i*3+2]};
   for(unsigned i=0;i<12;++i)observation.stationary=observation.stationary&&operational_producer_.raw(i).speed==0;
-  ready.support_observable=reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
+  // Commissioning: fixture support is the operator's declaration kept alive
+  // by the 1 s deadman, independent of where the joints are; the planner
+  // still checks every observation against the hard limits itself.
+  ready.support_observable=commissioning_bound_?
+    (validation_present_&&now_ms-validation_presence_ms_<=1000&&local_motion_observation_.externalSupportConfirmed):
+    reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
     motion::checkObservation(observation,reviewed_motion_.feedback,now_ms/1000.0)==motion::FeedbackReason::OK;
   ready.local_fixture_session=operational_session_.state()==execution::MotionSessionState::ARMED&&
     operational_session_.scope()==execution::TrialScope::FIXTURE_MICRO;
@@ -1137,7 +1152,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
   if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);
-  if(validation_profile_.sealed()&&validation_present_&&
+  if(profileActive()&&validation_present_&&
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
     const auto& frame=motion_coordinator_.frame();
     if(frame.target.valid&&!frame.executable){
@@ -1174,7 +1189,23 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   }
   // base_link height/contact stay unknown until independent measured
   // observations and runtime transforms exist; IMU never invents height.
+  updateLivePose();
+  telemetry.runtime_mode=execution::toString(runtime_mode_);
+  telemetry.limits_scope=calibration.commissioning_limits_active?"COMMISSIONING_CONTACT_INSET":calibration.operational_limits_approved?"REVIEWED_ROUTE":"NONE";
+  telemetry.restore=calibration.restored?"RESTORED":calibration::toString(calibration.restore_status);
+  telemetry.approved_joints=calibration.approved_joints;telemetry.commissioning_joints=calibration.commissioning_joints;
+  telemetry.pose_class=live_pose_valid_?(live_pose_.kind==motion::FixturePoseKind::PRONE_COMPATIBLE?"PRONE_COMPATIBLE":"UNKNOWN"):"NOT_EVALUATED";
+  telemetry.pose_reason=live_pose_valid_?motion::fixturePoseReasonName(live_pose_.reason):(calibration.restored?"FEEDBACK_STALE":"RESTORE_REQUIRED");
+  telemetry.pose_joint=live_pose_valid_?static_cast<int>(live_pose_.failedJointIndex<12?live_pose_.failedJointIndex:live_pose_.maxErrorJointIndex):-1;
+  telemetry.pose_max_dev_rad=live_pose_valid_?live_pose_.maxNominalErrorRad:-1;telemetry.pose_rms_dev_rad=live_pose_valid_?live_pose_.rmsNominalErrorRad:-1;
+  {const auto& stand=motion_coordinator_.stand();telemetry.entry=!stand.entryActive()?"NONE":!stand.entryPending()?"DONE":stand.entryStage()==0?"E0":"E1";
+   const char* phases[]={"PRE_ALIGN","REAR_DEPLOY","FRONT_DEPLOY","LOAD_TRANSFER","RISE"};const unsigned ph=static_cast<unsigned>(motion::pairedPronePhase(motion_coordinator_.proneSegment()));
+   telemetry.phase=commissioning_bound_?phases[ph<5?ph:4]:"";}
+  telemetry.commissioning_reason=commissioning_reason_;telemetry.fixture_declared=commissioning_bound_&&ready.support_observable;
+  telemetry.prime_clamp_mask=operational_session_.primeClampMask();
+  telemetry.session_profile_sha256=commissioning_bound_?commissioning_entry_.sha256:telemetry.session_profile_sha256;
   motion_service_.publishTelemetry(telemetry);
+  emitTelemetry(now_ms);
   if(motion_executor_.status().safe_off_required||operational_session_.safeOffRequired()) {
     // SAFE_OFF is ungated and independent of owner, mode, permit and policy.
     // One leg joint per tick; repeatedly verify every failed joint.

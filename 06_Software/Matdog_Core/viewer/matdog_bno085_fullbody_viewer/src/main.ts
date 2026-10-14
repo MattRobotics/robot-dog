@@ -12,6 +12,18 @@ import { MotionTelemetryStream, JOINT_NAMES } from './motion/telemetry';
 import { parseOfflineTrace } from './motion/offlineTrace';
 import { MotionTwinController } from './motion/twinController';
 import { syntheticMotionStatus } from './motion/syntheticMotion';
+import {
+  classifySource,
+  diagnosticCodes,
+  LiveFeedState,
+  type DiagnosticCode,
+  type LiveSnapshot,
+  type SourceClassification,
+  type TransportError,
+} from './motion/liveStatus';
+import { detectBridge, LiveTransport, postStop, type StopResult, type TransportEvents, type TransportKind } from './motion/bridgeClient';
+import { jointRows, parseDashboardModel, type DashboardModel, type JointLimit } from './dashboard/dashboardModel';
+import { renderDashboard, renderLiveBar, renderStopResult, setUpJointTable } from './dashboard/dashboardView';
 
 import { OrientationController } from './frame/orientationController';
 import { RAD_TO_DEG, sh2ToRollPitchYaw, type Sh2Quaternion } from './frame/orientation';
@@ -72,7 +84,6 @@ const motionStream = new MotionTelemetryStream();
 let motionMode: 'off' | 'synthetic' | 'live' | 'trace' = 'off';
 let motionStartMs = 0;
 let motionTimer = 0;
-let liveBusy = false;
 let traceRecords: unknown[] = [];
 let traceIndex = 0;
 let traceOriginMs = 0;
@@ -292,12 +303,54 @@ function setUpSyntheticPanel(): void {
 }
 
 /* ---------------------------------------------------------- motion twin --- */
+const urlParams = new URLSearchParams(window.location.search);
+const pollHzParam = Number(urlParams.get('poll_hz'));
+const liveFeed = new LiveFeedState();
+let liveTransport: LiveTransport | null = null;
+let transportKind: TransportKind = 'idle';
+let transportError: TransportError = 'NONE';
+let bridgeHealth: Record<string, unknown> | null = null;
+let lastLiveAvailable: boolean | null = null;
+let dashboardModel: DashboardModel | null = null;
+let assetsMissing = false;
+let jointLimits: Record<string, JointLimit> = {};
+let lastSource: SourceClassification = { badge: 'OFF', label: 'OFF' };
+let lastCodes: DiagnosticCode[] = [];
+let lastStop: StopResult | null = null;
+const btnStop = element<HTMLButtonElement>('btn-stop');
+const dashboardBlock = element('dashboard-block');
+
+function liveSnapshot(nowMs: number): LiveSnapshot {
+  const frame = motionStream.frame;
+  const rows = jointRows(dashboardModel, frame, jointLimits);
+  return {
+    mode: motionMode, hasFrame: frame !== null, stale: motionMode === 'off' || motionStream.isStale(nowMs),
+    bridge: dashboardModel?.bridge ?? null, telemetrySource: dashboardModel?.source ?? null,
+    transportError, assetsMissing, available: motionMode === 'live' ? lastLiveAvailable : null,
+    restore: dashboardModel?.readiness?.restore ?? null, permit: dashboardModel?.readiness?.permit ?? null,
+    reason: frame?.reason ?? '', actualMissing: frame !== null && frame.actual === null,
+    anyUnmapped: dashboardModel?.servos.some((servo) => servo?.mapped === false) ?? false,
+    commissioningRestore: dashboardModel?.commissioning?.restore ?? null,
+    jointLimitViolation: rows.some((row) => row.outsideLimit),
+  };
+}
+function renderLive(nowMs: number): void {
+  const snapshot = liveSnapshot(nowMs);
+  lastSource = classifySource(snapshot);
+  lastCodes = diagnosticCodes(snapshot);
+  renderLiveBar(lastSource, lastCodes);
+  if (dashboardBlock.hidden) return;
+  renderDashboard({ model: dashboardModel, frame: motionStream.frame, limits: jointLimits,
+    transport: motionMode === 'live' ? transportKind : motionMode, sampleAgeMs: motionStream.ageMs(nowMs), codes: lastCodes });
+}
 function renderMotion(): void {
-  const frame = motionStream.frame, age = motionStream.ageMs(performance.now());
-  const stale = motionMode === 'off' || motionStream.isStale(performance.now());
+  const now = performance.now();
+  const frame = motionStream.frame, age = motionStream.ageMs(now);
+  const stale = motionMode === 'off' || motionStream.isStale(now);
   element('twin-fresh').textContent = frame ? stale ? 'STALE' : 'FRESH' : 'NO DATA';
   element('twin-fresh').className = 'badge ' + (stale ? 'state-error' : 'state-connected');
   twin?.setStale(stale);
+  renderLive(now);
   if (!frame) return;
   if (frame.quaternion === null) {
     element('q-raw').textContent = 'UNKNOWN (no current Controller quaternion)';
@@ -312,13 +365,17 @@ function renderMotion(): void {
   element('twin-joints').textContent = JOINT_NAMES.map((name) => `${name.padEnd(22)} ${frame.actual?.[name]?.toFixed(4) ?? 'UNKNOWN'} / ${frame.target?.[name]?.toFixed(4) ?? 'UNKNOWN'}`).join('\n');
   element('twin-diagnostic').textContent = twin?.diagnostic || '';
 }
-function applyMotionStatus(value: unknown): boolean {
-  if (!motionStream.accept(value, performance.now())) {
+function applyMotionStatus(value: unknown, live = false): boolean {
+  const now = performance.now();
+  const accepted = live ? liveFeed.accept(motionStream, value, now) : motionStream.accept(value, now);
+  if (!accepted) {
     element('twin-diagnostic').textContent = 'Rejected telemetry: malformed, unsupported version, or timestamp regression.';
     return false;
   }
+  if (!live) dashboardModel = parseDashboardModel(value);
   const frame = motionStream.frame!;
-  twin?.apply(frame);
+  // Interpolation is visual only (live feed); numbers always show the received sample.
+  twin?.apply(frame, live ? now : undefined);
   if (frame.quaternion) {
     orientation.update(frame.quaternion);
     // Recenter belongs to the technical viewer only; it also rotates the target ghost.
@@ -328,15 +385,36 @@ function applyMotionStatus(value: unknown): boolean {
   }
   renderMotion(); return true;
 }
+/** One bridge/Controller status object (SSE event or poll response). */
+function handleLivePayload(value: unknown): void {
+  if (motionMode !== 'live') return;
+  transportError = 'NONE';
+  dashboardModel = parseDashboardModel(value);
+  const status = value as Record<string, unknown> | null;
+  lastLiveAvailable = status?.available !== false;
+  if (!lastLiveAvailable) { renderMotion(); return; }
+  applyMotionStatus(value, true);
+}
+const transportEvents: TransportEvents = {
+  onPayload: (value) => handleLivePayload(value),
+  onError: (kind, detail) => {
+    transportError = kind;
+    element('twin-diagnostic').textContent = `Live feed: ${kind} (${detail})`;
+    renderMotion();
+  },
+  onTransport: (kind) => { transportKind = kind; renderMotion(); },
+};
 function stopMotionFeed(): void {
   motionMode = 'off'; window.clearTimeout(motionTimer);
+  liveTransport?.stop(); liveTransport = null; transportKind = 'idle';
   btnRecenter.disabled = false; btnClearReference.disabled = false;
+  btnStop.hidden = true;
   renderMotion();
   element('twin-source').textContent = 'Feed paused; samples will become STALE. No command was sent.';
 }
 async function sampleMotion(): Promise<void> {
   window.clearTimeout(motionTimer);
-  if (document.hidden || motionMode === 'off' || liveBusy) return;
+  if (document.hidden || motionMode === 'off' || motionMode === 'live') return;
   if (motionMode === 'synthetic') applyMotionStatus(syntheticMotionStatus(performance.now() - motionStartMs));
   if (motionMode === 'trace') {
     const until = traceOriginMs + performance.now() - motionStartMs;
@@ -347,35 +425,56 @@ async function sampleMotion(): Promise<void> {
     }
     if (traceIndex === traceRecords.length) { stopMotionFeed(); element('twin-source').textContent = 'Offline trace completed. Final sample is retained with its timestamp.'; return; }
   }
-  if (motionMode === 'live') {
-    liveBusy = true;
-    const abort = new AbortController(), timeout = window.setTimeout(() => abort.abort(), 800);
-    try {
-      // Same-origin GET only. An optional host Vite proxy exposes this read-only route.
-      const response = await fetch('/api/motion/status', { cache: 'no-store', signal: abort.signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      if (!applyMotionStatus(await response.json())) throw new Error('invalid motion status');
-    } catch (error) {
-      element('twin-diagnostic').textContent = `Read-only Controller feed unavailable: ${error instanceof Error ? error.message : String(error)}`;
-    } finally { liveBusy = false; window.clearTimeout(timeout); }
-  }
   renderMotion();
-  if ((motionMode as string) !== 'off' && !document.hidden) motionTimer = window.setTimeout(() => void sampleMotion(), motionMode === 'live' ? 1000 : 100);
+  if ((motionMode as string) !== 'off' && !document.hidden) motionTimer = window.setTimeout(() => void sampleMotion(), 100);
+}
+function startLiveTransport(): void {
+  liveTransport?.stop();
+  const viaBridge = bridgeHealth !== null;
+  const pollHz = Number.isFinite(pollHzParam) && pollHzParam > 0 ? pollHzParam : viaBridge ? 10 : 1;
+  liveTransport = new LiveTransport(transportEvents, {
+    useSse: viaBridge && urlParams.get('transport') !== 'poll', pollHz, timeoutMs: 800 });
+  liveTransport.start();
 }
 function startMotionFeed(mode: 'synthetic' | 'live' | 'trace'): void {
-  stopMotionFeed(); motionStream.reset(); motionMode = mode; motionStartMs = performance.now();
-  // Full motion data shares a support-plane world frame with feet/trajectories.
-  // Recenter remains available for standalone IMU inspection after feed pause.
-  orientation.clearReference(); btnRecenter.disabled = true; btnClearReference.disabled = true;
+  stopMotionFeed(); motionStream.reset(); liveFeed.reset(); motionMode = mode; motionStartMs = performance.now();
+  dashboardModel = null; lastLiveAvailable = null; transportError = 'NONE';
+  // Synthetic/trace data share a support-plane world frame with feet/trajectories,
+  // so recenter is locked there. The live feed reports no feet/base position:
+  // the visual-only recenter stays available (nothing is sent to the sensor).
+  orientation.clearReference();
+  btnRecenter.disabled = mode !== 'live'; btnClearReference.disabled = mode !== 'live';
+  if (twin) twin.interpolationMs = mode === 'live' ? 100 : 0;
+  dashboardBlock.hidden = false;
+  btnStop.hidden = mode !== 'live';
   element('twin-source').textContent = mode === 'synthetic'
     ? 'SYNTHETIC DISPLAY FIXTURE: prone → acquire → rise 150 mm → WALK → STOP → intermediate restart. Illustrative values; physical and trajectory qualification are separate.'
     : mode === 'trace' ? 'OFFLINE TRACE REPLAY: source timestamps and joint targets are preserved. Synthetic evidence is not hardware qualification.'
-      : 'Controller HTTP read-only feed (1 Hz). No automatic serial access or hardware commands.';
+      : bridgeHealth
+        ? 'Host bridge feed (matdog_bridge.py): SSE stream, 10 Hz polling fallback. The bridge owns the serial port; this page only reads, plus the STOP de-escalation request.'
+        : 'Controller HTTP read-only feed (1 Hz). No automatic serial access or hardware commands.';
+  if (mode === 'live') { startLiveTransport(); renderMotion(); return; }
   void sampleMotion();
 }
 element('btn-motion-synthetic').addEventListener('click', () => startMotionFeed('synthetic'));
-element('btn-motion-live').addEventListener('click', () => startMotionFeed('live'));
+element('btn-motion-live').addEventListener('click', () => {
+  void detectBridge().then((health) => { bridgeHealth = health; startMotionFeed('live'); });
+});
 element('btn-motion-pause').addEventListener('click', stopMotionFeed);
+btnStop.addEventListener('click', () => {
+  // De-escalation: single tap, no confirmation dialog.
+  btnStop.disabled = true; btnStop.textContent = 'STOPPING…';
+  void postStop().then((result) => {
+    lastStop = result;
+    renderStopResult(result);
+    btnStop.classList.add('sent'); btnStop.textContent = result.ok ? 'STOP SENT' : 'STOP FAILED';
+    window.setTimeout(() => { btnStop.disabled = false; btnStop.textContent = 'STOP'; btnStop.classList.remove('sent'); }, 1500);
+  });
+});
+element('btn-panel-toggle').addEventListener('click', () => {
+  const collapsed = document.body.classList.toggle('panel-collapsed');
+  element('btn-panel-toggle').setAttribute('aria-expanded', String(!collapsed));
+});
 function loadMotionTrace(text: string): void {
   const records = parseOfflineTrace(text);
   traceOriginMs = records[0]!.now_ms as number;
@@ -389,9 +488,12 @@ element<HTMLInputElement>('motion-trace-file').addEventListener('change', async 
   } catch (error) { element('twin-diagnostic').textContent = `Trace rejected: ${error instanceof Error ? error.message : String(error)}`; }
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) window.clearTimeout(motionTimer); else void sampleMotion();
+  if (document.hidden) { window.clearTimeout(motionTimer); liveTransport?.stop(); }
+  else if (motionMode === 'live') liveTransport?.start();
+  else void sampleMotion();
 });
 window.setInterval(() => { if (!document.hidden) { renderMotion(); renderStatus(); } }, 500);
+setUpJointTable();
 
 /* ----------------------------------------------------------------- boot --- */
 
@@ -436,6 +538,8 @@ async function boot(): Promise<void> {
       );
     }
     const model = parseUrdf(await response.text());
+    // URDF model limits only (display flag); hard limits live on the Controller.
+    jointLimits = Object.fromEntries(model.joints.map((joint) => [joint.name, { lower: joint.lower, upper: joint.upper }]));
 
     const fetchGeometry = createFetchStlLoader();
     const meshCache = new Map<string, Promise<BufferGeometry>>();
@@ -447,6 +551,8 @@ async function boot(): Promise<void> {
     robot = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
     const target = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
     twin = new MotionTwinController(robot, target);
+    // Visual-only joint easing for the live feed; numbers stay the received sample.
+    viewer.setBeforeRender((nowMs) => twin?.animate(nowMs));
     viewer.robotAnchor.add(target.rootObject);
     viewer.scene.add(twin.overlay);
     robot.resetJoints();
@@ -462,14 +568,17 @@ async function boot(): Promise<void> {
     }
     renderModelInfo(model, sourceLabel);
 
+    // The canonical model has exactly 17 collision meshes; fewer is a deployment fault.
+    assetsMissing = robot.collisionMeshCount !== 17;
     setOverlay(
       `Loaded ${robot.collisionMeshCount} collision meshes · ${robot.jointNames.length} joints · ` +
         'neutral URDF pose. Connect the BNO085 to drive base_link.',
     );
     window.setTimeout(() => setOverlay(null), 6000);
   } catch (error) {
+    assetsMissing = true; renderMotion();
     setOverlay(
-      `Model load failed: ${error instanceof Error ? error.message : String(error)}`,
+      `Model load failed (ASSETS_MISSING): ${error instanceof Error ? error.message : String(error)}`,
       true,
     );
     throw error;
@@ -481,7 +590,12 @@ async function boot(): Promise<void> {
   }
   const motion = new URLSearchParams(window.location.search).get('motion');
   if (motion === 'synthetic') startMotionFeed('synthetic');
-  if (motion === 'live') startMotionFeed('live');
+  if (motion === 'live' || motion === null) {
+    // Served by the host bridge: LIVE is the default. Without a bridge the page
+    // stays OFF unless ?motion=live explicitly asks for the 1 Hz Controller feed.
+    bridgeHealth = await detectBridge();
+    if (bridgeHealth !== null || motion === 'live') startMotionFeed('live');
+  }
   if (motion === 'trace') {
     try {
       // Fixed same-origin staged test output; no arbitrary URL or hardware route.
@@ -536,6 +650,7 @@ window.matdogViewer = {
    * pane is not compositing.
    */
   forceRender: () => {
+    twin?.animate(performance.now());
     viewerScene?.renderFrame();
     const info = viewerScene?.renderer.info.render;
     return {
@@ -575,6 +690,7 @@ window.matdogViewer = {
     targetVisible: twin?.target.rootObject.visible ?? false,
     motion: motionStream.frame,
     motionStale: motionMode === 'off' || motionStream.isStale(performance.now()),
+    source: lastSource, codes: lastCodes, stop: lastStop, transport: transportKind,
   }),
 };
 

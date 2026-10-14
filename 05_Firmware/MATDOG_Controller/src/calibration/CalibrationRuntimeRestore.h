@@ -98,9 +98,21 @@ struct RuntimeCalibrationSnapshot {
   bool restored = false;
   bool calibration_accepted = false;  // revalidated 24/24 evidence only
   bool operational_limits_approved = false;
+  // Fixture-commissioning scope only: the limit table holds the gen-1 contact
+  // box with a reviewed inset (intersected with the URDF domain). It is NOT a
+  // reviewed route/workspace approval and never sets approved_joints or
+  // operational_limits_approved; collision is checked per trajectory.
+  bool commissioning_limits_active = false;
+  uint8_t commissioning_joints = 0;
+  uint16_t commissioning_inset_ticks = 0;
   // This service never issues a permit, including after all limits qualify.
   bool motion_permit = false;
 };
+
+// Bounds of the runtime-selectable commissioning inset. The lower bound is
+// still checked per joint against the recorded contact repeatability.
+constexpr uint16_t kCommissioningMinInsetTicks = 2;
+constexpr uint16_t kCommissioningMaxInsetTicks = 64;
 
 class CalibrationRuntimeRestore {
  public:
@@ -122,6 +134,22 @@ class CalibrationRuntimeRestore {
       const actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits,
       const char* pinned_route_sha256=nullptr);
 
+  // Fixture commissioning: twelve hard limits = [contact_min + inset,
+  // contact_max - inset] of the RESTORED acknowledged record, intersected with
+  // the URDF interval, then the same one-tick quantization inset. Requires a
+  // restored, accepted record, a confirmed installation and a safe idle
+  // runtime; the inset must exceed every joint's recorded contact
+  // repeatability. All twelve are staged and published together; on any
+  // rejection every old limit stays revoked.
+  OperationalAdmissionStatus qualifyCommissioningLimits(
+      const actuator::CalibrationGeometryProfile& profile,
+      const actuator::GeometryProvenance& expected_provenance, uint16_t contact_inset_ticks,
+      const RuntimeRestoreRequest& runtime_facts,
+      const actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
+
+  // Revokes every operational/commissioning limit, keeping the RESTORED
+  // transforms (RAM gen-1 mapping) intact. Safe-idle callers only.
+  void revokeLimits(actuator::ActuatorLimitTable& limits);
   void invalidate(actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
   const RuntimeCalibrationSnapshot& snapshot() const { return snapshot_; }
 

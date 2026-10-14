@@ -1,0 +1,142 @@
+{
+  "schema": "MATDOG_DASHBOARD_E2E_FAKE_DEVICE_V1",
+  "hardware": false,
+  "checks": {
+    "desktop": {
+      "collision_meshes": 17,
+      "joints": 16,
+      "source": {
+        "badge": "FAKE_DEVICE",
+        "label": "FAKE_DEVICE · TEL"
+      },
+      "codes": [
+        "MOTION_NOT_PERMITTED"
+      ],
+      "transport": "sse",
+      "joints_animated": true,
+      "telemetry_actual_changed": true,
+      "badge_text": "",
+      "stop": {
+        "ok": true,
+        "status": 200,
+        "body": {
+          "ok": true,
+          "written": [
+            "@MOTION COMMISSIONING STOP",
+            "@MOTION VALIDATION STOP"
+          ],
+          "replies": [
+            "COMMISSIONING=STOPPED REASON=LOCAL_OPERATOR_STOP FAKE_DEVICE_NOT_HARDWARE",
+            "VALIDATION=PASS REASON=SAFE_OFF_REQUESTED SESSION=OFF SEGMENT=0 NONCE=1 LIMITS=0 UPTIME_MS=21573 FAKE_DEVICE_NOT_HARDWARE"
+          ],
+          "error": "",
+          "serial_state": "CONNECTED",
+          "host_utc": "2026-10-14T12:11:07.241223Z",
+          "note": "De-escalation request only. Controller replies are listed when they arrived within 0.6 s; this is not a power cut and does not replace the physical stop."
+        },
+        "error": ""
+      },
+      "console_errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "http_errors": []
+    },
+    "mobile_390x844": {
+      "collision_meshes": 17,
+      "joints": 16,
+      "source": {
+        "badge": "FAKE_DEVICE",
+        "label": "FAKE_DEVICE · TEL"
+      },
+      "codes": [
+        "MOTION_NOT_PERMITTED"
+      ],
+      "transport": "sse",
+      "joints_animated": true,
+      "telemetry_actual_changed": true,
+      "badge_text": "",
+      "stop": null,
+      "console_errors": [],
+      "http_errors": []
+    }
+  },
+  "health": {
+    "name": "matdog_bridge",
+    "bridge_version": 1,
+    "ok": true,
+    "fake_device": true,
+    "serial": {
+      "path": "/tmp/matdog_fake_rmf6_uy3/usb-FAKE_DEVICE_NOT_HARDWARE-if00",
+      "state": "CONNECTED",
+      "detail": "owned; first TX done",
+      "owner_lock": "/tmp/matdog-e2e-ZZxsaa/matdog_bridge__tmp_matdog_fake_rmf6_uy3_usb-FAKE_DEVICE_NOT_HARDWARE-if00.lock",
+      "owner_lock_held": true,
+      "opens": 1,
+      "rx_bytes": 43216,
+      "tx_lines": 2,
+      "overflows": 0
+    },
+    "mode": "TEL",
+    "phase": "TEL",
+    "tel_hz_requested": 10,
+    "bridge": {
+      "name": "matdog_bridge",
+      "bridge_version": 1,
+      "source": "TEL",
+      "serial_state": "CONNECTED",
+      "serial_detail": "owned; first TX done",
+      "serial_path": "/tmp/matdog_fake_rmf6_uy3/usb-FAKE_DEVICE_NOT_HARDWARE-if00",
+      "phase": "TEL",
+      "host_received_ms": 1791979848228,
+      "age_ms": 40,
+      "boot_nonce": 1390851129,
+      "reboots_seen": 0,
+      "lines_per_s": 14.81,
+      "tel_hz": 9.63,
+      "fake_device": true,
+      "console_active": false,
+      "legacy_cycle_ms": null
+    },
+    "counters": {
+      "rx_lines": 21,
+      "rx_pre_tx_lines": 10,
+      "tel_lines": 14,
+      "parse_errors": 0,
+      "reboots_seen": 0,
+      "legacy_sensors": 0,
+      "legacy_joints": 0,
+      "legacy_timeouts": 0,
+      "serial_disconnects": 0
+    },
+    "console": {
+      "attached": false
+    },
+    "log": {
+      "path": "/tmp/matdog-e2e-ZZxsaa/bridge_serial.jsonl",
+      "records": 37,
+      "errors": 0
+    },
+    "last_error": "",
+    "uptime_s": 2.6
+  },
+  "status_http": 200,
+  "status_source": "FAKE_DEVICE_NOT_HARDWARE",
+  "status_bytes": 3430,
+  "sse": {
+    "events": 51,
+    "bytes": 175658,
+    "seconds": 5,
+    "events_per_s": 10.2,
+    "mean_event_bytes": 3442
+  },
+  "pass": true,
+  "bridge_log_tail": [
+    "[matdog_bridge] FAKE DEVICE - NOT HARDWARE - serial /tmp/matdog_fake_rmf6_uy3/usb-FAKE_DEVICE_NOT_HARDWARE-if00",
+    "[matdog_bridge] log /tmp/matdog-e2e-ZZxsaa/bridge_serial.jsonl",
+    "[matdog_bridge] viewer 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/dist",
+    "[matdog_bridge] dashboard http://127.0.0.1:8799/",
+    "[matdog_bridge] console 127.0.0.1:8798 (loopback, one writer)",
+    "[matdog_bridge] stopped; log /tmp/matdog-e2e-ZZxsaa/bridge_serial.jsonl",
+    ""
+  ]
+}

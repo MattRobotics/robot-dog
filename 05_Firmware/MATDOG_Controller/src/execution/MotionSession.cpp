@@ -10,7 +10,7 @@ const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutio
  if(!policy_||!runtime_||!executor_||!arbiter_||!geometry_||!provenance_)return "NOT_BOUND";
  if(!e.generation||static_cast<int32_t>(now-e.expires_at_ms)>=0||!e.local_operator_present||!e.physical_power_cut_verified||
     !e.installation_verified||!e.servo_output_ceiling_verified||!e.imu_fresh)return "LOCAL_TRIAL_EVIDENCE_REQUIRED";
- if(e.scope==TrialScope::FIXTURE_MICRO||e.scope==TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==TrialScope::SUPERVISED_FIXTURE_WALK){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
+ if(e.scope==TrialScope::FIXTURE_MICRO||e.scope==TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==TrialScope::SUPERVISED_FIXTURE_WALK||e.scope==TrialScope::FIXTURE_COMMISSIONING){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
  else if(e.scope==TrialScope::AUTONOMOUS_STAND||e.scope==TrialScope::AUTONOMOUS_WALK){
    if(!e.support_load_observable)return "AUTONOMOUS_SUPPORT_LOAD_REQUIRED";
    if(e.scope==TrialScope::AUTONOMOUS_WALK&&!e.loaded_dynamics_qualified)return "WALK_DYNAMICS_REQUIRED";
@@ -39,6 +39,26 @@ bool MotionSession::resolve(unsigned i,double q,actuator::ActuatorCommand& cmd,u
  if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,urad,&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
  cmd={};cmd.operation=actuator::ActuatorOperation::POSITION_COMMAND;cmd.joint=id;cmd.target_tick=tick;cmd.target_urad=urad;bus=servo->bus_id;return true;
 }
+bool MotionSession::insideTick(unsigned i,double q,uint16_t max_ticks,double& inside,uint8_t& ticks) const {
+ // Only a LOWER resting at its FOLDED (URDF-lower) end qualifies; anything
+ // else outside its limit is an abnormal pose and stays refused.
+ if(i>=12||i%3!=2||!std::isfinite(q)||max_ticks==0)return false;
+ const auto* servo=servo::legServoAt((i/3)*3+2-i%3);if(!servo)return false;
+ calibration::JointIdentity id;id.leg=static_cast<calibration::Leg>(i/3);id.joint=static_cast<calibration::JointKind>(i%3);
+ std::strncpy(id.physical_unit,servo->physical_unit,sizeof(id.physical_unit)-1);
+ const auto* t=policy_->transforms().find(id,geometry_->provenanceTag());const auto* l=policy_->limits().find(id,geometry_->provenanceTag());
+ if(!t||!l||l->max_tick-l->min_tick<4)return false;
+ uint16_t tick=0;if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,static_cast<actuator::MicroRad>(std::llround(q*1e6)),&tick)!=actuator::TargetResolveStatus::OK)return false;
+ // kPrimeInwardMarginTicks inside the edge, so a holding deadband cannot
+ // place the measured position outside the limit (ACTUAL_OUTSIDE_LIMITS).
+ uint16_t target=tick;
+ if(tick<l->min_tick)target=l->min_tick+kPrimeInwardMarginTicks;else if(tick>l->max_tick)target=l->max_tick-kPrimeInwardMarginTicks;else return false;
+ const unsigned distance=tick<target?target-tick:tick-target;if(distance>max_ticks)return false;
+ actuator::MicroRad urad=0;if(actuator::resolveRawToUrdfQ(*geometry_,*provenance_,*t,target,&urad)!=actuator::TargetResolveStatus::OK)return false;
+ // The inward target must move AWAY from the folded stop (q increases).
+ if(urad*1e-6<=q)return false;
+ inside=urad*1e-6;ticks=static_cast<uint8_t>(distance);return true;
+}
 bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const ExecutionEnvelope& envelope,const JointFeedback& fb,bool image,uint32_t now){
  if(state_!=MotionSessionState::OFF){reason_="SESSION_BUSY";return false;}
  if(!image){reason_="MOTION_AUTHORIZED_0";return false;}
@@ -49,9 +69,20 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
     !std::isfinite(envelope.max_acceleration_rad_s2)||envelope.max_acceleration_rad_s2<=0||!std::isfinite(envelope.tracking_tolerance_rad)||
     envelope.tracking_tolerance_rad<=0){reason_="ENVELOPE_UNAPPROVED";return false;}
  if(const char* r=gate(e,f,fb,now)){reason_=r;return false;}
+ uint16_t clamp_mask=0;uint8_t clamp_ticks[12]{};double primed[12]{};
  for(unsigned i=0;i<12;++i){actuator::ActuatorCommand cmd;uint8_t bus;
-  if(fb.torque_on[i]||!resolve(i,fb.actual_rad[i],cmd,bus)){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
-  primed_rad_[i]=fb.actual_rad[i];}
+  primed[i]=fb.actual_rad[i];
+  if(fb.torque_on[i]||!resolve(i,fb.actual_rad[i],cmd,bus)){
+   // Commissioning only: a measured rest just outside the hard limit (LOWER
+   // folded at its stop) primes at the nearest inside tick, never beyond the
+   // limit and never further than the evidence allows. Torque ON is always
+   // refused. The Safe Actuator layer still checks every target.
+   uint8_t ticks=0;
+   if(fb.torque_on[i]||e.scope!=TrialScope::FIXTURE_COMMISSIONING||!e.prime_clamp_max_ticks||
+      !insideTick(i,fb.actual_rad[i],e.prime_clamp_max_ticks,primed[i],ticks)||!resolve(i,primed[i],cmd,bus)){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
+   clamp_mask|=static_cast<uint16_t>(1u<<i);clamp_ticks[i]=ticks;}}
+ for(unsigned i=0;i<12;++i){primed_rad_[i]=primed[i];rest_rad_[i]=fb.actual_rad[i];clamp_ticks_[i]=clamp_ticks[i];}
+ clamp_mask_=clamp_mask;
  if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}
  evidence_=e;epoch_=policy_->epoch();permit_generation_=f.permit_generation;next_=0;started_at_ms_=now;
  state_=MotionSessionState::PRIMING;reason_="PRIMING_PRESENT";return true;
@@ -100,13 +131,18 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
   ++micro_step_;micro_sequence_=target.sequence;micro_issued_at_ms_=now;return;
  }
  if(now-started_at_ms_>=envelope_.batch_timeout_ms){revoke("PRIME_ARM_TIMEOUT");return;}
- for(unsigned i=0;i<12;++i)if(std::abs(fb.actual_rad[i]-primed_rad_[i])>envelope_.tracking_tolerance_rad){revoke("PRIME_DRIFT");return;}
+ // A clamped joint may only travel between its measured rest and its primed
+ // inside tick; every other joint must stay at its readback.
+ for(unsigned i=0;i<12;++i){const double lo=std::fmin(rest_rad_[i],primed_rad_[i])-envelope_.tracking_tolerance_rad,hi=std::fmax(rest_rad_[i],primed_rad_[i])+envelope_.tracking_tolerance_rad;
+  if(fb.actual_rad[i]<lo||fb.actual_rad[i]>hi){revoke("PRIME_DRIFT");return;}}
  if(state_==MotionSessionState::ARMING){
   // Old pre-prime snapshots cannot prove the holding drive profile. Wait
   // within the admission deadline for all twelve post-energize readbacks.
   if(!input.prime_profiles_verified)return;
   bool fresh=true;for(unsigned i=0;i<12;++i)fresh=fresh&&fb.torque_on[i]&&static_cast<int32_t>(fb.sampled_at_ms[i]-started_at_ms_)>0;
   if(!fresh)return;
+  // Clamped joints must have settled at their inside target before arm.
+  for(unsigned i=0;i<12;++i)if(std::abs(fb.actual_rad[i]-primed_rad_[i])>envelope_.tracking_tolerance_rad)return;
   if(!executor_->arm(f,envelope_,fb,now)){revoke(executor_->status().reason);return;}
   state_=MotionSessionState::ARMED;reason_="ARMED_LOCAL_SCOPED_PERMIT";return;
  }

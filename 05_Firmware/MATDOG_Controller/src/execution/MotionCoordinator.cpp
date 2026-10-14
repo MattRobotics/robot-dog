@@ -1,4 +1,5 @@
 #include "MotionCoordinator.h"
+#include <cmath>
 namespace matdog { namespace execution {
 void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;submitted_sequence_=0;arm_generation_=0;}
 void MotionCoordinator::synchronizeSession(){
@@ -11,6 +12,14 @@ bool MotionCoordinator::configure(const motion::FeedbackPolicy& p,const motion::
  if(executor_&&executor_->active())return false;
  if(!motion::validFeedbackPolicy(p))return false;
  feedback_policy_=p;walk_specification_=w;acquisition_=a?*a:motion::AcquisitionRoute{};configured_=true;return true;
+}
+bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c){
+ if(executor_&&executor_->active())return false;
+ if(!c.enabled){clearCommissioning();return true;}
+ if(!configured_||feedback_policy_.mode!=motion::FeedbackMode::FIXTURE_REVIEW||!feedback_policy_.fixtureLimitVariant||!acquisition_.pairedProne||
+    !c.certificate.present||!std::isfinite(c.minStageDurationS)||c.minStageDurationS<=0||
+    !std::isfinite(c.proneMaxDeviationRad)||!std::isfinite(c.proneMaxRmsRad)||c.proneMaxRmsRad<=0||c.proneMaxRmsRad>c.proneMaxDeviationRad)return false;
+ commissioning_=c;entry_plan_=motion::FixtureEntryPlan{};return true;
 }
 void MotionCoordinator::observe(const motion::AdaptiveObservation& o){observation_=o;}
 bool MotionCoordinator::assess(const motion::SegmentAssessment& a,uint32_t now){
@@ -28,11 +37,22 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
    if(walking_)return "WALK_MUST_STOP_FIRST";
    motion::AdaptiveStandRequest r;r.targetHeightM=c.target_height_m;r.firstSequence=executor_->status().accepted_sequence+1;
    if(acquisition_.count||acquisition_.pairedProne)r.acquisition=&acquisition_;
+   if(commissioning_.enabled){
+    if(!session_||session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "COMMISSIONING_SCOPE_REQUIRED";
+    // The entry starts at the armed (held) pose, never at a nominal knot.
+    motion::JointTargetFrame start;start.valid=true;
+    for(unsigned i=0;i<12;++i){auto& q=start.legs[i/3];(i%3==0?q.hip:i%3==1?q.upper:q.lower)=executor_->targetRadians()[i];}
+    const auto head=motion::pairedProneSample(0,0,true);if(!head.target.valid)return "ROUTE_HEAD_INVALID";
+    entry_plan_=motion::planFixtureEntry(start,head.target,feedback_policy_,commissioning_.certificate,commissioning_.minStageDurationS);
+    if(entry_plan_.status!=motion::EntryStatus::OK)return motion::entryStatusName(entry_plan_.status);
+    r.entry=&entry_plan_;r.proneMaxDeviationRad=commissioning_.proneMaxDeviationRad;r.proneMaxRmsRad=commissioning_.proneMaxRmsRad;
+   }
    return stand_.request(r,feedback_policy_,now/1000.0)?nullptr:motion::feedbackReasonName(stand_.reason());
   }
   case motion::Intent::GAIT_SELECT:return nullptr; // only WALK survived service validation
   case motion::Intent::BASE_VELOCITY:{
-   if(session_&&session_->scope()!=TrialScope::AUTONOMOUS_WALK&&session_->scope()!=TrialScope::SUPERVISED_FIXTURE_WALK)return "LOCAL_WALK_SCOPE_REQUIRED";
+   if(session_&&session_->scope()!=TrialScope::AUTONOMOUS_WALK&&session_->scope()!=TrialScope::SUPERVISED_FIXTURE_WALK&&
+      session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "LOCAL_WALK_SCOPE_REQUIRED";
    motion::PlanarVelocityCommand v;v.vxMps=c.vx;v.vyMps=c.vy;v.yawRateRadS=c.yaw_rate;v.stampS=c.issued_at_ms/1000.0;v.ttlS=c.ttl_ms/1000.0;v.sequence=c.sequence;
    if(walking_)return walk_.command(v,now/1000.0)?nullptr:motion::feedbackReasonName(walk_.reason());
    if(v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0)return nullptr;
@@ -43,7 +63,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
   default:return "ACTION_NOT_VALIDATED";
  }
 }
-void MotionCoordinator::stop(uint32_t){if(session_&&(session_->scope()==TrialScope::SUPERVISED_FIXTURE_STAND||session_->scope()==TrialScope::SUPERVISED_FIXTURE_WALK)){stand_.stop();session_->revoke("LOCAL_FIXTURE_STOP_SAFE_OFF");return;}if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
+void MotionCoordinator::stop(uint32_t){if(session_&&(session_->scope()==TrialScope::SUPERVISED_FIXTURE_STAND||session_->scope()==TrialScope::SUPERVISED_FIXTURE_WALK||session_->scope()==TrialScope::FIXTURE_COMMISSIONING)){stand_.stop();session_->revoke("LOCAL_FIXTURE_STOP_SAFE_OFF");return;}if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
 const char* MotionCoordinator::state() const {
  if(!walking_)return motion::adaptiveStandStateName(stand_.state());
  switch(walk_.state()){case motion::FeedbackWalkState::IDLE:return "IDLE";case motion::FeedbackWalkState::STARTING:return "WALK_STARTING";case motion::FeedbackWalkState::WALK:return "WALK";case motion::FeedbackWalkState::STOPPING:return "STOPPING";case motion::FeedbackWalkState::STAND:return "STAND";default:return "REJECTED";}

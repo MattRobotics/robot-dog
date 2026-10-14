@@ -16,6 +16,8 @@
 #include "../execution/MotionSession.h"
 #include "../execution/ValidationProfile.h"
 #include "../execution/ReviewedMotionRuntime.h"
+#include "../execution/CommissioningPolicy.h"
+#include "../motion/FixturePoseClassifier.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -63,6 +65,19 @@ class Controller {
   void printBootBanner();
   void updateOperationalMotion(uint32_t now_ms);
   bool localValidationCommand(const char*,uint32_t,char*,size_t);
+  // Runtime test policy (RAM-only). @MOTION COMMISSIONING / @MOTION TELEMETRY.
+  bool commissioningCommand(const char*,uint32_t,char*,size_t);
+  void unbindCommissioning(const char* reason);
+  void updateLivePose();
+  void emitTelemetry(uint32_t now_ms);
+  bool profileActive() const { return validation_profile_.sealed()||commissioning_bound_; }
+  execution::RuntimeTestMode runtime_mode_=execution::RuntimeTestMode::DIAGNOSTIC;
+  execution::CommissioningParameters commissioning_params_{};
+  motion::FixtureEntryCertificate commissioning_entry_{};
+  motion::FixturePoseClassification live_pose_{};
+  bool live_pose_valid_=false,commissioning_bound_=false;
+  const char* commissioning_reason_="DIAGNOSTIC_NO_ACTUATION";
+  uint32_t telemetry_period_ms_=0,telemetry_last_ms_=0,telemetry_seq_=0,boot_nonce_=0;
   execution::ValidationProfile validation_profile_{};
  calibration::CalibrationRecord validation_record_{};uint8_t validation_record_bytes_[calibration::kCalibrationRecordV1EncodedBytes]{};
   uint32_t validation_radio_generation_=0;

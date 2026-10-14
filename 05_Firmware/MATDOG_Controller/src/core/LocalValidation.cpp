@@ -35,13 +35,20 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
  if(!strcmp(t[0],"SENSORS")&&n==1){const auto i=imu_.orientationSnapshot();const auto& b=daly_.sample();snprintf(out,size,"SENSORS uptime_ms=%lu imu_valid=%u imu_stamp_ms=%lu quaternion=%.9f,%.9f,%.9f,%.9f bms_valid=%u bms_stamp_ms=%lu soc=%.3f power=%s fault=%u boot_safe_off_pending=%u",(unsigned long)now,i.valid?1u:0u,(unsigned long)i.sampled_at_ms,i.wxyz[0],i.wxyz[1],i.wxyz[2],i.wxyz[3],b.valid?1u:0u,(unsigned long)b.sampled_at_ms,b.soc_percent,core::toString(power_state_.state()),system_state_.systemHealth()==SystemHealth::FAULT?1u:0u,boot_safe_off_pending_?1u:0u);return true;}
  if(wifi_.configBusy()){reason="NETWORK_CONFIGURATION_TRANSACTION_ACTIVE";return reply();}
  if(!build::kSupervisedValidationCapable){reason="VALIDATION_CAPABILITY_NOT_COMPILED";return reply();}
+ if(runtime_mode_!=execution::RuntimeTestMode::GROUND_VALIDATION&&runtime_mode_!=execution::RuntimeTestMode::AUTONOMOUS){
+  reason="REVIEWED_RUNTIME_MODE_REQUIRED";return reply();
+ }
  if(!strcmp(t[0],"PROFILE")){
   if(authority_.current()!=ActuatorAuthority::NONE||motion_service_.busy()||boot_safe_off_pending_){reason="SAFE_IDLE_REQUIRED";return reply();}
+  unbindCommissioning("REVIEWED_PROFILE_LOADING");
   reviewed_motion_bound_=false;validation_present_=false;local_motion_observation_={};local_trial_evidence_={};operational_facts_.operator_permit=false;servo_bus_.setValidationTimeout(0);servo_bus_.setValidationDrive(0,0);validation_walk_admitted_=false;
   ok=validation_profile_.card(line+8);reason=validation_profile_.reason();return reply();
  }
  if(!timed){reason="LOCAL_ISSUED_CLOCK_REQUIRED";return reply();}
+ // Reviewed-card actuation and the commissioning policy never share a runtime.
+ if(commissioning_bound_){reason="COMMISSIONING_RUNTIME_BOUND_USE_@MOTION_COMMISSIONING";return reply();}
  if(!strcmp(t[0],"ADMIT")&&n==3&&!strcmp(t[2],"CONFIRM_CURRENT_INSTALLATION_AND_REVIEWED_PROFILE")){
+  if(!execution::runtimeModeAllowsScope(runtime_mode_,validation_profile_.runtime.scope)){reason="RUNTIME_MODE_SCOPE_MISMATCH";return reply();}
   uint32_t nonce;if(!uintToken(t[1],nonce)||nonce!=validation_nonce_||!validation_profile_.sealed()||boot_safe_off_pending_||authority_.current()!=ActuatorAuthority::NONE||motion_service_.busy())return reply();
   if(servo_preflight_.state()!=servo::ServoPreflight::State::COMPLETE||!servo_preflight_.result().allPass()){reason="LIVE_SERVO_PROFILE_CHECK_REQUIRED";return reply();}
   auto& p=validation_profile_;calibration::RuntimeRestoreRequest facts;facts.expected_generation=1;facts.current_installation_confirmed=true;facts.executor_idle=true;facts.motion_permit_revoked=true;

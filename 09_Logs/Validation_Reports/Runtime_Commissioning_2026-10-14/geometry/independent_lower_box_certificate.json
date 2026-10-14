@@ -1,0 +1,2047 @@
+{
+  "certificate": {
+    "schema": "MATDOG_INDEPENDENT_LOWER_ENTRY_BOX_V1",
+    "status": "PASS_INDEPENDENT_LOWER_BOX",
+    "hardware_authorized": false,
+    "tube_rad": 0.004,
+    "start_rad": [
+      -0.039884,
+      1.398991,
+      -1.601476,
+      0.041417,
+      1.388253,
+      -1.581534,
+      -0.044485,
+      1.440408,
+      -1.59534,
+      0.039884,
+      1.43734,
+      -1.59534
+    ],
+    "head_rad": [
+      -0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532,
+      -0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532
+    ],
+    "lower_domains_rad": {
+      "lf_lower_leg_joint": [
+        -1.605476,
+        -1.5406163880149817
+      ],
+      "rf_lower_leg_joint": [
+        -1.585534,
+        -1.5406163880149817
+      ],
+      "rh_lower_leg_joint": [
+        -1.59934,
+        -1.5493430342749532
+      ],
+      "lh_lower_leg_joint": [
+        -1.59934,
+        -1.5493430342749532
+      ]
+    },
+    "hip_upper_domain": "each independent +/-tube around measured start",
+    "required_nonadjacent_separation_m": 0.003,
+    "roundoff_m": 1e-09,
+    "mesh_sha256": {
+      "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "lf_hip_link": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "lf_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "lf_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lf_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "rf_hip_link": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "rf_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "rf_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rf_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "rh_hip_link": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "rh_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "rh_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "rh_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "lh_hip_link": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "lh_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "lh_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "lh_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+    },
+    "joint_log_sha256": "d1c2ecbaa965d5ea66f20b9a2d37a700ff135efd90d32c9a985aa1cc22d076ca",
+    "tool_sha256": "0e911cb17bc6c9e491896bb73e802ec4dc8fe1bba1ee7a3f997bbdfdfd693e0b",
+    "source_sha256": {
+      "continuous_pair_path.py": "b33cf93269ba843b8af270985c2f59cc87e2fc5b7fdd3ba73f02f30913c80253",
+      "certify_commissioning_entry.py": "8cefce25db75eca8b071b6635322a41cd92512a5e4a5881e28b0ae687a74d0ed",
+      "check_assembly_nesting.py": "7cd03fb71242860e32c709b8d3b08a03da7427785b198e1465c684745e356b06"
+    },
+    "lipschitz_radius_m": {
+      "base_link": {},
+      "lf_hip_link": {
+        "lf_hip_joint": 0.07780847914623551
+      },
+      "lf_upper_leg_link": {
+        "lf_hip_joint": 0.15059788844000133,
+        "lf_upper_leg_joint": 0.10259788844000134
+      },
+      "lf_lower_leg_link": {
+        "lf_hip_joint": 0.26332226355141836,
+        "lf_upper_leg_joint": 0.21532226355141834,
+        "lf_lower_leg_joint": 0.12532226355141834
+      },
+      "lf_foot_link": {
+        "lf_hip_joint": 0.26563665872234954,
+        "lf_upper_leg_joint": 0.21763665872234952,
+        "lf_lower_leg_joint": 0.12763665872234953
+      },
+      "rf_hip_link": {
+        "rf_hip_joint": 0.07780847914623551
+      },
+      "rf_upper_leg_link": {
+        "rf_hip_joint": 0.15059788844000133,
+        "rf_upper_leg_joint": 0.10259788844000134
+      },
+      "rf_lower_leg_link": {
+        "rf_hip_joint": 0.26332226355141836,
+        "rf_upper_leg_joint": 0.21532226355141834,
+        "rf_lower_leg_joint": 0.12532226355141834
+      },
+      "rf_foot_link": {
+        "rf_hip_joint": 0.2656500910418611,
+        "rf_upper_leg_joint": 0.21765009104186112,
+        "rf_lower_leg_joint": 0.12765009104186112
+      },
+      "rh_hip_link": {
+        "rh_hip_joint": 0.07780847914623551
+      },
+      "rh_upper_leg_link": {
+        "rh_hip_joint": 0.15059788844000133,
+        "rh_upper_leg_joint": 0.10259788844000134
+      },
+      "rh_lower_leg_link": {
+        "rh_hip_joint": 0.26332226355141836,
+        "rh_upper_leg_joint": 0.21532226355141834,
+        "rh_lower_leg_joint": 0.12532226355141834
+      },
+      "rh_foot_link": {
+        "rh_hip_joint": 0.2656500910418611,
+        "rh_upper_leg_joint": 0.21765009104186112,
+        "rh_lower_leg_joint": 0.12765009104186112
+      },
+      "lh_hip_link": {
+        "lh_hip_joint": 0.07780847914623551
+      },
+      "lh_upper_leg_link": {
+        "lh_hip_joint": 0.15059788844000133,
+        "lh_upper_leg_joint": 0.10259788844000134
+      },
+      "lh_lower_leg_link": {
+        "lh_hip_joint": 0.26332226355141836,
+        "lh_upper_leg_joint": 0.21532226355141834,
+        "lh_lower_leg_joint": 0.12532226355141834
+      },
+      "lh_foot_link": {
+        "lh_hip_joint": 0.26563665872234954,
+        "lh_upper_leg_joint": 0.21763665872234952,
+        "lh_lower_leg_joint": 0.12763665872234953
+      }
+    },
+    "rows": [
+      {
+        "pair": [
+          "base_link",
+          "lf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.012374633457002907,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "lf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.004277695738995838,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "lf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.02265653958123104,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.012343459224808112,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.005518198017383833,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.024039060937944397,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.012705609049114245,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.019556666471803034,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.024872755266132727,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.012773884812214665,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.019484536723750757,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "base_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.0248003528466054,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.005425742400052683,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.012169494613085908,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rf_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.07195719041375681,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.10665482663661187,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.10973822045504562,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11901275596191832,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.18502722644721992,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.21970482411303288,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.20397688865825478,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.20421960452398324,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.1693775311668301,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.18672670013457465,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1635702437312391,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_hip_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16217960778881169,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "lf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.00559559813871527,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rf_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.1066605332317934,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.13985357157162728,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.13074730343815869,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15395638005242984,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.1490230137854896,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.19155543959290422,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.18475157189380179,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1864411605642419,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.09482792358346624,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.11214716524981523,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.08947226868323985,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_upper_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.08764905928285129,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rf_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.10850116176206194,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1294369489335787,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11932200704691608,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15407803430892522,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.134169254685562,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1778280501667867,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16527079038176193,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16670713574166726,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.08966823707486091,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.10594046768397318,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.07866682984932152,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_lower_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.07664060220052221,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rf_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11766227034967564,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rf_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15259048948867238,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15399091305743726,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15953468847476757,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2335844908029532,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2714512523335198,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.25325313002463135,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.25348212591352753,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.19973651306380555,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.21483929635051965,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1879812473436875,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lf_foot_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.18581722472347995,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rf_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.007408678521250339,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.014135821064467508,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.1693775311668301,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.18674333549953775,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16365121039074404,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16224995731351424,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.18502665115449693,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.21977046984885096,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.20386425780243822,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_hip_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2040968176014155,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "rf_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.007721809914011083,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.09487078072161832,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.11201827156224997,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.08960205328006636,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.0877698267420301,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.14892413978372573,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.19160138933398643,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.18442172560330364,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_upper_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.18610047784078299,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.09116287663594808,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1075065415938676,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.08008301854087514,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.07803665060242826,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.13556500462660734,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.17912030755738456,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16633727454604808,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_lower_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1677630015038148,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "rh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2011866823604871,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "rh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2163517788233417,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.18946709790635197,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1873074391762872,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2350171065346923,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2727991083009114,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.2544111010623519,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rf_foot_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rf_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.25462825486923735,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "rh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.0062654951914642215,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.013011118734441189,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.0718797337649981,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.10666706596597661,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11007239793645014,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_hip_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11974454965698199,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_upper_leg_link",
+          "rh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.0064349026975990455,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_upper_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.10664931107477792,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_upper_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [],
+        "minimum_continuous_separation_bound_m": 0.1409537790016953,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_upper_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1324722512268448,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_upper_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.156113952776992,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_lower_leg_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11008893105218276,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_lower_leg_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.1324716081227676,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_lower_leg_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.12296289008548375,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_lower_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15962907444467672,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_foot_link",
+          "lh_hip_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.11980532865831997,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_foot_link",
+          "lh_upper_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15613897345440222,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_foot_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.15961650928227467,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "rh_foot_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "rh_lower_leg_joint",
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.16539840143055382,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lh_hip_link",
+          "lh_lower_leg_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.0062650766064479895,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lh_hip_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.013007177074453254,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      },
+      {
+        "pair": [
+          "lh_upper_leg_link",
+          "lh_foot_link"
+        ],
+        "pass_": true,
+        "checks": 1,
+        "leaves": 1,
+        "axes": [
+          "lh_lower_leg_joint"
+        ],
+        "minimum_continuous_separation_bound_m": 0.00643506752800337,
+        "blocked": null,
+        "initial_nested_a": [],
+        "initial_nested_b": []
+      }
+    ],
+    "elapsed_s": 0.8063098409984377,
+    "scope": "Baseline-CAD 120 non-adjacent pairs. Each LOWER may progress independently anywhere in the full measured-start-to-head range plus tube. Separate entry adjacent and ventral certificates are still required. Physical uncertainty and fixtures are excluded."
+  },
+  "certificate_sha256": "635095cbb5c887c79df65a427f589f5bd1ac37a2041622a552eddc46a591ddd5"
+}

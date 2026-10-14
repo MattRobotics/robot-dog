@@ -157,6 +157,12 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");
  w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\"}",telemetry_.session_state,telemetry_.session_reason);
  w.add(",\"validation\":{\"capable\":%s,\"scope\":\"%s\",\"segment\":%u,\"profile_sha256\":\"%s\",\"foot_load_proven\":%s}",telemetry_.validation_capable?"true":"false",telemetry_.fixture_scope?"SUSPENDED_FIXTURE":telemetry_.load_scope?"EXTERNAL_LOAD_REVIEW":"UNQUALIFIED",telemetry_.supervised_segment,telemetry_.session_profile_sha256,telemetry_.foot_load_proven?"true":"false");
+ w.add(",\"commissioning\":{\"mode\":\"%s\",\"limits\":\"%s\",\"approved_joints\":%u,\"commissioning_joints\":%u,\"restore\":\"%s\",\"pose\":\"%s\",\"pose_reason\":\"%s\",\"pose_joint\":%d,\"pose_max_dev_rad\":",
+  telemetry_.runtime_mode,telemetry_.limits_scope,telemetry_.approved_joints,telemetry_.commissioning_joints,telemetry_.restore,telemetry_.pose_class,telemetry_.pose_reason,telemetry_.pose_joint);
+ if(telemetry_.pose_max_dev_rad>=0)w.add("%.6f",telemetry_.pose_max_dev_rad);else w.add("null");
+ w.add(",\"pose_rms_dev_rad\":");if(telemetry_.pose_rms_dev_rad>=0)w.add("%.6f",telemetry_.pose_rms_dev_rad);else w.add("null");
+ w.add(",\"entry\":\"%s\",\"phase\":\"%s\",\"segment\":%u,\"session\":\"%s\",\"fixture\":\"%s\",\"prime_clamp_mask\":%u,\"reason\":\"%s\"}",
+  telemetry_.entry,telemetry_.phase,telemetry_.supervised_segment,telemetry_.session_state,telemetry_.fixture_declared?"OPERATOR_DECLARED":"NONE",telemetry_.prime_clamp_mask,telemetry_.commissioning_reason);
  w.add("}");return w.ok;
 }
 } }

@@ -307,11 +307,84 @@ void staleTablesRevokedAndNoAcceptanceFromLoad() {
   CHECK(s.persistence.readAcknowledgedRecord(s.profile, nullptr).load_status == LoadStatus::BAD_ARGUMENT);
   CHECK(s.persistence.readAcknowledgedRecord(s.profile, s.persistence.scratchRecord()).load_status == LoadStatus::BAD_ARGUMENT);
 }
+
+// Fixture commissioning limits: gen-1 contact box with a runtime inset,
+// intersected with the URDF interval. Never an operational/route approval.
+void commissioningLimits() {
+  Scenario s;
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, 8, facts(), s.transforms, s.limits) ==
+        OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  CHECK(s.limits.empty() && !s.restore.snapshot().commissioning_limits_active);
+  CHECK(s.run() == RuntimeRestoreStatus::RESTORED);
+  auto unsafe = facts(); unsafe.torque_off_confirmed = false;
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, 8, unsafe, s.transforms, s.limits) ==
+        OperationalAdmissionStatus::REJECT_UNSAFE_RUNTIME);
+  auto stranger = facts(); stranger.current_installation_confirmed = false;
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, 8, stranger, s.transforms, s.limits) ==
+        OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  auto generation = facts(); generation.expected_generation = 2;
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, 8, generation, s.transforms, s.limits) ==
+        OperationalAdmissionStatus::REJECT_GENERATION);
+  for (uint16_t bad : {uint16_t(0), uint16_t(1), uint16_t(65), uint16_t(4000)}) {
+    CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, bad, facts(), s.transforms, s.limits) ==
+          OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+    CHECK(s.limits.empty());
+  }
+  // The inset must exceed each joint's recorded contact repeatability.
+  uint16_t repeatability = 0;
+  const auto record = golden::goldenRecord();
+  for (const auto& j : record.joint)
+    for (const auto& c : j.contact) if (c.repeatability_ticks > repeatability) repeatability = c.repeatability_ticks;
+  if (repeatability >= kCommissioningMinInsetTicks) {
+    CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, repeatability, facts(), s.transforms, s.limits) ==
+          OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+    CHECK(s.limits.empty());
+  }
+  const uint16_t inset = repeatability + 1 < 8 ? 8 : repeatability + 1;
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, inset, facts(), s.transforms, s.limits) ==
+        OperationalAdmissionStatus::APPROVED);
+  const auto& snap = s.restore.snapshot();
+  CHECK(snap.commissioning_limits_active && snap.commissioning_joints == 12 && snap.commissioning_inset_ticks == inset);
+  CHECK(!snap.operational_limits_approved && snap.approved_joints == 0 && !snap.motion_permit);
+  CHECK(s.limits.size() == 12);
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const auto id = canonicalIdentity(i);
+    const auto* limit = s.limits.find(id, s.profile.provenanceTag());
+    const auto* t = s.transforms.find(id, s.profile.provenanceTag());
+    const auto* g = s.profile.findJoint(id);
+    CHECK(limit != nullptr && t != nullptr && g != nullptr);
+    if (!limit || !t || !g) continue;
+    const auto& j = record.joint[i];
+    const uint16_t lo = j.contact[0].fine_tick_2 < j.contact[1].fine_tick_2 ? j.contact[0].fine_tick_2 : j.contact[1].fine_tick_2;
+    const uint16_t hi = j.contact[0].fine_tick_2 > j.contact[1].fine_tick_2 ? j.contact[0].fine_tick_2 : j.contact[1].fine_tick_2;
+    CHECK(limit->min_tick >= lo + inset && limit->max_tick + inset <= hi);
+    // Never outside the URDF interval either.
+    MicroRad qa = 0, qb = 0;
+    CHECK(resolveRawToUrdfQ(s.profile, geometry_data::kProvenance, *t, limit->min_tick, &qa) == TargetResolveStatus::OK);
+    CHECK(resolveRawToUrdfQ(s.profile, geometry_data::kProvenance, *t, limit->max_tick, &qb) == TargetResolveStatus::OK);
+    CHECK(qa >= g->urdf_lower && qa <= g->urdf_upper && qb >= g->urdf_lower && qb <= g->urdf_upper);
+  }
+  // A reviewed qualification replaces the commissioning scope, and vice versa.
+  auto e = s.syntheticWorkspace(); CHECK(s.qualify(&e) == OperationalAdmissionStatus::APPROVED);
+  CHECK(!s.restore.snapshot().commissioning_limits_active && s.restore.snapshot().approved_joints == 12);
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, inset, facts(), s.transforms, s.limits) ==
+        OperationalAdmissionStatus::APPROVED);
+  CHECK(s.restore.snapshot().approved_joints == 0 && !s.restore.snapshot().operational_limits_approved);
+  // A later rejection revokes every old limit; invalidate clears the scope.
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, 1, facts(), s.transforms, s.limits) ==
+        OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+  CHECK(s.limits.empty() && !s.restore.snapshot().commissioning_limits_active);
+  CHECK(s.restore.qualifyCommissioningLimits(s.profile, geometry_data::kProvenance, inset, facts(), s.transforms, s.limits) ==
+        OperationalAdmissionStatus::APPROVED);
+  s.restore.invalidate(s.transforms, s.limits);
+  CHECK(s.limits.empty() && !s.restore.snapshot().commissioning_limits_active && s.restore.snapshot().commissioning_joints == 0);
+}
 }  // namespace
 
 int main() {
   verifiedReadAndRestore(); runtimePrerequisites(); persistentFailures();
   everyJointValidatedAtomically(); envelopeEvidenceGates(); staleTablesRevokedAndNoAcceptanceFromLoad();
+  commissioningLimits();
   std::printf("CalibrationRuntimeRestore: %d checks, %d failures (offline; no hardware or approved production bounds)\n", checks, failures);
   return failures == 0 ? 0 : 1;
 }

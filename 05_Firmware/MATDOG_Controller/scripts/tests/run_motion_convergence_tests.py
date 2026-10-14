@@ -71,7 +71,10 @@ def check_sources():
                          "execution/MotionCoordinator.h", "execution/MotionCoordinator.cpp",
                          "execution/MotionSession.h", "execution/MotionSession.cpp", "execution/ReviewedMotionRuntime.h",
                          "core/LocalValidation.cpp", "core/LocalMotionCommand.h", "execution/ValidationProfile.cpp", "execution/ValidationProfile.h",
-                         "network/HttpTransport.h", "network/HttpTransport.cpp"}
+                         "network/HttpTransport.h", "network/HttpTransport.cpp",
+                         # 2026-10-14 fixture-commissioning runtime policy: Controller-owned,
+                         # same USB-only role as LocalValidation/ValidationProfile.
+                         "core/Commissioning.cpp", "execution/CommissioningPolicy.h", "execution/CommissioningPolicy.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):
             continue

@@ -229,6 +229,13 @@ void CommandRouter::handleLine(String line) {
     else snprintf(response,sizeof(response),"VALIDATION=REFUSED REASON=ADAPTER_NOT_BOUND");
     Serial.println(response);return;
   }
+  if(upper.startsWith("@MOTION COMMISSIONING ")||upper.startsWith("@MOTION TELEMETRY ")) {
+    char response[1024]{};
+    if(modules_.commissioning_command)
+      modules_.commissioning_command(modules_.validation_context,line.c_str()+8,millis(),response,sizeof(response));
+    else snprintf(response,sizeof(response),"COMMISSIONING=REFUSED REASON=ADAPTER_NOT_BOUND");
+    Serial.println(response);return;
+  }
   if (upper == "@WIFI LAN ON" || upper == "@WIFI LAN OFF") {
     if (modules_.authority->current()!=ActuatorAuthority::NONE || modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE) { Serial.println("LAN=REJECT_MODE_OR_OWNER"); return; }
     modules_.wifi->setMaintenanceLan(upper == "@WIFI LAN ON");
