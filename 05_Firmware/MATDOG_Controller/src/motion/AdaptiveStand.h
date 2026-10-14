@@ -1,8 +1,11 @@
 #ifndef MATDOG_MOTION_ADAPTIVE_STAND_H
 #define MATDOG_MOTION_ADAPTIVE_STAND_H
 #include "PairedProneRoute.h"
+#include "FixtureEntryPlanner.h"
+#include "FixturePoseClassifier.h"
 namespace matdog { namespace motion {
-enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED, PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY, LOAD_TRANSFER, PAIRED_RISE };
+enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED, PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY, LOAD_TRANSFER, PAIRED_RISE,
+  ENTRY_DISENGAGE, ENTRY_ALIGN };
 enum class ObservedPoseClass : uint8_t { UNKNOWN, BELLY_FOLDED, SUPPORTED_INTERMEDIATE, SUPPORTED_STAND, NOMINAL_STAND, UNRECOVERABLE, PARTIAL_SUPPORT };
 const char* adaptiveStandStateName(AdaptiveStandState state);
 struct AcquisitionWaypoint {
@@ -33,6 +36,10 @@ struct AdaptiveStandRequest {
   double targetHeightM=.150, riseDurationS=8;
   uint32_t firstSequence=1;
   const AcquisitionRoute* acquisition=nullptr; // copied at request; caller may release
+  // Fixture commissioning: recognize PRONE in a broad region (classifier),
+  // then follow this staged entry to the fixture route head. Copied at request.
+  const FixtureEntryPlan* entry=nullptr;
+  double proneMaxDeviationRad=0, proneMaxRmsRad=0;
 };
 class AdaptiveStand {
  public:
@@ -44,7 +51,16 @@ class AdaptiveStand {
   ObservedPoseClass poseClass() const {return poseClass_;}
   FeedbackReason reason() const {return reason_;}
   unsigned proneSegment() const {return pairedSegment_;}
-  bool approveProneSegment(unsigned segment){if(segment!=pairedSegment_||!route_.supervisedSegments||pendingValid_)return false;approvedSegment_=segment;return true;}
+  bool approveProneSegment(unsigned segment){if(entryPending()||segment!=pairedSegment_||!route_.supervisedSegments||pendingValid_)return false;approvedSegment_=segment;return true;}
+  // Commissioning approvals: one entry stage, or every route segment up to and
+  // including `last` (a phase end chosen by the caller's runtime policy).
+  bool approveEntryStage(unsigned stage){if(!entryPending()||stage!=entryStage_||!route_.supervisedSegments||pendingValid_)return false;entryApproved_=static_cast<uint8_t>(stage);return true;}
+  bool approveProneThrough(unsigned last){if(entryPending()||!route_.supervisedSegments||pendingValid_||last<pairedSegment_||last>=kPairedProneSegments)return false;approvedThrough_=static_cast<uint16_t>(last);return true;}
+  bool entryActive() const {return entryActive_;}
+  bool entryPending() const {return entryActive_&&entryStage_<kFixtureEntryStages;}
+  unsigned entryStage() const {return entryStage_;}
+  const FixtureEntryPlan& entryPlan() const {return entry_;}
+  const FixturePoseClassification& proneClassification() const {return prone_;}
   bool physicalReadiness() const {return physicalReady_;}
  private:
   FeedbackFrame reject(FeedbackReason reason);
@@ -70,6 +86,12 @@ class AdaptiveStand {
   uint16_t entry_knot_=UINT16_MAX;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
   bool pendingValid_=false, assessed_=false, physicalReady_=false;
+  FixtureEntryPlan entry_{};
+  FixturePoseClassification prone_{};
+  bool entryActive_=false;
+  uint8_t entryStage_=0, entryApproved_=UINT8_MAX;
+  uint16_t approvedThrough_=UINT16_MAX;
+  bool beginEntryStage();
 };
 } }
 #endif

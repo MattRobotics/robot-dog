@@ -5,6 +5,14 @@
 #include "../motion/FeedbackWalk.h"
 #include "MotionSession.h"
 namespace matdog { namespace execution {
+// Fixture commissioning STAND: broad PRONE recognition plus a staged entry
+// from the armed pose to the fixture route head, certified offline from the
+// measured start (RAM-only reference). Rates/limits come from the feedback policy.
+struct CommissioningStandConfig {
+  bool enabled=false;
+  motion::FixtureEntryCertificate certificate{};
+  double minStageDurationS=3, proneMaxDeviationRad=0, proneMaxRmsRad=0;
+};
 // The semantic service, planner and executor share one Controller thread.
 // Configuration/evidence are supplied locally by reviewed artifacts, never Web.
 class MotionCoordinator : public core::SemanticMotionPlanner {
@@ -14,6 +22,13 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void bindSession(MotionSession* session){session_=session;}
   unsigned proneSegment() const{return stand_.proneSegment();}
   bool approveProneSegment(unsigned s){return stand_.approveProneSegment(s);}
+  bool configureCommissioning(const CommissioningStandConfig&);
+  void clearCommissioning(){commissioning_=CommissioningStandConfig{};entry_plan_=motion::FixtureEntryPlan{};}
+  bool approveEntryStage(unsigned s){return stand_.approveEntryStage(s);}
+  bool approveProneThrough(unsigned last){return stand_.approveProneThrough(last);}
+  const motion::AdaptiveStand& stand() const {return stand_;}
+  const motion::FixtureEntryPlan& entryPlan() const {return entry_plan_;}
+  const CommissioningStandConfig& commissioning() const {return commissioning_;}
   void observe(const motion::AdaptiveObservation&);
   bool assess(const motion::SegmentAssessment&,uint32_t now_ms);
   const char* accept(const motion::MotionCommand&,uint32_t now_ms) override;
@@ -35,6 +50,8 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   motion::AdaptiveObservation observation_{};
   motion::FeedbackFrame frame_{};
   motion::SegmentAssessment assessment_{};
+  CommissioningStandConfig commissioning_{};
+  motion::FixtureEntryPlan entry_plan_{};
   bool configured_=false,walking_=false;
   uint32_t submitted_sequence_=0,arm_generation_=0;
 };

@@ -1,5 +1,7 @@
 #include "CalibrationRuntimeRestore.h"
 
+#include "../actuator/CalibrationTargetResolver.h"
+
 #include <string.h>
 
 namespace matdog {
@@ -34,6 +36,9 @@ void CalibrationRuntimeRestore::invalidate(actuator::JointTransformTable& transf
   snapshot_.geometry = actuator::kNoGeometryProvenance;
   snapshot_.restored_joints = 0;
   snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
   snapshot_.motion_permit = false;
 }
 
@@ -124,6 +129,9 @@ OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyOperationalLimits(
   limits.clear();
   snapshot_.operational_limits_approved = false;
   snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
   snapshot_.failed_joint = kRecordJointCount;
   snapshot_.envelope_status = actuator::EnvelopeBuildStatus::NOT_EVALUATED;
   if (!snapshot_.restored || !snapshot_.calibration_accepted || transforms.size() != kRecordJointCount) {
@@ -202,6 +210,86 @@ OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyOperationalLimits(
   snapshot_.failed_joint = kRecordJointCount;
   snapshot_.approved_joints = staged.size();
   snapshot_.operational_limits_approved = true;
+  snapshot_.limits_status = OperationalAdmissionStatus::APPROVED;
+  return snapshot_.limits_status;
+}
+
+OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyCommissioningLimits(
+    const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance, uint16_t inset,
+    const RuntimeRestoreRequest& facts, const actuator::JointTransformTable& transforms,
+    actuator::ActuatorLimitTable& limits) {
+  auto reject = [&](OperationalAdmissionStatus status) {
+    snapshot_.limits_status = status;
+    return status;
+  };
+  if (!runtimeSafe(facts)) return reject(OperationalAdmissionStatus::REJECT_UNSAFE_RUNTIME);
+  limits.clear();
+  snapshot_.operational_limits_approved = false;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.envelope_status = actuator::EnvelopeBuildStatus::NOT_EVALUATED;
+  if (!snapshot_.restored || !snapshot_.calibration_accepted || transforms.size() != kRecordJointCount ||
+      !facts.current_installation_confirmed) {
+    return reject(OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  }
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      profile.provenanceTag() != snapshot_.geometry) {
+    return reject(OperationalAdmissionStatus::REJECT_GEOMETRY);
+  }
+  if (facts.expected_generation != snapshot_.restored_generation) {
+    return reject(OperationalAdmissionStatus::REJECT_GENERATION);
+  }
+  if (inset < kCommissioningMinInsetTicks || inset > kCommissioningMaxInsetTicks) {
+    return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+  }
+  actuator::ActuatorLimitTable staged;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    snapshot_.failed_joint = i;
+    // The inset must exceed the recorded contact repeatability, exactly as
+    // for a reviewed workspace: otherwise the limit could reach the stop.
+    if (inset <= contact_uncertainty_[i]) return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+    const actuator::JointTransform* transform = transforms.find(identity_[i], snapshot_.geometry);
+    if (transform == nullptr || transform->q0_tick != q0_[i]) return reject(OperationalAdmissionStatus::REJECT_TRANSFORM);
+    const actuator::GeometryJointRecord* joint = profile.findJoint(identity_[i]);
+    if (joint == nullptr) return reject(OperationalAdmissionStatus::REJECT_JOINT_IDENTITY);
+    uint16_t urdf_a = 0, urdf_b = 0;
+    if (actuator::resolveUrdfQToRaw(profile, expected_provenance, *transform, joint->urdf_lower, &urdf_a) !=
+            actuator::TargetResolveStatus::OK ||
+        actuator::resolveUrdfQToRaw(profile, expected_provenance, *transform, joint->urdf_upper, &urdf_b) !=
+            actuator::TargetResolveStatus::OK) {
+      return reject(OperationalAdmissionStatus::REJECT_ENVELOPE);
+    }
+    // Nearest-tick rounding of the URDF endpoints: inset one raw count so the
+    // limit cannot exceed the model interval, as qualifyOperationalLimits does.
+    int32_t lower = (urdf_a < urdf_b ? urdf_a : urdf_b) + 1;
+    int32_t upper = (urdf_a > urdf_b ? urdf_a : urdf_b) - 1;
+    const int32_t contact_lower = static_cast<int32_t>(contact_min_[i]) + inset;
+    const int32_t contact_upper = static_cast<int32_t>(contact_max_[i]) - inset;
+    if (contact_lower > lower) lower = contact_lower;
+    if (contact_upper < upper) upper = contact_upper;
+    if (upper - lower <= 2 || lower < 0 || upper > 4095) {
+      return reject(OperationalAdmissionStatus::REJECT_CONTACT_CLEARANCE);
+    }
+    actuator::JointLimit limit;
+    limit.identity = identity_[i];
+    limit.state = EvidenceState::PROMOTED;
+    limit.origin = CalibrationOrigin::LIVE_SESSION;
+    limit.geometry = snapshot_.geometry;
+    limit.min_tick = static_cast<uint16_t>(lower);
+    limit.max_tick = static_cast<uint16_t>(upper);
+    limit.present = true;
+    if (!staged.admit(limit)) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  }
+  if (staged.size() != kRecordJointCount) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  limits = staged;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.commissioning_limits_active = true;
+  snapshot_.commissioning_joints = staged.size();
+  snapshot_.commissioning_inset_ticks = inset;
   snapshot_.limits_status = OperationalAdmissionStatus::APPROVED;
   return snapshot_.limits_status;
 }
