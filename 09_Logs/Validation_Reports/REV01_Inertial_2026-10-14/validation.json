@@ -1,0 +1,50 @@
+{
+  "base_main_commit": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+  "budget_input_sha256": "125ad50b1e5f47ce31b21bec20161d015f80b396b33bdaee00a4c1dd920df8d6",
+  "command_eligible": false,
+  "hardware_verified": false,
+  "numpy_oracle": {
+    "historical_c4c_poses": 51,
+    "max_com_error_m": 1.3877787807814457e-17,
+    "max_inertia_error_kg_m2": 1.3877787807814457e-17,
+    "max_principal_moment_error_kg_m2": 3.469446951953614e-18,
+    "numpy_version": "2.3.5",
+    "poses": 100,
+    "status": "OFFLINE VALIDATED",
+    "synthetic_additional_poses": 49,
+    "tolerance_absolute": 1e-12
+  },
+  "pr50_contract": {
+    "compiler": "g++",
+    "exported_readiness": "HISTORICAL_REV00",
+    "header_path": "06_Software/Matdog_Core/stabilization_g5b/InertialInput.h",
+    "header_sha256": "d9310c92b52fb3d4f95372192b6be7bc8b87720a7601e235188fc6edb4a4be28",
+    "link_capacity": 17,
+    "missing_dependency_preserved": true,
+    "mode": "C++17 host fixture, compile and execute; no pipeline/runtime integration",
+    "pinned_pr50_commit": "0529e44303467c454b07eb7f0e24bedd07182f08",
+    "status": "OFFLINE VALIDATED",
+    "string_capacities_bytes": {
+      "assemblyRevision": 32,
+      "linkName": 32,
+      "provenance": 96,
+      "sourceSha256": 65
+    }
+  },
+  "pr50_pending_contract": null,
+  "protected_files_changed": [],
+  "source_hashes": {
+    "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "06_Software/Matdog_Core/kinematics/matdog_offline_static_stability_support_polygon.py": "c53e31955afdedf471aa451fa6f1b749591dfe7387e7df6dbe0e950ebcca5da9",
+    "06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py": "8646de211301cd767906b2e7a5019ef7a864cd6f15c8b380777cd3ee9192a8e5",
+    "09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json": "4b667a5995e55122b9578c39042914a373aa6bb4e0be84de11381e7f2398b7b2",
+    "09_Logs/Validation_Reports/C4_static_stability_support_polygon/2026-07-08_191840_C4E_static_stability_support_polygon.json": "819ebb061177c19801a30be893a266776ad1d2b9271ecd14cb9dee64f6bb3f56"
+  },
+  "status": "OFFLINE VALIDATED",
+  "unit": {
+    "errors": 0,
+    "failures": 0,
+    "status": "OFFLINE VALIDATED",
+    "tests_run": 35
+  }
+}

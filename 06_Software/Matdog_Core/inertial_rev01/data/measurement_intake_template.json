@@ -1,0 +1,225 @@
+{
+  "schema": 1,
+  "status": "PENDING_MEASUREMENT",
+  "assembly_revision": "REV01-candidate",
+  "cad": {
+    "document_revision": "PENDING_MEASUREMENT",
+    "configuration_inventory": "PENDING_MEASUREMENT",
+    "frame_registration_to_REV00": "PENDING_MEASUREMENT",
+    "inertia_product_sign_and_unit": "PENDING_MEASUREMENT",
+    "full_assembly_pose_rad": "PENDING_MEASUREMENT",
+    "full_assembly_mass_kg": "PENDING_MEASUREMENT",
+    "full_assembly_com_base_m": "PENDING_MEASUREMENT",
+    "full_assembly_inertia_at_com_base_kg_m2": "PENDING_MEASUREMENT",
+    "links": [
+      {
+        "link_name": "base_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lf_hip_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lf_upper_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lf_lower_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lf_foot_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rf_hip_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rf_upper_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rf_lower_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rf_foot_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rh_hip_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rh_upper_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rh_lower_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "rh_foot_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lh_hip_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lh_upper_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lh_lower_leg_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      },
+      {
+        "link_name": "lh_foot_link",
+        "mass_kg": "PENDING_MEASUREMENT",
+        "com_in_link_m": "PENDING_MEASUREMENT",
+        "inertia_at_com_link_kg_m2": "PENDING_MEASUREMENT",
+        "report_file_sha256": "PENDING_MEASUREMENT",
+        "material_density_evidence": "PENDING_MEASUREMENT",
+        "included_components": "PENDING_MEASUREMENT",
+        "export_units": "PENDING_MEASUREMENT",
+        "origin_and_axes_confirmation": "PENDING_MEASUREMENT"
+      }
+    ]
+  },
+  "assembled_robot": {
+    "inventory_and_power_configuration": "PENDING_MEASUREMENT",
+    "date_time_and_operator": "PENDING_MEASUREMENT",
+    "scale_id_resolution_and_uncertainty": "PENDING_MEASUREMENT",
+    "total_mass_kg_repeated": "PENDING_MEASUREMENT",
+    "component_masses_kg": "PENDING_MEASUREMENT",
+    "joint_pose_semantic_rad": "PENDING_MEASUREMENT",
+    "registered_support_contact_world_m": "PENDING_MEASUREMENT",
+    "static_reaction_forces_N_repeated": "PENDING_MEASUREMENT",
+    "com_xy_from_reactions_base_m": "PENDING_MEASUREMENT",
+    "com_z_independent_method_and_uncertainty": "PENDING_MEASUREMENT",
+    "measurement_uncertainties_and_method": "PENDING_MEASUREMENT",
+    "cad_vs_weighing_reconciliation": "PENDING_MEASUREMENT",
+    "mounted_accessory_transforms_and_com": "PENDING_MEASUREMENT"
+  },
+  "qualification": {
+    "all_inputs_reconciled": "PENDING_MEASUREMENT",
+    "measurement_time_domain_for_G5B": "PENDING_MEASUREMENT",
+    "signed_revision_approval": "PENDING_MEASUREMENT",
+    "hardware_status": "HARDWARE UNVERIFIED"
+  }
+}
