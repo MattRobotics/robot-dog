@@ -11,7 +11,7 @@ static std::array<double, 12> toRad(std::array<double, 12> x) {
 }
 int main() {
   unsigned checks = 0;
-#define CHECK(expr) do { ++checks; if (!(expr)) { std::cerr << "FAIL line " << __LINE__ << ": " << #expr << "\\n"; return 1; } } while (0)
+#define CHECK(expr) do { ++checks; if (!(expr)) { std::cerr << "FAIL line " << __LINE__ << ": " << #expr << "\n"; return 1; } } while (0)
   // Frozen route fixture first knot and rounded real encoder-derived 2026-10-13.
   const auto nominal = toRad({-1.0,83.74,-88.5,1.0,83.74,-88.5,1.0,90.0,-89.0,-1.0,90.0,-89.0});
   const auto actual = toRad({-2.29,80.16,-91.76,2.37,79.54,-90.62,-2.55,82.53,-91.41,2.29,82.35,-91.41});
