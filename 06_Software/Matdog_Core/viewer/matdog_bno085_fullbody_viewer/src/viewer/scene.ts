@@ -34,6 +34,8 @@ export interface ViewerScene {
   resetCamera(): void;
   /** Renders a single frame, re-syncing the viewport to the container first. */
   renderFrame(): void;
+  /** Visual-only per-frame hook (e.g. joint interpolation), called before each paced render. */
+  setBeforeRender(callback: ((nowMs: number) => void) | null): void;
 }
 
 const BACKGROUND_COLOR = 0x111418;
@@ -183,10 +185,12 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
   };
 
   let lastRenderedMs = -Infinity;
+  let beforeRender: ((nowMs: number) => void) | null = null;
   const tick = (timestampMs = performance.now()): void => {
     animationHandle = requestAnimationFrame(tick);
     if (document.hidden || timestampMs - lastRenderedMs < 1000 / 30) return;
     lastRenderedMs = timestampMs;
+    beforeRender?.(timestampMs);
     renderFrame();
   };
 
@@ -198,6 +202,9 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
     robotAnchor,
     resetCamera,
     renderFrame,
+    setBeforeRender(callback: ((nowMs: number) => void) | null): void {
+      beforeRender = callback;
+    },
     start(): void {
       if (running) return;
       running = true;

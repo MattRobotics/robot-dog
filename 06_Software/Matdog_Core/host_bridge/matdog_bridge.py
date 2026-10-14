@@ -440,7 +440,7 @@ def parse_joint(line: str) -> Optional[dict]:
     age = _int(kv.get("age_ms")) or 0
     voltage = _int(kv.get("voltage_dv"))
     return {"slot": slot, "id": _int(kv.get("id")), "unit": kv.get("configured_unit"),
-            "raw": _int(kv.get("raw")), "mapped": mapped, "torque": _int(kv.get("torque")),
+            "raw": _int(kv.get("raw")), "mapped": mapped, "energized": _int(kv.get("torque")),
             "speed": _int(kv.get("speed_raw")), "goal": _int(kv.get("goal")), "output": _int(kv.get("output")),
             "temp": _int(kv.get("temp")), "volt_dv": voltage, "status": _int(kv.get("status")),
             "stamp_ms": stamp, "reply_age_ms": age, "controller_now_ms": stamp + age,
@@ -650,12 +650,12 @@ class TelemetryEngine:
         servos = []
         for slot, j in enumerate(joints):
             if j is None:
-                servos.append({"slot": slot, "id": None, "raw": None, "mapped": None, "torque": None,
+                servos.append({"slot": slot, "id": None, "raw": None, "mapped": None, "energized": None,
                                "speed": None, "goal": None, "temp": None, "volt_dv": None, "status": None,
                                "age_ms": None, "actual_rad": None, "stamp_ms": None})
             else:
                 servos.append({"slot": slot, "id": j["id"], "raw": j["raw"], "mapped": j["mapped"],
-                               "torque": j["torque"], "speed": j["speed"], "goal": j["goal"], "temp": j["temp"],
+                               "energized": j["energized"], "speed": j["speed"], "goal": j["goal"], "temp": j["temp"],
                                "volt_dv": j["volt_dv"], "status": j["status"],
                                "age_ms": max(0, now_ms - j["stamp_ms"]), "actual_rad": j["actual_rad"],
                                "stamp_ms": j["stamp_ms"]})
@@ -1359,7 +1359,7 @@ class FakeController:
         tracking = max(abs(a - b) for a, b in zip(actual, target))
         self.tel_seq += 1
         servos = [{"slot": s, "id": self.BUS_IDS[s], "raw": self._servo_raw(s, actual[s]), "mapped": mapped[s],
-                   "torque": 0, "speed": 0, "goal": 0, "temp": 31 + s % 4, "volt_dv": 118, "status": 0,
+                   "energized": 0, "speed": 0, "goal": 0, "temp": 31 + s % 4, "volt_dv": 118, "status": 0,
                    "age_ms": 20 + 7 * s} for s in range(12)]
         return {
             "version": 1, "now_ms": now, "last_sequence": 0, "owner": "FAKE_DEVICE",
@@ -1380,7 +1380,7 @@ class FakeController:
             "imu": {"valid": True, "stamp_ms": max(0, now - 3)},
             "commissioning": {"mode": "DIAGNOSTIC", "pose": "PRONE_COMPATIBLE", "pose_max_dev_rad": 0.0412,
                               "pose_joint": 5, "entry": "NONE", "limits": "NONE", "approved_joints": 0,
-                              "egress_mask": 0, "restore": "RESTORED" if all_mapped else "NOT_RUN",
+                              "commissioning_joints": 0, "prime_clamp_mask": 0, "restore": "RESTORED" if all_mapped else "NOT_RUN",
                               "segment": 0, "phase": "FAKE_IDLE", "session": "OFF"},
         }
 
