@@ -1,0 +1,1338 @@
+{
+  "scope": "offline only; not a firmware release",
+  "gates": [
+    {
+      "name": "scope_and_core_purity",
+      "status": "PASS",
+      "unexpected_paths": [],
+      "forbidden_tokens": [],
+      "main_base": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af"
+    },
+    {
+      "name": "g5b_strict_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O2",
+        "-I",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion",
+        "-I",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/tests/test_pipeline.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.cpp",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "g5b_cpp",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test"
+      ],
+      "output_sha256": "2f1201352d0a70dcf4a5299dece09f77563561fd28b556d5ab0937cf0084aee0"
+    },
+    {
+      "name": "g5b_sanitizer_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/clang++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-g",
+        "-O1",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-I",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion",
+        "-I",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/tests/test_pipeline.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.cpp",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/g5b_san"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "g5b_asan_ubsan",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/g5b_san"
+      ],
+      "output_sha256": "2f1201352d0a70dcf4a5299dece09f77563561fd28b556d5ab0937cf0084aee0"
+    },
+    {
+      "name": "g5b_bridge_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O2",
+        "-shared",
+        "-fPIC",
+        "-I",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion",
+        "-I",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/tests/bridge.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.cpp",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/bridge.so"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "g5b_independent_oracle_and_simulations",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/tests/offline_oracle.py",
+        "/tmp/matdog-g5b-offline-jm6fgcup/bridge.so",
+        "$REPO/09_Logs/Validation_Reports/G5B_IMU_Offline_2026-10-14"
+      ],
+      "output_sha256": "791fdf8e37c7bb8b55135f71d17b177afdc4f95e9f3d575895bc477160f6d59a"
+    },
+    {
+      "name": "g5b_deterministic_replay",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/tests/offline_oracle.py",
+        "/tmp/matdog-g5b-offline-jm6fgcup/bridge.so",
+        "/tmp/matdog-g5b-offline-jm6fgcup/repeated"
+      ],
+      "output_sha256": "791fdf8e37c7bb8b55135f71d17b177afdc4f95e9f3d575895bc477160f6d59a"
+    },
+    {
+      "name": "g5b_byte_identical_replay",
+      "status": "PASS",
+      "files": [
+        "offline_results.json",
+        "simulation_trace.csv"
+      ]
+    },
+    {
+      "name": "g5b_stack_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O2",
+        "-fstack-usage",
+        "-I",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion",
+        "-I",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b",
+        "-c",
+        "$REPO/06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.cpp",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/pipeline.o"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "main_motion_source_provenance",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "$REPO/05_Firmware/MATDOG_Controller/scripts/tests/run_motion_convergence_tests.py",
+        "--source-only"
+      ],
+      "output_sha256": "cd2fe19bd378118ddbdb1223b3b08b9da19d22e1662c4e2c242a3d076e8a08b6"
+    },
+    {
+      "name": "existing_kinematics_python",
+      "status": "FAIL",
+      "returncode": 1,
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "$REPO/06_Software/Matdog_Core/kinematics/tests"
+      ],
+      "output_sha256": "0395f848fc22e8754affc7e4923eb4ccee2127329a8a304f15a86af66cbb593a",
+      "required_for_g5b": false,
+      "baseline_identical": true,
+      "baseline_reason": "16 errors from obsolete visual-zero calibration-status expectation; protected files unchanged",
+      "baseline_sha256": {
+        "06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py": "56a3e95035e70bc157c867c5a924d576c02ac3166ee63f89c5a695693b122c33",
+        "06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py": "6848c46f539ef5f4281f41510142a3cf3ed06950ae9c9e021effe311cd0d1536",
+        "06_Software/Matdog_Core/calibration/MATDOG_JOINT_CALIBRATION.yaml": "53cfeb3075ad673e23faa0e6b800aaf30c2d37cb5344d601be693e6941eecc92"
+      }
+    },
+    {
+      "name": "pertinent_kinematics_python",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "-m",
+        "unittest",
+        "test_matdog_body_stance",
+        "test_matdog_foot_contact",
+        "test_matdog_leg_contact",
+        "test_matdog_leg_contact_ik",
+        "test_matdog_leg_ik",
+        "test_matdog_quadruped_leg_contact",
+        "test_matdog_quadruped_leg_contact_ik",
+        "test_matdog_urdf_fk"
+      ],
+      "output_sha256": "44e51c4e9b1f89f86ee6abef8391a5ce2967f35611bf979df55175e504bb7130"
+    },
+    {
+      "name": "legacy_core_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "-c",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_motion_kinematics_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_motion_kinematics.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_motion_kinematics"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_motion_kinematics",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_motion_kinematics"
+      ],
+      "output_sha256": "f53b2b9af04c97f372aec574f8f6bb3f21a08412372f1796e404620d8a03b9af"
+    },
+    {
+      "name": "test_contact_stand_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_contact_stand"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_contact_stand",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_contact_stand"
+      ],
+      "output_sha256": "33229ab7ef16c04e572d6b27b5ef1b51afecea94ae3a634d7b607cce2db60504"
+    },
+    {
+      "name": "test_startup_timed_stand_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_stand.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_startup_timed_stand"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_startup_timed_stand",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_startup_timed_stand"
+      ],
+      "output_sha256": "ceb946e4e2f5de0998c9cb891a89af7c51c6befd3d70d5bf182120e1b5b6a7b8"
+    },
+    {
+      "name": "test_pose_support_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_pose_support"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_pose_support",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_pose_support"
+      ],
+      "output_sha256": "e82c6ba5bcadcee44ee6cd6a83361da58c066179c24bdcfd2fc9f081116cb9dd"
+    },
+    {
+      "name": "test_gait_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_gait"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_gait",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_gait"
+      ],
+      "output_sha256": "d489d547b123cb6f1ed3ffe7e80cca23959dd5b398ccb1bee1602ab9cb455c8d"
+    },
+    {
+      "name": "test_contact_mode_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_contact_mode.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_contact_mode"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_contact_mode",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_contact_mode"
+      ],
+      "output_sha256": "3ed6223c092c66c5ec6ca5f2d7505fb5a17e23c336cc742fd9bbe2b30b79bda1"
+    },
+    {
+      "name": "test_stabilization_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_stabilization.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_stabilization"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "test_stabilization",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/test_stabilization"
+      ],
+      "output_sha256": "95932f778cdee99843c5905b8478c16fff72a22cb219fd74091a5708d649ca38"
+    },
+    {
+      "name": "motion_oracle_driver_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/motion_oracle_driver.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/motion_oracle_driver"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "motion_historical_python_oracle",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_motion_oracle.py",
+        "/tmp/matdog-g5b-offline-jm6fgcup/motion_oracle_driver"
+      ],
+      "output_sha256": "f6bbf253533212ca5dc301c07dab5055f40f4dd3b3dbb8f497365a8fc1c2e8e9"
+    },
+    {
+      "name": "contact_stand_oracle_driver_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/contact_stand_oracle_driver.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/contact_stand_oracle_driver"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "contact_stand_historical_python_oracle",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand_oracle.py",
+        "/tmp/matdog-g5b-offline-jm6fgcup/contact_stand_oracle_driver"
+      ],
+      "output_sha256": "08552b94934b99d5fa829bef27ff2d2684ed6396d79ffc74152a657b2acb310c"
+    },
+    {
+      "name": "startup_timed_oracle_driver_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "g++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-O1",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/startup_timed_oracle_driver.cpp",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ActuatorEnvelope.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyPose.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/BodyStabilizer.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ContactMode.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/FootContact.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Gait.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/ImuAttitude.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegInverseKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/LegKinematics.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/Locomotion.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/MotionState.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/PoseSupport.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTrajectory.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StandTransition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/StartupAcquisition.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltCompensation.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TiltedContactIk.o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/objects/TimedStand.o",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/startup_timed_oracle_driver"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "startup_timed_historical_python_oracle",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_oracle.py",
+        "/tmp/matdog-g5b-offline-jm6fgcup/startup_timed_oracle_driver"
+      ],
+      "output_sha256": "82f77e3de1a3ffb73eb756043347f5db0aa6766551f0e4666089fb3081e9f3e2"
+    },
+    {
+      "name": "g5a_sanitizer_build",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/clang++",
+        "-std=c++17",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-pedantic",
+        "-fno-exceptions",
+        "-fno-rtti",
+        "-g",
+        "-O1",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/05_Firmware/MATDOG_Controller/scripts/tests/test_stabilization.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp",
+        "$REPO/05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp",
+        "-o",
+        "/tmp/matdog-g5b-offline-jm6fgcup/g5a_san"
+      ],
+      "output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "g5a_asan_ubsan",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/tmp/matdog-g5b-offline-jm6fgcup/g5a_san"
+      ],
+      "output_sha256": "95932f778cdee99843c5905b8478c16fff72a22cb219fd74091a5708d649ca38"
+    },
+    {
+      "name": "g5a_independent_checks",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/06_Software/Matdog_Core/stabilization_audit/independent_checks.py"
+      ],
+      "output_sha256": "5b5c78135f579f08c23e740f0e46cb8206e7d14905c9fa9059cb3976968aa0e8"
+    },
+    {
+      "name": "g5a_loop_simulations",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/06_Software/Matdog_Core/stabilization_audit/perturbation_sim.py"
+      ],
+      "output_sha256": "9794af4b197ceb7b9bdcb613f5a9b661ba0c7bc3f28c174366504a4141bd4bae"
+    },
+    {
+      "name": "g4_independent_oracle",
+      "status": "PASS",
+      "returncode": 0,
+      "command": [
+        "/usr/bin/python3",
+        "/tmp/matdog-g5b-offline-jm6fgcup/reference/06_Software/Matdog_Core/stabilization_audit/run_g4_oracle.py"
+      ],
+      "output_sha256": "3cd12abaa8efe3ba67eec4e772bfedb0922ac81a132ef820074aead5e0917b24"
+    },
+    {
+      "name": "git_whitespace_check",
+      "status": "PASS",
+      "returncode": 0
+    }
+  ],
+  "historical_test_commit": "e1704719979789cd9c9f18741e4546725558797e",
+  "historical_test_sources": [
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_host_tests.sh",
+      "sha256": "49b2aa5f9f27b8698074c14144fc5aee8b8f9cf9b6d4978a544240f342b2d0f0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_kinematics.cpp",
+      "sha256": "f5fc13e699b9f9c61cace28e12dcd7b2d01810b0477cd9e96a4842fef4b874c7"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/motion_oracle_driver.cpp",
+      "sha256": "5ea79808c3cc466c5f6a4f43973fa62114f77e87b179e0ed6b73b4cba7712960"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_oracle.py",
+      "sha256": "9d1fe10de5eb01fc78ec875330582d6231cd537a4417b3c685e8967523e61df0"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand.cpp",
+      "sha256": "a3e460ce299d3836b58eec30e279ccb4d19a3f1333a1d7d9ffe65869f1095d16"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/contact_stand_oracle_driver.cpp",
+      "sha256": "07771f4390b62588b438a9a4212548a5d5b6a3f4b27d8287096cd75745172dad"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_stand_oracle.py",
+      "sha256": "cd7e8e56768d37706269760ebd63987485cc56201ad794a8ae26d03a8ab4f3f6"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_stand.cpp",
+      "sha256": "31040375c483058b851d51b2cc5ff62877377c934abff16a167974ee95781112"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/startup_timed_oracle_driver.cpp",
+      "sha256": "000d5c315460a8530531288b6930a012e850cb648dd010c77632f5dbf2bf2928"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_startup_timed_oracle.py",
+      "sha256": "b4c9d2392de2caa0ec584d6ee5269bbebf60ff5821f76c74f695e4c9c430e02d"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_pose_support.cpp",
+      "sha256": "e17ba3ab0ac5eb4abc1dedbf2dfeefddf6977d158ec2f66e57caf7a13e8896ce"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_gait.cpp",
+      "sha256": "134dee7814454960885fedfaa01ddc2839c43a0b1550e238a6639ed059624390"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_contact_mode.cpp",
+      "sha256": "b5bed83d34bf0e767a3bbb0404a9734f50c7983669770ee070ba0f780f5ec789"
+    },
+    {
+      "path": "05_Firmware/MATDOG_Controller/scripts/tests/test_stabilization.cpp",
+      "sha256": "fcb43dd9f158b1542844677e9db856332759b39dcf65f8c6c3ecf057901fc7b9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_motion_geometry_export.py",
+      "sha256": "d0e22b4980b41a8c0d098f336ddaf6a4f533470ff8f95184e29217fbc08cc6e3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/kinematics/matdog_contact_stand_export.py",
+      "sha256": "e2912d0cf8edea7db027059694a7c6dbe57e7d399c6a2b807a9fa200ddfb5f62"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/PoseExport.java",
+      "sha256": "0a82e1e562e6a88d2abe6320c8821f17b153cfd81124f665834116bc5d0357cc"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/README.md",
+      "sha256": "daf342c5dc665bc9cba32736b7d3e1ef1ee97e48b7aea250f9850654d4550ac6"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/artifact_manifest.py",
+      "sha256": "967dc3e8a5b3cf33078e9a09f20d44ca77824e6546d50c3378e7e8a4724c35ea"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/build_report.py",
+      "sha256": "8db3a19c7009a38dd94e00b2bfe4ca1fea60ee36442b6d1c0de7517dcc578385"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/closeout.py",
+      "sha256": "2590580b9913190e89c17266c6a7c233bb2362e94cc3965d867502cd82c43e96"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/connectivity.py",
+      "sha256": "f610e57f0e05c0d3aaca05a212a6915488bc49785d723ef95fef99582b94fc5b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/contact_bridge.cpp",
+      "sha256": "9a77d5474f0a97554467386e7a5e596d9e648a453252c0f820556f131014cf85"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/contact_modes.py",
+      "sha256": "4e4f930acca31811228cf6869367e58a1e63e4482efca19c0646f05424681657"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/diagnostics.py",
+      "sha256": "86f546aa45c32ec4f057a641b43a634563ecb792bf55d7d5b23e7a1644ad3232"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/dimensions.py",
+      "sha256": "c936b50ab33118ef3fbb29341cb62aca313cb505a377eac6bd2c64b9f6821969"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/equivalent_stand.py",
+      "sha256": "78e3b6af9b7197e2f7e17a5d2967d9e9554f9ac50bd37a60c28ff1d05e8357c9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/evidence_closure.py",
+      "sha256": "9627cb4f5a200321ad4eda3ddedb585cf3df9f0fddafca99de9b4630a18e1f9f"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/expanded_survey.py",
+      "sha256": "5e7601cac0450249a7a6ff8e72e3d5aa2e182912e814e2a3f00eaf73af5b897b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/ik.py",
+      "sha256": "27ee6ead719440f493b0c15e1db3aa2a9d3d87a834d52a8f412790c73e0d862c"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/lower_envelope.py",
+      "sha256": "c81a8aecb6ba0236e75366fc58cb0e2b35af8e2cba10ef4d3437b4a17921eba4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/model.py",
+      "sha256": "d9866cd8e98debff5ca5e7cfb86bd7d69f4edc1dd450b5ec1d5da9bc65f87698"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/policy_report.py",
+      "sha256": "9c53e902168fc7e1cec99b02d1f65d24f4875b650d4c1277ee0ccb64afb1fdf6"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/pose_export.py",
+      "sha256": "331a7b88388ec3d3908877b01bbd4e3063e79555ba6d47f33d890f07d0acfbbf"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/pose_library.py",
+      "sha256": "d8aa1ebfed57a0a964be20d49a41a6e39296e9400f136acc2efea3c4a7e1cafb"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/render.py",
+      "sha256": "2f2e3765580e44866e11920bd6f13baa086e5a69bbd8560c08f7b669febf0a30"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/requirements.txt",
+      "sha256": "03dead8c49a8d6b7a211d18a7260e1ad39140b01cf4b164e612697e7124942fb"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/research_checkpoint.md",
+      "sha256": "6329c91fe70fd33433dface44862df1bc87e830462d79d51245aa6b1db5044d5"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/rest_connectivity.py",
+      "sha256": "ba9d202aa04add6cab4b4d78b408b74ae1eba1fe1d952b63f1d6b73f6cb8a725"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/retarget.py",
+      "sha256": "478e07c2ab3f514edc45ad4e4fe0767f788eac2dd59951131347ed86a35137c9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/revalidate.py",
+      "sha256": "0399cc21f8716d14dd277e5045b3f9d376ca37f713784f32d635b74565fecc28"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/route_extension.py",
+      "sha256": "1f5b0a9dbd8762c42d6c4b548ff75448f20ac278e607c958935b7b63c2acd7f5"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/support_transfer.py",
+      "sha256": "e548af534fac5f7b954d96390f80c0ee28f04c76dd301abb012d028bb3f64aba"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/survey.py",
+      "sha256": "5e521a48ca8286536dc93603a21572510ad37c428f7973235d310fafc0a8440d"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/test_pose_audit.py",
+      "sha256": "59996c6a557b6bf46772ee45bdf1efb3355c441ea56e4a16268f5d5e8b9b5566"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/transfer_search.py",
+      "sha256": "b58b1d6ee7f8ae86d88e4a8842310d8ba52c9b67dcf2c722d43f8a62773279fc"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/transition_summary.py",
+      "sha256": "6bbe0ec421782b33cad1902f5b07692dd13c765cf79d6593e3a5037791df3a48"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/validate.py",
+      "sha256": "b57a877d4288a4ada45dae9eff329cd5c8e742ba450707c205764bea8e4256b9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/pose_audit/xgo_audit.py",
+      "sha256": "615c7d44561c374a7b0fb6e6360595aa8b2d736acf8df33fde484e29b6eb835e"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/README.md",
+      "sha256": "23b19b0973ad450aa5d85ab9489ae6f4898a36e6f937f23b172629cc8c026579"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/artifact_manifest.py",
+      "sha256": "0e41e97404833c8065025f436929dfc9536f3101d5c3c47fc9b656234ff228b4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/audit_gate.py",
+      "sha256": "ab73d4564a151edc0b3d61d7bfc68c838c77f1cd6e71d28cce71d0c0086637d4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/bridge.cpp",
+      "sha256": "79f4a3bcda03dbfb4605614e58788eedda205f0e0c2244af2e4e0b86bf40a9ed"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/build_report.py",
+      "sha256": "680bbfb6d41d304e3f2cbceae60034fe07baeabbb46233aab0f4a158720d693c"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/contact_discrepancy.py",
+      "sha256": "1440edf4bb072340932da165a4463da2f40a73ba1de3216d6bddf23ec0862df7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/core.py",
+      "sha256": "f70613d11fa3885ce143c8f00417eb3dce9651942aa8ebbe7edd9543f6a1489b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_ground_probe.py",
+      "sha256": "84199f255ad00ba5a8cec6bf0b31d8cd97a5a7f76b9197cc875935f9271fc9c4"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_representatives.py",
+      "sha256": "a1b1dacae658dd234154532c2e6f87f03dcce2d6a048aa5fee069ca7092ffe3a"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/dense_robust_full.py",
+      "sha256": "de5aad9cc950461603d8968284d2f1a03db8327448b8427008968bd22fdd8e0e"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/derivatives.py",
+      "sha256": "55b5601f5e6fad58943d62efb50e1ea3b6ec4cdd504e2f7777b641bdd05eda65"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_frontier_full.py",
+      "sha256": "f72278f4138c7ce6f9ec490b88a42e8af58f56982f732997ed3f1f35e8045677"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_screen.py",
+      "sha256": "881a39c33b48045c5956fe1187e848dc2d2fb0cd11b511f3d177cb2a781c67df"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/diag_stride_extension.py",
+      "sha256": "1e281db30b48dd8185db578fab686972dbcdea750f1ac41f3c897f10112f95b8"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/envelope_summary.py",
+      "sha256": "78a44f9e19f91c3b2fdf2a8bc19074a46f6be1d8219668cec44f03d482747c52"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/lifecycle_audit.py",
+      "sha256": "c28d816c1414dfbf06ae76f85dc6f3bfc126e5be01e7a1499327474acac1ea68"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/lifecycle_probe.py",
+      "sha256": "0708c941fca303619629fa0e9e4d80c4b9b3f1db70e1e369eb44ee510063b701"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/oracle.py",
+      "sha256": "84ec1ff5f381292da246be9cb6b963ac29e4fcaf6567ad83c663ccbb79c13549"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/refine.py",
+      "sha256": "6d670d73e7535d33160a7873b521e16a6c8ce7b42e7c980d0e373f04a0cb7900"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/render.py",
+      "sha256": "8a715f61093051fb9bb124372098cb6056c09c896ca38ea1eeeae30379d54e3b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/revalidate_saved.py",
+      "sha256": "defd1b0a1a8955ab02b39ee90fd05978a793b975ace64dfb1d3d5fc9c2ec3a09"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/robust_search.py",
+      "sha256": "876eca1d0a488abe6b59860fb824c1efc960d574295076f30f32ce7742654255"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/select_representatives.py",
+      "sha256": "c0d3ca84da1508371ea94a0d70dfe9243846aa8e77fff29a0755d9d29c4e013f"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/survey.py",
+      "sha256": "606f1cf29b8ccc1c85816d5af09c2e2a4922a723beae4484dc6e44b645c5ec05"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/test_gait_audit.py",
+      "sha256": "3d33417db776268fb05c0036e69baaa9ab15ebfd3205b2ca2c4eb685621be810"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/validate.py",
+      "sha256": "b55cb79d8daff5442ff7232b318b2ee78c9b8e09445210bdc2c29906e7dbf70b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/gait_audit/xgo_evidence.py",
+      "sha256": "d6b704a106163e46b4a783e63830980fdebc90c5d2eda5c495ddf96f3f06d5d8"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/README.md",
+      "sha256": "f94146dae575b69fc96e57038c6d3dab1bab0bda3362cecf188527743a367b38"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/alternatives.py",
+      "sha256": "a347f7282508451b7b73d12c2e5fe6bc93fa37bc514bd323ca0641d48d467e6f"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/artifact_manifest.py",
+      "sha256": "6e71312bf103b50ec0a4a4b96320a960a8de9213488f7efa4286e21d6b079c2f"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/build_report.py",
+      "sha256": "76ee144f2e6a6d57e6c5f789d25e6b7d4fe46911c91e49ac29a96cb61ab7e1c0"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/common.py",
+      "sha256": "5e8b82cc952b67391cf2bf7214a73d2b2af6a6c1d3c9120a14f3a3ff893f7304"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/contact_model.py",
+      "sha256": "e672b5f38712adf8c753fe415d5c0c96bcc03d5871deb3212fc8c027ca350c9d"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/geometry_provenance.py",
+      "sha256": "4e149af6eb1bdc6f207574b52d4d5f33fc6e0bd187ced9389b43aeae9b029fe0"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/lifecycle_v2.py",
+      "sha256": "b4fef80d4750c3c00a4e236aa5b83a186f570bf785bcf3aa93008001c04b57e9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/per_foot_discrepancy.py",
+      "sha256": "d8ea4f9389d748374cb07ff2df6759d3f760170ffb3881d33a3da85c1c53fe67"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/replay_compare.py",
+      "sha256": "00931de23e5b729ba258369c2f7ca79c77fd09d64e3df9609d442870a4b92dd1"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/root_cause.py",
+      "sha256": "101302b329502fc6a872e668a382d37cf32a52c1d10ed4521af9757ecd9fbd87"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_convergence.sh",
+      "sha256": "b92201150c315a74c9645179c1f149f6c6c269c60121cf99dc3986ca35d01214"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_g4_oracle.py",
+      "sha256": "053606388385eea9e731aaf3dfd92a565de16f9f5da4cf1d00411ab94887527d"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/run_lifecycles.sh",
+      "sha256": "c684686fb1a23c6ac19260618ccf6befd7aebbcda26593d26a17e81cdc378774"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/test_contact_audit.py",
+      "sha256": "e4174f3dc147ca52faf3802fdaaa815933019d4abbd402d94971b49a975a8ff7"
+    },
+    {
+      "path": "06_Software/Matdog_Core/contact_audit/validate.py",
+      "sha256": "fa516b5d8a4db08e5ed3e1942ac52777273d5e1927e6453fca4a953f29199915"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/artifact_manifest.py",
+      "sha256": "fbae896b960a377194e17bcba97de302ab2b0508285893e72306acaa9b1af4d9"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/bridge.cpp",
+      "sha256": "6440e1fd94eb5ade2d83c81bdd64e8bae47ce2fb75ffb83f26e0314030dc8128"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/build_report.py",
+      "sha256": "c182d6e12f93dc524696fe2dc156362ecc045715107dec2b761cea214dec0132"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/core.py",
+      "sha256": "93fa5681192f1481e66113fd1e5bba3e87dedeb5f1b0e64c22364bfd21a2613e"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/dynamics.py",
+      "sha256": "c58d95dd157e11782408eabd61ff0b535431c9ba7a5d47232e883c164b81b322"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/feasibility_table.py",
+      "sha256": "87e579bb957f679fd0088bae0b91ca17c6683777df7a55d1400d4795d71ca688"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/independent_checks.py",
+      "sha256": "e4dca96492f66446dd3526f083b2ddb73007e31e87dee74b8ef30cb6ce0811bd"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/joint_range.py",
+      "sha256": "e1909768e0699a33fb09991d497d5f6d8e279154eeba6eb32c907230adfa5c84"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/perturbation_sim.py",
+      "sha256": "8135e5e7da1fec83d5090a2684a407d9dd50a320c276215c3a498cef890ffd5e"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/provenance.py",
+      "sha256": "5b9955266bacf9b733af1969c0e1c990daa0df9d7ed49b0d42a4693842c762b1"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/run_g4_oracle.py",
+      "sha256": "7cdb2172baefba3b81a00c0d7983921309233ea4e5d8a94624df88bdb1e69849"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/stability_actuator.py",
+      "sha256": "0be7a4da878695c4f717fef26e56fb38c8ae4d839b71698126418bf450f2220b"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/test_stabilization_audit.py",
+      "sha256": "bf9ba6356c91ad0cf98ca5d9524e408bfcc7e57ac657449fa7fd3f058ceaf0b3"
+    },
+    {
+      "path": "06_Software/Matdog_Core/stabilization_audit/validate.py",
+      "sha256": "f5356080701d581c95ec75810918ae222dcf2fc33d0d1bc18385eb6f99cbcf42"
+    }
+  ],
+  "source_sha256": {
+    "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp": "cbe2def140c839b46cbf1df3d4ee4321a5cf5dcc8d90f7ce1a63f6b34553dfd5",
+    "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.h": "7338343b726565dad13a9af440ec90aa960ca6f83e4cd93412b3eb23e84eb57e",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "cde2c92e30befbc192e02c226178759aa6e4163cba619f73fcf830adb42447d0",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyPose.h": "6a06577cb546e3aaf3ad60b354f4ac068c0d89b71726ee18a4a5213f3b236150",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp": "21f31eb43321a4b0381631c58410862a2620e2fcae9368b5fb28ff0099ed2adb",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.h": "0b6725ad90edc1e39f3bb469f687576fa3fe5b76cb3d2ece13c5528d98b95625",
+    "05_Firmware/MATDOG_Controller/src/motion/CONTACT_STAND.md": "9f52dde7388beabd0b9cef1e9d4e6e748ea095d2487b5094ced0b8231ff46579",
+    "05_Firmware/MATDOG_Controller/src/motion/ContactMode.cpp": "0ba4354fb66f00591512666ac7e9cb0ae3f633de8e9c02e234784028f2fa2e2e",
+    "05_Firmware/MATDOG_Controller/src/motion/ContactMode.h": "20473ace82c6d8b68cec99956657e23fabe3c5d8a34fd42e875ed8ea9d8c637b",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "0ce86767cf1c9a7b31975a397b5e26bd439da0814fba060cc8b6dec14d0c0d90",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "f86582bd9e57bb6a3ef2ed4b5296f22c75c50ef30c4257797930476619a568ad",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContactData.h": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "a6c497c393641577988d9773f001a4280e875422bc22d7588bd2fb8979198823",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+    "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp": "69450b45a15e366df68f6139a1996274ecbe4f2f549cfd2d3424521c2228ae9f",
+    "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.h": "48d7b6e0b48095a6d279e992c894ad4005dc430442d93376f9b35b760e3bc84e",
+    "05_Firmware/MATDOG_Controller/src/motion/LegGeometryData.h": "343f1cebe24a791fdd20946d12c576a8951c56cfb00cd16b1961c7fd4d5b45db",
+    "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "824e9bd8381d058cdc67dcb072c5bf51f23b47b6b7aef6df3d06f14b040aef57",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "b1749fa338b619c13b5c6be322a18a14d3d4957709a0dec66df1b92aa06ec6b7",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.h": "f9d5f3fefd1aba7c4a3a494a085262422db9d0d9976aecb7bacbcd40e20bbfe6",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "226d4b7032dd61a7bbd0279e9a247c686f70a5ca47be9368b5698a0e740255d7",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp": "2a9a6df04b23a1ec3823f196a9547167d7f1469b25e5f401dc47650ded12e6de",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h": "0b29b56bfa69b7cb190a45b21a9b9ceb9342ba2068950af33444c6bd2dce6501",
+    "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp": "01aa7fbf6badaa5b89f0ebb14068247e9093dbafe8ac7755ec0722d31c00e3ed",
+    "05_Firmware/MATDOG_Controller/src/motion/MotionState.h": "ac332cdc7ea1882f73d914eb57b0ddc645891e64b3c5591c86a51b2ed2e19a35",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseReferenceData.h": "d4aa21a18cfe40145dc563d0221bde6a04e091687e5439f125cf1e04bc8e90bd",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp": "6ecac0820bc64b3798387a0bd3e421cd5cee7c1267841cacebb15a5aea2c5ac5",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.h": "28fbb53006fa832c8903ef759c4cf79979d6424c78614af31c0f42eb265cd797",
+    "05_Firmware/MATDOG_Controller/src/motion/README.md": "499d88a70ee1bfe7ab66fc855a5bb0e096f04dba935b81a4b225510f2c5859b1",
+    "05_Firmware/MATDOG_Controller/src/motion/STABILIZATION.md": "ea0d9624bb10e222b9beb79dfea9c36216ec3e7907dd27cf2b098bb397353ced",
+    "05_Firmware/MATDOG_Controller/src/motion/STARTUP_TIMING.md": "c866d0a1e49754773b50f7ead5f5b6de6df7b3412f454ac57f47d458f781103e",
+    "05_Firmware/MATDOG_Controller/src/motion/StandReferenceData.h": "f10222bc306aad11515d8ec639f4c76368b194995e77c9ea8042190de473703f",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "1917bf8d7514822f824c06186629254cf3b8cefc8125489f42824061b33b07f5",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "13eb95275affe78a09009a7035bf3a335798d94ad3128fecf735d8beb77c6e19",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp": "bab3e9de1332c9e60d26e8265fd0560989426358f7f55853a1251f60bd805039",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTransition.h": "7909f8542876605d88b1d9a4a28c75a9b3af012d40f7309bfeeae4bc0e16ca4a",
+    "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp": "2d67616a9572a3101d57d895973287127a038d9fe49512c0477e19de0b43a479",
+    "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h": "bc707de17c302e04031a35929f47d1600a788a2b3a4fd298c8cce27ca8862c75",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "4a53f6303aa74c2fff1df9647cf5b878e4d4b6aeffab54b15c61133914ec8aef",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "4c54dce41551a836e266a984f090556a82e5cba18be2d07e8fade03071150eb6",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "fb75ce615dd017683a053233947aebb9f8afcab673953c54e0bad5ab43f9858a",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "12a490c4f6e8557fb722d84704bca3106f6f5abe8f34ecd24e10ffefe9bc5042",
+    "05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp": "dc5e4fc91b3564d4b5b8df9c21e029094f17f97aca305615c3522e0b7794fdda",
+    "05_Firmware/MATDOG_Controller/src/motion/TimedStand.h": "c7ebf7d73d393f16a5f1020980c135c51984d6258573d3f6d10e353f2626e195",
+    "06_Software/Matdog_Core/stabilization_g5b/AUDIT.md": "27827cea8fff8498475aeea6974d3beeac1806a65800c5d9300ddb5c2f7e1132",
+    "06_Software/Matdog_Core/stabilization_g5b/InertialInput.h": "d9310c92b52fb3d4f95372192b6be7bc8b87720a7601e235188fc6edb4a4be28",
+    "06_Software/Matdog_Core/stabilization_g5b/README.md": "63cf95f475a22d26111d8d2d437623887420106acb3239cabded9e1f592bd3bc",
+    "06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.cpp": "672090482f75753f8e0b4fb5516eeaa9a84a4ad0a149ec2cb7cf864b99417d8b",
+    "06_Software/Matdog_Core/stabilization_g5b/StabilizationPipeline.h": "c8d90ba46b89f0827cfb9ee564437ce589b6d871159f3ef46c694e9edfdab0af",
+    "06_Software/Matdog_Core/stabilization_g5b/run_validation.py": "ed530251143e322aa40fbd42918aebbb350956f59425d19f5d287ee696ab2cf9",
+    "06_Software/Matdog_Core/stabilization_g5b/tests/Fixtures.h": "3aa48d07810266f3239760bc814d04ea9de57cb76ae9df841ed2663a86977837",
+    "06_Software/Matdog_Core/stabilization_g5b/tests/bridge.cpp": "65f19a35acb931c980506080d308f2a6faef65919085d4f56433abcb992fc4be",
+    "06_Software/Matdog_Core/stabilization_g5b/tests/offline_oracle.py": "e5354e47770853dd0c2e36b584ac8ac014ba2660610aec86f673bc29ef73f943",
+    "06_Software/Matdog_Core/stabilization_g5b/tests/test_pipeline.cpp": "b10eb9d86af473d29690f2685eec29f391c575af7d217747d4cee40e0de54544"
+  },
+  "all_passed": false,
+  "required_gates_passed": true,
+  "hardware_commands_executed": false,
+  "post_validation_notes": {
+    "updated_files": [
+      "06_Software/Matdog_Core/stabilization_g5b/README.md",
+      "06_Software/Matdog_Core/stabilization_g5b/tests/offline_oracle.py"
+    ],
+    "change": "documentation frame alignment and CSV LF terminator only",
+    "verification": "current bridge rebuilt strict; oracle and simulations rerun twice, numerical JSON identical and LF CSV byte-identical; no controller changes"
+  }
+}

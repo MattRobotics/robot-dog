@@ -1,0 +1,8 @@
+MOTION_ORACLE = PASS: 2380 vectors, 208 C4 contacts, 12 Python LF DLS + 16 Python contact DLS, 7 rejected model mutations; repeated output identical
+max FK=8.442e-17 m; rotation=3.331e-16; IK=1.279e-16 m
+max Python LF DLS=6.878e-09 m; contact DLS=1.044e-07 m
+max C4 target contact=9.930e-06 m; archived contact drift=9.679e-17 m
+sha256 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf 3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59
+sha256 06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml 43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966
+sha256 09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json 221b6551ccf1bf36cd10b2b4136da38d1d2a73af18d65e0f3486de1faa72991b
+sha256 09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json 4b667a5995e55122b9578c39042914a373aa6bb4e0be84de11381e7f2398b7b2

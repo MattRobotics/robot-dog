@@ -1,0 +1,5 @@
+CONTACT_STAND_ORACLE = PASS: 648 contact vectors; C4-A + 51 C4-C frames; 16 Python contact IK refinements; 7 rejected model/reference mutations
+max contact FK=4.002966042487e-16 m; tilt=2.220446049250e-16 rad; contact IK=1.118863022828e-16 m
+C4-A max joint difference=5.498188095520e-07 rad; C4-C=2.110450133915e-04 rad; refined Python IK=3.730215580866e-10 rad; delta difference=2.108700418759e-04 rad
+STAND_METRICS {"branch_changes": [0, 0, 0, 0], "max_delta": [[0, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.012288128068594917, 0.0225291444407838], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158], [2.220446049250313e-16, 0.010920836394428535, 0.016688362809624158]], "max_drift": 9.813077866773594e-17, "max_joint_delta": 0.0225291444407838, "max_residual": 7.473417450352271e-17, "min_margin": 0.3049188401684514, "samples": 51}
+C4_POLICY = PASS 52/52 poses; min non-foot ground=2.708862337240e-03 m; min knee/contact=8.775925732693e-02 m

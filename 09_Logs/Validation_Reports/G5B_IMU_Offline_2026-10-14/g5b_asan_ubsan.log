@@ -1,0 +1,35 @@
+FAULT_CASE NOT_CONFIGURED target_valid=0 joints=ZERO latch=0 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE DUPLICATE_SAMPLE target_valid=0 joints=ZERO latch=0 attitude=0 ik=0 correction_rad=(-0.0004,0) convergence=NA overshoot=NA
+FAULT_CASE INCOHERENT_SAMPLE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(-0.0004,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=4 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE DISCONNECTED target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=3 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=2 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE INCOHERENT_SAMPLE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE INCOHERENT_SAMPLE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=8 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE INVALID_TIME target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE UNCONFIRMED_CONTACT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE SUPPORT_ORDER target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE PLANE_MOTION target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=7 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE INCOHERENT_SAMPLE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE EPOCH_CHANGED target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE SAMPLE_GAP target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE COMMAND_TOO_LATE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IMU_REJECTED target_valid=0 joints=ZERO latch=1 attitude=5 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE UNCONFIRMED_CONTACT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE UNCONFIRMED_CONTACT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE PLANE_GATE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE INVALID_SUPPORT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE PLANE_MOTION target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE IK_FAILURE target_valid=0 joints=ZERO latch=1 attitude=0 ik=2 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE OPERATIONAL_LIMIT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE TARGET_DISCONTINUITY target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE CONDITION_LIMIT target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+FAULT_CASE DISCONNECTED target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,-0.0292) convergence=NA overshoot=NA
+FAULT_CASE FAULT_LATCHED target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,-0.0284) convergence=NA overshoot=NA
+FAULT_CASE DISABLED target_valid=0 joints=ZERO latch=0 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+MOVING_PLANE roll_final_rad=.006 pitch_final_rad=.015 max_contact_residual_m=2.61509564004e-16
+FAULT_CASE INVALID_RATE target_valid=0 joints=ZERO latch=1 attitude=0 ik=0 correction_rad=(0,0) convergence=NA overshoot=NA
+G5B_PIPELINE checks=811 failures=0 = PASS

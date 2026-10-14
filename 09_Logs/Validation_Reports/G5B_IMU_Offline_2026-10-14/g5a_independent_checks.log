@@ -1,0 +1,6 @@
+frames True {'positive_roll_left_hip_rises': True, 'positive_pitch_front_goes_down': True, 'lf_hip_is_left_and_front': True, 'rh_hip_is_right_and_rear': True}
+ik worst residual 5.283100346087366e-14 joint diff 2.0398738254101545e-11
+roll_+ {'max_tested_ok_deg': 8.0, 'first_failure_deg': 8.25, 'failed_leg': 'lf', 'cause': 'CONTACT_MODE', 'any_in_limit_solution_exists_independent': True, 'solves_if_edge_biased_contact_allowed': True}
+roll_- {'max_tested_ok_deg': 8.0, 'first_failure_deg': 8.25, 'failed_leg': 'rf', 'cause': 'CONTACT_MODE', 'any_in_limit_solution_exists_independent': True, 'solves_if_edge_biased_contact_allowed': True}
+pitch_+ {'max_tested_ok_deg': 14.5, 'first_failure_deg': 14.75, 'failed_leg': 'rh', 'cause': 'NO_CONVERGENCE', 'any_in_limit_solution_exists_independent': False, 'solves_if_edge_biased_contact_allowed': False}
+pitch_- {'max_tested_ok_deg': 5.5, 'first_failure_deg': 5.75, 'failed_leg': 'lf', 'cause': 'NO_CONVERGENCE', 'any_in_limit_solution_exists_independent': False, 'solves_if_edge_biased_contact_allowed': False}
