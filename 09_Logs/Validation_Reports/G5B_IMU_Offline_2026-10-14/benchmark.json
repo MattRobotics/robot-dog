@@ -1,0 +1,8 @@
+{
+  "status": "HOST MEASUREMENT",
+  "steps": 10000,
+  "accepted": 10000,
+  "mean_update_us": 33.88151780000004,
+  "maximum_observed_update_us": 71.992,
+  "scope": "host wall clock; not ESP32 WCET or qualified servo latency"
+}

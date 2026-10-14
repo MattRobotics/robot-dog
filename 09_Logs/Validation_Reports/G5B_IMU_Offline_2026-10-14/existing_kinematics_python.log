@@ -1,0 +1,229 @@
+.....................EEEEEEEEEEEEEEEE.........................
+======================================================================
+ERROR: test_joint_order_servo_mapping_and_direction_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_joint_order_servo_mapping_and_direction_for_every_leg) (leg='lf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 73, in test_joint_order_servo_mapping_and_direction_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_joint_order_servo_mapping_and_direction_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_joint_order_servo_mapping_and_direction_for_every_leg) (leg='rf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 73, in test_joint_order_servo_mapping_and_direction_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_joint_order_servo_mapping_and_direction_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_joint_order_servo_mapping_and_direction_for_every_leg) (leg='rh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 73, in test_joint_order_servo_mapping_and_direction_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_joint_order_servo_mapping_and_direction_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_joint_order_servo_mapping_and_direction_for_every_leg) (leg='lh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 73, in test_joint_order_servo_mapping_and_direction_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg) (leg='lf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 91, in test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg) (leg='rf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 91, in test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg) (leg='rh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 91, in test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg) (leg='lh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 91, in test_visual_zero_encoder_map_becomes_zero_radians_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg) (leg='lf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 112, in test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg) (leg='rf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 112, in test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg) (leg='rh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 112, in test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg) (leg='lh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 112, in test_visual_zero_encoder_map_reproduces_urdf_foot_frame_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_error_is_circular_and_unsigned_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_error_is_circular_and_unsigned_for_every_leg) (leg='lf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 146, in test_visual_zero_error_is_circular_and_unsigned_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_error_is_circular_and_unsigned_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_error_is_circular_and_unsigned_for_every_leg) (leg='rf')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 146, in test_visual_zero_error_is_circular_and_unsigned_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_error_is_circular_and_unsigned_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_error_is_circular_and_unsigned_for_every_leg) (leg='rh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 146, in test_visual_zero_error_is_circular_and_unsigned_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+======================================================================
+ERROR: test_visual_zero_error_is_circular_and_unsigned_for_every_leg (test_matdog_leg_fk_live.TestMatdogLegFkLivePureLayer.test_visual_zero_error_is_circular_and_unsigned_for_every_leg) (leg='lh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 146, in test_visual_zero_error_is_circular_and_unsigned_for_every_leg
+    calibration = self.load_calibration(leg)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/tests/test_matdog_leg_fk_live.py", line 62, in load_calibration
+    return load_leg_calibration(self.config_path, leg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-g5b-imu-offline/06_Software/Matdog_Core/kinematics/matdog_leg_fk_live.py", line 112, in load_leg_calibration
+    raise RuntimeError(
+RuntimeError: calibration_status inatteso: 'DIGITAL_ZERO_CALIBRATED_AND_VERIFIED'; atteso 'VISUAL_ZERO_CAPTURED_PENDING_LIVE_VALIDATION'
+
+----------------------------------------------------------------------
+Ran 50 tests in 19.605s
+
+FAILED (errors=16)

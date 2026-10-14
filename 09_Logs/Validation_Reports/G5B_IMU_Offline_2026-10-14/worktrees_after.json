@@ -1,0 +1,136 @@
+[
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog",
+    "head": "7b258b36c257bd455f135aee2667d035c4929544",
+    "status": " M 05_Firmware/MATDOG_Controller/CHANGELOG.md\n M 05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_4_ROBOT_POWERED_RUNBOOK.md\n M 05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md\n M 05_Firmware/MATDOG_Controller/VALIDATION.md\n M 05_Firmware/MATDOG_Controller/scripts/calibration_hw_session.py\n M 05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_hw_session.py\n M 09_Logs/Development_Log/2026-10-03_M0_4_P2_PREPARED.md\n?? 05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_4_TARGETED_CHECKS.md\n?? 05_Firmware/MATDOG_Controller/scripts/migration_m0_targeted.py\n?? 05_Firmware/MATDOG_Controller/scripts/tests/test_migration_m0_targeted.py\n",
+    "dirty_file_sha256": {
+      "05_Firmware/MATDOG_Controller/CHANGELOG.md": "a8b33450f6c874d19d5b93f1081e16b828a950ae079121c01706094e3d5150a8",
+      "05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_4_ROBOT_POWERED_RUNBOOK.md": "a6572e59e4c50b82f2325c52af3051b49a04f40dcc7df0a251b45a3d1ff7508f",
+      "05_Firmware/MATDOG_Controller/FULL_CALIBRATION_4LEG_HARDWARE_RUNBOOK.md": "c07e52b7519bb57a17a5b6b59cab2a98f898df5517dcee75acffaae2b25830fa",
+      "05_Firmware/MATDOG_Controller/VALIDATION.md": "975e5ee36f8a4c50b61e7d21bc467ae4d7e60c7063751e0ca99b33b385b8cf4d",
+      "05_Firmware/MATDOG_Controller/scripts/calibration_hw_session.py": "8ec0c6392d7d998de5b47ad75bee83e2ce0995b7bb8a44827714445f876817fb",
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_hw_session.py": "219eb57d0b24aef91a48d3d986d2e4c71d5df7fb64f8bbb6b9f0ca2b8163af17",
+      "09_Logs/Development_Log/2026-10-03_M0_4_P2_PREPARED.md": "32a8df3917543676976cb24208ca35005fade061a9e4cbf0f46b8f3c9f69bde4",
+      "05_Firmware/MATDOG_Controller/FLASH_LAYOUT_M0_4_TARGETED_CHECKS.md": "46c8d88070194e838b224c05cbe11184e34769df6ae0a9df1cad97e4ff895e1b",
+      "05_Firmware/MATDOG_Controller/scripts/migration_m0_targeted.py": "01ee8720cf22d6566358e455c5f02429d25974dae6645bef9d8a557cd8c5a539",
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_migration_m0_targeted.py": "83a52edaf458c63228a87476815feaf4b252873f2fdf2499bda9ec39560da79d"
+    }
+  },
+  {
+    "path": "/home/matteo-manicardi/.codex/worktrees/ap-only-admin/robot-dog",
+    "head": "a2ba085b687558d08dd9c5c2f1bd4d195bb35065",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/.codex/worktrees/f01-lifecycle-epoch/robot-dog",
+    "head": "b7516c39c9fcba09992acd07377facd5ae6e8588",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog",
+    "head": "13404187b1a2abf1ac1aafb4bf379b58cac36916",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog-led-ap-combined-20261010",
+    "head": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog-main",
+    "head": "108408b5eba5f6356e36233446c05745e97e310e",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog-post-abort",
+    "head": "1a5e0085098eeb907319f6f1a00693869444d9cf",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog-post-abort-flash-125d981",
+    "head": "125d981b02a38673c8c54f2096632c99fd1f29ff",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/github/robot-dog-post-abort-flash-1a5e008",
+    "head": "1a5e0085098eeb907319f6f1a00693869444d9cf",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/MATDOG_LED_DIRTY_FRAME_OFFLINE_20261010/led-dirty-frame-dev3-wt",
+    "head": "fee9383156fad914b03af27788c5519954e65fca",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/wifi-rebuild-20261003",
+    "head": "a06314e8f3647bfb0f66d0fa827fcd24f65ffaca",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-ap403-offline-20261009",
+    "head": "b7516c39c9fcba09992acd07377facd5ae6e8588",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-digital-twin-live-20261014",
+    "head": "102c0ba00b219524bcc2af25fb36ee8543f9ac27",
+    "status": " M 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/index.html\n M 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/main.ts\n M 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/twinController.ts\n M 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/style.css\n M 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/viewer/scene.ts\n?? 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/dashboard/\n?? 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/bridgeClient.ts\n?? 06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/liveStatus.ts\n",
+    "dirty_file_sha256": {
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/index.html": "7a7934a903c3f4ba9e972cea11c6a06b3e8b3cdbbf746a415f48ba129994e418",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/main.ts": "39987d05220179650c99bb4d4d41c60569a71ad4807a54e69a06ac78fb000bc9",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/twinController.ts": "87dae6f4e9058bdd0172d3932e974e1c45dcfc3a919d312302b249205874fbd8",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/style.css": "39f3e63b398126b0896838e4d838189ddc5d2ba553c14ab6eddfa4b9ea9c5322",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/viewer/scene.ts": "b32b2a883ecc2f52636467bf600744f351658edd07626cdd1a1ccb1543465a6e",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/bridgeClient.ts": "89732d883934694dcd02fcc06e015adc29391b38c31f17f4f78d98024e99d716",
+      "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/liveStatus.ts": "05f0b2370979dd56bef57fb0b821b9704878ce80ae7530cb3354256ffd4c082e"
+    }
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-f01-prelisten-spike-20261010",
+    "head": "b7516c39c9fcba09992acd07377facd5ae6e8588",
+    "status": "",
+    "dirty_file_sha256": {}
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-runtime-commissioning-20261014",
+    "head": "34e686ff42f240a44c7906c908abebd0e9bd8521",
+    "status": " M 05_Firmware/MATDOG_Controller/scripts/tests/run_motion_service_executor_tests.sh\n M 05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_runtime_restore.cpp\n M 05_Firmware/MATDOG_Controller/scripts/tests/test_motion_http_transport.py\n M 05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.cpp\n M 05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.h\n M 05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.cpp\n M 05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.h\n M 05_Firmware/MATDOG_Controller/src/execution/MotionSession.cpp\n M 05_Firmware/MATDOG_Controller/src/execution/MotionSession.h\n M 05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.cpp\n M 05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.h\n M 05_Firmware/MATDOG_Controller/src/motion/FixturePoseClassifier.h\n?? 05_Firmware/MATDOG_Controller/scripts/tests/run_fixture_commissioning_tests.py\n?? 05_Firmware/MATDOG_Controller/scripts/tests/test_fixture_commissioning.cpp\n?? 05_Firmware/MATDOG_Controller/src/execution/CommissioningPolicy.cpp\n?? 05_Firmware/MATDOG_Controller/src/execution/CommissioningPolicy.h\n?? 05_Firmware/MATDOG_Controller/src/motion/FixtureEntryPlanner.cpp\n?? 05_Firmware/MATDOG_Controller/src/motion/FixtureEntryPlanner.h\n",
+    "dirty_file_sha256": {
+      "05_Firmware/MATDOG_Controller/scripts/tests/run_motion_service_executor_tests.sh": "016985aa8ab04e608af9c7c2c7e3954526abbb3d62a6c301c2371272718c59d8",
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_calibration_runtime_restore.cpp": "c6dbef49fd8055bd2de82ecfcb453bc344f0ca95776128ea2be87de239a4e8d3",
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_motion_http_transport.py": "8f976560544cf4587aa9005cfb2091cbe1e5d9c1b2ec406e66d3c3bdb3fa8211",
+      "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.cpp": "57b4257094269d2c2f38c2ce7596b0f29be0397a1c8e9dc9302bfe4b78d11b34",
+      "05_Firmware/MATDOG_Controller/src/calibration/CalibrationRuntimeRestore.h": "001b1424fab74b1066c87aed977258c149349a8c33457b96c04dc2eae39fdef5",
+      "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.cpp": "2787a36c3d34daf249cbb127446c5a96ad442ab5d8bfde8acc16c30cd2b023e5",
+      "05_Firmware/MATDOG_Controller/src/execution/MotionCoordinator.h": "f53350f7918dba4375e8240bf2fcbae50067461b5c7c03c8ae5d95380aa96bb8",
+      "05_Firmware/MATDOG_Controller/src/execution/MotionSession.cpp": "1564f637514b724d664d22caeb95b890c845e398c902f14fe63fa1c5d907c5ff",
+      "05_Firmware/MATDOG_Controller/src/execution/MotionSession.h": "e258050aca0cd3c2ec572bb05cdd861623a9fb598ef9b3a7d58c0eb0f404d8d8",
+      "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.cpp": "70b6dad68b6ce09d3fbf9c26aac9e2c3c724c48078ce5c0469789b31a365a68b",
+      "05_Firmware/MATDOG_Controller/src/motion/AdaptiveStand.h": "dedbb2921fc6ea1898f73a8871bdc92077664c66070732f7e9a7bdc7883d7994",
+      "05_Firmware/MATDOG_Controller/src/motion/FixturePoseClassifier.h": "7a728bd888d2d0f9f390afe4ea9801ff09f8016b916c7c8a7477b20078ebab20",
+      "05_Firmware/MATDOG_Controller/scripts/tests/run_fixture_commissioning_tests.py": "f5bca33790009e603d89b9f03cd95cde19ce8ff7edb3663c56b81215a130dec6",
+      "05_Firmware/MATDOG_Controller/scripts/tests/test_fixture_commissioning.cpp": "9b0020825246ba0db0f1607a0534ba3bdd54c2e7fae84e5c574055eeeab2597b",
+      "05_Firmware/MATDOG_Controller/src/execution/CommissioningPolicy.cpp": "fc2f894bf719988defa1522dcccf165a3c695d0f6cdd12f7997cc13e87f0083e",
+      "05_Firmware/MATDOG_Controller/src/execution/CommissioningPolicy.h": "846412b5a31ec184f8dd6d5e8e3a6a108133e8f4b5c03a09d9b3471d3ca43b25",
+      "05_Firmware/MATDOG_Controller/src/motion/FixtureEntryPlanner.cpp": "4a106d7d0cf0d7304c1bedb52360ba8c39307af523a0b2badbb67e8b377651af",
+      "05_Firmware/MATDOG_Controller/src/motion/FixtureEntryPlanner.h": "cf46cecc3f39f77cbac14da22de5f6084c67d9e6c7e43941a8c2499502fbed65"
+    }
+  },
+  {
+    "path": "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-wifi-ota-shelly",
+    "head": "aee49bf306f88d56562634aeba08b767f92b247c",
+    "status": "",
+    "dirty_file_sha256": {}
+  }
+]

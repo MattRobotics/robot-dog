@@ -1,0 +1,534 @@
+{
+  "scope": "offline software and synthetic simulations only; no hardware qualification",
+  "geometry": {
+    "status": "OFFLINE VALIDATED",
+    "cases": 72,
+    "accepted": 72,
+    "refusals": {},
+    "worst_contact_residual_m": 9.568345523823188e-14,
+    "worst_joint_difference_rad": 2.0972112935169207e-12,
+    "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+  },
+  "integral_law": {
+    "status": "OFFLINE VALIDATED",
+    "new_samples": 100,
+    "duplicate_polls": 100,
+    "max_correction_error_rad": 5.204170427930421e-18
+  },
+  "simulations": [
+    {
+      "name": "level",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 0.0,
+      "tail_max_error_rad": 0.0,
+      "tail_rms_error_rad": 0.0,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 6.206335383118183e-17,
+      "max_joint_step_rad": 0.0,
+      "min_joint_margin_rad": 0.3049188401684514,
+      "max_correction_rate_rad_s": 0.0,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "roll_positive",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 2.540000000000002,
+      "tail_max_error_rad": 1.9508692732789212e-07,
+      "tail_rms_error_rad": 6.541446898888088e-08,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.984325997607704e-14,
+      "max_joint_step_rad": 0.0004002340899659229,
+      "min_joint_margin_rad": 0.28478938448708446,
+      "max_correction_rate_rad_s": 0.015000000000000001,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "roll_negative",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 2.540000000000002,
+      "tail_max_error_rad": 1.9508692732789212e-07,
+      "tail_rms_error_rad": 6.541446898888088e-08,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.984325997607704e-14,
+      "max_joint_step_rad": 0.0004002340899659229,
+      "min_joint_margin_rad": 0.28478938448708446,
+      "max_correction_rate_rad_s": 0.015000000000000001,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "pitch_positive",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 3.000000000000002,
+      "tail_max_error_rad": 3.251448788682554e-07,
+      "tail_rms_error_rad": 1.0902411497902125e-07,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.87007352616825e-14,
+      "max_joint_step_rad": 0.0013375193234876348,
+      "min_joint_margin_rad": 0.23601248305769978,
+      "max_correction_rate_rad_s": 0.025000000000000005,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "pitch_negative",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 3.000000000000002,
+      "tail_max_error_rad": 3.251448788682554e-07,
+      "tail_rms_error_rad": 1.0902411497902125e-07,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.940904972544887e-14,
+      "max_joint_step_rad": 0.001332522424321414,
+      "min_joint_margin_rad": 0.3062513625927728,
+      "max_correction_rate_rad_s": 0.025000000000000005,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "combined",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 2.540000000000002,
+      "tail_max_error_rad": 1.9508692732789212e-07,
+      "tail_rms_error_rad": 8.377139437278802e-08,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.908800359565696e-14,
+      "max_joint_step_rad": 0.0011194040622442003,
+      "min_joint_margin_rad": 0.30539879481565796,
+      "max_correction_rate_rad_s": 0.015000000000000005,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "periodic",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": null,
+      "tail_max_error_rad": 0.002130597003097455,
+      "tail_rms_error_rad": 0.0010835146703617531,
+      "overshoot_fraction": null,
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.537745095673799e-14,
+      "max_joint_step_rad": 6.130194221820595e-05,
+      "min_joint_margin_rad": 0.30384354990857665,
+      "max_correction_rate_rad_s": 0.002298652195972019,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ],
+      "tail_rms_roll_to_disturbance_rms_ratio": 1.083514670361753
+    },
+    {
+      "name": "delay_jitter",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.99999999999999,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 2.5059999999999962,
+      "tail_max_error_rad": 1.6800721212677228e-07,
+      "tail_rms_error_rad": 6.70706022058705e-08,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.900866386370319e-14,
+      "max_joint_step_rad": 0.001652040504838248,
+      "min_joint_margin_rad": 0.30574529034232356,
+      "max_correction_rate_rad_s": 0.015000000000000003,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0029999999999992255,
+        0.009000000000000341
+      ],
+      "measurement_to_command_range_s": [
+        0.007999999999999563,
+        0.014000000000001123
+      ]
+    },
+    {
+      "name": "saturation",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": null,
+      "tail_max_error_rad": 0.27,
+      "tail_rms_error_rad": 0.19091883092036782,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 569,
+      "rejections": {},
+      "max_contact_residual_m": 8.733767642312895e-14,
+      "max_joint_step_rad": 0.0023113191058073412,
+      "min_joint_margin_rad": 0.22164004345900523,
+      "max_correction_rate_rad_s": 0.04000000000000007,
+      "rate_limited_samples": 37,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "gradual_plane",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": null,
+      "tail_max_error_rad": 1.6187800962793458e-06,
+      "tail_rms_error_rad": 5.427920868846615e-07,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.941148444452451e-14,
+      "max_joint_step_rad": 0.0006042584750742819,
+      "min_joint_margin_rad": 0.21591943680405778,
+      "max_correction_rate_rad_s": 0.004825866596574325,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "damping_baseline",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.0,
+      "settling_time_to_1mrad_s": 2.760000000000002,
+      "tail_max_error_rad": 1.9021816343237075e-07,
+      "tail_rms_error_rad": 7.252564590103602e-08,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.944708966259061e-14,
+      "max_joint_step_rad": 0.0013912250556016303,
+      "min_joint_margin_rad": 0.2331276810753944,
+      "max_correction_rate_rad_s": 0.020000000000000007,
+      "rate_limited_samples": 0,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "damping_experiment",
+      "status": "SIMULATED",
+      "plant": "first_order_tau_80ms_plus_delay_and_disturbance",
+      "samples": 600,
+      "duration_s": 11.999999999999833,
+      "damping_time_s": 0.15,
+      "settling_time_to_1mrad_s": 3.2200000000000024,
+      "tail_max_error_rad": 1.3097035429579518e-06,
+      "tail_rms_error_rad": 5.414992716202008e-07,
+      "overshoot_fraction": [
+        0.0,
+        0.0
+      ],
+      "saturated_samples": 0,
+      "rejections": {},
+      "max_contact_residual_m": 9.987339436072914e-14,
+      "max_joint_step_rad": 0.00320476357692534,
+      "min_joint_margin_rad": 0.233128223279728,
+      "max_correction_rate_rad_s": 0.04,
+      "rate_limited_samples": 1,
+      "measurement_age_range_s": [
+        0.0,
+        0.0
+      ],
+      "measurement_to_command_range_s": [
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "faults": [
+    {
+      "name": "disconnected",
+      "status": "OFFLINE VALIDATED",
+      "reason": "DISCONNECTED",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "invalid_quaternion",
+      "status": "OFFLINE VALIDATED",
+      "reason": "IMU_REJECTED",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "unknown_contact",
+      "status": "OFFLINE VALIDATED",
+      "reason": "UNCONFIRMED_CONTACT",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "unreliable_contact",
+      "status": "OFFLINE VALIDATED",
+      "reason": "UNCONFIRMED_CONTACT",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "ik_unreachable",
+      "status": "OFFLINE VALIDATED",
+      "reason": "IK_FAILURE",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "stale_support",
+      "status": "OFFLINE VALIDATED",
+      "reason": "STALE_SUPPORT",
+      "target_valid": false,
+      "fault_latched": true,
+      "correction_diagnostic_rad": [
+        0.0,
+        0.0
+      ],
+      "joint_targets": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  ],
+  "fixed_storage_bytes": {
+    "pipeline": 1112,
+    "output": 448
+  }
+}

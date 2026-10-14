@@ -1,0 +1,12 @@
+{
+  "quaternion_tilt_max_error_rad": 2.7755575615628914e-16,
+  "samples": 4000,
+  "conventions": {
+    "positive_roll_left_hip_rises": true,
+    "positive_pitch_front_goes_down": true,
+    "lf_hip_is_left_and_front": true,
+    "rh_hip_is_right_and_rear": true
+  },
+  "pose_to_quaternion_to_tilt_max_error_rad": 5.551115123125783e-17,
+  "all_conventions_hold": true
+}
