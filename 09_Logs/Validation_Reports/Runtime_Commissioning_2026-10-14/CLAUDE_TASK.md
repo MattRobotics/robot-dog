@@ -1,6 +1,6 @@
 # MATDOG 2026-10-14 — Claude Code implementation work order
 
-**Base**: PR #47 head `13404187b1a2abf1ac1aafb4bf379b58cac36916`. This branch adds *only* a tested **recognition-only** `FixturePoseClassifier.h` + nine-case standalone unit test. It **does not** grant motion authority or certify collision-free transitions.
+**Base**: PR #47 head `13404187b1a2abf1ac1aafb4bf379b58cac36916`. This branch adds *only* a tested **recognition-only** `FixturePoseClassifier.h` + eleven-check standalone unit test. It **does not** grant motion authority or certify collision-free transitions.
 
 ## Critical existing behavior to preserve
 
