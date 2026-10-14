@@ -4,9 +4,8 @@
 // Commissioning pose *recognition only*. This function never creates targets,
 // grants motor authority, bypasses joint limits or validates a motion corridor.
 // Order: [LF(H,U,L), RF(H,U,L), RH(H,U,L), LH(H,U,L)]. SI radians.
-#include <array>
 #include <cmath>
-#include <cstddef>
+#include <stddef.h>
 
 namespace matdog { namespace motion {
 
@@ -40,14 +39,16 @@ struct FixturePoseClassification {
 // first knot, never inferred from EEPROM or from a previous tracking target.
 // The 10-degree recognition envelope is a configurable INITIAL heuristic,
 // NOT motion admission and NOT the reviewed 6-mrad tracking tube.
+// actual and nominal each point to 12 values in the order above.
 inline FixturePoseClassification classifyFixtureProne(
-    const std::array<double, 12>& actual,
-    const std::array<double, 12>& nominal,
+    const double* actual,
+    const double* nominal,
     bool fixtureConfirmed,
     bool stationary,
     double maxNominalDeviationRad = 0.17453292519943295,
     double maxRmsDeviationRad = 0.12217304763960307) {
   FixturePoseClassification out;
+  if (actual == nullptr || nominal == nullptr) return out;
   if (!std::isfinite(maxNominalDeviationRad) || maxNominalDeviationRad <= 0.0 ||
       !std::isfinite(maxRmsDeviationRad) || maxRmsDeviationRad <= 0.0 ||
       maxRmsDeviationRad > maxNominalDeviationRad) return out;
@@ -55,7 +56,7 @@ inline FixturePoseClassification classifyFixtureProne(
   if (!fixtureConfirmed || !stationary) return out;
 
   double squaredSum = 0.0;
-  for (std::size_t j = 0; j < 12; ++j) {
+  for (size_t j = 0; j < 12; ++j) {
     const double a = actual[j], n = nominal[j];
     out.failedJointIndex = static_cast<unsigned>(j);
     out.reason = FixturePoseReason::NONFINITE;

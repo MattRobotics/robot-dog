@@ -49,9 +49,10 @@ bool MotionSession::insideTick(unsigned i,double q,uint16_t max_ticks,double& in
  const auto* t=policy_->transforms().find(id,geometry_->provenanceTag());const auto* l=policy_->limits().find(id,geometry_->provenanceTag());
  if(!t||!l||l->max_tick-l->min_tick<4)return false;
  uint16_t tick=0;if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,static_cast<actuator::MicroRad>(std::llround(q*1e6)),&tick)!=actuator::TargetResolveStatus::OK)return false;
- // One tick inside the edge, so a holding deadband of one count stays legal.
+ // kPrimeInwardMarginTicks inside the edge, so a holding deadband cannot
+ // place the measured position outside the limit (ACTUAL_OUTSIDE_LIMITS).
  uint16_t target=tick;
- if(tick<l->min_tick)target=l->min_tick+1;else if(tick>l->max_tick)target=l->max_tick-1;else return false;
+ if(tick<l->min_tick)target=l->min_tick+kPrimeInwardMarginTicks;else if(tick>l->max_tick)target=l->max_tick-kPrimeInwardMarginTicks;else return false;
  const unsigned distance=tick<target?target-tick:tick-target;if(distance>max_ticks)return false;
  actuator::MicroRad urad=0;if(actuator::resolveRawToUrdfQ(*geometry_,*provenance_,*t,target,&urad)!=actuator::TargetResolveStatus::OK)return false;
  // The inward target must move AWAY from the folded stop (q increases).
@@ -70,17 +71,16 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
  if(const char* r=gate(e,f,fb,now)){reason_=r;return false;}
  uint16_t clamp_mask=0;uint8_t clamp_ticks[12]{};double primed[12]{};
  for(unsigned i=0;i<12;++i){actuator::ActuatorCommand cmd;uint8_t bus;
-  if(fb.torque_on[i]){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
   primed[i]=fb.actual_rad[i];
-  if(resolve(i,fb.actual_rad[i],cmd,bus))continue;
-  // Commissioning only: a measured rest just outside the hard limit (LOWER
-  // folded at its stop) primes at the nearest inside tick, never beyond the
-  // limit and never further than the evidence allows. The Safe Actuator layer
-  // still checks every target against the unchanged limit table.
-  uint8_t ticks=0;
-  if(e.scope!=TrialScope::FIXTURE_COMMISSIONING||!e.prime_clamp_max_ticks||!insideTick(i,fb.actual_rad[i],e.prime_clamp_max_ticks,primed[i],ticks)||
-     !resolve(i,primed[i],cmd,bus)){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
-  clamp_mask|=static_cast<uint16_t>(1u<<i);clamp_ticks[i]=ticks;}
+  if(fb.torque_on[i]||!resolve(i,fb.actual_rad[i],cmd,bus)){
+   // Commissioning only: a measured rest just outside the hard limit (LOWER
+   // folded at its stop) primes at the nearest inside tick, never beyond the
+   // limit and never further than the evidence allows. Torque ON is always
+   // refused. The Safe Actuator layer still checks every target.
+   uint8_t ticks=0;
+   if(fb.torque_on[i]||e.scope!=TrialScope::FIXTURE_COMMISSIONING||!e.prime_clamp_max_ticks||
+      !insideTick(i,fb.actual_rad[i],e.prime_clamp_max_ticks,primed[i],ticks)||!resolve(i,primed[i],cmd,bus)){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
+   clamp_mask|=static_cast<uint16_t>(1u<<i);clamp_ticks[i]=ticks;}}
  for(unsigned i=0;i<12;++i){primed_rad_[i]=primed[i];rest_rad_[i]=fb.actual_rad[i];clamp_ticks_[i]=clamp_ticks[i];}
  clamp_mask_=clamp_mask;
  if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}

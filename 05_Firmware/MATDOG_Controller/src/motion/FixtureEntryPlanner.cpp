@@ -22,14 +22,19 @@ FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTarge
   if(!c.present||!finiteFrame(c.start)||!finiteFrame(c.goal)||!std::isfinite(c.tubeRad)||c.tubeRad<=p.maxTrackingErrorRad||c.tubeRad>.02){
     plan.status=EntryStatus::CERTIFICATE_REQUIRED;return plan;}
   for(unsigned i=0;i<12;++i)if(std::abs(at(goal,i)-at(c.goal,i))>1e-9){plan.failedJoint=i;plan.status=EntryStatus::GOAL_MISMATCH;return plan;}
-  // The certificate covers straight staged segments from its start inside a
-  // joint tube. A different start shifts every point of the path by at most
+  // The certificate covers independent LOWER ranges during DISENGAGE and the
+  // straight ALIGN stage inside a joint tube. A different start shifts the
+  // HIP/UPPER part of every point by at most
   // its distance from the certified set, and tracking adds its tolerance.
-  // For LOWER the certified set is the whole stage-0 interval: a start
-  // already moved along that interval (inward prime) is on the certified path.
+  // Each LOWER may start anywhere within its own certified stage-0 interval
+  // after inward PRIME, independently of the other three LOWER joints.
+  double deviation[12]{};
   for(unsigned i=0;i<12;++i){const double q=at(start,i),a=at(c.start,i),b=at(c.goal,i);
     const double d=i%3==2?(q<std::fmin(a,b)?std::fmin(a,b)-q:q>std::fmax(a,b)?q-std::fmax(a,b):0.):std::abs(q-a);
-    if(d>plan.startDeviationRad){plan.startDeviationRad=d;if(d+p.maxTrackingErrorRad>c.tubeRad)plan.failedJoint=i;}}
+    deviation[i]=d;
+    if(d>plan.startDeviationRad)plan.startDeviationRad=d;
+    // Reserve roundoff and positive space for the sequential write box.
+    if(d+p.maxTrackingErrorRad+1e-6>=c.tubeRad)plan.failedJoint=i;}
   if(plan.failedJoint<12){plan.status=EntryStatus::START_OUTSIDE_CERTIFIED_REGION;return plan;}
   plan.middle=start;for(unsigned i=2;i<12;i+=3)at(plan.middle,i)=at(goal,i);
   const JointTargetFrame* frames[]={&plan.start,&plan.middle,&plan.goal};
@@ -43,9 +48,15 @@ FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTarge
       // Quintic peaks: velocity 1.875 d/T, acceleration 10/sqrt(3) d/T^2,
       // largest per-sample step 1.875 d dt/T.
       T=std::fmax(T,1.875*delta/v);T=std::fmax(T,std::sqrt(5.773502691896258*delta/a));
-      T=std::fmax(T,1.875*delta*p.samplePeriodS/p.maxJointStepRad);}
+      T=std::fmax(T,1.875*delta*p.samplePeriodS/p.maxJointStepRad);
+      // Executor feedback can occupy [previous,target] +/- tracking while
+      // the twelve writes complete. The midpoint lies on this straight stage;
+      // half the largest sample step must fit the certificate's remaining tube.
+      const double budget=c.tubeRad-p.maxTrackingErrorRad-deviation[i]-1e-6;
+      T=std::fmax(T,1.875*delta*p.samplePeriodS/(2*budget));}
     // Whole samples; tiny upward margin keeps the closed-form peaks inside.
-    plan.durationS[s]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;}
+    plan.durationS[s]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;
+    if(!std::isfinite(plan.durationS[s])||plan.durationS[s]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
   plan.status=EntryStatus::OK;return plan;
 }
 LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body){

@@ -102,7 +102,9 @@ constexpr uint32_t kDalyBusBaud   = 9600;     // DALY XY-017 RS485, hardware-pro
 // § DALY KEY.
 // The core default is 256 B.
 constexpr uint32_t kUsbTxTimeoutMs = 0;
-constexpr uint32_t kUsbTxRingBytes = 3072;
+// Complete bounded @TEL record (<6144 B) plus ordinary diagnostics (<2674 B).
+// Timeout remains zero; telemetry is skipped if the whole record cannot fit.
+constexpr uint32_t kUsbTxRingBytes = 12288;
 
 }  // namespace build
 }  // namespace matdog

@@ -42,6 +42,16 @@ void CalibrationRuntimeRestore::invalidate(actuator::JointTransformTable& transf
   snapshot_.motion_permit = false;
 }
 
+void CalibrationRuntimeRestore::revokeLimits(actuator::ActuatorLimitTable& limits) {
+  limits.clear();
+  snapshot_.operational_limits_approved = false;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.limits_status = OperationalAdmissionStatus::NOT_RUN;
+}
+
 RuntimeRestoreStatus CalibrationRuntimeRestore::restore(
     CalibrationPersistenceService& persistence,
     const actuator::CalibrationGeometryProfile& profile,

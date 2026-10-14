@@ -1,7 +1,6 @@
 #include "AdaptiveStand.h"
 #include "TimedStand.h"
 #include "PoseSupport.h"
-#include <array>
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -200,7 +199,7 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
       // Recognition is a broad multi-joint region around the route head, NOT
       // the certified route tube; the staged entry is what reaches the tube.
       const auto head=pairedProneSample(0,0,true);if(!head.target.valid)return reject(FeedbackReason::ROUTE_REQUIRED);
-      std::array<double,12> actual{},nominal{};
+      double actual[12]{},nominal[12]{};
       for(unsigned i=0;i<12;++i){const auto& a=o.actual.legs[i/3];const auto& n=head.target.legs[i/3];
         actual[i]=i%3==0?a.hip:i%3==1?a.upper:a.lower;nominal[i]=i%3==0?n.hip:i%3==1?n.upper:n.lower;}
       prone_=classifyFixtureProne(actual,nominal,o.externalSupportConfirmed,o.stationary,request_.proneMaxDeviationRad,request_.proneMaxRmsRad);

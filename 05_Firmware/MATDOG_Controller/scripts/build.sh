@@ -263,6 +263,43 @@ APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
 PARTITION_ARTIFACT="$BUILD_DIR/MATDOG_Controller.ino.partitions.bin"
 MANIFEST="$BUILD_DIR/matdog_build_manifest.txt"
 
+# Use an existing private device identity without copying it into the checkout
+# or exported products. A supplied but inaccessible identity must fail closed.
+TLS_HEADER="$SKETCH_DIR/src/config/TlsIdentity.local.h"
+TLS_FLAG=""
+if [ -n "${MATDOG_TLS_IDENTITY_FILE:-}" ]; then
+  TLS_HEADER="$(python3 - "$REPO_ROOT" <<'PY_TLS_PATH'
+import os, re, subprocess, sys
+from pathlib import Path
+repo = Path(sys.argv[1]).resolve()
+raw = os.environ["MATDOG_TLS_IDENTITY_FILE"]
+if not re.fullmatch(r"/[A-Za-z0-9_./-]+", raw):
+    raise SystemExit("private TLS path must be absolute and shell-safe")
+path = Path(raw).resolve(strict=True)
+if not path.is_file():
+    raise SystemExit("private TLS identity is not a file")
+protected = [repo]
+listing = subprocess.check_output(["git", "-C", str(repo), "worktree", "list", "--porcelain"], text=True)
+protected += [Path(line[9:]).resolve() for line in listing.splitlines() if line.startswith("worktree ")]
+common = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "--git-common-dir"], text=True).strip()
+protected.append((repo / common).resolve())
+if any(path == p or path.is_relative_to(p) for p in protected):
+    raise SystemExit("external private TLS identity must stay outside Git worktrees")
+if not re.fullmatch(r"/[A-Za-z0-9_./-]+", str(path)):
+    raise SystemExit("resolved private TLS path is not shell-safe")
+print(path)
+PY_TLS_PATH
+  )"
+  TLS_FLAG=" -DMATDOG_TLS_IDENTITY_HEADER=\"${TLS_HEADER}\""
+fi
+TLS_HEADER_SHA256="$(python3 - "$TLS_HEADER" <<'PY_TLS_HASH'
+import hashlib, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+print(hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "ABSENT")
+PY_TLS_HASH
+)"
+
 # A previous build's table or manifest must never be mistaken for this one's.
 rm -f "$MANIFEST" "$PARTITION_ARTIFACT"
 if [ -n "${EXTERNAL_ROOT:-}" ]; then
@@ -275,7 +312,7 @@ python3 "$SCRIPT_DIR/matdog_layout.py" check-fqbn --fqbn "$FQBN" >/dev/null
 "$ARDUINO" "${CLI_OPTIONS[@]}" compile \
   --fqbn "$FQBN" \
   --build-property "upload.maximum_size=5242880" \
-  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\" -DMATDOG_GIT_SHA=\"${SOURCE_COMMIT}\" -DMATDOG_GIT_DIRTY=${GIT_DIRTY} -DMATDOG_BUILD_UTC=\"${BUILD_UTC}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}${VALIDATION_FLAG}" \
+  --build-property "compiler.cpp.extra_flags=-DMATDOG_BUILD_ID=\"${BUILD_ID}\" -DMATDOG_GIT_SHA=\"${SOURCE_COMMIT}\" -DMATDOG_GIT_DIRTY=${GIT_DIRTY} -DMATDOG_BUILD_UTC=\"${BUILD_UTC}\"${PROFILE_FLAG}${OTA_INGEST_FLAG}${VALIDATION_FLAG}${TLS_FLAG}" \
   --warnings all \
   "${COMPILE_OPTIONS[@]}" \
   "$SKETCH_DIR" \
@@ -333,11 +370,14 @@ python3 "$SCRIPT_DIR/build_manifest.py" write \
 
 printf "SUPERVISED_VALIDATION_CAPABLE=%s\nBOOT_MOTION_AUTHORIZED=0\n" "$VALIDATION_ID" >> "$MANIFEST"
 
-python3 - "$SKETCH_DIR/src/config/TlsIdentity.local.h" "$MANIFEST" <<'PY_TLS'
+python3 - "$TLS_HEADER" "$MANIFEST" "$TLS_HEADER_SHA256" <<'PY_TLS'
 import hashlib,re,sys
 from pathlib import Path
 p=Path(sys.argv[1]);manifest=Path(sys.argv[2])
 # Private key/header are never copied into the public receipt.
 header_hash=hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else 'ABSENT'
+if header_hash != sys.argv[3]:
+    manifest.unlink(missing_ok=True)
+    raise SystemExit('private TLS identity changed during compilation; rebuild required')
 with manifest.open('a') as f:f.write('PRIVATE_TLS_CONFIGURATION_SHA256='+header_hash+'\n')
 PY_TLS

@@ -11,8 +11,11 @@ namespace matdog { namespace motion {
 // and AdaptiveStand/Executor/Safe Actuator layer re-check every sample.
 enum class EntryStatus : uint8_t { OK, INVALID_INPUT, LIMIT, CERTIFICATE_REQUIRED, START_OUTSIDE_CERTIFIED_REGION, GOAL_MISMATCH, RATE_POLICY };
 const char* entryStatusName(EntryStatus status);
-// Offline certificate of the two staged straight joint-space segments from a
-// MEASURED start to the route head, with a joint tube. RAM-only; the digest is
+// Offline certificate from a MEASURED start to the route head, with a joint
+// tube. DISENGAGE must cover the Cartesian product of the four LOWER ranges,
+// including independent inward PRIME offsets; ALIGN covers its straight stage.
+// Encoder/install accuracy and modified cover compatibility need external
+// measurement bounds. RAM-only; the digest is
 // the certificate file, recorded for traceability, not an approval by itself.
 struct FixtureEntryCertificate {
   bool present=false;

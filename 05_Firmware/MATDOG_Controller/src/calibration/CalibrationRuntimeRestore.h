@@ -147,6 +147,9 @@ class CalibrationRuntimeRestore {
       const RuntimeRestoreRequest& runtime_facts,
       const actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
 
+  // Revokes every operational/commissioning limit, keeping the RESTORED
+  // transforms (RAM gen-1 mapping) intact. Safe-idle callers only.
+  void revokeLimits(actuator::ActuatorLimitTable& limits);
   void invalidate(actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
   const RuntimeCalibrationSnapshot& snapshot() const { return snapshot_; }
 

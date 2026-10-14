@@ -2,7 +2,11 @@
 #define MATDOG_CONFIG_TLS_IDENTITY_H
 // Provision per-device identity through the authorized physical firmware path.
 // PEM key/cert are intentionally absent in source. No shared/default identity.
-#if __has_include("TlsIdentity.local.h")
+#if defined(MATDOG_TLS_IDENTITY_HEADER)
+// An authorized build may reference the private header outside all worktrees.
+// Only the public digest enters the build receipt; the header is never exported.
+#include MATDOG_TLS_IDENTITY_HEADER
+#elif __has_include("TlsIdentity.local.h")
 #include "TlsIdentity.local.h"
 #endif
 #ifndef MATDOG_TLS_CERT_PEM

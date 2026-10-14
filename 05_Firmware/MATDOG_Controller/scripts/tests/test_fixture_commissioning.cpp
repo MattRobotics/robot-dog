@@ -61,7 +61,8 @@ double slot(const motion::JointTargetFrame& f,unsigned i){const auto& q=f.legs[i
 struct Bench {
  Rig r;double limits[12][2]{},measured[12]{};execution::CommissioningParameters params;execution::ReviewedMotionRuntime runtime;
  MotionSession session;MotionCoordinator coordinator;MotionService service;LocalTrialEvidence evidence;uint32_t now=100;
- Bench(){
+ Bench(double tracking=.006){
+  params.tracking_tolerance_rad=tracking;
   CHECK(r.arbiter.release(r.facts.lease)==AuthorityResult::RELEASED);r.facts.lease={};
   commissioningLimits(r,limits,measured);
   CHECK(execution::buildCommissioningRuntime(params,limits,1,r.policy.epoch(),&runtime));
@@ -126,9 +127,9 @@ void primeClampAndRefusals(){
  {Bench b;CHECK(b.session.request(b.evidence,b.r.facts,b.r.envelope,b.r.feedback,true,b.now));
   CHECK(b.session.primeClampMask()==((1u<<2)|(1u<<5)|(1u<<8)|(1u<<11)));
   for(unsigned i=0;i<12;++i){
-   if(i%3==2){CHECK(b.session.primeClampTicks(i)==kLowerOutside[i/3]+1);
+   if(i%3==2){CHECK(b.session.primeClampTicks(i)==kLowerOutside[i/3]+kPrimeInwardMarginTicks);
     // The clamp moves AWAY from the folded stop: LOWER angle increases.
-    CHECK(b.session.primedRadians()[i]>b.measured[i]);CHECK(b.session.primedRadians()[i]-b.measured[i]<5*2*3.14159265358979/4096);}
+    CHECK(b.session.primedRadians()[i]>b.measured[i]);CHECK(b.session.primedRadians()[i]-b.measured[i]<(b.params.prime_clamp_ticks+.5)*2*3.14159265358979/4096);}
    else CHECK(b.session.primedRadians()[i]==b.measured[i]);}
   for(unsigned k=0;k<12;++k){b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);}
   CHECK(b.r.backend.writes.size()==12);
@@ -148,11 +149,11 @@ void classifierOnMeasuredPose(){
  double q[12];for(unsigned i=0;i<12;++i)q[i]=kMeasuredDeg[i]*kDeg;
  std::array<double,12> a{},n{};const auto head=motion::pairedProneSample(0,0,true);
  for(unsigned i=0;i<12;++i){a[i]=q[i];n[i]=slot(head.target,i);}
- const auto c=motion::classifyFixtureProne(a,n,true,true);
+ const auto c=motion::classifyFixtureProne(a.data(),n.data(),true,true);
  CHECK(c.kind==motion::FixturePoseKind::PRONE_COMPATIBLE);CHECK(c.maxErrorJointIndex==10);CHECK(c.maxNominalErrorRad>.006);
- auto bad=a;bad[7]=-bad[7];CHECK(motion::classifyFixtureProne(bad,n,true,true).reason==motion::FixturePoseReason::UPPER_BAND);
- bad=a;bad[0]=.5;const auto hip=motion::classifyFixtureProne(bad,n,true,true);CHECK(hip.reason==motion::FixturePoseReason::HIP_BAND&&hip.failedJointIndex==0);
- CHECK(motion::classifyFixtureProne(a,n,false,true).reason==motion::FixturePoseReason::NOT_FIXTURE);
+ auto bad=a;bad[7]=-bad[7];CHECK(motion::classifyFixtureProne(bad.data(),n.data(),true,true).reason==motion::FixturePoseReason::UPPER_BAND);
+ bad=a;bad[0]=.5;const auto hip=motion::classifyFixtureProne(bad.data(),n.data(),true,true);CHECK(hip.reason==motion::FixturePoseReason::HIP_BAND&&hip.failedJointIndex==0);
+ CHECK(motion::classifyFixtureProne(a.data(),n.data(),false,true).reason==motion::FixturePoseReason::NOT_FIXTURE);
  // The certified 6 mrad route cursor still rejects this pose; recognition is separate.
  motion::AdaptiveObservation o;observe(o,q,100);auto p=execution::CommissioningParameters{};double lim[12][2];
  for(unsigned i=0;i<12;++i){const auto* m=motion::legModel(static_cast<motion::LegId>(i/3));lim[i][0]=m->limits[i%3].lower;lim[i][1]=m->limits[i%3].upper;}
@@ -166,7 +167,7 @@ void entryPlanner(){
  // The measured LOWER rest is outside the hard limit: the plan refuses it.
  CHECK(plan.status==motion::EntryStatus::LIMIT&&plan.failedJoint%3==2);
  // From the primed (clamped) pose it is inside the certified tube and limits.
- for(unsigned i=2;i<12;i+=3){auto& q=start.legs[i/3];q.lower+=(kLowerOutside[i/3]+1)*2*3.14159265358979/4096;}
+ for(unsigned i=2;i<12;i+=3){auto& q=start.legs[i/3];q.lower+=(kLowerOutside[i/3]+kPrimeInwardMarginTicks)*2*3.14159265358979/4096;}
  plan=motion::planFixtureEntry(start,head,b.runtime.feedback,c,b.params.entry_min_stage_s);
  CHECK(plan.status==motion::EntryStatus::OK);CHECK(plan.durationS[0]>=b.params.entry_min_stage_s&&plan.durationS[1]>=b.params.entry_min_stage_s);
  // Stage 0 moves only LOWER, away from the stop; stage 1 never moves LOWER.
@@ -184,12 +185,29 @@ void entryPlanner(){
  auto moved=start;moved.legs[3].upper+=.01;CHECK(motion::planFixtureEntry(moved,head,b.runtime.feedback,c,4).status==motion::EntryStatus::START_OUTSIDE_CERTIFIED_REGION);
  auto other=head;other.legs[0].hip+=.001;CHECK(motion::planFixtureEntry(start,other,b.runtime.feedback,c,4).status==motion::EntryStatus::GOAL_MISMATCH);
  auto nan=start;nan.legs[2].lower=NAN;CHECK(motion::planFixtureEntry(nan,head,b.runtime.feedback,c,4).status==motion::EntryStatus::INVALID_INPUT);
+ // The narrow computational entry tube covers asynchronous writes too.
+ auto narrow=c;narrow.tubeRad=.004;auto policy=b.runtime.feedback;policy.maxTrackingErrorRad=.0035;
+ auto slow=motion::planFixtureEntry(start,head,policy,narrow,4);CHECK(slow.status==motion::EntryStatus::OK);
+ CHECK(slow.durationS[1]>plan.durationS[1]);
+ for(unsigned stage=0;stage<2;++stage){
+  const auto& a=stage==0?slow.start:slow.middle;const auto& z=stage==0?slow.middle:slow.goal;
+  for(unsigned i=0;i<12;++i){const double delta=std::abs(slot(z,i)-slot(a,i));
+   const double step=1.875*delta*policy.samplePeriodS/slow.durationS[stage];
+   CHECK(step/2+policy.maxTrackingErrorRad+1e-6<=narrow.tubeRad);}
+ }
+ // A shifted HIP/UPPER consumes more of the tube and lengthens ALIGN.
+ auto shifted=start;shifted.legs[3].upper+=.0002;policy.segmentTimeoutS=30;
+ auto adjusted=motion::planFixtureEntry(shifted,head,policy,narrow,4);
+ CHECK(adjusted.status==motion::EntryStatus::OK&&adjusted.durationS[1]>slow.durationS[1]);
+ // Unsafe duration is refused rather than relaxing a timeout or a tube.
+ policy.segmentTimeoutS=4;
+ CHECK(motion::planFixtureEntry(start,head,policy,narrow,4).status==motion::EntryStatus::RATE_POLICY);
 }
 
 // Full supervised STAND from the measured prone pose, all approvals explicit.
-void standFromMeasuredPose(bool approve_phases){
- Bench b;if(approve_phases)b.params.approval=execution::SegmentApproval::PHASE;
- auto c=b.certificate(); // measured torque-OFF rest, as the host certificate tool uses
+void standFromMeasuredPose(bool approve_phases,double tube=.01,double tracking=.006){
+ Bench b(tracking);if(approve_phases)b.params.approval=execution::SegmentApproval::PHASE;
+ auto c=b.certificate(tube); // measured torque-OFF rest, as the host certificate tool uses
  CHECK(b.configure(c)); // ADMIT configures before GRANT
  CHECK(b.arm());CHECK(b.r.executor.active());
  const auto ack=b.stand();CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);
@@ -236,7 +254,7 @@ void standFromMeasuredPose(bool approve_phases){
   CHECK(inside);}
  // STAND reached through the certified fixture route (C4 targets, not body height).
  const auto c4=motion::pairedProneSample(250,1,true).target;for(unsigned i=0;i<12;++i)CHECK(std::abs(q[i]-slot(c4,i))<1e-9);
- std::printf("COMMISSIONING_STAND approval=%s frames=%u entry_frames=%u writes=%zu entry_s=%.2f+%.2f max_step=%.6f\n",approve_phases?"PHASE":"SEGMENT",frames,entry_frames,b.r.backend.writes.size(),b.coordinator.entryPlan().durationS[0],b.coordinator.entryPlan().durationS[1],max_step);
+ std::printf("COMMISSIONING_STAND approval=%s tube=%.6f tracking=%.6f frames=%u entry_frames=%u writes=%zu entry_s=%.2f+%.2f max_step=%.6f\n",approve_phases?"PHASE":"SEGMENT",tube,tracking,frames,entry_frames,b.r.backend.writes.size(),b.coordinator.entryPlan().durationS[0],b.coordinator.entryPlan().durationS[1],max_step);
 }
 
 void standRefusalsAndStop(){
@@ -275,6 +293,14 @@ void standRefusalsAndStop(){
   CHECK(execution::setCommissioningParameter(p,"approval","PHASE",&why)&&p.approval==execution::SegmentApproval::PHASE);
   execution::RuntimeTestMode m;CHECK(execution::parseRuntimeTestMode("FIXTURE_COMMISSIONING",&m)&&m==execution::RuntimeTestMode::FIXTURE_COMMISSIONING);
   CHECK(!execution::parseRuntimeTestMode("UNLOCKED",&m));
+  const TrialScope scopes[]={TrialScope::FIXTURE_MICRO,TrialScope::SUPERVISED_FIXTURE_STAND,
+   TrialScope::SUPERVISED_FIXTURE_WALK,TrialScope::AUTONOMOUS_STAND,TrialScope::AUTONOMOUS_WALK,TrialScope::FIXTURE_COMMISSIONING};
+  for(auto scope:scopes){
+   CHECK(!execution::runtimeModeAllowsScope(execution::RuntimeTestMode::DIAGNOSTIC,scope));
+   CHECK(execution::runtimeModeAllowsScope(execution::RuntimeTestMode::FIXTURE_COMMISSIONING,scope)==(scope==TrialScope::FIXTURE_COMMISSIONING));
+   CHECK(execution::runtimeModeAllowsScope(execution::RuntimeTestMode::GROUND_VALIDATION,scope)==(scope!=TrialScope::FIXTURE_COMMISSIONING));
+   CHECK(execution::runtimeModeAllowsScope(execution::RuntimeTestMode::AUTONOMOUS,scope)==(scope==TrialScope::AUTONOMOUS_STAND||scope==TrialScope::AUTONOMOUS_WALK));
+  }
   char text[900];CHECK(execution::formatCommissioningParameters(p,text,sizeof(text)));}
 }
 }
@@ -282,5 +308,6 @@ void standRefusalsAndStop(){
 int main(){
  classifierOnMeasuredPose();primeClampAndRefusals();entryPlanner();
  standFromMeasuredPose(false);standFromMeasuredPose(true);standRefusalsAndStop();
+ standFromMeasuredPose(false,.004,.0035);standFromMeasuredPose(true,.004,.0035);
  std::printf("FIXTURE_COMMISSIONING %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;
 }

@@ -17,6 +17,7 @@ struct LocalTrialEvidence {
  // tick instead of its readback. 0 = exact readback prime only.
  uint16_t prime_clamp_max_ticks=0;
 };
+constexpr uint16_t kPrimeInwardMarginTicks=2;
 enum class MotionSessionState : uint8_t { OFF, PRIMING, ENERGIZING, ARMING, ARMED, SAFE_OFF_REQUIRED };
 // LOCAL Controller lifecycle, no HTTP binding. A separate operator permit and
 // scoped evidence are required. Prime writes PRESENT targets while torque is

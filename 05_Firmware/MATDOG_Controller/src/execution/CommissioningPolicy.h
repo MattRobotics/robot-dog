@@ -14,6 +14,8 @@ namespace matdog { namespace execution {
 enum class RuntimeTestMode : uint8_t { DIAGNOSTIC, FIXTURE_COMMISSIONING, GROUND_VALIDATION, AUTONOMOUS };
 const char* toString(RuntimeTestMode mode);
 bool parseRuntimeTestMode(const char* text, RuntimeTestMode* mode);
+// Mode selection is a RAM scope restriction; it never supplies a permit.
+bool runtimeModeAllowsScope(RuntimeTestMode mode, TrialScope scope);
 enum class SegmentApproval : uint8_t { SEGMENT, PHASE, CONTINUOUS };
 const char* toString(SegmentApproval approval);
 struct CommissioningParameters {

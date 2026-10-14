@@ -151,6 +151,7 @@ class CommandRouter {
     calibration::CalibrationRuntimeRestore* runtime_restore=nullptr;
     void* validation_context=nullptr;
     bool (*validation_command)(void*,const char*,uint32_t,char*,size_t)=nullptr;
+    bool (*commissioning_command)(void*,const char*,uint32_t,char*,size_t)=nullptr;
   };
 
   void begin(const Modules& modules);

@@ -19,6 +19,14 @@ bool parseRuntimeTestMode(const char* s,RuntimeTestMode* m){
   for(auto x:all)if(!std::strcmp(s,toString(x))){*m=x;return true;}
   return false;
 }
+bool runtimeModeAllowsScope(RuntimeTestMode mode,TrialScope scope){
+  if(mode==RuntimeTestMode::FIXTURE_COMMISSIONING)return scope==TrialScope::FIXTURE_COMMISSIONING;
+  if(mode==RuntimeTestMode::AUTONOMOUS)return scope==TrialScope::AUTONOMOUS_STAND||scope==TrialScope::AUTONOMOUS_WALK;
+  if(mode==RuntimeTestMode::GROUND_VALIDATION)return scope==TrialScope::FIXTURE_MICRO||
+    scope==TrialScope::SUPERVISED_FIXTURE_STAND||scope==TrialScope::SUPERVISED_FIXTURE_WALK||
+    scope==TrialScope::AUTONOMOUS_STAND||scope==TrialScope::AUTONOMOUS_WALK;
+  return false;
+}
 const char* toString(SegmentApproval a){switch(a){case SegmentApproval::PHASE:return "PHASE";case SegmentApproval::CONTINUOUS:return "CONTINUOUS";default:return "SEGMENT";}}
 bool validCommissioningParameters(const CommissioningParameters& p,const char** reason){
   auto bad=[&](const char* r){if(reason)*reason=r;return false;};

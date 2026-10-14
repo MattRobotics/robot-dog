@@ -161,6 +161,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
                         SOURCE_DATE_EPOCH="1791158400", PYTHONDONTWRITEBYTECODE="1")
         for name in ("MATDOG_BUILD_DIR", "MATDOG_OUTPUT_DIR", "MATDOG_BUILD_CACHE_DIR",
                      "MATDOG_BUILD_TMP_DIR", "MATDOG_PROFILE", "MATDOG_OTA_INGEST_VALIDATION",
+                     "MATDOG_TLS_IDENTITY_FILE",
                      "FAKE_STATUS", "FAKE_FAIL", "FAKE_OTHER_WORKTREE"):
             self.env.pop(name, None)
         self.before = file_hashes(self.repo)
@@ -241,6 +242,25 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         for changes in ({"SOURCE_DATE_EPOCH": "-1"}, {"SOURCE_DATE_EPOCH": "invalid"},
                         {"MATDOG_PROFILE": "typo"}, {"MATDOG_OTA_INGEST_VALIDATION": "2"}):
             self.assertNotEqual(self.run_build(**changes).returncode, 0)
+        self.assertFalse(self.capture.exists())
+
+    def test_external_private_tls_bound_without_exporting_header(self):
+        private = self.base / "private-identity.h"
+        private.write_text('#define MATDOG_TLS_CERT_PEM "test-only-cert"\n'
+                           '#define MATDOG_TLS_KEY_PEM "test-only-key"\n')
+        result = self.run_build(MATDOG_TLS_IDENTITY_FILE=str(private))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.manifest()["PRIVATE_TLS_CONFIGURATION_SHA256"], bm.sha256_file(private))
+        args = json.loads(self.capture.read_text())
+        flags = next(value for value in args if value.startswith("compiler.cpp.extra_flags="))
+        self.assertIn('-DMATDOG_TLS_IDENTITY_HEADER="' + str(private) + '"', flags)
+        self.assertFalse(any(p.name == private.name for p in self.root.rglob("*")))
+
+    def test_private_tls_missing_unsafe_or_inside_worktree_refused(self):
+        for path in (self.base / "missing.h", self.sketch / "src/config/BuildConfig.h",
+                     self.base / "unsafe name.h", Path("relative.h")):
+            with self.subTest(path=path):
+                self.assertNotEqual(self.run_build(MATDOG_TLS_IDENTITY_FILE=str(path)).returncode, 0)
         self.assertFalse(self.capture.exists())
 
 
