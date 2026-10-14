@@ -1,0 +1,222 @@
+{
+  "schema": 1,
+  "readiness": "REV01_PENDING",
+  "assembly_revision": "REV01-candidate",
+  "units": {
+    "mass": "kg",
+    "length": "m",
+    "angle": "rad",
+    "inertia": "kg*m^2"
+  },
+  "inventory_review": "PENDING_MEASUREMENT",
+  "assembly_configuration_description": "PENDING_MEASUREMENT",
+  "link_reviews": [
+    {
+      "link_name": "base_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lf_hip_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lf_upper_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lf_lower_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lf_foot_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rf_hip_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rf_upper_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rf_lower_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rf_foot_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rh_hip_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rh_upper_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rh_lower_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "rh_foot_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lh_hip_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lh_upper_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lh_lower_leg_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    },
+    {
+      "link_name": "lh_foot_link",
+      "decision": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT"
+    }
+  ],
+  "components": [
+    {
+      "id": "electronics",
+      "description": "Controller, power electronics and installed boards: enumerate exact coverage",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "bno085",
+      "description": "Installed BNO085 module including its dedicated mount",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "wiring",
+      "description": "Installed harness, connectors, sleeves and strain relief",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "rear_antenna_support",
+      "description": "Rear antenna support and fasteners",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "antenna",
+      "description": "Antenna and cable, excluding support already allocated",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "fuse_holder",
+      "description": "Fuse holder, fuse and dedicated attachment",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "charging_contacts",
+      "description": "Charging contacts and dedicated attachment",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "battery_power_configuration",
+      "description": "Battery or external-power configuration delta: replace full affected link when removing baseline parts",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "neck_yaw_assembly",
+      "description": "Historical 0.061 kg actuator is a reference only; installed articulated topology needs separate review",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    },
+    {
+      "id": "other_components",
+      "description": "Complete inventory of additional/modified parts; split into independent disjoint rows",
+      "disposition": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "com_in_parent_m": "PENDING_MEASUREMENT",
+      "inertia_at_com_component_kg_m2": "PENDING_MEASUREMENT",
+      "component_rpy_in_parent_rad": "PENDING_MEASUREMENT",
+      "evidence": "PENDING_MEASUREMENT",
+      "coverage_note": "PENDING_MEASUREMENT"
+    }
+  ]
+}

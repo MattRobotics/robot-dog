@@ -1,0 +1,103 @@
+{
+  "command_eligible": false,
+  "components": [
+    {
+      "component_id": "electronics",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "bno085",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "wiring",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "rear_antenna_support",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "antenna",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "fuse_holder",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "charging_contacts",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "battery_power_configuration",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "neck_yaw_assembly",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    },
+    {
+      "component_id": "other_components",
+      "disposition": "PENDING_MEASUREMENT",
+      "mass_kg": "PENDING_MEASUREMENT",
+      "parent_link": "PENDING_MEASUREMENT",
+      "sensitivity": null,
+      "status": "PENDING_MEASUREMENT"
+    }
+  ],
+  "hardware_verified": false,
+  "multiple_additions": "Use one aggregate denominator, not a sum of individual exact shifts",
+  "pose_semantic_rad": {
+    "lf_hip_joint": 0.0,
+    "lf_lower_leg_joint": 0.0,
+    "lf_upper_leg_joint": 0.0,
+    "lh_hip_joint": 0.0,
+    "lh_lower_leg_joint": 0.0,
+    "lh_upper_leg_joint": 0.0,
+    "rf_hip_joint": 0.0,
+    "rf_lower_leg_joint": 0.0,
+    "rf_upper_leg_joint": 0.0,
+    "rh_hip_joint": 0.0,
+    "rh_lower_leg_joint": 0.0,
+    "rh_upper_leg_joint": 0.0
+  },
+  "readiness": "REV01_PENDING",
+  "uncertainty_propagation": "dC = (r-C)/M_total * dm + (m/M_total) * dr; actual dm,dr bounds PENDING_MEASUREMENT"
+}

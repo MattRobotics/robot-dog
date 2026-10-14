@@ -1,0 +1,4659 @@
+{
+  "actual_REV01_assembly_verified": false,
+  "all_com_centers_geometrically_inside": true,
+  "assumptions": [
+    "C4-C nominal four-contact horizontal support geometry, not physical contact evidence",
+    "Plane tolerance 10 micrometres from historical C4-C numerical envelope",
+    "20 mm box reproduced only for comparison with C4-E, not measured REV01 uncertainty"
+  ],
+  "command_eligible": false,
+  "frames": [
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.1
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407165474494,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.899301814579817e-07,
+        "lf_lower_leg_joint": -0.471967675802369,
+        "lf_upper_leg_joint": 0.8597019686763694,
+        "lh_hip_joint": 7.062734720037801e-07,
+        "lh_lower_leg_joint": -0.6870606105411085,
+        "lh_upper_leg_joint": 1.405096330461043,
+        "rf_hip_joint": -4.899301814579817e-07,
+        "rf_lower_leg_joint": -0.471967675802369,
+        "rf_upper_leg_joint": 0.8597019686763694,
+        "rh_hip_joint": -7.062734720037801e-07,
+        "rh_lower_leg_joint": -0.6870606105411085,
+        "rh_upper_leg_joint": 1.405096330461043
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007883961197,
+      "projection": {
+        "com_world_m": [
+          -0.01371060535518663,
+          -0.000336008064516129,
+          0.11709476425028192
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01371060535518663,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407293791083,
+        "support_hull_plane_m": [
+          [
+            -0.09400008934311888,
+            -0.1437123690537963
+          ],
+          [
+            0.09400008934311888,
+            -0.1437123690537963
+          ],
+          [
+            0.09400007177349694,
+            0.13013564183905113
+          ],
+          [
+            -0.09400007177349694,
+            0.13013564183905113
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01371060535518663,
+          -0.000336008064516129,
+          0.017094764250281926
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01403785009095074,
+            3.052092228897752e-05,
+            -0.0012692404856458057
+          ],
+          [
+            3.052092228897752e-05,
+            0.03069943402797861,
+            1.1609289512800518e-06
+          ],
+          [
+            -0.0012692404856458057,
+            1.1609289512800518e-06,
+            0.03976610402110533
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 0
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.101
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407159385956,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.886934826247977e-07,
+        "lf_lower_leg_joint": -0.45878420265763603,
+        "lf_upper_leg_joint": 0.8524055798170787,
+        "lh_hip_joint": 6.968213735808124e-07,
+        "lh_lower_leg_joint": -0.6752169871617615,
+        "lh_upper_leg_joint": 1.3948694756216018,
+        "rf_hip_joint": -4.886934826247977e-07,
+        "rf_lower_leg_joint": -0.45878420265763603,
+        "rf_upper_leg_joint": 0.8524055798170787,
+        "rh_hip_joint": -6.968213735808124e-07,
+        "rh_lower_leg_joint": -0.6752169871617615,
+        "rh_upper_leg_joint": 1.3948694756216018
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007882279072,
+      "projection": {
+        "com_world_m": [
+          -0.013650315276654511,
+          -0.000336008064516129,
+          0.11789584912322122
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013650315276654511,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407281813155,
+        "support_hull_plane_m": [
+          [
+            -0.09400008884421761,
+            -0.14371241836652243
+          ],
+          [
+            0.09400008884421761,
+            -0.14371241836652243
+          ],
+          [
+            0.09400007208099188,
+            0.1301356365328779
+          ],
+          [
+            -0.09400007208099188,
+            0.1301356365328779
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013650315276654511,
+          -0.000336008064516129,
+          0.016895849123221215
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01407465497685164,
+            3.0470682566536334e-05,
+            -0.001297966998007456
+          ],
+          [
+            3.0470682566536334e-05,
+            0.030737283301587315,
+            1.326684926659744e-06
+          ],
+          [
+            -0.001297966998007456,
+            1.326684926659744e-06,
+            0.03976714846934884
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 1
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10200000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407156043528,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.876190439641428e-07,
+        "lf_lower_leg_joint": -0.4455261474692682,
+        "lf_upper_leg_joint": 0.8450728019653969,
+        "lh_hip_joint": 6.877805726426302e-07,
+        "lh_lower_leg_joint": -0.6633208414736697,
+        "lh_upper_leg_joint": 1.3846780487840433,
+        "rf_hip_joint": -4.876190439641428e-07,
+        "rf_lower_leg_joint": -0.4455261474692682,
+        "rf_upper_leg_joint": 0.8450728019653969,
+        "rh_hip_joint": -6.877805726426302e-07,
+        "rh_lower_leg_joint": -0.6633208414736697,
+        "rh_upper_leg_joint": 1.3846780487840433
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007883254851,
+      "projection": {
+        "com_world_m": [
+          -0.013588571491290303,
+          -0.000336008064516129,
+          0.11869757606706692
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013588571491290303,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407272671368,
+        "support_hull_plane_m": [
+          [
+            -0.09400008837926459,
+            -0.14371246632708332
+          ],
+          [
+            0.09400008837926459,
+            -0.14371246632708332
+          ],
+          [
+            0.09400007241010806,
+            0.13013563130032887
+          ],
+          [
+            -0.09400007241010806,
+            0.13013563130032887
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013588571491290303,
+          -0.000336008064516129,
+          0.01669757606706691
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014111934393199313,
+            3.0419231470192712e-05,
+            -0.0013263291190240174
+          ],
+          [
+            3.0419231470192712e-05,
+            0.030775139983667432,
+            1.4919058643531096e-06
+          ],
+          [
+            -0.0013263291190240174,
+            1.4919058643531096e-06,
+            0.039767725796402094
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 2
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10300000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407155452595,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.867082319161812e-07,
+        "lf_lower_leg_joint": -0.4321915918890788,
+        "lf_upper_leg_joint": 0.8377024867595713,
+        "lh_hip_joint": 6.791359107418196e-07,
+        "lh_lower_leg_joint": -0.6513711876428256,
+        "lh_upper_leg_joint": 1.3745200081601885,
+        "rf_hip_joint": -4.867082319161812e-07,
+        "rf_lower_leg_joint": -0.4321915918890788,
+        "rf_upper_leg_joint": 0.8377024867595713,
+        "rh_hip_joint": -6.791359107418196e-07,
+        "rh_lower_leg_joint": -0.6513711876428256,
+        "rh_upper_leg_joint": 1.3745200081601885
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007886900518,
+      "projection": {
+        "com_world_m": [
+          -0.013525371099747793,
+          -0.000336008064516129,
+          0.11949993426669044
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013525371099747793,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407266360734,
+        "support_hull_plane_m": [
+          [
+            -0.09400008794753062,
+            -0.14371251296112098
+          ],
+          [
+            0.09400008794753062,
+            -0.14371251296112098
+          ],
+          [
+            0.09400007276153648,
+            0.13013562613612967
+          ],
+          [
+            -0.09400007276153648,
+            0.13013562613612967
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013525371099747793,
+          -0.000336008064516129,
+          0.016499934266690428
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014149684190840684,
+            3.03665665839197e-05,
+            -0.0013543271761399724
+          ],
+          [
+            3.03665665839197e-05,
+            0.030813013174442388,
+            1.6566007766068544e-06
+          ],
+          [
+            -0.0013543271761399724,
+            1.6566007766068544e-06,
+            0.03976784925177742
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 3
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10400000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407157623417,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.859625253526253e-07,
+        "lf_lower_leg_joint": -0.41877854819685,
+        "lf_upper_leg_joint": 0.8302934505392948,
+        "lh_hip_joint": 6.708732982248916e-07,
+        "lh_lower_leg_joint": -0.6393670072982895,
+        "lh_upper_leg_joint": 1.3643933393127095,
+        "rf_hip_joint": -4.859625253526253e-07,
+        "rf_lower_leg_joint": -0.41877854819685,
+        "rf_upper_leg_joint": 0.8302934505392948,
+        "rh_hip_joint": -6.708732982248916e-07,
+        "rh_lower_leg_joint": -0.6393670072982895,
+        "rh_upper_leg_joint": 1.3643933393127095
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007893232564,
+      "projection": {
+        "com_world_m": [
+          -0.013460710157210284,
+          -0.000336008064516129,
+          0.12030291321045272
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013460710157210284,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407262881553,
+        "support_hull_plane_m": [
+          [
+            -0.09400008754836532,
+            -0.14371255829316754
+          ],
+          [
+            0.09400008754836532,
+            -0.14371255829316754
+          ],
+          [
+            0.09400007313599053,
+            0.13013562103509374
+          ],
+          [
+            -0.09400007313599053,
+            0.13013562103509374
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013460710157210284,
+          -0.000336008064516129,
+          0.016302913210452716
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014187900340767036,
+            3.031268462050325e-05,
+            -0.0013819614236925818
+          ],
+          [
+            3.031268462050325e-05,
+            0.030850911804426836,
+            1.8207784227696917e-06
+          ],
+          [
+            -0.0013819614236925818,
+            1.8207784227696917e-06,
+            0.03976753179513217
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 4
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10500000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407162572958,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.853837608521075e-07,
+        "lf_lower_leg_joint": -0.40528495554018334,
+        "lf_upper_leg_joint": 0.8228444721653669,
+        "lh_hip_joint": 6.629796318684787e-07,
+        "lh_lower_leg_joint": -0.6273072483698582,
+        "lh_upper_leg_joint": 1.354296052884384,
+        "rf_hip_joint": -4.853837608521075e-07,
+        "rf_lower_leg_joint": -0.40528495554018334,
+        "rf_upper_leg_joint": 0.8228444721653669,
+        "rh_hip_joint": -6.629796318684787e-07,
+        "rh_lower_leg_joint": -0.6273072483698582,
+        "rh_upper_leg_joint": 1.354296052884384
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007902274021,
+      "projection": {
+        "com_world_m": [
+          -0.013394583667965422,
+          -0.000336008064516129,
+          0.12110650268682091
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013394583667965422,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407262240924,
+        "support_hull_plane_m": [
+          [
+            -0.0940000871811917,
+            -0.14371260234657712
+          ],
+          [
+            0.0940000871811917,
+            -0.14371260234657712
+          ],
+          [
+            0.09400007353424365,
+            0.13013561599198242
+          ],
+          [
+            -0.09400007353424365,
+            0.13013561599198242
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013394583667965422,
+          -0.000336008064516129,
+          0.016106502686820904
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014226578928917252,
+            3.0257581417015697e-05,
+            -0.0014092320375304135
+          ],
+          [
+            3.0257581417015697e-05,
+            0.030888844652601718,
+            1.984447312111929e-06
+          ],
+          [
+            -0.0014092320375304135,
+            1.984447312111929e-06,
+            0.03976678611964324
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 5
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10600000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407170324225,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.849742810634891e-07,
+        "lf_lower_leg_joint": -0.391708675913223,
+        "lf_upper_leg_joint": 0.8153542906989908,
+        "lh_hip_joint": 6.554424212871189e-07,
+        "lh_lower_leg_joint": -0.6151908238528712,
+        "lh_upper_leg_joint": 1.3442261823554367,
+        "rf_hip_joint": -4.849742810634891e-07,
+        "rf_lower_leg_joint": -0.391708675913223,
+        "rf_upper_leg_joint": 0.8153542906989908,
+        "rh_hip_joint": -6.554424212871189e-07,
+        "rh_lower_leg_joint": -0.6151908238528712,
+        "rh_upper_leg_joint": 1.3442261823554367
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007914054135,
+      "projection": {
+        "com_world_m": [
+          -0.01332698557719868,
+          -0.000336008064516129,
+          0.12191069278112672
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01332698557719868,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407264451589,
+        "support_hull_plane_m": [
+          [
+            -0.09400008684546149,
+            -0.14371264514358162
+          ],
+          [
+            0.09400008684546149,
+            -0.14371264514358162
+          ],
+          [
+            0.09400007395715394,
+            0.13013561100148147
+          ],
+          [
+            -0.09400007395715394,
+            0.13013561100148147
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01332698557719868,
+          -0.000336008064516129,
+          0.015910692781126713
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014265716151115701,
+            3.020125192798001e-05,
+            -0.0014361391097719917
+          ],
+          [
+            3.020125192798001e-05,
+            0.030926820364570354,
+            2.1476157065270336e-06
+          ],
+          [
+            -0.0014361391097719917,
+            2.1476157065270336e-06,
+            0.03976562467522565
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 6
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10700000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407180906835,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.847365720367645e-07,
+        "lf_lower_leg_joint": -0.37804748985653536,
+        "lf_upper_leg_joint": 0.8078216029314723,
+        "lh_hip_joint": 6.482503419561608e-07,
+        "lh_lower_leg_joint": -0.6030166104942197,
+        "lh_upper_leg_joint": 1.3341817818217034,
+        "rf_hip_joint": -4.847365720367645e-07,
+        "rf_lower_leg_joint": -0.37804748985653536,
+        "rf_upper_leg_joint": 0.8078216029314723,
+        "rh_hip_joint": -6.482503419561608e-07,
+        "rh_lower_leg_joint": -0.6030166104942197,
+        "rh_upper_leg_joint": 1.3341817818217034
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007928608279,
+      "projection": {
+        "com_world_m": [
+          -0.013257908759936767,
+          -0.000336008064516129,
+          0.12271547387251475
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013257908759936767,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407269533433,
+        "support_hull_plane_m": [
+          [
+            -0.09400008654073223,
+            -0.14371268670541854
+          ],
+          [
+            0.09400008654073223,
+            -0.14371268670541854
+          ],
+          [
+            0.09400007440561074,
+            0.13013560605818753
+          ],
+          [
+            -0.09400007440561074,
+            0.13013560605818753
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013257908759936767,
+          -0.000336008064516129,
+          0.015715473872514738
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014305308308133117,
+            3.0143690216155317e-05,
+            -0.0014626826436810465
+          ],
+          [
+            3.0143690216155317e-05,
+            0.03096484747075495,
+            2.31029162307344e-06
+          ],
+          [
+            -0.0014626826436810465,
+            2.31029162307344e-06,
+            0.03976405969166806
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 7
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.108
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407194355504,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.846735721870698e-07,
+        "lf_lower_leg_joint": -0.36429909184987885,
+        "lf_upper_leg_joint": 0.8002450607489866,
+        "lh_hip_joint": 6.41392505449593e-07,
+        "lh_lower_leg_joint": -0.5907834473974835,
+        "lh_upper_leg_joint": 1.324160923786493,
+        "rf_hip_joint": -4.846735721870698e-07,
+        "rf_lower_leg_joint": -0.36429909184987885,
+        "rf_upper_leg_joint": 0.8002450607489866,
+        "rh_hip_joint": -6.41392505449593e-07,
+        "rh_lower_leg_joint": -0.5907834473974835,
+        "rh_upper_leg_joint": 1.324160923786493
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007945977131,
+      "projection": {
+        "com_world_m": [
+          -0.013187345007011542,
+          -0.000336008064516129,
+          0.12352083663106718
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013187345007011542,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407277510959,
+        "support_hull_plane_m": [
+          [
+            -0.09400008626657469,
+            -0.14371272705207633
+          ],
+          [
+            0.09400008626657469,
+            -0.14371272705207633
+          ],
+          [
+            0.09400007488058325,
+            0.13013560115653242
+          ],
+          [
+            -0.09400007488058325,
+            0.13013560115653242
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013187345007011542,
+          -0.000336008064516129,
+          0.015520836631067183
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014345351800868388,
+            3.0084889440842594e-05,
+            -0.0014888625486340356
+          ],
+          [
+            3.0084889440842594e-05,
+            0.031002934404708617,
+            2.472482836371603e-06
+          ],
+          [
+            -0.0014888625486340356,
+            2.472482836371603e-06,
+            0.03976210320176301
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 8
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.10900000000000001
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407210712905,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.847886301589005e-07,
+        "lf_lower_leg_joint": -0.3504610853742169,
+        "lf_upper_leg_joint": 0.7926232683171447,
+        "lh_hip_joint": 6.348589459870442e-07,
+        "lh_lower_leg_joint": -0.5784901345402946,
+        "lh_upper_leg_joint": 1.3141616969668748,
+        "rf_hip_joint": -4.847886301589005e-07,
+        "rf_lower_leg_joint": -0.3504610853742169,
+        "rf_upper_leg_joint": 0.7926232683171447,
+        "rh_hip_joint": -6.348589459870442e-07,
+        "rh_lower_leg_joint": -0.5784901345402946,
+        "rh_upper_leg_joint": 1.3141616969668748
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007966209164,
+      "projection": {
+        "com_world_m": [
+          -0.0131152850079554,
+          -0.000336008064516129,
+          0.12432677201521929
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.0131152850079554,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407288416673,
+        "support_hull_plane_m": [
+          [
+            -0.09400008602264119,
+            -0.14371276620257548
+          ],
+          [
+            0.09400008602264119,
+            -0.14371276620257548
+          ],
+          [
+            0.09400007538311624,
+            0.13013559629091914
+          ],
+          [
+            -0.09400007538311624,
+            0.13013559629091914
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.0131152850079554,
+          -0.000336008064516129,
+          0.015326772015219267
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01438584312563381,
+            3.002484184362876e-05,
+            -0.001514678635114607
+          ],
+          [
+            3.002484184362876e-05,
+            0.031041089521656972,
+            2.6341968807578038e-06
+          ],
+          [
+            -0.001514678635114607,
+            2.6341968807578038e-06,
+            0.03975976706456594
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 9
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.11
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407230029369,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.850854848058842e-07,
+        "lf_lower_leg_joint": -0.3365309776103866,
+        "lf_upper_leg_joint": 0.7849547790707405,
+        "lh_hip_joint": 6.286405457838623e-07,
+        "lh_lower_leg_joint": -0.5661354311958988,
+        "lh_upper_leg_joint": 1.3041822040972164,
+        "rf_hip_joint": -4.850854848058842e-07,
+        "rf_lower_leg_joint": -0.3365309776103866,
+        "rf_upper_leg_joint": 0.7849547790707405,
+        "rh_hip_joint": -6.286405457838623e-07,
+        "rh_lower_leg_joint": -0.5661354311958988,
+        "rh_upper_leg_joint": 1.3041822040972164
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400007989360356,
+      "projection": {
+        "com_world_m": [
+          -0.013041718330654104,
+          -0.000336008064516129,
+          0.1251332712693675
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.013041718330654104,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407302290745,
+        "support_hull_plane_m": [
+          [
+            -0.0940000858086599,
+            -0.14371280417466034
+          ],
+          [
+            0.0940000858086599,
+            -0.14371280417466034
+          ],
+          [
+            0.0940000759143289,
+            0.1301355914555695
+          ],
+          [
+            -0.0940000759143289,
+            0.1301355914555695
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.013041718330654104,
+          -0.000336008064516129,
+          0.015133271269367487
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014426778869548556,
+            2.9963538731434278e-05,
+            -0.001540130609756555
+          ],
+          [
+            2.9963538731434278e-05,
+            0.03107932111731427,
+            2.79544105227609e-06
+          ],
+          [
+            -0.001540130609756555,
+            2.79544105227609e-06,
+            0.03975706298881805
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 10
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.111
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407252360818,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.855683589734016e-07,
+        "lf_lower_leg_joint": -0.32250617374237545,
+        "lf_upper_leg_joint": 0.777238092488182,
+        "lh_hip_joint": 6.227285205230235e-07,
+        "lh_lower_leg_joint": -0.5537180542612979,
+        "lh_upper_leg_joint": 1.2942205597412217,
+        "rf_hip_joint": -4.855683589734016e-07,
+        "rf_lower_leg_joint": -0.32250617374237545,
+        "rf_upper_leg_joint": 0.777238092488182,
+        "rh_hip_joint": -6.227285205230235e-07,
+        "rh_lower_leg_joint": -0.5537180542612979,
+        "rh_upper_leg_joint": 1.2942205597412217
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008015492515,
+      "projection": {
+        "com_world_m": [
+          -0.012966633397647677,
+          -0.000336008064516129,
+          0.12594032592187843
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012966633397647677,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407319178341,
+        "support_hull_plane_m": [
+          [
+            -0.09400008562436843,
+            -0.1437128409851216
+          ],
+          [
+            0.09400008562436843,
+            -0.1437128409851216
+          ],
+          [
+            0.09400007647543167,
+            0.13013558664443636
+          ],
+          [
+            -0.09400007647543167,
+            0.13013558664443636
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012966633397647677,
+          -0.000336008064516129,
+          0.014940325921878422
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01446815570600642,
+            2.9900970456760266e-05,
+            -0.0015652180703301351
+          ],
+          [
+            2.9900970456760266e-05,
+            0.031117637447119786,
+            2.956222410338694e-06
+          ],
+          [
+            -0.0015652180703301351,
+            2.956222410338694e-06,
+            0.039754002556713575
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 11
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.112
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407277772079,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.862418767991141e-07,
+        "lf_lower_leg_joint": -0.30838397082433905,
+        "lf_upper_leg_joint": 0.7694716506264504,
+        "lh_hip_joint": 6.171150326258514e-07,
+        "lh_lower_leg_joint": -0.5412366764750113,
+        "lh_upper_leg_joint": 1.2842748880885646,
+        "rf_hip_joint": -4.862418767991141e-07,
+        "rf_lower_leg_joint": -0.30838397082433905,
+        "rf_upper_leg_joint": 0.7694716506264504,
+        "rh_hip_joint": -6.171150326258514e-07,
+        "rh_lower_leg_joint": -0.5412366764750113,
+        "rh_upper_leg_joint": 1.2842748880885646
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008044676111,
+      "projection": {
+        "com_world_m": [
+          -0.01289001745878308,
+          -0.000336008064516129,
+          0.1267479277833184
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01289001745878308,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407339133644,
+        "support_hull_plane_m": [
+          [
+            -0.09400008546960027,
+            -0.14371287664961868
+          ],
+          [
+            0.09400008546960027,
+            -0.14371287664961868
+          ],
+          [
+            0.09400007706771533,
+            0.1301355818513823
+          ],
+          [
+            -0.09400007706771533,
+            0.1301355818513823
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01289001745878308,
+          -0.000336008064516129,
+          0.014747927783318402
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014509970390243892,
+            2.9837126394903467e-05,
+            -0.0015899405006936955
+          ],
+          [
+            2.9837126394903467e-05,
+            0.031156046745984246,
+            3.1165477792008115e-06
+          ],
+          [
+            -0.0015899405006936955,
+            3.1165477792008115e-06,
+            0.039750597248081276
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 12
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.113
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640730633697,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.871112794683287e-07,
+        "lf_lower_leg_joint": -0.29416155117923887,
+        "lf_upper_leg_joint": 0.7616538344033741,
+        "lh_hip_joint": 6.117928456955343e-07,
+        "lh_lower_leg_joint": -0.5286899245237898,
+        "lh_upper_leg_joint": 1.2743433207403927,
+        "rf_hip_joint": -4.871112794683287e-07,
+        "rf_lower_leg_joint": -0.29416155117923887,
+        "rf_upper_leg_joint": 0.7616538344033741,
+        "rh_hip_joint": -6.117928456955343e-07,
+        "rh_lower_leg_joint": -0.5286899245237898,
+        "rh_upper_leg_joint": 1.2743433207403927
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008076990724,
+      "projection": {
+        "com_world_m": [
+          -0.012811856560130877,
+          -0.000336008064516129,
+          0.12755606894511365
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012811856560130877,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407362219357,
+        "support_hull_plane_m": [
+          [
+            -0.09400008534424151,
+            -0.14371291118261942
+          ],
+          [
+            0.09400008534424151,
+            -0.14371291118261942
+          ],
+          [
+            0.09400007769258775,
+            0.13013557706995058
+          ],
+          [
+            -0.09400007769258775,
+            0.13013557706995058
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012811856560130877,
+          -0.000336008064516129,
+          0.014556068945113652
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014552219754962775,
+            2.977199491805662e-05,
+            -0.0016142972656690438
+          ],
+          [
+            2.977199491805662e-05,
+            0.031194557248626742,
+            3.276423749076761e-06
+          ],
+          [
+            -0.0016142972656690438,
+            3.276423749076761e-06,
+            0.03974685846509971
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 13
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.114
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407338135482,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.881822230434691e-07,
+        "lf_lower_leg_joint": -0.2798359752718139,
+        "lf_upper_leg_joint": 0.7537829595905857,
+        "lh_hip_joint": 6.067551139403438e-07,
+        "lh_lower_leg_joint": -0.5160763770282972,
+        "lh_upper_leg_joint": 1.2644239944765439,
+        "rf_hip_joint": -4.881822230434691e-07,
+        "rf_lower_leg_joint": -0.2798359752718139,
+        "rf_upper_leg_joint": 0.7537829595905857,
+        "rh_hip_joint": -6.067551139403438e-07,
+        "rh_lower_leg_joint": -0.5160763770282972,
+        "rh_upper_leg_joint": 1.2644239944765439
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.0740000811252221,
+      "projection": {
+        "com_world_m": [
+          -0.012732135508830449,
+          -0.000336008064516129,
+          0.12836474177857768
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012732135508830449,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407388503913,
+        "support_hull_plane_m": [
+          [
+            -0.09400008524820418,
+            -0.14371294459759876
+          ],
+          [
+            0.09400008524820418,
+            -0.14371294459759876
+          ],
+          [
+            0.09400007835154417,
+            0.13013557229340902
+          ],
+          [
+            -0.09400007835154417,
+            0.13013557229340902
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012732135508830449,
+          -0.000336008064516129,
+          0.014364741778577663
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014594900706017756,
+            2.970556336600884e-05,
+            -0.0016382876057747845
+          ],
+          [
+            2.970556336600884e-05,
+            0.03123317721069183,
+            3.4358566769510905e-06
+          ],
+          [
+            -0.0016382876057747845,
+            3.4358566769510905e-06,
+            0.03974279755772389
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 14
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.115
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640737325943,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.894610619196273e-07,
+        "lf_lower_leg_joint": -0.2654041740137237,
+        "lf_upper_leg_joint": 0.7458572724964986,
+        "lh_hip_joint": 6.019958368034574e-07,
+        "lh_lower_leg_joint": -0.5033945624010909,
+        "lh_upper_leg_joint": 1.2545150489932386,
+        "rf_hip_joint": -4.894610619196273e-07,
+        "rf_lower_leg_joint": -0.2654041740137237,
+        "rf_upper_leg_joint": 0.7458572724964986,
+        "rh_hip_joint": -6.019958368034574e-07,
+        "rh_lower_leg_joint": -0.5033945624010909,
+        "rh_upper_leg_joint": 1.2545150489932386
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008151368226,
+      "projection": {
+        "com_world_m": [
+          -0.012650837833612512,
+          -0.000336008064516129,
+          0.12917393893438292
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012650837833612512,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407418067244,
+        "support_hull_plane_m": [
+          [
+            -0.09400008518149244,
+            -0.14371297690675924
+          ],
+          [
+            0.09400008518149244,
+            -0.14371297690675924
+          ],
+          [
+            0.09400007904621537,
+            0.1301355675146637
+          ],
+          [
+            -0.09400007904621537,
+            0.1301355675146637
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012650837833612512,
+          -0.000336008064516129,
+          0.014173938934382912
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.0146380102181508,
+            2.963781801324901e-05,
+            -0.0016619106318155334
+          ],
+          [
+            2.963781801324901e-05,
+            0.03127191493071735,
+            3.59485268701864e-06
+          ],
+          [
+            -0.0016619106318155334,
+            3.59485268701864e-06,
+            0.03973842584992497
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 15
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.11599999999999999
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640741180886,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.90954715416521e-07,
+        "lf_lower_leg_joint": -0.25086294043701296,
+        "lf_upper_leg_joint": 0.737874945301478,
+        "lh_hip_joint": 5.975094224319397e-07,
+        "lh_lower_leg_joint": -0.4906429565641416,
+        "lh_upper_leg_joint": 1.2446146246096996,
+        "rf_hip_joint": -4.90954715416521e-07,
+        "rf_lower_leg_joint": -0.25086294043701296,
+        "rf_upper_leg_joint": 0.737874945301478,
+        "rh_hip_joint": -5.975094224319397e-07,
+        "rh_lower_leg_joint": -0.4906429565641416,
+        "rh_upper_leg_joint": 1.2446146246096996
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008193634809,
+      "projection": {
+        "com_world_m": [
+          -0.01256794574067887,
+          -0.000336008064516129,
+          0.1299836533424931
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01256794574067887,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407450996908,
+        "support_hull_plane_m": [
+          [
+            -0.09400008514414479,
+            -0.14371300812130175
+          ],
+          [
+            0.09400008514414479,
+            -0.14371300812130175
+          ],
+          [
+            0.0940000797783492,
+            0.1301355627263867
+          ],
+          [
+            -0.0940000797783492,
+            0.1301355627263867
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01256794574067887,
+          -0.000336008064516129,
+          0.013983653342493114
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014681545330759696,
+            2.9568744032207266e-05,
+            -0.0016851653192624084
+          ],
+          [
+            2.9568744032207266e-05,
+            0.03131077877317013,
+            3.753417670740369e-06
+          ],
+          [
+            -0.0016851653192624084,
+            3.753417670740369e-06,
+            0.03973375466695396
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 16
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.11699999999999999
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407453895084,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.926708218048087e-07,
+        "lf_lower_leg_joint": -0.23620892067843965,
+        "lf_upper_leg_joint": 0.7298340710176627,
+        "lh_hip_joint": 5.932909013092388e-07,
+        "lh_lower_leg_joint": -0.47781998051860647,
+        "lh_upper_leg_joint": 1.2347208599297428,
+        "rf_hip_joint": -4.926708218048087e-07,
+        "rf_lower_leg_joint": -0.23620892067843965,
+        "rf_upper_leg_joint": 0.7298340710176627,
+        "rh_hip_joint": -5.932909013092388e-07,
+        "rh_lower_leg_joint": -0.47781998051860647,
+        "rh_upper_leg_joint": 1.2347208599297428
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008239439379,
+      "projection": {
+        "com_world_m": [
+          -0.012483440064602143,
+          -0.000336008064516129,
+          0.1307938782126254
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012483440064602143,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407487391168,
+        "support_hull_plane_m": [
+          [
+            -0.09400008513626665,
+            -0.1437130382511497
+          ],
+          [
+            0.09400008513626665,
+            -0.1437130382511497
+          ],
+          [
+            0.09400008054983884,
+            0.1301355579207136
+          ],
+          [
+            -0.09400008054983884,
+            0.1301355579207136
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012483440064602143,
+          -0.000336008064516129,
+          0.013793878212625411
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014725503143686515,
+            2.94983254523326e-05,
+            -0.0017080505024205839
+          ],
+          [
+            2.94983254523326e-05,
+            0.031349777192634244,
+            3.911557286459185e-06
+          ],
+          [
+            -0.0017080505024205839,
+            3.911557286459185e-06,
+            0.03972879536374502
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 17
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.118
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407499641178,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.946178047652969e-07,
+        "lf_lower_leg_joint": -0.2214386041955132,
+        "lf_upper_leg_joint": 0.7217326580236995,
+        "lh_hip_joint": 5.89335854250285e-07,
+        "lh_lower_leg_joint": -0.46492399775539983,
+        "lh_upper_leg_joint": 1.2248318894581256,
+        "rf_hip_joint": -4.946178047652969e-07,
+        "rf_lower_leg_joint": -0.2214386041955132,
+        "rf_upper_leg_joint": 0.7217326580236995,
+        "rh_hip_joint": -5.89335854250285e-07,
+        "rh_lower_leg_joint": -0.46492399775539983,
+        "rh_upper_leg_joint": 1.2248318894581256
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008288911292,
+      "projection": {
+        "com_world_m": [
+          -0.012397300213800257,
+          -0.000336008064516129,
+          0.13160460703528187
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012397300213800257,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407527359309,
+        "support_hull_plane_m": [
+          [
+            -0.094000085158023,
+            -0.1437130673051326
+          ],
+          [
+            0.094000085158023,
+            -0.1437130673051326
+          ],
+          [
+            0.09400008136273712,
+            0.13013555308936245
+          ],
+          [
+            -0.09400008136273712,
+            0.13013555308936245
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012397300213800257,
+          -0.000336008064516129,
+          0.013604607035281891
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014769880813012913,
+            2.942654511465995e-05,
+            -0.001730564868294246
+          ],
+          [
+            2.942654511465995e-05,
+            0.031388918759426024,
+            4.06927695853963e-06
+          ],
+          [
+            -0.001730564868294246,
+            4.06927695853963e-06,
+            0.039723559354735975
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 18
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.119
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640754918234,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.968049354905234e-07,
+        "lf_lower_leg_joint": -0.20654831313994104,
+        "lf_upper_leg_joint": 0.7135686241375593,
+        "lh_hip_joint": 5.856403219410816e-07,
+        "lh_lower_leg_joint": -0.4519533114932542,
+        "lh_upper_leg_joint": 1.2149458411559404,
+        "rf_hip_joint": -4.968049354905234e-07,
+        "rf_lower_leg_joint": -0.20654831313994104,
+        "rf_upper_leg_joint": 0.7135686241375593,
+        "rh_hip_joint": -5.856403219410816e-07,
+        "rh_lower_leg_joint": -0.4519533114932542,
+        "rh_upper_leg_joint": 1.2149458411559404
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008342192288,
+      "projection": {
+        "com_world_m": [
+          -0.012309504110153227,
+          -0.000336008064516129,
+          0.13241583358339643
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012309504110153227,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407571021829,
+        "support_hull_plane_m": [
+          [
+            -0.09400008520962809,
+            -0.14371309529081605
+          ],
+          [
+            0.09400008520962809,
+            -0.14371309529081605
+          ],
+          [
+            0.09400008221927084,
+            0.13013554822352708
+          ],
+          [
+            -0.09400008221927084,
+            0.13013554822352708
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012309504110153227,
+          -0.000336008064516129,
+          0.013415833583396434
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014814675546844491,
+            2.935338462149021e-05,
+            -0.001752706950149504
+          ],
+          [
+            2.935338462149021e-05,
+            0.03142821218676964,
+            4.2265818759956516e-06
+          ],
+          [
+            -0.001752706950149504,
+            4.2265818759956516e-06,
+            0.0397180581452603
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 19
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.12
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407602666158,
+      "joint_positions_rad": {
+        "lf_hip_joint": 4.992422098574442e-07,
+        "lf_lower_leg_joint": -0.19153419079216857,
+        "lf_upper_leg_joint": 0.7053397901719781,
+        "lh_hip_joint": 5.822009618095328e-07,
+        "lh_lower_leg_joint": -0.4389061617317628,
+        "lh_upper_leg_joint": 1.205060833931646,
+        "rf_hip_joint": -4.992422098574442e-07,
+        "rf_lower_leg_joint": -0.19153419079216857,
+        "rf_upper_leg_joint": 0.7053397901719781,
+        "rh_hip_joint": -5.822009618095328e-07,
+        "rh_lower_leg_joint": -0.4389061617317628,
+        "rh_upper_leg_joint": 1.205060833931646
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008399436542,
+      "projection": {
+        "com_world_m": [
+          -0.012220028122235322,
+          -0.000336008064516129,
+          0.13322755191467736
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012220028122235322,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407618511013,
+        "support_hull_plane_m": [
+          [
+            -0.09400008529137081,
+            -0.1437131222146075
+          ],
+          [
+            0.09400008529137081,
+            -0.1437131222146075
+          ],
+          [
+            0.09400008312182453,
+            0.1301355433138464
+          ],
+          [
+            -0.09400008312182453,
+            0.1301355433138464
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012220028122235322,
+          -0.000336008064516129,
+          0.013227551914677367
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014859884601067746,
+            2.9278824280758615e-05,
+            -0.0017744751206942942
+          ],
+          [
+            2.9278824280758615e-05,
+            0.031467666359812574,
+            4.383476990539336e-06
+          ],
+          [
+            -0.0017744751206942942,
+            4.383476990539336e-06,
+            0.03971230336480586
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 20
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.121
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407660257578,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.019409151210441e-07,
+        "lf_lower_leg_joint": -0.17639218895626724,
+        "lf_upper_leg_joint": 0.6970438729184362,
+        "lh_hip_joint": 5.790149510533169e-07,
+        "lh_lower_leg_joint": -0.4257807221033504,
+        "lh_upper_leg_joint": 1.1951749750523017,
+        "rf_hip_joint": -5.019409151210441e-07,
+        "rf_lower_leg_joint": -0.17639218895626724,
+        "rf_upper_leg_joint": 0.6970438729184362,
+        "rh_hip_joint": -5.790149510533169e-07,
+        "rh_lower_leg_joint": -0.4257807221033504,
+        "rh_upper_leg_joint": 1.1951749750523017
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008460816078,
+      "projection": {
+        "com_world_m": [
+          -0.012128846991563082,
+          -0.000336008064516129,
+          0.13403975637468277
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012128846991563082,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407669975091,
+        "support_hull_plane_m": [
+          [
+            -0.09400008540360315,
+            -0.14371314808152572
+          ],
+          [
+            0.09400008540360315,
+            -0.14371314808152572
+          ],
+          [
+            0.094000084073039,
+            0.1301355383501792
+          ],
+          [
+            -0.094000084073039,
+            0.1301355383501792
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012128846991563082,
+          -0.000336008064516129,
+          0.013039756374682767
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014905505275067406,
+            2.920284304456987e-05,
+            -0.001795867584855218
+          ],
+          [
+            2.920284304456987e-05,
+            0.03150729036670223,
+            4.5399670140167684e-06
+          ],
+          [
+            -0.001795867584855218,
+            4.5399670140167684e-06,
+            0.03970630680238034
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 21
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.122
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407722133006,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.049129946904754e-07,
+        "lf_lower_leg_joint": -0.16111805419828373,
+        "lf_upper_leg_joint": 0.6886784774913215,
+        "lh_hip_joint": 5.760799101201496e-07,
+        "lh_lower_leg_joint": -0.4125750965124208,
+        "lh_upper_leg_joint": 1.1852863574741686,
+        "rf_hip_joint": -5.049129946904754e-07,
+        "rf_lower_leg_joint": -0.16111805419828373,
+        "rf_upper_leg_joint": 0.6886784774913215,
+        "rh_hip_joint": -5.760799101201496e-07,
+        "rh_lower_leg_joint": -0.4125750965124208,
+        "rh_upper_leg_joint": 1.1852863574741686
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008526514432,
+      "projection": {
+        "com_world_m": [
+          -0.012035933751203006,
+          -0.000336008064516129,
+          0.13485244160076687
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.012035933751203006,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407725573016,
+        "support_hull_plane_m": [
+          [
+            -0.09400008554673174,
+            -0.1437131728954497
+          ],
+          [
+            0.09400008554673174,
+            -0.1437131728954497
+          ],
+          [
+            0.0940000850757107,
+            0.13013553332172123
+          ],
+          [
+            -0.0940000850757107,
+            0.13013553332172123
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.012035933751203006,
+          -0.000336008064516129,
+          0.01285244160076686
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014951534907361917,
+            2.9125418441377197e-05,
+            -0.001816882372045302
+          ],
+          [
+            2.9125418441377197e-05,
+            0.031547093532071115,
+            4.696056415120931e-06
+          ],
+          [
+            -0.001816882372045302,
+            4.696056415120931e-06,
+            0.03970008044435418
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 22
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.123
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640778247686,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.081720224063573e-07,
+        "lf_lower_leg_joint": -0.1457073127932989,
+        "lf_upper_leg_joint": 0.6802410889620438,
+        "lh_hip_joint": 5.733940396613832e-07,
+        "lh_lower_leg_joint": -0.3992873155379255,
+        "lh_upper_leg_joint": 1.1753930570687947,
+        "rf_hip_joint": -5.081720224063573e-07,
+        "rf_lower_leg_joint": -0.1457073127932989,
+        "rf_upper_leg_joint": 0.6802410889620438,
+        "rh_hip_joint": -5.733940396613832e-07,
+        "rh_lower_leg_joint": -0.3992873155379255,
+        "rh_upper_leg_joint": 1.1753930570687947
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.0740000859072379,
+      "projection": {
+        "com_world_m": [
+          -0.01194125963594424,
+          -0.000336008064516129,
+          0.13566560252690088
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01194125963594424,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407785483774,
+        "support_hull_plane_m": [
+          [
+            -0.09400008613296022,
+            0.1301355282167945
+          ],
+          [
+            -0.09400008572124043,
+            -0.1437131966587833
+          ],
+          [
+            0.09400008572124043,
+            -0.1437131966587833
+          ],
+          [
+            0.09400008613296022,
+            0.1301355282167945
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01194125963594424,
+          -0.000336008064516129,
+          0.012665602526900872
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.014997970871168961,
+            2.9046526501132083e-05,
+            -0.0018375173279208373
+          ],
+          [
+            2.9046526501132083e-05,
+            0.031587085453202435,
+            4.851749415373447e-06
+          ],
+          [
+            -0.0018375173279208373,
+            4.851749415373447e-06,
+            0.039693636515072864
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 23
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.124
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407840257677,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.117325784547067e-07,
+        "lf_lower_leg_joint": -0.13015525423568167,
+        "lf_upper_leg_joint": 0.6717290631991014,
+        "lh_hip_joint": 5.709560513826768e-07,
+        "lh_lower_leg_joint": -0.3859153325835087,
+        "lh_upper_leg_joint": 1.1654931297436228,
+        "rf_hip_joint": -5.117325784547067e-07,
+        "rf_lower_leg_joint": -0.13015525423568167,
+        "rf_upper_leg_joint": 0.6717290631991014,
+        "rh_hip_joint": -5.709560513826768e-07,
+        "rh_lower_leg_joint": -0.3859153325835087,
+        "rh_upper_leg_joint": 1.1654931297436228
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008652420643,
+      "projection": {
+        "com_world_m": [
+          -0.01184479398322101,
+          -0.000336008064516129,
+          0.13647923438955126
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01184479398322101,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407849901331,
+        "support_hull_plane_m": [
+          [
+            -0.09400008724813398,
+            0.13013552302280854
+          ],
+          [
+            -0.09400008592768269,
+            -0.14371321937263953
+          ],
+          [
+            0.09400008592768269,
+            -0.14371321937263953
+          ],
+          [
+            0.09400008724813398,
+            0.13013552302280854
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01184479398322101,
+          -0.000336008064516129,
+          0.012479234389551246
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015044810569836132,
+            2.8966141672717876e-05,
+            -0.001857770105513376
+          ],
+          [
+            2.8966141672717876e-05,
+            0.03162727603930222,
+            5.007049984226938e-06
+          ],
+          [
+            -0.001857770105513376,
+            5.007049984226938e-06,
+            0.03968698752069177
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 24
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.125
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366407902547578,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.156108837403512e-07,
+        "lf_lower_leg_joint": -0.11445691313301443,
+        "lf_upper_leg_joint": 0.6631396168170504,
+        "lh_hip_joint": 5.687651504356853e-07,
+        "lh_lower_leg_joint": -0.3724570197551404,
+        "lh_upper_leg_joint": 1.1555846084376356,
+        "rf_hip_joint": -5.156108837403512e-07,
+        "rf_lower_leg_joint": -0.11445691313301443,
+        "rf_upper_leg_joint": 0.6631396168170504,
+        "rh_hip_joint": -5.687651504356853e-07,
+        "rh_lower_leg_joint": -0.3724570197551404,
+        "rh_upper_leg_joint": 1.1555846084376356
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008718685698,
+      "projection": {
+        "com_world_m": [
+          -0.011746504123742788,
+          -0.000336008064516129,
+          0.1372933327346802
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011746504123742788,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366407919040158,
+        "support_hull_plane_m": [
+          [
+            -0.09400008842491804,
+            0.1301355177260292
+          ],
+          [
+            -0.0940000861666817,
+            -0.14371324103657085
+          ],
+          [
+            0.0940000861666817,
+            -0.14371324103657085
+          ],
+          [
+            0.09400008842491804,
+            0.1301355177260292
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011746504123742788,
+          -0.000336008064516129,
+          0.01229333273468021
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015092051432138383,
+            2.8884236732815215e-05,
+            -0.0018776381556803432
+          ],
+          [
+            2.8884236732815215e-05,
+            0.03166767555428345,
+            5.161961833230967e-06
+          ],
+          [
+            -0.0018776381556803432,
+            5.161961833230967e-06,
+            0.03968014629667053
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 25
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.126
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640796955799,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.198246173838282e-07,
+        "lf_lower_leg_joint": -0.09860704929290694,
+        "lf_upper_leg_joint": 0.6544698161265092,
+        "lh_hip_joint": 5.668212040973661e-07,
+        "lh_lower_leg_joint": -0.35891016343837473,
+        "lh_upper_leg_joint": 1.1456654999809657,
+        "rf_hip_joint": -5.198246173838282e-07,
+        "rf_lower_leg_joint": -0.09860704929290694,
+        "rf_upper_leg_joint": 0.6544698161265092,
+        "rh_hip_joint": -5.668212040973661e-07,
+        "rh_lower_leg_joint": -0.35891016343837473,
+        "rh_upper_leg_joint": 1.1456654999809657
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008789739293,
+      "projection": {
+        "com_world_m": [
+          -0.011646355260736352,
+          -0.000336008064516129,
+          0.1381078934260255
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011646355260736352,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.0936640799313565,
+        "support_hull_plane_m": [
+          [
+            -0.0940000896673149,
+            0.13013551231147902
+          ],
+          [
+            -0.0940000864389584,
+            -0.1437132616486953
+          ],
+          [
+            0.0940000864389584,
+            -0.1437132616486953
+          ],
+          [
+            0.0940000896673149,
+            0.13013551231147902
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011646355260736352,
+          -0.000336008064516129,
+          0.012107893426025506
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01513969090739128,
+            2.8800782685271794e-05,
+            -0.0018971187167818435
+          ],
+          [
+            2.8800782685271794e-05,
+            0.031708294663583325,
+            5.316488409132881e-06
+          ],
+          [
+            -0.0018971187167818435,
+            5.316488409132881e-06,
+            0.03967312605947698
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 26
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.127
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408041522478,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.243934894711316e-07,
+        "lf_lower_leg_joint": -0.08260012577136591,
+        "lf_upper_leg_joint": 0.6457165649580097,
+        "lh_hip_joint": 5.651245406897241e-07,
+        "lh_lower_leg_joint": -0.34527245955394686,
+        "lh_upper_leg_joint": 1.1357337818018143,
+        "rf_hip_joint": -5.243934894711316e-07,
+        "rf_lower_leg_joint": -0.08260012577136591,
+        "rf_upper_leg_joint": 0.6457165649580097,
+        "rh_hip_joint": -5.651245406897241e-07,
+        "rh_lower_leg_joint": -0.34527245955394686,
+        "rh_upper_leg_joint": 1.1357337818018143
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.0740000886582473,
+      "projection": {
+        "com_world_m": [
+          -0.011544310336471044,
+          -0.000336008064516129,
+          0.13892291265479761
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011544310336471044,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.0936640807244791,
+        "support_hull_plane_m": [
+          [
+            -0.09400009097975005,
+            0.13013550676282504
+          ],
+          [
+            -0.09400008674530394,
+            -0.14371328120559715
+          ],
+          [
+            0.09400008674530394,
+            -0.14371328120559715
+          ],
+          [
+            0.09400009097975005,
+            0.13013550676282504
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011544310336471044,
+          -0.000336008064516129,
+          0.01192291265479762
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01518772646035382,
+            2.8715748649880792e-05,
+            -0.0019162088034871808
+          ],
+          [
+            2.8715748649880792e-05,
+            0.03174914448557507,
+            5.47063288579707e-06
+          ],
+          [
+            -0.0019162088034871808,
+            5.47063288579707e-06,
+            0.03966594046310204
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 27
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.128
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408118697033,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.293391129951237e-07,
+        "lf_lower_leg_joint": -0.06643028462733605,
+        "lf_upper_leg_joint": 0.6368765912190469,
+        "lh_hip_joint": 5.636760122438786e-07,
+        "lh_lower_leg_joint": -0.3315415084583201,
+        "lh_upper_leg_joint": 1.1257873984611901,
+        "rf_hip_joint": -5.293391129951237e-07,
+        "rf_lower_leg_joint": -0.06643028462733605,
+        "rf_upper_leg_joint": 0.6368765912190469,
+        "rh_hip_joint": -5.636760122438786e-07,
+        "rh_lower_leg_joint": -0.3315415084583201,
+        "rh_upper_leg_joint": 1.1257873984611901
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400008947208372,
+      "projection": {
+        "com_world_m": [
+          -0.011440329884601459,
+          -0.000336008064516129,
+          0.13973838695096127
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011440329884601459,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408157261877,
+        "support_hull_plane_m": [
+          [
+            -0.09400009236705988,
+            0.13013550106211272
+          ],
+          [
+            -0.09400008708659166,
+            -0.14371329970211716
+          ],
+          [
+            0.09400008708659166,
+            -0.14371329970211716
+          ],
+          [
+            0.09400009236705988,
+            0.13013550106211272
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011440329884601459,
+          -0.000336008064516129,
+          0.011738386950961271
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015236155565872989,
+            2.8629101739338647e-05,
+            -0.0019349051946180981
+          ],
+          [
+            2.8629101739338647e-05,
+            0.03179023664821654,
+            5.624398154803893e-06
+          ],
+          [
+            -0.0019349051946180981,
+            5.624398154803893e-06,
+            0.03965860366106362
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 28
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.129
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408201363711,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.346852441841259e-07,
+        "lf_lower_leg_joint": -0.05009132008199801,
+        "lf_upper_leg_joint": 0.6279464320152253,
+        "lh_hip_joint": 5.624771293986659e-07,
+        "lh_lower_leg_joint": -0.3177148094616364,
+        "lh_upper_leg_joint": 1.1158242580022777,
+        "rf_hip_joint": -5.346852441841259e-07,
+        "rf_lower_leg_joint": -0.05009132008199801,
+        "rf_upper_leg_joint": 0.6279464320152253,
+        "rh_hip_joint": -5.624771293986659e-07,
+        "rh_lower_leg_joint": -0.3177148094616364,
+        "rh_upper_leg_joint": 1.1158242580022777
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.0740000903418329,
+      "projection": {
+        "com_world_m": [
+          -0.011334371866614405,
+          -0.000336008064516129,
+          0.14055431319635664
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011334371866614405,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408247891155,
+        "support_hull_plane_m": [
+          [
+            -0.09400009383454322,
+            0.13013549518967868
+          ],
+          [
+            -0.09400008746380083,
+            -0.14371331713135022
+          ],
+          [
+            0.09400008746380083,
+            -0.14371331713135022
+          ],
+          [
+            0.09400009383454322,
+            0.13013549518967868
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011334371866614405,
+          -0.000336008064516129,
+          0.011554313196356638
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015284975703217542,
+            2.854080692295002e-05,
+            -0.001953204419882793
+          ],
+          [
+            2.854080692295002e-05,
+            0.03183158335172914,
+            5.77778681451603e-06
+          ],
+          [
+            -0.001953204419882793,
+            5.77778681451603e-06,
+            0.039651130374756566
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 29
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.13
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408289835134,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.404583574434884e-07,
+        "lf_lower_leg_joint": -0.03357664872828554,
+        "lf_upper_leg_joint": 0.6189224171426305,
+        "lh_hip_joint": 5.615300195506521e-07,
+        "lh_lower_leg_joint": -0.303789754922668,
+        "lh_upper_leg_joint": 1.1058422280884859,
+        "rf_hip_joint": -5.404583574434884e-07,
+        "rf_lower_leg_joint": -0.03357664872828554,
+        "rf_upper_leg_joint": 0.6189224171426305,
+        "rh_hip_joint": -5.615300195506521e-07,
+        "rh_lower_leg_joint": -0.303789754922668,
+        "rh_upper_leg_joint": 1.1058422280884859
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009127074127,
+      "projection": {
+        "com_world_m": [
+          -0.011226391490389,
+          -0.000336008064516129,
+          0.14137068863982677
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011226391490389,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408344683357,
+        "support_hull_plane_m": [
+          [
+            -0.09400009538807362,
+            0.13013548912368292
+          ],
+          [
+            -0.09400008787801312,
+            -0.14371333348461257
+          ],
+          [
+            0.09400008787801312,
+            -0.14371333348461257
+          ],
+          [
+            0.09400009538807362,
+            0.13013548912368292
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011226391490389,
+          -0.000336008064516129,
+          0.011370688639826754
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01533418435006329,
+            2.845082687544136e-05,
+            -0.001971102745383542
+          ],
+          [
+            2.845082687544136e-05,
+            0.03187319743818203,
+            5.930801157472389e-06
+          ],
+          [
+            -0.001971102745383542,
+            5.930801157472389e-06,
+            0.039643535969058875
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 30
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.131
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.0736640838445599,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.466878202302452e-07,
+        "lf_lower_leg_joint": -0.016879276399255485,
+        "lf_upper_leg_joint": 0.6098006507293039,
+        "lh_hip_joint": 5.608373539790507e-07,
+        "lh_lower_leg_joint": -0.289763623887922,
+        "lh_upper_leg_joint": 1.0958391319112222,
+        "rf_hip_joint": -5.466878202302452e-07,
+        "rf_lower_leg_joint": -0.016879276399255485,
+        "rf_upper_leg_joint": 0.6098006507293039,
+        "rh_hip_joint": -5.608373539790507e-07,
+        "rh_lower_leg_joint": -0.289763623887922,
+        "rh_upper_leg_joint": 1.0958391319112222
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009226238678,
+      "projection": {
+        "com_world_m": [
+          -0.011116341008573678,
+          -0.000336008064516129,
+          0.14218751091469847
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011116341008573678,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408448022004,
+        "support_hull_plane_m": [
+          [
+            -0.09400009703414401,
+            0.13013548284008886
+          ],
+          [
+            -0.0940000883304045,
+            -0.14371334875124334
+          ],
+          [
+            0.0940000883304045,
+            -0.14371334875124334
+          ],
+          [
+            0.09400009703414401,
+            0.13013548284008886
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011116341008573678,
+          -0.000336008064516129,
+          0.011187510914698476
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015383778976036952,
+            2.83591218089449e-05,
+            -0.001988596157722826
+          ],
+          [
+            2.83591218089449e-05,
+            0.03191509246901334,
+            6.08344315582168e-06
+          ],
+          [
+            -0.001988596157722826,
+            6.08344315582168e-06,
+            0.039635836536311746
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 31
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.132
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408485607283,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.534060558872697e-07,
+        "lf_lower_leg_joint": 8.238791540812751e-06,
+        "lf_upper_leg_joint": 0.6005769907632842,
+        "lh_hip_joint": 5.604025785203599e-07,
+        "lh_lower_leg_joint": -0.2756335752222152,
+        "lh_upper_leg_joint": 1.08581274383738,
+        "rf_hip_joint": -5.534060558872697e-07,
+        "rf_lower_leg_joint": 8.238791540812751e-06,
+        "rf_upper_leg_joint": 0.6005769907632842,
+        "rh_hip_joint": -5.604025785203599e-07,
+        "rh_lower_leg_joint": -0.2756335752222152,
+        "rh_upper_leg_joint": 1.08581274383738
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009332071993,
+      "projection": {
+        "com_world_m": [
+          -0.011004169494127563,
+          -0.000336008064516129,
+          0.14300477805886225
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.011004169494127563,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408558330801,
+        "support_hull_plane_m": [
+          [
+            -0.0940000987799102,
+            0.13013547631194902
+          ],
+          [
+            -0.0940000888222843,
+            -0.143713362918444
+          ],
+          [
+            0.0940000888222843,
+            -0.143713362918444
+          ],
+          [
+            0.0940000987799102,
+            0.13013547631194902
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.011004169494127563,
+          -0.000336008064516129,
+          0.01100477805886224
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015433757035777408,
+            2.826564928595636e-05,
+            -0.002005680346546817
+          ],
+          [
+            2.826564928595636e-05,
+            0.03195728281170187,
+            6.235714444589971e-06
+          ],
+          [
+            -0.002005680346546817,
+            6.235714444589971e-06,
+            0.039628048989935015
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 32
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.133
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408593712497,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.606494298642758e-07,
+        "lf_lower_leg_joint": 0.01709382777595577,
+        "lf_upper_leg_joint": 0.5912470261997433,
+        "lh_hip_joint": 5.60229762329098e-07,
+        "lh_lower_leg_joint": -0.2613966401920531,
+        "lh_upper_leg_joint": 1.0757607847770803,
+        "rf_hip_joint": -5.606494298642758e-07,
+        "rf_lower_leg_joint": 0.01709382777595577,
+        "rf_upper_leg_joint": 0.5912470261997433,
+        "rh_hip_joint": -5.60229762329098e-07,
+        "rh_lower_leg_joint": -0.2613966401920531,
+        "rh_upper_leg_joint": 1.0757607847770803
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009445013149,
+      "projection": {
+        "com_world_m": [
+          -0.010889822589897706,
+          -0.000336008064516129,
+          0.14382248853794138
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010889822589897706,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408676081218,
+        "support_hull_plane_m": [
+          [
+            -0.09400010063336506,
+            0.13013546950946825
+          ],
+          [
+            -0.0940000893550751,
+            -0.1437133759713208
+          ],
+          [
+            0.0940000893550751,
+            -0.1437133759713208
+          ],
+          [
+            0.09400010063336506,
+            0.13013546950946825
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010889822589897706,
+          -0.000336008064516129,
+          0.010822488537941386
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015484115961394282,
+            2.8170364010661504e-05,
+            -0.0020223506852812046
+          ],
+          [
+            2.8170364010661504e-05,
+            0.03199978373704974,
+            6.387616302373382e-06
+          ],
+          [
+            -0.0020223506852812046,
+            6.387616302373382e-06,
+            0.03962019116926179
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 33
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.134
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408709240614,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.68458285984381e-07,
+        "lf_lower_leg_joint": 0.03438595688292492,
+        "lf_upper_leg_joint": 0.5818060512926688,
+        "lh_hip_joint": 5.603237601633539e-07,
+        "lh_lower_leg_joint": -0.24704971443529047,
+        "lh_upper_leg_joint": 1.0656809172279558,
+        "rf_hip_joint": -5.68458285984381e-07,
+        "rf_lower_leg_joint": 0.03438595688292492,
+        "rf_upper_leg_joint": 0.5818060512926688,
+        "rh_hip_joint": -5.603237601633539e-07,
+        "rh_lower_leg_joint": -0.24704971443529047,
+        "rh_upper_leg_joint": 1.0656809172279558
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009565548032,
+      "projection": {
+        "com_world_m": [
+          -0.010773242228610832,
+          -0.000336008064516129,
+          0.14464064127186887
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010773242228610832,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366408801795488,
+        "support_hull_plane_m": [
+          [
+            -0.09400010260336499,
+            0.13013546239908824
+          ],
+          [
+            -0.09400008993034174,
+            -0.1437133878925247
+          ],
+          [
+            0.09400008993034174,
+            -0.1437133878925247
+          ],
+          [
+            0.09400010260336499,
+            0.13013546239908824
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010773242228610832,
+          -0.000336008064516129,
+          0.010640641271868862
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015534853154252579,
+            2.8073217595601338e-05,
+            -0.0020386022098706864
+          ],
+          [
+            2.8073217595601338e-05,
+            0.032042611528691214,
+            6.539149629191602e-06
+          ],
+          [
+            -0.0020386022098706864,
+            6.539149629191602e-06,
+            0.03961228195726599
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 34
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.135
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408832714488,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.768779223487926e-07,
+        "lf_lower_leg_joint": 0.05189367997134228,
+        "lf_upper_leg_joint": 0.5722490367226297,
+        "lh_hip_joint": 5.606901879746246e-07,
+        "lh_lower_leg_joint": -0.23258954927096817,
+        "lh_upper_leg_joint": 1.05557073997616,
+        "rf_hip_joint": -5.768779223487926e-07,
+        "rf_lower_leg_joint": 0.05189367997134228,
+        "rf_upper_leg_joint": 0.5722490367226297,
+        "rh_hip_joint": -5.606901879746246e-07,
+        "rh_lower_leg_joint": -0.23258954927096817,
+        "rh_upper_leg_joint": 1.05557073997616
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009694218242,
+      "projection": {
+        "com_world_m": [
+          -0.010654366318999355,
+          -0.000336008064516129,
+          0.14545923566557248
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010654366318999355,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.0936640893605642,
+        "support_hull_plane_m": [
+          [
+            -0.09400010469982671,
+            0.13013545494318024
+          ],
+          [
+            -0.09400009054979154,
+            -0.1437133986620756
+          ],
+          [
+            0.09400009054979154,
+            -0.1437133986620756
+          ],
+          [
+            0.09400010469982671,
+            0.13013545494318024
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010654366318999355,
+          -0.000336008064516129,
+          0.01045923566557248
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015585965975927018,
+            2.7974158300122068e-05,
+            -0.0020544295951783675
+          ],
+          [
+            2.7974158300122068e-05,
+            0.03208578360689151,
+            6.690314920918426e-06
+          ],
+          [
+            -0.0020544295951783675,
+            6.690314920918426e-06,
+            0.03960434141341989
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 35
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.136
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366408964717691,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.859591661803666e-07,
+        "lf_lower_leg_joint": 0.06962669726422523,
+        "lf_upper_leg_joint": 0.5625705970164014,
+        "lh_hip_joint": 5.613355264849022e-07,
+        "lh_lower_leg_joint": -0.21801274226027137,
+        "lh_upper_leg_joint": 1.045427782401536,
+        "rf_hip_joint": -5.859591661803666e-07,
+        "rf_lower_leg_joint": 0.06962669726422523,
+        "rf_upper_leg_joint": 0.5625705970164014,
+        "rh_hip_joint": -5.613355264849022e-07,
+        "rh_lower_leg_joint": -0.21801274226027137,
+        "rh_upper_leg_joint": 1.045427782401536
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009831628068,
+      "projection": {
+        "com_world_m": [
+          -0.010533128392968358,
+          -0.000336008064516129,
+          0.14627827164421964
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010533128392968358,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366409079515044,
+        "support_hull_plane_m": [
+          [
+            -0.09400010693385707,
+            0.13013544709944105
+          ],
+          [
+            -0.09400009121529465,
+            -0.14371340825745738
+          ],
+          [
+            0.09400009121529465,
+            -0.14371340825745738
+          ],
+          [
+            0.09400010693385707,
+            0.13013544709944105
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010533128392968358,
+          -0.000336008064516129,
+          0.010278271644219631
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015637451738228066,
+            2.7873130736360505e-05,
+            -0.002069827128765511
+          ],
+          [
+            2.7873130736360505e-05,
+            0.03212931866900531,
+            6.841112239911665e-06
+          ],
+          [
+            -0.002069827128765511,
+            6.841112239911665e-06,
+            0.0395963909241364
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 36
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.137
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409105902731,
+      "joint_positions_rad": {
+        "lf_hip_joint": 5.957591695766108e-07,
+        "lf_lower_leg_joint": 0.08759542194914133,
+        "lf_upper_leg_joint": 0.5527649536687186,
+        "lh_hip_joint": 5.622671656959916e-07,
+        "lh_lower_leg_joint": -0.2033157269628054,
+        "lh_upper_leg_joint": 1.0352494983524008,
+        "rf_hip_joint": -5.957591695766108e-07,
+        "rf_lower_leg_joint": 0.08759542194914133,
+        "rf_upper_leg_joint": 0.5527649536687186,
+        "rh_hip_joint": -5.622671656959916e-07,
+        "rh_lower_leg_joint": -0.2033157269628054,
+        "rh_upper_leg_joint": 1.0352494983524008
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400009978452986,
+      "projection": {
+        "com_world_m": [
+          -0.010409457207894253,
+          -0.000336008064516129,
+          0.14709774969396266
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010409457207894253,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366409232900015,
+        "support_hull_plane_m": [
+          [
+            -0.09400010931792668,
+            0.13013543881987744
+          ],
+          [
+            -0.09400009192889588,
+            -0.1437134166530772
+          ],
+          [
+            0.09400009192889588,
+            -0.1437134166530772
+          ],
+          [
+            0.09400010931792668,
+            0.13013543881987744
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010409457207894253,
+          -0.000336008064516129,
+          0.010097749693962653
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01568930769208022,
+            2.7770075537838053e-05,
+            -0.00208478868164329
+          ],
+          [
+            2.7770075537838053e-05,
+            0.03217323684937044,
+            6.991541181060842e-06
+          ],
+          [
+            -0.00208478868164329,
+            6.991541181060842e-06,
+            0.0395884533737965
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 37
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.138
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409257001637,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.063425357841054e-07,
+        "lf_lower_leg_joint": 0.1058110558517322,
+        "lf_upper_leg_joint": 0.542825893238827,
+        "lh_hip_joint": 5.634934067983571e-07,
+        "lh_lower_leg_joint": -0.1884947617860518,
+        "lh_upper_leg_joint": 1.0250332595374159,
+        "rf_hip_joint": -6.063425357841054e-07,
+        "rf_lower_leg_joint": 0.1058110558517322,
+        "rf_upper_leg_joint": 0.542825893238827,
+        "rh_hip_joint": -5.634934067983571e-07,
+        "rh_lower_leg_joint": -0.1884947617860518,
+        "rh_upper_leg_joint": 1.0250332595374159
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400010135450716,
+      "projection": {
+        "com_world_m": [
+          -0.010283276296829735,
+          -0.000336008064516129,
+          0.14791767090897873
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010283276296829735,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366409397029896,
+        "support_hull_plane_m": [
+          [
+            -0.09400011186610906,
+            0.13013543004989586
+          ],
+          [
+            -0.09400009269281943,
+            -0.14371342382009503
+          ],
+          [
+            0.09400009269281943,
+            -0.14371342382009503
+          ],
+          [
+            0.09400011186610906,
+            0.13013543004989586
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010283276296829735,
+          -0.000336008064516129,
+          0.009917670908978705
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015741531015087105,
+            2.7664928984647405e-05,
+            -0.002099307675536239
+          ],
+          [
+            2.7664928984647405e-05,
+            0.0322175599021484,
+            7.141600832587973e-06
+          ],
+          [
+            -0.002099307675536239,
+            7.141600832587973e-06,
+            0.039580553340040875
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 38
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.139
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409418837784,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.177821904275909e-07,
+        "lf_lower_leg_joint": 0.12428567571781632,
+        "lf_upper_leg_joint": 0.5327467195715201,
+        "lh_hip_joint": 5.650237539125795e-07,
+        "lh_lower_leg_joint": -0.17354591783639695,
+        "lh_upper_leg_joint": 1.0147763483815009,
+        "rf_hip_joint": -6.177821904275909e-07,
+        "rf_lower_leg_joint": 0.12428567571781632,
+        "rf_upper_leg_joint": 0.5327467195715201,
+        "rh_hip_joint": -5.650237539125795e-07,
+        "rh_lower_leg_joint": -0.17354591783639695,
+        "rh_upper_leg_joint": 1.0147763483815009
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400010303473127,
+      "projection": {
+        "com_world_m": [
+          -0.01015450345815172,
+          -0.000336008064516129,
+          0.14873803704601554
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.01015450345815172,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366409572826066,
+        "support_hull_plane_m": [
+          [
+            -0.09400011459427976,
+            0.13013542072734413
+          ],
+          [
+            -0.0940000935095218,
+            -0.14371342972623374
+          ],
+          [
+            0.0940000935095218,
+            -0.14371342972623374
+          ],
+          [
+            0.09400011459427976,
+            0.13013542072734413
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.01015450345815172,
+          -0.000336008064516129,
+          0.00973803704601553
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015794118797501373,
+            2.7557622578177482e-05,
+            -0.0021133770461275385
+          ],
+          [
+            2.7557622578177482e-05,
+            0.032262311411170384,
+            7.291289730595255e-06
+          ],
+          [
+            -0.0021133770461275385,
+            7.291289730595255e-06,
+            0.039572717317661925
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 39
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.13999999999999999
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409592341297,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.301614229544549e-07,
+        "lf_lower_leg_joint": 0.14303233200467558,
+        "lf_upper_leg_joint": 0.5225201990923439,
+        "lh_hip_joint": 5.668686043052568e-07,
+        "lh_lower_leg_joint": -0.15846506565475751,
+        "lh_upper_leg_joint": 1.0044759502785805,
+        "rf_hip_joint": -6.301614229544549e-07,
+        "rf_lower_leg_joint": 0.14303233200467558,
+        "rf_upper_leg_joint": 0.5225201990923439,
+        "rh_hip_joint": -5.668686043052568e-07,
+        "rh_lower_leg_joint": -0.15846506565475751,
+        "rh_upper_leg_joint": 1.0044759502785805
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400010483482797,
+      "projection": {
+        "com_world_m": [
+          -0.010023050174276661,
+          -0.000336008064516129,
+          0.14955885058766835
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.010023050174276661,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.0936640976133154,
+        "support_hull_plane_m": [
+          [
+            -0.09400011752053848,
+            0.13013541078098137
+          ],
+          [
+            -0.0940000943816462,
+            -0.14371343433540448
+          ],
+          [
+            0.0940000943816462,
+            -0.14371343433540448
+          ],
+          [
+            0.09400011752053848,
+            0.13013541078098137
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.010023050174276661,
+          -0.000336008064516129,
+          0.009558850587668375
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.015847068026345782,
+            2.7448082556724808e-05,
+            -0.0021269892016422508
+          ],
+          [
+            2.7448082556724808e-05,
+            0.032307517031840656,
+            7.440605806335833e-06
+          ],
+          [
+            -0.0021269892016422508,
+            7.440605806335833e-06,
+            0.03956497397641154
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 40
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.141
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409778569062,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.435751881238136e-07,
+        "lf_lower_leg_joint": 0.16206516244079383,
+        "lf_upper_leg_joint": 0.5121384979222806,
+        "lh_hip_joint": 5.690399380833995e-07,
+        "lh_lower_leg_joint": -0.1432478607200398,
+        "lh_upper_leg_joint": 0.9941291451793016,
+        "rf_hip_joint": -6.435751881238136e-07,
+        "rf_lower_leg_joint": 0.16206516244079383,
+        "rf_upper_leg_joint": 0.5121384979222806,
+        "rh_hip_joint": -5.690399380833995e-07,
+        "rh_lower_leg_joint": -0.1432478607200398,
+        "rh_upper_leg_joint": 0.9941291451793016
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400010676572957,
+      "projection": {
+        "com_world_m": [
+          -0.00988882094710884,
+          -0.000336008064516129,
+          0.15038011481620453
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.00988882094710884,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366409963732246,
+        "support_hull_plane_m": [
+          [
+            -0.09400012066550481,
+            0.13013540012870162
+          ],
+          [
+            -0.09400009531214243,
+            -0.14371343760745434
+          ],
+          [
+            0.09400009531214243,
+            -0.14371343760745434
+          ],
+          [
+            0.09400012066550481,
+            0.13013540012870162
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.00988882094710884,
+          -0.000336008064516129,
+          0.009380114816204555
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.0159003755672639,
+            2.733622934172591e-05,
+            -0.0021401359759782488
+          ],
+          [
+            2.733622934172591e-05,
+            0.03235320477118093,
+            7.589546324696753e-06
+          ],
+          [
+            -0.0021401359759782488,
+            7.589546324696753e-06,
+            0.03955735445922065
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 41
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.142
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366409978721672,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.5813238224322e-07,
+        "lf_lower_leg_joint": 0.1813995231563007,
+        "lf_upper_leg_joint": 0.5015931092569325,
+        "lh_hip_joint": 5.715508518788597e-07,
+        "lh_lower_leg_joint": -0.12788972756754907,
+        "lh_upper_leg_joint": 0.9837328984234041,
+        "rf_hip_joint": -6.5813238224322e-07,
+        "rf_lower_leg_joint": 0.1813995231563007,
+        "rf_upper_leg_joint": 0.5015931092569325,
+        "rh_hip_joint": -5.715508518788597e-07,
+        "rh_lower_leg_joint": -0.12788972756754907,
+        "rh_upper_leg_joint": 0.9837328984234041
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400010883985633,
+      "projection": {
+        "com_world_m": [
+          -0.009751712534914359,
+          -0.000336008064516129,
+          0.1512018338998052
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009751712534914359,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366410181378065,
+        "support_hull_plane_m": [
+          [
+            -0.09400012405280558,
+            0.130135388675755
+          ],
+          [
+            -0.09400009630419644,
+            -0.14371343949744567
+          ],
+          [
+            0.09400009630419644,
+            -0.14371343949744567
+          ],
+          [
+            0.09400012405280558,
+            0.130135388675755
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009751712534914359,
+          -0.000336008064516129,
+          0.009201833899805226
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01595403814369335,
+            2.722197690184434e-05,
+            -0.0021528085754751293
+          ],
+          [
+            2.722197690184434e-05,
+            0.03239940531355173,
+            7.73810781233223e-06
+          ],
+          [
+            -0.0021528085754751293,
+            7.73810781233223e-06,
+            0.039549892728775723
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 42
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.143
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366410194171044,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.739583212950916e-07,
+        "lf_lower_leg_joint": 0.20105214081608444,
+        "lf_upper_leg_joint": 0.49087476911379596,
+        "lh_hip_joint": 5.744159460923867e-07,
+        "lh_lower_leg_joint": -0.11238584236206203,
+        "lh_upper_leg_joint": 0.9732840507359292,
+        "rf_hip_joint": -6.739583212950916e-07,
+        "rf_lower_leg_joint": 0.20105214081608444,
+        "rf_upper_leg_joint": 0.49087476911379596,
+        "rh_hip_joint": -5.744159460923867e-07,
+        "rh_lower_leg_joint": -0.11238584236206203,
+        "rh_upper_leg_joint": 0.9732840507359292
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400011107139912,
+      "projection": {
+        "com_world_m": [
+          -0.009611613072210671,
+          -0.000336008064516129,
+          0.15202401299388488
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009611613072210671,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366410415813857,
+        "support_hull_plane_m": [
+          [
+            -0.09400012770961409,
+            0.1301353763118291
+          ],
+          [
+            -0.09400009736130135,
+            -0.14371343995567532
+          ],
+          [
+            0.09400009736130135,
+            -0.14371343995567532
+          ],
+          [
+            0.09400012770961409,
+            0.1301353763118291
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009611613072210671,
+          -0.000336008064516129,
+          0.009024012993884886
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016008052312779332,
+            2.7105232019573373e-05,
+            -0.0021649975181751765
+          ],
+          [
+            2.7105232019573373e-05,
+            0.03244615240133355,
+            7.886285973235654e-06
+          ],
+          [
+            -0.0021649975181751765,
+            7.886285973235654e-06,
+            0.03954262597232555
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 43
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.144
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366410426497429,
+      "joint_positions_rad": {
+        "lf_hip_joint": 6.911982284406157e-07,
+        "lf_lower_leg_joint": 0.22104129004402273,
+        "lf_upper_leg_joint": 0.4799733580632986,
+        "lh_hip_joint": 5.776517523075914e-07,
+        "lh_lower_leg_joint": -0.09673111374062457,
+        "lh_upper_leg_joint": 0.9627793072739451,
+        "rf_hip_joint": -6.911982284406157e-07,
+        "rf_lower_leg_joint": 0.22104129004402273,
+        "rf_upper_leg_joint": 0.4799733580632986,
+        "rh_hip_joint": -5.776517523075914e-07,
+        "rh_lower_leg_joint": -0.09673111374062457,
+        "rh_upper_leg_joint": 0.9627793072739451
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400011347670046,
+      "projection": {
+        "com_world_m": [
+          -0.009468401049390576,
+          -0.000336008064516129,
+          0.1528466583603947
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009468401049390576,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.0936641066882134,
+        "support_hull_plane_m": [
+          [
+            -0.09400013166739632,
+            0.13013536290810607
+          ],
+          [
+            -0.09400009848733788,
+            -0.14371343892680058
+          ],
+          [
+            0.09400009848733788,
+            -0.14371343892680058
+          ],
+          [
+            0.09400013166739632,
+            0.13013536290810607
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009468401049390576,
+          -0.000336008064516129,
+          0.008846658360394728
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016062414437395693,
+            2.6985893440957576e-05,
+            -0.002176692564148055
+          ],
+          [
+            2.6985893440957576e-05,
+            0.032493483282222915,
+            8.034075589322981e-06
+          ],
+          [
+            -0.002176692564148055,
+            8.034075589322981e-06,
+            0.0395355950770097
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 44
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.145
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366410677541631,
+      "joint_positions_rad": {
+        "lf_hip_joint": 7.100235293683239e-07,
+        "lf_lower_leg_joint": 0.241386999626547,
+        "lf_upper_leg_joint": 0.4688777869960704,
+        "lh_hip_joint": 5.81276300611229e-07,
+        "lh_lower_leg_joint": -0.08092016170667592,
+        "lh_upper_leg_joint": 0.9522152256101925,
+        "rf_hip_joint": -7.100235293683239e-07,
+        "rf_lower_leg_joint": 0.241386999626547,
+        "rf_upper_leg_joint": 0.4688777869960704,
+        "rh_hip_joint": -5.81276300611229e-07,
+        "rh_lower_leg_joint": -0.08092016170667592,
+        "rh_upper_leg_joint": 0.9522152256101925
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400011607480891,
+      "projection": {
+        "com_world_m": [
+          -0.009321944131729569,
+          -0.000336008064516129,
+          0.15366977751542885
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009321944131729569,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.093664109424813,
+        "support_hull_plane_m": [
+          [
+            -0.09400013596321574,
+            0.130135348313639
+          ],
+          [
+            -0.09400009968650994,
+            -0.14371343634932504
+          ],
+          [
+            0.09400009968650994,
+            -0.14371343634932504
+          ],
+          [
+            0.09400013596321574,
+            0.130135348313639
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009321944131729569,
+          -0.000336008064516129,
+          0.008669777515428858
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.01611712065117023,
+            2.686385089147064e-05,
+            -0.002187882637520684
+          ],
+          [
+            2.686385089147064e-05,
+            0.032541439231874025,
+            8.181470397433094e-06
+          ],
+          [
+            -0.002187882637520684,
+            8.181470397433094e-06,
+            0.039528845187556984
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 45
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.146
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366410948235938,
+      "joint_positions_rad": {
+        "lf_hip_joint": 7.304846672159472e-07,
+        "lf_lower_leg_joint": 0.26211139306790027,
+        "lf_upper_leg_joint": 0.45757580939102216,
+        "lh_hip_joint": 5.853099116928748e-07,
+        "lh_lower_leg_joint": -0.06494729433079326,
+        "lh_upper_leg_joint": 0.9415882025158122,
+        "rf_hip_joint": -7.304846672159472e-07,
+        "rf_lower_leg_joint": 0.26211139306790027,
+        "rf_upper_leg_joint": 0.45757580939102216,
+        "rh_hip_joint": -5.853099116928748e-07,
+        "rh_lower_leg_joint": -0.06494729433079326,
+        "rh_upper_leg_joint": 0.9415882025158122
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400011887481922,
+      "projection": {
+        "com_world_m": [
+          -0.009172097343109852,
+          -0.000336008064516129,
+          0.15449337907425095
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009172097343109852,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366411237797546,
+        "support_hull_plane_m": [
+          [
+            -0.09400014061153575,
+            0.1301353323331597
+          ],
+          [
+            -0.09400010096348849,
+            -0.143713432155118
+          ],
+          [
+            0.09400010096348849,
+            -0.143713432155118
+          ],
+          [
+            0.09400014061153575,
+            0.1301353323331597
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009172097343109852,
+          -0.000336008064516129,
+          0.008493379074250969
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016172166933557046,
+            2.6738983562513086e-05,
+            -0.0021985556125290414
+          ],
+          [
+            2.6738983562513086e-05,
+            0.03259006648321926,
+            8.328463218466669e-06
+          ],
+          [
+            -0.0021985556125290414,
+            8.328463218466669e-06,
+            0.03952242655868627
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 46
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.147
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366411276091718,
+      "joint_positions_rad": {
+        "lf_hip_joint": 7.571417184589807e-07,
+        "lf_lower_leg_joint": 0.2832340232884437,
+        "lf_upper_leg_joint": 0.44605656299675267,
+        "lh_hip_joint": 5.897751899895144e-07,
+        "lh_lower_leg_joint": -0.048806482078940706,
+        "lh_upper_leg_joint": 0.9308944594336315,
+        "rf_hip_joint": -7.571417184589807e-07,
+        "rf_lower_leg_joint": 0.2832340232884437,
+        "rf_upper_leg_joint": 0.44605656299675267,
+        "rh_hip_joint": -5.897751899895144e-07,
+        "rh_lower_leg_joint": -0.048806482078940706,
+        "rh_upper_leg_joint": 0.9308944594336315
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400012228029156,
+      "projection": {
+        "com_world_m": [
+          -0.009018723622263698,
+          -0.000336008064516129,
+          0.1553174893601937
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.009018723622263698,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366411598722327,
+        "support_hull_plane_m": [
+          [
+            -0.09400014649941833,
+            0.13013531473434592
+          ],
+          [
+            -0.09400010232342203,
+            -0.14371342626575728
+          ],
+          [
+            0.09400010232342203,
+            -0.14371342626575728
+          ],
+          [
+            0.09400014649941833,
+            0.13013531473434592
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.009018723622263698,
+          -0.000336008064516129,
+          0.008317489360193723
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016227543223341846,
+            2.6611177240932573e-05,
+            -0.0022087044372356333
+          ],
+          [
+            2.6611177240932573e-05,
+            0.03263940123114592,
+            8.47503211719064e-06
+          ],
+          [
+            -0.0022087044372356333,
+            8.47503211719064e-06,
+            0.03951638550516874
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 47
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.148
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366403615834077,
+      "joint_positions_rad": {
+        "lf_hip_joint": -7.87836196468172e-09,
+        "lf_lower_leg_joint": 0.3050167572724967,
+        "lf_upper_leg_joint": 0.4341773749089736,
+        "lh_hip_joint": 5.946599351057229e-07,
+        "lh_lower_leg_joint": -0.032491318562202116,
+        "lh_upper_leg_joint": 0.9201300213386858,
+        "rf_hip_joint": 7.87836196468172e-09,
+        "rf_lower_leg_joint": 0.3050167572724967,
+        "rf_upper_leg_joint": 0.4341773749089736,
+        "rh_hip_joint": -5.946599351057229e-07,
+        "rh_lower_leg_joint": -0.032491318562202116,
+        "rh_upper_leg_joint": 0.9201300213386858
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400004081586058,
+      "projection": {
+        "com_world_m": [
+          -0.00886059517819638,
+          -0.000336008064516129,
+          0.15614135833042836
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.00886059517819638,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366404384855931,
+        "support_hull_plane_m": [
+          [
+            -0.09400010376547642,
+            -0.1437134189115901
+          ],
+          [
+            0.09400010376547642,
+            -0.1437134189115901
+          ],
+          [
+            0.09399999846765865,
+            0.13013523002410435
+          ],
+          [
+            -0.09399999846765865,
+            0.13013523002410435
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.00886059517819638,
+          -0.000336008064516129,
+          0.008141358330428358
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016283513287600276,
+            2.6479408808490977e-05,
+            -0.002218022374209414
+          ],
+          [
+            2.6479408808490977e-05,
+            0.032690246227472165,
+            8.621802104294006e-06
+          ],
+          [
+            -0.002218022374209414,
+            8.621802104294006e-06,
+            0.03951125080438805
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 48
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.149
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366403663821461,
+      "joint_positions_rad": {
+        "lf_hip_joint": -8.578515162536624e-09,
+        "lf_lower_leg_joint": 0.32705028673203096,
+        "lf_upper_leg_joint": 0.42216037553412705,
+        "lh_hip_joint": 5.99462845717047e-07,
+        "lh_lower_leg_joint": -0.015996005146056588,
+        "lh_upper_leg_joint": 0.9092912486813147,
+        "rf_hip_joint": 8.578515162536624e-09,
+        "rf_lower_leg_joint": 0.32705028673203096,
+        "rf_upper_leg_joint": 0.42216037553412705,
+        "rh_hip_joint": -5.99462845717047e-07,
+        "rh_lower_leg_joint": -0.015996005146056588,
+        "rh_upper_leg_joint": 0.9092912486813147
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07400004130742104,
+      "projection": {
+        "com_world_m": [
+          -0.008699484266907453,
+          -0.000336008064516129,
+          0.1569664509514194
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.008699484266907453,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366404444398538,
+        "support_hull_plane_m": [
+          [
+            -0.09400010520289964,
+            -0.14371339188301643
+          ],
+          [
+            0.09400010520289964,
+            -0.14371339188301643
+          ],
+          [
+            0.09399999832290035,
+            0.13013522991405102
+          ],
+          [
+            -0.09399999832290035,
+            0.13013522991405102
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.008699484266907453,
+          -0.000336008064516129,
+          0.00796645095141939
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016339563468777456,
+            2.6345155086113754e-05,
+            -0.0022270419182612126
+          ],
+          [
+            2.6345155086113754e-05,
+            0.03274127543113502,
+            8.767552423222253e-06
+          ],
+          [
+            -0.0022270419182612126,
+            8.767552423222253e-06,
+            0.039506229922918426
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 49
+    },
+    {
+      "body_pose": {
+        "base_link_parallel_to_ground": true,
+        "pitch_rad": 0.0,
+        "roll_rad": 0.0,
+        "translation_world_m": [
+          0.0,
+          0.0,
+          0.15
+        ],
+        "yaw_rad": 0.0
+      },
+      "computed_com_centered_same_20mm_box_margin_m": 0.07366398756922234,
+      "joint_positions_rad": {
+        "lf_hip_joint": -1.8271454699690187e-08,
+        "lf_lower_leg_joint": 0.3495791223438952,
+        "lf_upper_leg_joint": 0.40987242488000036,
+        "lh_hip_joint": -2.7929329747154383e-08,
+        "lh_lower_leg_joint": 0.0007813874861022763,
+        "lh_upper_leg_joint": 0.8983341577111159,
+        "rf_hip_joint": 1.8271454699690187e-08,
+        "rf_lower_leg_joint": 0.3495791223438952,
+        "rf_upper_leg_joint": 0.40987242488000036,
+        "rh_hip_joint": 2.7929329747154383e-08,
+        "rh_lower_leg_joint": 0.0007813874861022763,
+        "rh_upper_leg_joint": 0.8983341577111159
+      },
+      "mass_evidence": "HISTORICAL_REV00",
+      "old_base_link_proxy_box_margin_m": 0.07399999567547182,
+      "projection": {
+        "com_world_m": [
+          -0.00853411943049587,
+          -0.000336008064516129,
+          0.1577916730131869
+        ],
+        "command_eligible": false,
+        "geometrically_inside": true,
+        "hardware_verified": false,
+        "projected_com_world_m": [
+          -0.00853411943049587,
+          -0.000336008064516129,
+          0.0
+        ],
+        "signed_margin_m": 0.09366398766702587,
+        "support_hull_plane_m": [
+          [
+            -0.09399999640965956,
+            0.13013522828008084
+          ],
+          [
+            -0.09399999507047414,
+            -0.14371694529805976
+          ],
+          [
+            0.09399999507047414,
+            -0.14371694529805976
+          ],
+          [
+            0.09399999640965956,
+            0.13013522828008084
+          ]
+        ]
+      },
+      "total_base": {
+        "com_m": [
+          -0.00853411943049587,
+          -0.000336008064516129,
+          0.007791673013186893
+        ],
+        "evidence": "OFFLINE_COMPUTED",
+        "inertia_at_com_kg_m2": [
+          [
+            0.016396063412865917,
+            2.6207356567932483e-05,
+            -0.0022356536527146525
+          ],
+          [
+            2.6207356567932483e-05,
+            0.03279325766161766,
+            8.913194879151244e-06
+          ],
+          [
+            -0.0022356536527146525,
+            8.913194879151244e-06,
+            0.03950170598220521
+          ]
+        ],
+        "mass_kg": 2.48
+      },
+      "trajectory_index": 50
+    }
+  ],
+  "hardware_verified": false,
+  "mass_evidence": "HISTORICAL_REV00",
+  "samples": 51,
+  "status": "OFFLINE VALIDATED",
+  "worst_center_margin_m": 0.09366398766702587,
+  "worst_same_20mm_box_margin_m": 0.07366398756922234
+}
