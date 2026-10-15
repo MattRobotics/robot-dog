@@ -43,6 +43,11 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void bindArmer(SessionArmer* armer){armer_=armer;}
   bool arming() const override {return pending_stand_;}
   const char* lastEntryReason() const {return entry_reason_;}
+  bool walking() const {return walking_;}
+  // Operational first stride (2026-10-15): the 250 ms walk TTL is renewed by
+  // the Controller ONLY while the authenticated operator heartbeat is current;
+  // without it the stride expires (COMMAND_EXPIRED -> SAFE_OFF). Never starts one.
+  bool renewWalk(uint32_t now_ms);
   unsigned proneSegment() const{return stand_.proneSegment();}
   bool approveProneSegment(unsigned s){return stand_.approveProneSegment(s);}
   bool configureCommissioning(const CommissioningStandConfig&);
@@ -69,6 +74,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   const char* preArmCheck();
   SessionArmer* armer_=nullptr;
   bool pending_stand_=false;motion::MotionCommand pending_command_{};uint32_t pending_since_ms_=0;
+  motion::PlanarVelocityCommand walk_command_{};
   const char* entry_reason_="";
   MotionExecutor* executor_=nullptr;
   MotionSession* session_=nullptr;

@@ -1322,6 +1322,15 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     else if(validation_walk_started_){validation_walk_admitted_=false;validation_walk_started_=false;}
   }
   ready.walk_qualified=reviewed_motion_bound_&&validation_walk_admitted_;
+  // OPERATIONAL first stride (2026-10-15): available only from a verified STAND
+  // of this armed session (or while that stride runs), with the authenticated
+  // operator present. STAND success never starts a stride by itself.
+  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_){
+    const bool standing=!strcmp(motion_coordinator_.state(),"STAND")&&!motion_coordinator_.walking()&&
+                        motion_executor_.status().state==execution::ExecutorState::READY;
+    ready.walk_qualified=operational_walk_bound_&&reviewed_motion_bound_&&operatorPresent(now_ms)&&
+                         operational_session_.state()==execution::MotionSessionState::ARMED&&(standing||motion_coordinator_.walking());
+  }
   ready.first_stride_only=reviewed_motion_bound_&&reviewed_motion_.walk.firstStrideOnly;
   ready.max_vx=reviewed_motion_.walk.maxVxMps;ready.max_vy=reviewed_motion_.walk.maxVyMps;ready.max_yaw_rate=reviewed_motion_.walk.maxYawRateRadS;
   ready.operational_permit=operational_facts_.operator_permit;
@@ -1366,6 +1375,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // fixture or lost held contact must stop WRITING without waiting for its ACK.
   operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
   if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
+  // The stride's internal TTL lives only as long as the operator heartbeat.
+  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&motion_coordinator_.walking()&&operatorPresent(now_ms)&&
+     motion_coordinator_.renewWalk(now_ms))motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);
   if(profileActive()&&validation_present_&&
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
@@ -1416,7 +1428,8 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   {const auto& v=service_.readinessView();telemetry.system_health=v.system_health;telemetry.calibration_state=v.calibration;
    telemetry.joint_feedback=v.joint_feedback;telemetry.motion_authority=v.motion_authority;telemetry.readiness_phase=v.phase;telemetry.readiness_reason=v.reason;
    telemetry.operating_mode=operating_mode_.mode()==OperatingMode::RUN?"RUN":"MAINTENANCE";telemetry.entry_reason=motion_coordinator_.lastEntryReason();
-   telemetry.operator_present=operatorPresent(now_ms);}
+   telemetry.operator_present=operatorPresent(now_ms);
+   telemetry.walk=runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_?(motion_coordinator_.walking()?"FIRST_STRIDE_ACTIVE":operational_walk_reason_):"WALK_NOT_BOUND";}
   telemetry.restore_trigger=last_restore_trigger_;telemetry.restore_generation=last_restore_generation_;
   telemetry.restore_fingerprint=last_restore_fingerprint_;
   // base_link height/contact stay unknown until independent measured

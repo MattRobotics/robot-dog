@@ -32,7 +32,7 @@ void Controller::unbindCommissioning(const char* reason){
  reviewed_motion_bound_=false;reviewed_motion_={};
  commissioning_bound_=false;motion_coordinator_.clearCommissioning();
  local_motion_observation_={};local_trial_evidence_={};operational_facts_.operator_permit=false;
- validation_present_=false;validation_walk_admitted_=false;
+ validation_present_=false;validation_walk_admitted_=false;operational_walk_bound_=false;operational_walk_reason_="WALK_NOT_BOUND";
  servo_bus_.setValidationTimeout(0);servo_bus_.setValidationDrive(0,0);
  // Commissioning limits never outlive their policy; RESTORE (transforms) stays.
  if(runtime_restore_.snapshot().commissioning_limits_active||runtime_restore_.snapshot().operational_limits_approved)runtime_restore_.revokeLimits(actuator_policy_.limits());
@@ -95,14 +95,23 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
       actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
     unbindCommissioning("LIMIT_TRANSFORM_FAILED");reason=commissioning_reason_;return false;}
    limits[i][0]=std::fmin(lo,hi)*1e-6;limits[i][1]=std::fmax(lo,hi)*1e-6;}
+  // Operational (2026-10-15): the compiled, certified first stride is bound as
+  // a SPECIFICATION when it fits the live gen-1 limits; motion still needs a
+  // verified STAND and one explicit Dashboard command per stride.
+  execution::CommissioningParameters params=commissioning_params_;
+  if(operational)params.walk_enabled=true;
+  operational_walk_bound_=false;operational_walk_reason_="WALK_NOT_BOUND";
   execution::ReviewedMotionRuntime r;
-  if(!execution::buildCommissioningRuntime(commissioning_params_,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return false;}
+  if(!execution::buildCommissioningRuntime(params,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return false;}
   // The certified fixture route must fit the hard limits as a whole.
   for(unsigned k=0;k<=motion::kPairedProneSegments;++k){const auto f=motion::pairedProneSample(k==motion::kPairedProneSegments?k-1:k,k==motion::kPairedProneSegments?1:0,true);
    for(unsigned i=0;i<12;++i){const auto& q=f.target.legs[i/3];const double v=i%3==0?q.hip:i%3==1?q.upper:q.lower;
     if(!f.target.valid||v<limits[i][0]||v>limits[i][1]){unbindCommissioning("ROUTE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}}
-  if(commissioning_params_.walk_enabled){unsigned joint=0;
-   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}
+  if(params.walk_enabled){unsigned joint=0;
+   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){
+    if(!operational){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}
+    r.walk=motion::WalkSpecification{};operational_walk_reason_="WALK_TUBE_OUTSIDE_LIMITS";  // STAND stays available, WALK does not
+   } else if(operational){operational_walk_bound_=true;operational_walk_reason_="FIRST_STRIDE_BOUND";}}
   motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
   route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
   execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=commissioning_params_.entry_min_stage_s;

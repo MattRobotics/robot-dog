@@ -85,6 +85,7 @@ class Controller {
   uint32_t presenceWindowMs() const { return runtime_mode_==execution::RuntimeTestMode::OPERATIONAL?kOperationalHeartbeatMs:1000; }
   const char* armOperationalSession(uint32_t now_ms);
   static constexpr uint32_t kOperationalHeartbeatMs=3000;
+  bool operational_walk_bound_=false;const char* operational_walk_reason_="WALK_NOT_BOUND";
   core::OperationalReadiness readiness_core_{};
   core::ReadinessAction last_readiness_action_=core::ReadinessAction::NONE;
   AuthorityLease motion_authority_lease_{};

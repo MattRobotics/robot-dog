@@ -50,6 +50,7 @@ struct MotionTelemetry {
  const char* system_health="BOOTING";const char* calibration_state="NOT_RESTORED";const char* joint_feedback="UNAVAILABLE";
  const char* motion_authority="NOT_GRANTED";const char* readiness_phase="BOOTING";const char* readiness_reason="";
  const char* operating_mode="MAINTENANCE";const char* entry_reason="";bool operator_present=false;
+ const char* walk="WALK_NOT_BOUND";  // operational first stride binding/reason
 };
 // Controller owns this transport-independent intention service. A transport
 // submits a typed command and receives an ack; it cannot acquire a lease.
@@ -67,6 +68,9 @@ class MotionService {
   bool busy() const { return executor_&&(executor_->active()||executor_->status().safe_off_required); }
  // Torque sequence or motion in progress (arming a STAND included).
  bool engaged() const { return busy()||(planner_&&planner_->arming()); }
+ // Operational first stride: the Controller extends the client deadline only
+ // while the authenticated operator heartbeat is current (never starts motion).
+ void renewTeleop(uint32_t now_ms,uint32_t ttl_ms){ if(active_command_&&active_intent_==motion::Intent::BASE_VELOCITY&&teleop_deadline_ms_)teleop_deadline_ms_=now_ms+ttl_ms; }
   const MotionReadiness& readiness() const { return readiness_; }
   const motion::MotionAck& lastAck() const { return last_ack_; }
   const motion::MotionAck& activeAck() const { return active_ack_; }

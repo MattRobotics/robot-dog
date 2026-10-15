@@ -1,5 +1,6 @@
 #include "MotionCoordinator.h"
 #include <cmath>
+#include <cstring>
 #include "../motion/FixturePoseClassifier.h"
 namespace matdog { namespace execution {
 void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;submitted_sequence_=0;arm_generation_=0;}
@@ -93,16 +94,33 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
    if(session_&&session_->scope()!=TrialScope::AUTONOMOUS_WALK&&session_->scope()!=TrialScope::SUPERVISED_FIXTURE_WALK&&
       session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "LOCAL_WALK_SCOPE_REQUIRED";
    motion::PlanarVelocityCommand v;v.vxMps=c.vx;v.vyMps=c.vy;v.yawRateRadS=c.yaw_rate;v.stampS=c.issued_at_ms/1000.0;v.ttlS=c.ttl_ms/1000.0;v.sequence=c.sequence;
+   if(commissioning_.measuredStart){
+    // Operational: the request was age-checked against its own TTL by the
+    // contract; the stride runs on the Controller clock with the reviewed
+    // internal TTL, renewed only by the operator heartbeat (renewWalk).
+    const bool zero=v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0;
+    if(walking_&&!zero)return "WALK_IN_PROGRESS";            // one explicit stride per command
+    if(!walking_&&!zero&&stand_.state()!=motion::AdaptiveStandState::STAND)return "STAND_VERIFIED_REQUIRED";
+    v.stampS=now/1000.0;v.ttlS=std::fmin(v.ttlS,walk_specification_.maxCommandTtlS);
+    if(walking_)v.sequence=walk_command_.sequence+1;           // after the internal renewals
+   }
    if(walking_)return walk_.command(v,now/1000.0)?nullptr:motion::feedbackReasonName(walk_.reason());
    if(v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0)return nullptr;
    auto spec=walk_specification_;spec.firstTargetSequence=executor_->status().accepted_sequence+1;
    if(!walk_.start(stand_,observation_,v,spec,feedback_policy_,now/1000.0))return motion::feedbackReasonName(walk_.reason());
-   walking_=true;return nullptr;
+   walk_command_=v;walking_=true;return nullptr;
   }
   default:return "ACTION_NOT_VALIDATED";
  }
 }
 void MotionCoordinator::stop(uint32_t){pending_stand_=false;if(session_&&(session_->scope()==TrialScope::SUPERVISED_FIXTURE_STAND||session_->scope()==TrialScope::SUPERVISED_FIXTURE_WALK||session_->scope()==TrialScope::FIXTURE_COMMISSIONING)){stand_.stop();session_->revoke("LOCAL_FIXTURE_STOP_SAFE_OFF");return;}if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
+bool MotionCoordinator::renewWalk(uint32_t now){
+ if(!walking_||!commissioning_.measuredStart)return false;
+ const auto st=walk_.state();if(st!=motion::FeedbackWalkState::STARTING&&st!=motion::FeedbackWalkState::WALK)return false;
+ auto v=walk_command_;v.stampS=now/1000.0;v.sequence=walk_command_.sequence+1;
+ if(!walk_.command(v,now/1000.0))return false;
+ walk_command_=v;return true;
+}
 const char* MotionCoordinator::state() const {
  if(!walking_)return motion::adaptiveStandStateName(stand_.state());
  switch(walk_.state()){case motion::FeedbackWalkState::IDLE:return "IDLE";case motion::FeedbackWalkState::STARTING:return "WALK_STARTING";case motion::FeedbackWalkState::WALK:return "WALK";case motion::FeedbackWalkState::STOPPING:return "STOPPING";case motion::FeedbackWalkState::STAND:return "STAND";default:return "REJECTED";}

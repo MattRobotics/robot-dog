@@ -7,6 +7,7 @@
 // Production MotionService/Coordinator/AdaptiveStand/Session/Executor/policy;
 // kinematic servo double; measured 2026-10-13 prone. NO hardware.
 #define MATDOG_FIXTURE_COMMISSIONING_NO_MAIN
+#include "../../src/motion/FirstStrideReference.h"
 #include "test_fixture_commissioning.cpp"
 
 namespace {
@@ -21,7 +22,12 @@ struct TestArmer : execution::SessionArmer {
 };
 struct Operational {
   Bench b;TestArmer armer;core::AuthorityLease held{};
-  explicit Operational(double fold_offset_deg=0,double keepout_deg=-92.070442,double keepout_sign=1){
+  bool walk_ok=false;   // what the Controller computes: verified STAND + bound stride + operator present
+  explicit Operational(double fold_offset_deg=0,double keepout_deg=-92.070442,double keepout_sign=1,bool walk=false){
+    if(walk){  // operational admission binds the compiled first stride as a specification
+      b.params.walk_enabled=true;CHECK(execution::buildCommissioningRuntime(b.params,b.limits,1,b.r.policy.epoch(),&b.runtime));b.r.envelope=b.runtime.execution;
+      CHECK(motion::compiledFirstStrideFitsLimits(b.runtime.feedback,motion::compiledFirstStrideTubeRad()));
+    }
     for(unsigned i=0;i<12;++i)if(i%3==1){b.r.feedback.actual_rad[i]+=fold_offset_deg*kDeg;}
     // READY: the Controller holds MOTION authority idle (OperationalReadiness GRANT_AUTHORITY).
     CHECK(b.r.arbiter.request(ActuatorAuthority::MOTION,OperatingMode::RUN,&held)==AuthorityResult::GRANTED);
@@ -37,7 +43,8 @@ struct Operational {
     CHECK(b.coordinator.configureCommissioning(cc));   // no certificate needed
     b.service.begin(&b.r.executor,&b.coordinator);refresh();
   }
-  MotionReadiness readiness(){auto r=ready();r.walk_qualified=false;r.local_operator_owns_session=false;return r;}
+  MotionReadiness readiness(){auto r=ready();r.walk_qualified=walk_ok;r.first_stride_only=b.runtime.walk.firstStrideOnly;
+    r.max_vx=b.runtime.walk.maxVxMps;r.max_vy=0;r.max_yaw_rate=0;r.local_operator_owns_session=false;return r;}
   void refresh(){b.service.refresh(readiness(),b.now);}
   // As every Controller tick: the measured pose is published before a command is served.
   void publish(){motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];observe(o,q,b.now);b.coordinator.observe(o);}
@@ -103,6 +110,110 @@ void operationalStandEndToEnd(double fold_offset_deg){
   CHECK(b.r.backend.writes.size()==writes);
   std::printf("OPERATIONAL_STAND fold_offset_deg=%.2f entry=%s entry_s=%.2f+%.2f frames=%u writes=%zu approvals=0 old_tube_needed=no\n",fold_offset_deg,
     motion::entryStatusName(b.coordinator.entryPlan().status),b.coordinator.entryPlan().durationS[0],b.coordinator.entryPlan().durationS[1],frames,writes);
+}
+
+// PRONE -> STAND -> first stride -> STAND on the fixture (directive 2026-10-15).
+// One explicit Dashboard command per stride; the internal 250 ms stride TTL is
+// renewed only while the operator heartbeat is current (Controller behaviour).
+struct Driver {
+  Operational& op;double q[12]{};unsigned frames=0;double max_step=0;
+  explicit Driver(Operational& o):op(o){for(unsigned i=0;i<12;++i)q[i]=op.b.r.feedback.actual_rad[i];}
+  // One Controller tick; returns false when the planner rejected.
+  bool tick(uint32_t dt,bool heartbeat){
+    auto& b=op.b;uint32_t& now=b.now;now+=dt;
+    for(unsigned i=0;i<12;++i)b.r.feedback.sampled_at_ms[i]=now;   // the servo bus answers every tick
+    if(heartbeat){b.r.facts.permit_expires_at_ms=b.evidence.expires_at_ms=now+3000;
+      if(b.coordinator.walking()&&b.coordinator.renewWalk(now))b.service.renewTeleop(now,static_cast<uint32_t>(b.runtime.walk.maxCommandTtlS*1000));}
+    motion::AdaptiveObservation o;observe(o,q,now);b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,now);op.refresh();
+    auto frame=b.coordinator.frame();
+    if(frame.target.valid&&frame.target.sequence>b.r.executor.status().completed_sequence){
+      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=now/1000.;a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
+      a.geometryIdentityVerified=a.sweptCollisionClear=a.supportCompatible=a.continuousBoundsConfirmed=a.fixtureTrialEnvelopeReviewed=true;
+      if(b.coordinator.assess(a,now)){b.coordinator.update(b.r.facts,b.r.feedback,now);
+        for(unsigned i=0;i<12;++i)b.r.executor.update(b.r.facts,b.r.feedback,++now);
+        if(b.r.executor.status().state==ExecutorState::SAFE_OFF_REQUIRED||b.r.executor.status().state==ExecutorState::FAULT)return false;
+        for(unsigned i=0;i<12;++i){const double t=b.r.executor.targetRadians()[i];max_step=std::max(max_step,std::abs(t-q[i]));q[i]=t;b.r.feedback.actual_rad[i]=t;b.r.feedback.sampled_at_ms[i]=now+1;}
+        ++now;b.r.executor.update(b.r.facts,b.r.feedback,now);++frames;}
+    }
+    b.r.executor.update(b.r.facts,b.r.feedback,now);
+    if(b.r.executor.status().state==ExecutorState::SAFE_OFF_REQUIRED||b.r.executor.status().state==ExecutorState::FAULT)return false;
+    return std::strcmp(b.coordinator.state(),"REJECTED")!=0;
+  }
+};
+bool reachStand(Operational& op,Driver& d){
+  auto& b=op.b;if(op.stand().outcome!=motion::CommandOutcome::ACCEPTED)return false;
+  for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+  for(unsigned i=0;i<12;++i)d.q[i]=b.r.feedback.actual_rad[i];
+  while(std::strcmp(b.coordinator.state(),"STAND")&&b.now<50000000)if(!d.tick(20,true))return false;
+  op.refresh();return b.service.activeAck().outcome==motion::CommandOutcome::COMPLETED;
+}
+motion::MotionAck walkCommand(Operational& op,uint32_t seq,double vx){
+  auto c=command(motion::Intent::BASE_VELOCITY,seq,motion::ClientOwner::DASHBOARD);c.vx=vx;c.issued_at_ms=op.b.now;c.ttl_ms=1000;
+  return op.b.service.command(c,op.b.now);
+}
+bool writesInsideLimits(Bench& b){
+  for(const auto& w:b.r.backend.writes){bool inside=false;
+    for(unsigned i=0;i<12;++i){const auto* l=b.r.policy.limits().find(slotIdentity(i),b.r.geometry.provenanceTag());const auto* g=b.r.geometry.findJoint(slotIdentity(i));
+      if(g&&g->bus_id==w.bus)inside=l&&l->contains(w.tick);}
+    if(!inside)return false;}
+  return true;
+}
+void operationalWalkEndToEnd(){
+  const double vx=[]{Bench b;b.params.walk_enabled=true;execution::ReviewedMotionRuntime r;execution::buildCommissioningRuntime(b.params,b.limits,1,b.r.policy.epoch(),&r);return r.walk.maxVxMps;}();
+  // No stride before a verified STAND: the service gate and the planner both refuse.
+  { Operational op(0,-92.070442,1,true);
+    CHECK(walkCommand(op,1,vx).outcome==motion::CommandOutcome::REJECTED);                     // walk_qualified=false (Controller)
+    op.walk_ok=true;op.refresh();const auto a=walkCommand(op,2,vx);CHECK(a.outcome==motion::CommandOutcome::REJECTED);
+    CHECK(op.b.r.backend.writes.empty()&&!op.b.coordinator.walking()); }
+  Operational op(0,-92.070442,1,true);auto& b=op.b;Driver d(op);
+  CHECK(reachStand(op,d));const unsigned stand_frames=d.frames;const size_t stand_writes=b.r.backend.writes.size();
+  // STAND success never starts a stride: 100 more ticks, no new write.
+  for(unsigned k=0;k<100;++k){CHECK(d.tick(50,true));}
+  CHECK(b.r.backend.writes.size()==stand_writes&&!b.coordinator.walking());
+  op.walk_ok=true;op.refresh();
+  CHECK(walkCommand(op,10,vx*.5).outcome==motion::CommandOutcome::REJECTED);                      // only the certified stride speed
+  const auto ack=walkCommand(op,11,vx);CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);REASON(ack.reason,"OK");
+  CHECK(b.coordinator.walking());
+  CHECK(walkCommand(op,12,vx).outcome==motion::CommandOutcome::REJECTED);                          // one stride per command
+  d.frames=0;d.max_step=0;bool ok=true;
+  while(b.coordinator.walking()&&b.now<200000000&&(ok=d.tick(51,true))){}
+  if(!ok)std::printf("walk stopped: frame=%s executor=%s session=%s\n",motion::feedbackReasonName(b.coordinator.frame().reason),b.r.executor.status().reason,b.session.reason());
+  std::printf("OPERATIONAL_WALK first_stride frames=%u state=%s max_step_rad=%.6f writes=%zu ok=%d\n",d.frames,b.coordinator.state(),d.max_step,b.r.backend.writes.size()-stand_writes,ok?1:0);
+  CHECK(ok&&!b.coordinator.walking()&&!std::strcmp(b.coordinator.state(),"STAND"));
+  CHECK(d.frames==19080&&d.max_step<=b.params.max_step_rad+1e-9);
+  CHECK(b.r.executor.status().state==ExecutorState::READY&&!b.session.safeOffRequired());
+  op.refresh();CHECK(b.service.activeAck().outcome==motion::CommandOutcome::COMPLETED);REASON(b.service.activeAck().reason,"ZERO_VELOCITY_VERIFIED");
+  CHECK(writesInsideLimits(b));
+  // Ends where it started (suspended stride returns to the stand pose); a
+  // second stride needs a NEW explicit command after this verification.
+  { const auto end=motion::pairedProneSample(250,1,true).target;double dev=0;for(unsigned i=0;i<12;++i)dev=std::max(dev,std::abs(d.q[i]-slot(end,i)));
+    std::printf("OPERATIONAL_WALK return_to_stand max_dev_rad=%.6f stand_frames=%u\n",dev,stand_frames); }
+  const size_t after=b.r.backend.writes.size();for(unsigned k=0;k<100;++k){CHECK(d.tick(50,true));}
+  CHECK(b.r.backend.writes.size()==after&&!b.coordinator.walking());
+  const auto second=walkCommand(op,20,vx);
+  std::printf("OPERATIONAL_WALK second_stride_command=%s reason=%s\n",motion::toString(second.outcome),second.reason);
+  if(second.outcome==motion::CommandOutcome::ACCEPTED){for(unsigned k=0;k<400&&b.coordinator.walking();++k){CHECK(d.tick(51,true));}
+    CHECK(b.coordinator.walking());
+    // STOP during a stride: SAFE_OFF, no further position write.
+    auto stop=command(motion::Intent::STOP,21,motion::ClientOwner::DASHBOARD);stop.issued_at_ms=b.now;b.service.command(stop,b.now);
+    CHECK(b.session.safeOffRequired()&&b.r.executor.status().safe_off_required);
+    const size_t w=b.r.backend.writes.size();for(unsigned k=0;k<20;++k){b.r.executor.update(b.r.facts,b.r.feedback,++b.now);}
+  CHECK(b.r.backend.writes.size()==w);}
+}
+void operationalWalkDeadman(){
+  const double vx=[]{Bench b;b.params.walk_enabled=true;execution::ReviewedMotionRuntime r;execution::buildCommissioningRuntime(b.params,b.limits,1,b.r.policy.epoch(),&r);return r.walk.maxVxMps;}();
+  Operational op(0,-92.070442,1,true);auto& b=op.b;Driver d(op);CHECK(reachStand(op,d));
+  op.walk_ok=true;op.refresh();CHECK(walkCommand(op,30,vx).outcome==motion::CommandOutcome::ACCEPTED);
+  for(unsigned k=0;k<200;++k){CHECK(d.tick(51,true));}
+  CHECK(b.coordinator.walking());
+  // Heartbeat lost: no renewal. The stride expires within its 250 ms TTL and the
+  // executor goes to SAFE_OFF; writing stops.
+  bool rejected=false;uint32_t lost=b.now;
+  for(unsigned k=0;k<20&&!rejected;++k)rejected=!d.tick(51,false)||b.r.executor.status().safe_off_required;
+  std::printf("OPERATIONAL_WALK deadman: safe_off_after_ms=%u executor=%s\n",b.now-lost,execution::toString(b.r.executor.status().state));
+  CHECK(rejected&&b.now-lost<=1500);
+  const size_t w=b.r.backend.writes.size();for(unsigned k=0;k<20;++k){b.r.executor.update(b.r.facts,b.r.feedback,++b.now);}
+  CHECK(b.r.backend.writes.size()==w);
 }
 
 void operationalRefusals(){
@@ -180,5 +291,6 @@ void operationalRefusals(){
 int main(){
   operationalStandEndToEnd(0);operationalStandEndToEnd(.8);operationalStandEndToEnd(-2.0);
   operationalRefusals();
+  operationalWalkDeadman();operationalWalkEndToEnd();
   std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;
 }
