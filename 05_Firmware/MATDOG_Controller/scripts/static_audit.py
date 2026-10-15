@@ -6450,8 +6450,17 @@ def check_network_v3_boundaries(files, sketch_dir):
     if forwards!=["Controller.cpp"]:
         fail(f"The operating mode is forwarded to the Wi-Fi owner only by the Controller; call sites: {forwards}")
     controller=re.sub(r"\s+","",by_name.get("Controller.cpp",(None,""))[1])
-    if "wifi_.setRunMode(operating_mode_.mode()==OperatingMode::RUN);" not in controller:
-        fail("The Controller must forward exactly `mode == RUN`; any other mode keeps the maintenance AP")
+    # 2026-10-14 (operator directive): the radio role follows the OPERATOR's
+    # @MODE choice only (routerRole); automatic RUN entry by operational
+    # readiness keeps the administrative AP that serves the Android Dashboard.
+    if "wifi_.setRunMode(operating_mode_.routerRole());" not in controller:
+        fail("The Controller must forward exactly the operator's router role; automatic RUN keeps the AP")
+    autorun=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)enterRunAutomatic\s*\(",c2)]
+    if autorun!=["Controller.cpp"]:
+        fail(f"Automatic RUN entry belongs to operational readiness only; call sites: {autorun}")
+    raw_controller=by_name.get("Controller.cpp",(None,""))[1]
+    if "enterRunAutomatic" in raw_controller and "case core::ReadinessAction::ENTER_RUN:" not in raw_controller:
+        fail("enterRunAutomatic must be driven by OperationalReadiness ENTER_RUN")
     page_path=sketch_dir/"src"/"network"/"PortalPage.h"
     check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 

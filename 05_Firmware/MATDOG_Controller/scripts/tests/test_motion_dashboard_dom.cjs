@@ -314,6 +314,22 @@ async function boot(enabled = false, options = {}) {
   confirm.checked = true; confirm.onchange();
   assert(button.disabled && button.textContent.includes('già attivo'), 'idempotent UI once restored');
   p.close();
+
+  // --- Operational READY (directive 2026-10-14) -----------------------------
+  p = await boot(true);
+  p.device.status.now_ms += 100;
+  p.device.status.operational = { system_health: 'READY', calibration: 'RESTORED', joint_feedback: 'AVAILABLE', motion_authority: 'GRANTED', phase: 'READY', reason: 'OK', mode: 'RUN', entry_reason: '', operator_present: true };
+  await p.motionPoll();
+  const opText = p.q('#motion-state').textContent;
+  assert(opText.includes('SistemaREADY') && opText.includes('CalibrazioneRESTORED') && opText.includes('Feedback giuntiAVAILABLE') && opText.includes('Motion AuthorityGRANTED'));
+  assert(opText.includes('Operatore (heartbeat)presente'));
+  assert(!p.q('#motion-stand').disabled, 'READY + Controller-available STAND: no extra consent step in the UI');
+  assert(p.q('[data-action="posture.lie_down"]').disabled, 'unimplemented action stays disabled');
+  assert(p.q('[data-action="posture.lie_down"]').closest('.motion-action').textContent.includes('planned'), 'unimplemented action is labelled as such');
+  assert.strictEqual(p.q('#motion-twin-local').getAttribute('href'), '/twin/', 'Digital Twin served by the robot');
+  p.q('#motion-stand').click(); await settle();
+  assert.strictEqual(p.device.commands.at(-1).type, 'POSTURE.STAND');
+  p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
-  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate; FIXTURE_ONLY)');
+  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

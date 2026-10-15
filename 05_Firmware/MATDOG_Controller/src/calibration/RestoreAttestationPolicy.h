@@ -1,18 +1,18 @@
 #ifndef MATDOG_CALIBRATION_RESTORE_ATTESTATION_POLICY_H
 #define MATDOG_CALIBRATION_RESTORE_ATTESTATION_POLICY_H
-// Issue #48: decides WHETHER a RAM-only gen-N RESTORE may run, automatically
-// at boot or on an explicit operator request. Pure: plain facts in, decision
-// out. No NVS, servo, authority, permit or limit access, and no include of a
-// persistence header (audit boundary P3a). The Controller gathers the facts
-// and, only on ALLOW_*, calls CalibrationRuntimeRestore::restore() itself.
+// Issue #48 (final operator decision 2026-10-14): decides WHETHER a RAM-only
+// gen-N RESTORE may run, automatically at boot or on an explicit operator
+// request. Pure: plain facts in, decision out. No NVS, servo, authority,
+// permit or limit access, and no include of a persistence header (P3a).
 //
-// ST3215 IDs cannot prove which physical unit is mounted. Automatic RESTORE
-// therefore needs a reviewed installation attestation pinned in the firmware
-// build (record generation + content fingerprint); a manual RESTORE needs a
-// present operator who confirms the mechanical installation. Live evidence
-// (12/12 read-only preflight, torque OFF, raw inside the recorded spans) is
-// required in BOTH cases; it can refuse, never substitute for, attestation.
-// A RESTORE never approves JointLimits, never grants authority or a permit.
+// Boot RESTORE is AUTOMATIC when the record is valid and the live read-only
+// evidence agrees with it: 12/12 preflight (bus id, model, offset, persistent
+// profile), 12/12 torque OFF, every live raw tick inside the record's own
+// mechanical contact span. No operator confirmation, fingerprint pin,
+// attestation or rebuild is required. A servo swap/remount is maintenance:
+// the live-span check refuses with the joint, and a RAM suspension
+// (auto_restore_enabled=false) exists for a dedicated maintenance procedure.
+// A RESTORE never approves limits by itself and never moves a joint.
 #include <stdint.h>
 
 namespace matdog {
@@ -21,10 +21,10 @@ namespace calibration {
 enum class RestoreTrigger : uint8_t { BOOT_AUTOMATIC, OPERATOR_MANUAL };
 
 enum class RestoreDecision : uint8_t {
-  ALLOW_AUTOMATIC,          // boot: attested installation + live evidence
+  ALLOW_AUTOMATIC,          // boot: valid record + live evidence
   ALLOW_OPERATOR,           // manual: operator confirmation + live evidence
   ALREADY_RESTORED,         // idempotent: same generation already in RAM
-  PENDING_OPERATOR_REVIEW,  // valid record, but attestation absent/mismatched
+  PENDING_OPERATOR_REVIEW,  // valid record, auto RESTORE suspended or evidence pending
   REFUSED,                  // a precondition failed; reason says which
 };
 
@@ -65,11 +65,11 @@ struct RestoreFacts {
   uint32_t restored_generation = 0;
 };
 
-// Compiled into the build after operator review. present=false by default:
-// nothing in this repository fabricates an attestation.
+// Boot behaviour switch. Default: automatic. `present`, `generation` and
+// `record_fingerprint` are informational only (no longer a gate).
 struct InstallationAttestation {
   bool present = false;
-  bool auto_restore_enabled = false;
+  bool auto_restore_enabled = true;
   uint32_t generation = 0;
   uint64_t record_fingerprint = 0;
 };

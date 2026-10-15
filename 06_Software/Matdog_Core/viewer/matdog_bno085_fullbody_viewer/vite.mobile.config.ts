@@ -17,6 +17,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     cssCodeSplit: false,
     modulePreload: false,
-    rollupOptions: { input: 'mobile.html', output: { inlineDynamicImports: true } },
+    // Fixed names: the ESP32 serves exactly these paths under /twin/ (ETag = SHA-256).
+    rollupOptions: { input: 'mobile.html', output: { inlineDynamicImports: true, entryFileNames: 'assets/twin.js', assetFileNames: 'assets/[name][extname]' } },
   },
 });

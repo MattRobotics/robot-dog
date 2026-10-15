@@ -69,6 +69,62 @@ void Controller::emitTelemetry(uint32_t now){
  if(used<sizeof(buffer)-1&&Serial.availableForWrite()>=static_cast<int>(used))
   Serial.write(reinterpret_cast<const uint8_t*>(buffer),used);
 }
+// Shared by @MOTION COMMISSIONING ADMIT (supervised, certificate, per-segment
+// approvals) and the automatic OPERATIONAL admission at READY (measured-start
+// entry, continuous route). Hard limits, route-fit and live checks are the same.
+bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t now,const char** out){
+  const char* reason="ADMIT";
+  struct Out{const char*& r;const char** o;~Out(){if(o)*o=r;}} sink{reason,out};
+  const auto& cal=runtime_restore_.snapshot();
+  if(servo_preflight_.state()!=servo::ServoPreflight::State::COMPLETE||!servo_preflight_.result().allPass()){reason="LIVE_SERVO_PROFILE_CHECK_REQUIRED";return false;}
+  if(!cal.restored||!cal.calibration_accepted){reason="RESTORE_REQUIRED";return false;}
+  if(!operational&&!commissioning_entry_.present){reason="ENTRY_CERTIFICATE_REQUIRED";return false;}
+  if(!execution::validCommissioningParameters(commissioning_params_,&reason))return false;
+  calibration::RuntimeRestoreRequest facts;facts.expected_generation=cal.restored_generation;facts.current_installation_confirmed=true;
+  facts.executor_idle=true;facts.motion_permit_revoked=true;
+  facts.torque_off_confirmed=operational_producer_.rawFresh(now,commissioning_params_.feedback_max_age_ms);
+  for(unsigned i=0;i<12;++i)facts.torque_off_confirmed=facts.torque_off_confirmed&&operational_producer_.raw(i).torque==0&&operational_producer_.raw(i).speed==0;
+  if(!facts.torque_off_confirmed){reason="TORQUE_OFF_STATIONARY_FRESH_REQUIRED";return false;}
+  // A reviewed card profile and this policy are never bound together.
+  validation_profile_.clear();unbindCommissioning("ADMIT_IN_PROGRESS");
+  const auto admission=runtime_restore_.qualifyCommissioningLimits(geometry_profile_,actuator::geometry_data::kProvenance,commissioning_params_.inset_ticks,facts,actuator_policy_.transforms(),actuator_policy_.limits());
+  if(admission!=calibration::OperationalAdmissionStatus::APPROVED){reason=calibration::toString(admission);commissioning_reason_=reason;return false;}
+  double limits[12][2];
+  for(unsigned i=0;i<12;++i){const auto id=slotIdentity(i);const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());actuator::MicroRad lo,hi;
+   if(!tr||!lim||actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||
+      actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
+    unbindCommissioning("LIMIT_TRANSFORM_FAILED");reason=commissioning_reason_;return false;}
+   limits[i][0]=std::fmin(lo,hi)*1e-6;limits[i][1]=std::fmax(lo,hi)*1e-6;}
+  execution::ReviewedMotionRuntime r;
+  if(!execution::buildCommissioningRuntime(commissioning_params_,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return false;}
+  // The certified fixture route must fit the hard limits as a whole.
+  for(unsigned k=0;k<=motion::kPairedProneSegments;++k){const auto f=motion::pairedProneSample(k==motion::kPairedProneSegments?k-1:k,k==motion::kPairedProneSegments?1:0,true);
+   for(unsigned i=0;i<12;++i){const auto& q=f.target.legs[i/3];const double v=i%3==0?q.hip:i%3==1?q.upper:q.lower;
+    if(!f.target.valid||v<limits[i][0]||v>limits[i][1]){unbindCommissioning("ROUTE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}}
+  if(commissioning_params_.walk_enabled){unsigned joint=0;
+   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}
+  motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
+  route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
+  execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=commissioning_params_.entry_min_stage_s;
+  if(operational){
+   // Measured-start entry: no certificate tube. Keep-outs from CAD/FCL
+   // (GEOMETRY_ENTRY_REPORT 2026-10-14): LF LOWER first zero separation
+   // -92.070442 deg. Other legs: measured gen-1 contact limits only.
+   cc.measuredStart=true;cc.pathMarginRad=.001;cc.keepoutCount=1;
+   auto& k=cc.keepouts[0];k.id="LF_UPPER_LOWER_CONTACT";k.a=k.b=2;k.ca=1;k.cb=0;k.bound=-92.070442*3.14159265358979323846/180.0;
+  }
+  cc.proneMaxDeviationRad=commissioning_params_.prone_max_deviation_rad;cc.proneMaxRmsRad=commissioning_params_.prone_max_rms_rad;
+  if(!motion_coordinator_.configure(r.feedback,r.walk,&route)||!motion_coordinator_.configureCommissioning(cc)){unbindCommissioning("PLANNER_CONFIGURATION_REJECTED");reason=commissioning_reason_;return false;}
+  reviewed_motion_=r;reviewed_motion_bound_=true;commissioning_bound_=true;
+  servo_bus_.setValidationTimeout(commissioning_params_.transaction_timeout_ms);servo_bus_.setValidationDrive(commissioning_params_.drive_speed,commissioning_params_.drive_acceleration);
+  // Fixture support is the operator's declaration (this token + the deadman),
+  // never a load measurement. The body pose is the route's virtual reference.
+  motion::AdaptiveObservation o;o.body=motion::pairedProneSample(0,0,true).cartesian.body;o.stampS=issued/1000.0;
+  o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;
+  local_motion_observation_=o;local_trial_evidence_={};
+  if(operational)runtime_mode_=execution::RuntimeTestMode::OPERATIONAL;
+  reason=operational?"OPERATIONAL_LIMITS_AND_PLANNER_BOUND":"COMMISSIONING_LIMITS_QUALIFIED_NO_PERMIT";commissioning_reason_=reason;return true;
+}
 bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,size_t size){
  if(line&&!strncmp(line,"TELEMETRY ",10)){
   uint32_t hz;if(!uintArg(line+10,hz)||hz>20){snprintf(out,size,"TELEMETRY=REFUSED REASON=HZ_0_TO_20");return false;}
@@ -105,6 +161,14 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
   validation_nonce_=esp_random();if(!validation_nonce_)validation_nonce_=1;ok=true;reason="SAFE_OFF_REQUESTED";return reply();
  }
  if(!strcmp(t[0],"STATUS")&&n==1){ok=true;reason=boot_safe_off_pending_?"BOOT_SAFE_OFF_PENDING":commissioning_reason_;return reply();}
+ // Maintenance procedure (servo swap/remount): suspend the automatic boot
+ // RESTORE in RAM until RESUME or reboot. Manual RESTORE stays available.
+ if(!strcmp(t[0],"AUTO_RESTORE")&&n==2&&(!strcmp(t[1],"SUSPEND")||!strcmp(t[1],"RESUME"))){
+  if(!idle){reason="SAFE_IDLE_REQUIRED";return reply();}
+  auto_restore_suspended_=!strcmp(t[1],"SUSPEND");
+  if(!auto_restore_suspended_){restore_refused_permanent_=false;restore_refused_transient_=false;}
+  ok=true;reason=auto_restore_suspended_?"AUTO_RESTORE_SUSPENDED_RAM_ONLY":"AUTO_RESTORE_RESUMED";return reply();
+ }
  if(!strcmp(t[0],"PARAMS")&&n==1){
   char text[760];ok=execution::formatCommissioningParameters(commissioning_params_,text,sizeof(text));
   snprintf(out,size,"COMMISSIONING_PARAMS mode=%s %s entry_certificate=%s",execution::toString(runtime_mode_),ok?text:"FORMAT_OVERFLOW",commissioning_entry_.present?commissioning_entry_.sha256:"NONE");return ok;
@@ -155,46 +219,7 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
  if(!strcmp(t[0],"ADMIT")&&n==3&&!strcmp(t[2],"CONFIRM_FIXTURE_SUPPORT_FREE_VOLUME_POWER_CUT_INSTALLATION")){
   if(runtime_mode_!=execution::RuntimeTestMode::FIXTURE_COMMISSIONING){reason="FIXTURE_COMMISSIONING_MODE_REQUIRED";return reply();}
   if(!idle||boot_safe_off_pending_){reason="SAFE_IDLE_REQUIRED";return reply();}
-  if(servo_preflight_.state()!=servo::ServoPreflight::State::COMPLETE||!servo_preflight_.result().allPass()){reason="LIVE_SERVO_PROFILE_CHECK_REQUIRED";return reply();}
-  if(!cal.restored||!cal.calibration_accepted){reason="RESTORE_REQUIRED";return reply();}
-  if(!commissioning_entry_.present){reason="ENTRY_CERTIFICATE_REQUIRED";return reply();}
-  if(!execution::validCommissioningParameters(commissioning_params_,&reason))return reply();
-  calibration::RuntimeRestoreRequest facts;facts.expected_generation=cal.restored_generation;facts.current_installation_confirmed=true;
-  facts.executor_idle=true;facts.motion_permit_revoked=true;
-  facts.torque_off_confirmed=operational_producer_.rawFresh(now,commissioning_params_.feedback_max_age_ms);
-  for(unsigned i=0;i<12;++i)facts.torque_off_confirmed=facts.torque_off_confirmed&&operational_producer_.raw(i).torque==0&&operational_producer_.raw(i).speed==0;
-  if(!facts.torque_off_confirmed){reason="TORQUE_OFF_STATIONARY_FRESH_REQUIRED";return reply();}
-  // A reviewed card profile and this policy are never bound together.
-  validation_profile_.clear();unbindCommissioning("ADMIT_IN_PROGRESS");
-  const auto admission=runtime_restore_.qualifyCommissioningLimits(geometry_profile_,actuator::geometry_data::kProvenance,commissioning_params_.inset_ticks,facts,actuator_policy_.transforms(),actuator_policy_.limits());
-  if(admission!=calibration::OperationalAdmissionStatus::APPROVED){reason=calibration::toString(admission);commissioning_reason_=reason;return reply();}
-  double limits[12][2];
-  for(unsigned i=0;i<12;++i){const auto id=slotIdentity(i);const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());actuator::MicroRad lo,hi;
-   if(!tr||!lim||actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||
-      actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
-    unbindCommissioning("LIMIT_TRANSFORM_FAILED");reason=commissioning_reason_;return reply();}
-   limits[i][0]=std::fmin(lo,hi)*1e-6;limits[i][1]=std::fmax(lo,hi)*1e-6;}
-  execution::ReviewedMotionRuntime r;
-  if(!execution::buildCommissioningRuntime(commissioning_params_,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return reply();}
-  // The certified fixture route must fit the hard limits as a whole.
-  for(unsigned k=0;k<=motion::kPairedProneSegments;++k){const auto f=motion::pairedProneSample(k==motion::kPairedProneSegments?k-1:k,k==motion::kPairedProneSegments?1:0,true);
-   for(unsigned i=0;i<12;++i){const auto& q=f.target.legs[i/3];const double v=i%3==0?q.hip:i%3==1?q.upper:q.lower;
-    if(!f.target.valid||v<limits[i][0]||v>limits[i][1]){unbindCommissioning("ROUTE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return reply();}}}
-  if(commissioning_params_.walk_enabled){unsigned joint=0;
-   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return reply();}}
-  motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=true;route.timeScale=r.stand_time_scale;
-  route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
-  execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=commissioning_params_.entry_min_stage_s;
-  cc.proneMaxDeviationRad=commissioning_params_.prone_max_deviation_rad;cc.proneMaxRmsRad=commissioning_params_.prone_max_rms_rad;
-  if(!motion_coordinator_.configure(r.feedback,r.walk,&route)||!motion_coordinator_.configureCommissioning(cc)){unbindCommissioning("PLANNER_CONFIGURATION_REJECTED");reason=commissioning_reason_;return reply();}
-  reviewed_motion_=r;reviewed_motion_bound_=true;commissioning_bound_=true;
-  servo_bus_.setValidationTimeout(commissioning_params_.transaction_timeout_ms);servo_bus_.setValidationDrive(commissioning_params_.drive_speed,commissioning_params_.drive_acceleration);
-  // Fixture support is the operator's declaration (this token + the deadman),
-  // never a load measurement. The body pose is the route's virtual reference.
-  motion::AdaptiveObservation o;o.body=motion::pairedProneSample(0,0,true).cartesian.body;o.stampS=issued/1000.0;
-  o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;
-  local_motion_observation_=o;local_trial_evidence_={};
-  ok=true;reason="COMMISSIONING_LIMITS_QUALIFIED_NO_PERMIT";commissioning_reason_=reason;return reply();
+  ok=admitRuntimePolicy(false,issued,now,&reason);return reply();
  }
  if(!commissioning_bound_){reason="COMMISSIONING_ADMIT_REQUIRED";return reply();}
  if(!strcmp(t[0],"PRESENT")&&n==3&&!strcmp(t[2],"CONFIRM_PRESENT_FIXTURE_POWER_CUT_FREE_VOLUME")){

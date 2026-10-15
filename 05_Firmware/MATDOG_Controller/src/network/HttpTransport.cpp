@@ -17,6 +17,7 @@
 #include "PortalPage.h"
 #include "../core/MotionJson.h"
 #include "RestoreRequestJson.h"
+#include "TwinAssets.h"
 #include "WifiManager.h"
 
 namespace matdog {
@@ -192,7 +193,13 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
       {"/api/motion/login", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/api/motion/session", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/api/motion/logout", HTTP_POST, &HttpTransport::handleWifi, this},
-      {"/api/calibration/restore", HTTP_POST, &HttpTransport::handleCalibrationRestore, this}};
+      {"/api/calibration/restore", HTTP_POST, &HttpTransport::handleCalibrationRestore, this},
+      // Phone Digital Twin (AP, LAN read-only and router TLS alike).
+      {"/twin", HTTP_GET, &HttpTransport::handleTwin, this},
+      {"/twin/", HTTP_GET, &HttpTransport::handleTwin, this},
+      {"/twin/assets/twin.js", HTTP_GET, &HttpTransport::handleTwin, this},
+      {"/twin/matdog_collision.mtw", HTTP_GET, &HttpTransport::handleTwin, this},
+      {"/twin/matt_robodog_rev00.urdf", HTTP_GET, &HttpTransport::handleTwin, this}};
   for (const auto &uri : uris) {
     // AP-administration only: never on the TLS router listener. RESTORE
     // (Issue #48) also refuses any non-AP socket inside its handler.
@@ -207,7 +214,12 @@ bool HttpTransport::registerReadOnlyHandlers(httpd_handle_t server) {
     {"/status",HTTP_GET,&HttpTransport::handleStatus,this},
     {"/wifi/status",HTTP_GET,&HttpTransport::handleWifi,this},
     {"/api/motion/status",HTTP_GET,&HttpTransport::handleMotion,this},
-    {"/api/motion/capabilities",HTTP_GET,&HttpTransport::handleMotion,this}};
+    {"/api/motion/capabilities",HTTP_GET,&HttpTransport::handleMotion,this},
+    {"/twin",HTTP_GET,&HttpTransport::handleTwin,this},
+    {"/twin/",HTTP_GET,&HttpTransport::handleTwin,this},
+    {"/twin/assets/twin.js",HTTP_GET,&HttpTransport::handleTwin,this},
+    {"/twin/matdog_collision.mtw",HTTP_GET,&HttpTransport::handleTwin,this},
+    {"/twin/matt_robodog_rev00.urdf",HTTP_GET,&HttpTransport::handleTwin,this}};
   for(const auto& route:routes) if(httpd_register_uri_handler(server,&route)!=ESP_OK)return false;
   return true;
 }
@@ -252,7 +264,7 @@ void HttpTransport::lifecycleTick() {
     if (desired_.load() && !server_) {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
-      c.max_uri_handlers = 21;
+      c.max_uri_handlers = 26;  // 19 admin/motion/restore + 5 twin (+2 spare)
       c.max_open_sockets = 2;
       // A phone browser may open more connections than the two this listener
       // holds; the least recently used one is closed instead of stalling.
@@ -271,7 +283,7 @@ void HttpTransport::lifecycleTick() {
         heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) >= 100000) {
       httpd_ssl_config_t c = HTTPD_SSL_CONFIG_DEFAULT();
       c.httpd.stack_size = 28672;
-      c.httpd.max_uri_handlers = 12;
+      c.httpd.max_uri_handlers = 17;  // 10 motion/auth + 5 twin (+2 spare)
       c.httpd.max_open_sockets = 1;
       c.httpd.task_priority = 2;
       c.httpd.recv_wait_timeout = 3;
@@ -533,6 +545,10 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   }
 
   case HttpRequestKind::MOTION_STATUS:
+    // An authenticated AP Dashboard/Twin poll is the operational operator
+    // heartbeat (deadman). Anonymous or LAN read-only polls never count.
+    if(req.ap_socket&&!readonly&&portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie))
+      service_->operatorHeartbeat(now_ms);
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
     if(resp.ok)appendTransportStats(resp.text,sizeof(resp.text));
@@ -550,6 +566,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     }
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
+    if(req.ap_socket)service_->operatorHeartbeat(now_ms);  // the command itself proves presence
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
     resp.ok=service_->motionAck(ack,resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"ACK_UNAVAILABLE";
@@ -1232,6 +1249,30 @@ bool HttpTransport::readBoundedBody(httpd_req_t* req,char* body,size_t cap,size_
     *used+=got;
   }
   body[*used]=0;return true;
+}
+esp_err_t HttpTransport::handleTwin(httpd_req_t* req) {
+  // Public display assets (no secret, no calibration, no command path). They
+  // are served from flash in the httpd task: no Controller mailbox involved.
+  HttpTransportRequest r{};
+  if(!socketFacts(req,r))return sendJsonError(req,"403 Forbidden","SOCKET_FACTS");
+  char path[64]{};size_t n=0;while(req->uri[n]&&req->uri[n]!='?'&&n+1<sizeof(path)){path[n]=req->uri[n];++n;}
+  if(!strcmp(path,"/twin")){
+    httpd_resp_set_status(req,"302 Found");httpd_resp_set_hdr(req,"Location","/twin/");httpd_resp_set_hdr(req,"Cache-Control","no-store");
+    return httpd_resp_send(req,nullptr,0);
+  }
+  const twin_assets::Asset* asset=nullptr;
+  for(size_t i=0;i<twin_assets::kAssetCount;++i)if(!strcmp(twin_assets::kAssets[i].path,path))asset=&twin_assets::kAssets[i];
+  if(!asset)return sendJsonError(req,"404 Not Found","TWIN_ASSET_UNKNOWN");
+  char tag[48]{};
+  if(httpd_req_get_hdr_value_str(req,"If-None-Match",tag,sizeof(tag))==ESP_OK&&!strcmp(tag,asset->etag)){
+    httpd_resp_set_status(req,"304 Not Modified");httpd_resp_set_hdr(req,"ETag",asset->etag);return httpd_resp_send(req,nullptr,0);
+  }
+  httpd_resp_set_type(req,asset->type);
+  httpd_resp_set_hdr(req,"Content-Encoding","gzip");
+  httpd_resp_set_hdr(req,"ETag",asset->etag);
+  httpd_resp_set_hdr(req,"Cache-Control","no-cache");
+  httpd_resp_set_hdr(req,"X-Content-Type-Options","nosniff");
+  return httpd_resp_send(req,reinterpret_cast<const char*>(asset->gz),static_cast<ssize_t>(asset->gz_len));
 }
 esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);

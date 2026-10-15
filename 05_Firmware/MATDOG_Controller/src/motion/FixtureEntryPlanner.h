@@ -1,6 +1,7 @@
 #ifndef MATDOG_MOTION_FIXTURE_ENTRY_PLANNER_H
 #define MATDOG_MOTION_FIXTURE_ENTRY_PLANNER_H
 #include "MotionFeedback.h"
+#include "StartPoseArchitecture.h"
 namespace matdog { namespace motion {
 // Pure joint-space entry from the MEASURED armed pose to the head of the
 // fixture route. Stage 0 moves only the four LOWER joints (out of the folded
@@ -9,7 +10,9 @@ namespace matdog { namespace motion {
 // starts and ends at rest. This module grants nothing: it rejects a start that
 // is outside the joint limits or outside the runtime-loaded entry certificate,
 // and AdaptiveStand/Executor/Safe Actuator layer re-check every sample.
-enum class EntryStatus : uint8_t { OK, INVALID_INPUT, LIMIT, CERTIFICATE_REQUIRED, START_OUTSIDE_CERTIFIED_REGION, GOAL_MISMATCH, RATE_POLICY };
+enum class EntryStatus : uint8_t { OK, INVALID_INPUT, LIMIT, CERTIFICATE_REQUIRED, START_OUTSIDE_CERTIFIED_REGION, GOAL_MISMATCH, RATE_POLICY,
+  // Measured-start planner (2026-10-14): actionable path refusals.
+  PATH_START_OUTSIDE_LIMITS, PATH_START_IN_KEEPOUT, PATH_LIMIT, PATH_KEEPOUT };
 const char* entryStatusName(EntryStatus status);
 // Offline certificate from a MEASURED start to the route head, with a joint
 // tube. DISENGAGE must cover the Cartesian product of the four LOWER ranges,
@@ -30,7 +33,25 @@ struct FixtureEntryPlan {
   double durationS[kFixtureEntryStages]{};
   unsigned failedJoint=12;          // slot LF hip..LH lower, 12 = none
   double startDeviationRad=0;       // max |start - certificate start|
+  // Measured-start planner diagnostics (which sample/keep-out, how much room).
+  unsigned failedSample=0;          // index in the sampled two-stage path
+  int failedKeepout=-1;
+  double clearanceRad=0, requiredClearanceRad=0;
 };
+// Measured-start entry (operator directive 2026-10-14). Plans from the HELD
+// measured pose to the route head; no certificate tube, no nominal-start
+// requirement. The specific sampled path must keep tracking + margin from the
+// hard limits and every keep-out (a start already close to a stop may only
+// move away from it). Recognition (classifier) is a separate, earlier layer;
+// tracking is checked while executing. Rates/durations as planFixtureEntry.
+struct MeasuredEntryConfig {
+  const startpose::JointKeepOut* keepouts=nullptr;
+  unsigned keepoutCount=0;
+  double pathMarginRad=.001;
+};
+FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTargetFrame& goal,
+                                   const FeedbackPolicy& policy,const MeasuredEntryConfig& config,
+                                   double minStageDurationS);
 // minStageDurationS bounds the slowest observable stage; rates come from the
 // feedback policy (velocity, acceleration, per-sample step at samplePeriodS).
 FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTargetFrame& goal,

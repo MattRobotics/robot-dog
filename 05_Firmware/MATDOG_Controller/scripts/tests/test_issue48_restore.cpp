@@ -1,6 +1,7 @@
 // Issue #48: conditional RAM-only RESTORE. Real golden 24/24 record, fake
-// read-only storage. Proves: AUTO only with a pinned attestation + live
-// evidence; PENDING_OPERATOR_REVIEW otherwise; manual needs confirmation;
+// read-only storage. Proves (final operator decision 2026-10-14): AUTOMATIC
+// boot RESTORE with live evidence and no pin/attestation; RAM suspension =>
+// PENDING; manual needs confirmation;
 // live raw outside the recorded span refuses atomically; no storage writes;
 // idempotence; nothing here grants limits/permit/authority.
 #include <cstdio>
@@ -95,20 +96,20 @@ int main() {
   std::printf("ISSUE48 golden gen=%lu fingerprint=%016llx\n", (unsigned long)in.generation, (unsigned long long)in.fingerprint);
 
   // --- policy matrix ---
-  InstallationAttestation none;
-  InstallationAttestation pinned; pinned.present = true; pinned.auto_restore_enabled = true;
-  pinned.generation = 1; pinned.record_fingerprint = in.fingerprint;
+  InstallationAttestation suspended; suspended.auto_restore_enabled = false;  // RAM maintenance suspension
+  InstallationAttestation pinned;  // default configuration: automatic, nothing pinned
+  const InstallationAttestation& none = pinned;
+  CHECK(pinned.auto_restore_enabled && !pinned.present && pinned.record_fingerprint == 0);
   RestoreRequestFacts boot;
   RestoreRequestFacts manual; manual.trigger = RestoreTrigger::OPERATOR_MANUAL; manual.requested_generation = 1; manual.operator_confirmed_installation = true;
   const RestoreFacts ok = goodFacts(in);
   auto decide = [&](RestoreFacts f, const InstallationAttestation& a, const RestoreRequestFacts& q) { return evaluateRestore(f, a, q); };
 
-  CHECK(decide(ok, none, boot).decision == RestoreDecision::PENDING_OPERATOR_REVIEW);
-  CHECK(decide(ok, none, boot).reason == RestoreReason::INSTALLATION_ATTESTATION_ABSENT);
-  CHECK(decide(ok, pinned, boot).decision == RestoreDecision::ALLOW_AUTOMATIC);
-  { auto a = pinned; a.record_fingerprint ^= 1; CHECK(decide(ok, a, boot).reason == RestoreReason::INSTALLATION_ATTESTATION_MISMATCH); }
-  { auto a = pinned; a.generation = 2; CHECK(decide(ok, a, boot).decision == RestoreDecision::PENDING_OPERATOR_REVIEW); }
-  { auto a = pinned; a.auto_restore_enabled = false; CHECK(decide(ok, a, boot).reason == RestoreReason::AUTO_RESTORE_DISABLED); }
+  CHECK(decide(ok, pinned, boot).decision == RestoreDecision::ALLOW_AUTOMATIC);   // no pin, no confirmation
+  { auto a = pinned; a.record_fingerprint ^= 1; a.generation = 7; CHECK(decide(ok, a, boot).decision == RestoreDecision::ALLOW_AUTOMATIC); }  // informational only
+  CHECK(decide(ok, suspended, boot).decision == RestoreDecision::PENDING_OPERATOR_REVIEW);
+  CHECK(decide(ok, suspended, boot).reason == RestoreReason::AUTO_RESTORE_DISABLED);
+  CHECK(decide(ok, suspended, manual).decision == RestoreDecision::ALLOW_OPERATOR);  // maintenance can still restore by hand
   CHECK(decide(ok, none, manual).decision == RestoreDecision::ALLOW_OPERATOR);
   { auto q = manual; q.operator_confirmed_installation = false; CHECK(decide(ok, none, q).reason == RestoreReason::OPERATOR_CONFIRMATION_REQUIRED); }
   { auto q = manual; q.requested_generation = 2; CHECK(decide(ok, none, q).reason == RestoreReason::GENERATION_MISMATCH); }
@@ -129,7 +130,9 @@ int main() {
   { auto f = ok; f.already_restored = true; f.restored_generation = 1; CHECK(decide(f, pinned, boot).decision == RestoreDecision::ALREADY_RESTORED);
     CHECK(decide(f, none, manual).decision == RestoreDecision::ALREADY_RESTORED); }
   { auto f = ok; f.preflight_complete = false; f.preflight_pass = 0; f.torque_off = 0;
-    CHECK(decide(f, none, boot).reason == RestoreReason::INSTALLATION_ATTESTATION_ABSENT); }  // boot never needs the preflight without a pin
+    CHECK(decide(f, pinned, boot).reason == RestoreReason::PREFLIGHT_NOT_COMPLETE); }  // automatic boot waits for its own preflight
+  { auto f = ok; f.live_positions_inside_record = false; f.live_position_failed_joint = 3;  // remounted servo => maintenance
+    const auto v = decide(f, pinned, boot); CHECK(v.decision == RestoreDecision::REFUSED && v.reason == RestoreReason::LIVE_POSITION_OUTSIDE_RECORD && v.failed_joint == 3); }
   for (int d = 0; d <= 4; ++d) CHECK(std::strcmp(toString(static_cast<RestoreDecision>(d)), "UNKNOWN") != 0);
   for (int r = 0; r <= 15; ++r) CHECK(std::strcmp(toString(static_cast<RestoreReason>(r)), "UNKNOWN") != 0);
 

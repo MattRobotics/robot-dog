@@ -11,7 +11,10 @@ namespace matdog { namespace execution {
 // The protections below are NOT parameters: SAFE_OFF/STOP, watchdog and
 // session revocation, Safe Actuator limits and authority, feedback freshness,
 // bus exclusivity, deadman expiry and the compiled caps of every parameter.
-enum class RuntimeTestMode : uint8_t { DIAGNOSTIC, FIXTURE_COMMISSIONING, GROUND_VALIDATION, AUTONOMOUS };
+// OPERATIONAL (2026-10-14): bound automatically at READY; same hard limits,
+// route and live protections as FIXTURE_COMMISSIONING, but the entry is planned
+// from the measured pose and the route runs continuously on an explicit command.
+enum class RuntimeTestMode : uint8_t { DIAGNOSTIC, FIXTURE_COMMISSIONING, GROUND_VALIDATION, AUTONOMOUS, OPERATIONAL };
 const char* toString(RuntimeTestMode mode);
 bool parseRuntimeTestMode(const char* text, RuntimeTestMode* mode);
 // Mode selection is a RAM scope restriction; it never supplies a permit.

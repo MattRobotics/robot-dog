@@ -700,6 +700,13 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
 bash "$SCRIPT_DIR/run_telemetry_channels_tests.sh"
 bash "$SCRIPT_DIR/run_calibration_restore_tests.sh"
 bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
+# Operator directive 2026-10-14: operational readiness (boot -> RESTORE ->
+# authority, revocation/re-grant), operational STAND end to end, phone twin assets.
+"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
+  -o "$OUT/test_operational_readiness" "$SCRIPT_DIR/test_operational_readiness.cpp" "$SKETCH_DIR/src/core/OperationalReadiness.cpp"
+"$OUT/test_operational_readiness"
+python3 "$SCRIPT_DIR/run_operational_motion_tests.py"
+python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"

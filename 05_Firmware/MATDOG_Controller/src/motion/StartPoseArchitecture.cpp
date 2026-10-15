@@ -114,7 +114,7 @@ PathVerdict checkPath(const double (*path)[kJoints], unsigned count, const Joint
       if (s == 0) {
         // The measured start is a fact. Deeper than the tracking tolerance
         // inside a known obstacle means the mapping or the geometry is wrong.
-        if (c < -tracking.rad) { v.reason = PathReason::START_IN_KEEPOUT; v.keepout = static_cast<int>(k); v.clearance_rad = c; return v; }
+        if (c < -tracking.rad) { v.reason = PathReason::START_IN_KEEPOUT; v.keepout = static_cast<int>(k); v.joint = keepouts[k].a; v.clearance_rad = c; return v; }
       } else if (c < v.required_rad && c < prev_k[k] - 1e-12) {
         v.reason = PathReason::KEEPOUT; v.sample = s; v.keepout = static_cast<int>(k);
         v.joint = keepouts[k].a; v.clearance_rad = c; return v;

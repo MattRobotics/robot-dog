@@ -19,6 +19,9 @@ class SemanticMotionPlanner {
   virtual void stop(uint32_t)=0;
   virtual const char* state() const=0;
   virtual bool coordinatedStopping() const { return false; }
+  // True while an accepted command waits for the session to arm (torque
+  // sequence). The service must not read the idle executor as an abort.
+  virtual bool arming() const { return false; }
 };
 struct MotionTelemetry {
  bool joints_valid=false, quaternion_valid=false, height_valid=false,raw_valid=false;
@@ -43,6 +46,10 @@ struct MotionTelemetry {
  // Issue #48 restore state (static strings owned by the policy layer).
  const char* restore_decision="NOT_EVALUATED";const char* restore_reason="";const char* restore_trigger="NONE";
  uint32_t restore_generation=0;uint64_t restore_fingerprint=0;
+ // Operational readiness (directive 2026-10-14), static strings.
+ const char* system_health="BOOTING";const char* calibration_state="NOT_RESTORED";const char* joint_feedback="UNAVAILABLE";
+ const char* motion_authority="NOT_GRANTED";const char* readiness_phase="BOOTING";const char* readiness_reason="";
+ const char* operating_mode="MAINTENANCE";const char* entry_reason="";bool operator_present=false;
 };
 // Controller owns this transport-independent intention service. A transport
 // submits a typed command and receives an ack; it cannot acquire a lease.
@@ -71,7 +78,7 @@ class MotionService {
   MotionTelemetry telemetry_{};
   motion::MotionAck last_ack_{},active_ack_{};
   motion::Intent active_intent_=motion::Intent::UNKNOWN;
-  bool active_command_=false,active_zero_velocity_=false;
+  bool active_command_=false,active_zero_velocity_=false,arming_seen_=false;
   Replay replay_[3]{};
   motion::ClientOwner command_owner_=motion::ClientOwner::UNKNOWN;
   uint32_t teleop_deadline_ms_=0,active_arm_generation_=0;

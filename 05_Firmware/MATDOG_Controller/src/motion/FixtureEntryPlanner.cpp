@@ -10,7 +10,8 @@ bool moves(unsigned stage,unsigned i){return stage==0?i%3==2:i%3!=2;}
 bool finiteFrame(const JointTargetFrame& f){if(!f.valid)return false;for(unsigned i=0;i<12;++i)if(!std::isfinite(at(f,i)))return false;return true;}
 }
 const char* entryStatusName(EntryStatus s){
-  const char* n[]={"OK","INVALID_INPUT","LIMIT","CERTIFICATE_REQUIRED","START_OUTSIDE_CERTIFIED_REGION","GOAL_MISMATCH","RATE_POLICY"};
+  const char* n[]={"OK","INVALID_INPUT","LIMIT","CERTIFICATE_REQUIRED","START_OUTSIDE_CERTIFIED_REGION","GOAL_MISMATCH","RATE_POLICY",
+                   "PATH_START_OUTSIDE_LIMITS","PATH_START_IN_KEEPOUT","PATH_LIMIT","PATH_KEEPOUT"};
   const unsigned i=static_cast<unsigned>(s);return i<sizeof(n)/sizeof(n[0])?n[i]:"UNKNOWN";
 }
 FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTargetFrame& goal,const FeedbackPolicy& p,
@@ -57,6 +58,43 @@ FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTarge
     // Whole samples; tiny upward margin keeps the closed-form peaks inside.
     plan.durationS[s]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;
     if(!std::isfinite(plan.durationS[s])||plan.durationS[s]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
+  plan.status=EntryStatus::OK;return plan;
+}
+FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTargetFrame& goal,const FeedbackPolicy& p,
+                                   const MeasuredEntryConfig& c,double minStage){
+  FixtureEntryPlan plan;plan.start=start;plan.goal=goal;
+  if(!finiteFrame(start)||!finiteFrame(goal)||!std::isfinite(minStage)||minStage<=0||minStage>120||
+     !std::isfinite(p.samplePeriodS)||p.samplePeriodS<=0||!std::isfinite(p.maxJointStepRad)||p.maxJointStepRad<=0||
+     !std::isfinite(p.maxTrackingErrorRad)||p.maxTrackingErrorRad<=0||!std::isfinite(c.pathMarginRad)||c.pathMarginRad<=0||
+     (c.keepoutCount&&!c.keepouts)||c.keepoutCount>16)return plan;
+  plan.middle=start;for(unsigned i=2;i<12;i+=3)at(plan.middle,i)=at(goal,i);
+  // The specific swept path, sampled, against limits and keep-outs.
+  double s[12],g[12];for(unsigned i=0;i<12;++i){s[i]=at(start,i);g[i]=at(goal,i);}
+  double path[startpose::kEntryPathSamples][12];startpose::buildTwoStageEntry(s,g,path);
+  startpose::JointLimits12 limits;for(unsigned i=0;i<12;++i){limits.lower[i]=p.jointLimits[i/3][i%3].lower;limits.upper[i]=p.jointLimits[i/3][i%3].upper;}
+  startpose::TrackingTolerance tracking;tracking.rad=p.maxTrackingErrorRad;tracking.settle_s=p.segmentTimeoutS>0?p.segmentTimeoutS:1;
+  startpose::PathClearance margin;margin.margin_rad=c.pathMarginRad;
+  const auto v=startpose::checkPath(path,startpose::kEntryPathSamples,limits,c.keepouts,c.keepoutCount,tracking,margin);
+  plan.failedSample=v.sample;plan.failedKeepout=v.keepout;plan.clearanceRad=v.clearance_rad;plan.requiredClearanceRad=v.required_rad;
+  if(!v.admissible){
+    plan.failedJoint=v.joint<12?v.joint:12;
+    plan.status=v.reason==startpose::PathReason::START_OUTSIDE_LIMITS?EntryStatus::PATH_START_OUTSIDE_LIMITS:
+                v.reason==startpose::PathReason::START_IN_KEEPOUT?EntryStatus::PATH_START_IN_KEEPOUT:
+                v.reason==startpose::PathReason::KEEPOUT?EntryStatus::PATH_KEEPOUT:
+                v.reason==startpose::PathReason::LIMIT?EntryStatus::PATH_LIMIT:EntryStatus::INVALID_INPUT;
+    return plan;
+  }
+  const JointTargetFrame* frames[]={&plan.start,&plan.middle,&plan.goal};
+  for(unsigned st=0;st<kFixtureEntryStages;++st){double T=minStage;
+    for(unsigned i=0;i<12;++i){if(!moves(st,i))continue;
+      const double delta=std::abs(at(*frames[st+1],i)-at(*frames[st],i));
+      const double vmax=rate(p.maxVelocityRadS[i/3],i%3),amax=rate(p.maxAccelerationRadS2[i/3],i%3);
+      if(!std::isfinite(vmax)||vmax<=0||!std::isfinite(amax)||amax<=0){plan.failedJoint=i;plan.status=EntryStatus::RATE_POLICY;return plan;}
+      // Quintic peaks: velocity 1.875 d/T, acceleration 10/sqrt(3) d/T^2, step 1.875 d dt/T.
+      T=std::fmax(T,1.875*delta/vmax);T=std::fmax(T,std::sqrt(5.773502691896258*delta/amax));
+      T=std::fmax(T,1.875*delta*p.samplePeriodS/p.maxJointStepRad);}
+    plan.durationS[st]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;
+    if(!std::isfinite(plan.durationS[st])||plan.durationS[st]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
   plan.status=EntryStatus::OK;return plan;
 }
 LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body){

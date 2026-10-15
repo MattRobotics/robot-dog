@@ -25,14 +25,11 @@ RestoreVerdict evaluateRestore(const RestoreFacts& f, const InstallationAttestat
     v.decision = RestoreDecision::ALREADY_RESTORED; v.reason = RestoreReason::OK; return v;
   }
 
-  // Boot: without a pinned, matching, enabled attestation there is nothing
-  // to attempt; the read-only preflight is not even started for it.
-  if (!manual) {
-    if (!a.present) return pending(RestoreReason::INSTALLATION_ATTESTATION_ABSENT);
-    if (a.generation != f.record_generation || a.record_fingerprint != f.record_fingerprint)
-      return pending(RestoreReason::INSTALLATION_ATTESTATION_MISMATCH);
-    if (!a.auto_restore_enabled) return pending(RestoreReason::AUTO_RESTORE_DISABLED);
-  }
+  // Boot (operator directive 2026-10-14): automatic. Servos are installed
+  // permanently; a swap/remount is a maintenance event that the live-span
+  // check below detects. The only boot-side switch is a RAM maintenance
+  // suspension (auto_restore_enabled=false), never a build-time pin.
+  if (!manual && !a.auto_restore_enabled) return pending(RestoreReason::AUTO_RESTORE_DISABLED);
 
   // Live read-only evidence: required for both triggers, never sufficient.
   if (!f.preflight_complete) return manual ? refuse(RestoreReason::PREFLIGHT_NOT_COMPLETE)

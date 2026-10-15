@@ -83,7 +83,11 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
    clamp_mask|=static_cast<uint16_t>(1u<<i);clamp_ticks[i]=ticks;}}
  for(unsigned i=0;i<12;++i){primed_rad_[i]=primed[i];rest_rad_[i]=fb.actual_rad[i];clamp_ticks_[i]=clamp_ticks[i];}
  clamp_mask_=clamp_mask;
- if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}
+ // The Controller may already hold the MOTION lease idle (READY with
+ // authority granted): adopt exactly that lease, never mint a second one.
+ if(f.lease.valid()&&f.lease.owner==core::ActuatorAuthority::MOTION&&arbiter_->current()==core::ActuatorAuthority::MOTION&&
+    arbiter_->generation()==f.lease.generation)lease_=f.lease;
+ else if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}
  evidence_=e;epoch_=policy_->epoch();permit_generation_=f.permit_generation;next_=0;started_at_ms_=now;
  state_=MotionSessionState::PRIMING;reason_="PRIMING_PRESENT";return true;
 }

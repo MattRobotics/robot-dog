@@ -12,15 +12,15 @@ bool real(const char* s,double& v){if(!s||!*s)return false;char* e=nullptr;v=std
 bool whole(const char* s,uint32_t& v){if(!s||!*s||*s=='-')return false;char* e=nullptr;errno=0;const unsigned long x=std::strtoul(s,&e,10);if(*e||errno==ERANGE||x>0xffffffffUL)return false;v=static_cast<uint32_t>(x);return true;}
 bool in(double v,double lo,double hi){return std::isfinite(v)&&v>lo&&v<=hi;}
 }
-const char* toString(RuntimeTestMode m){switch(m){case RuntimeTestMode::FIXTURE_COMMISSIONING:return "FIXTURE_COMMISSIONING";case RuntimeTestMode::GROUND_VALIDATION:return "GROUND_VALIDATION";case RuntimeTestMode::AUTONOMOUS:return "AUTONOMOUS";default:return "DIAGNOSTIC";}}
+const char* toString(RuntimeTestMode m){switch(m){case RuntimeTestMode::OPERATIONAL:return "OPERATIONAL";case RuntimeTestMode::FIXTURE_COMMISSIONING:return "FIXTURE_COMMISSIONING";case RuntimeTestMode::GROUND_VALIDATION:return "GROUND_VALIDATION";case RuntimeTestMode::AUTONOMOUS:return "AUTONOMOUS";default:return "DIAGNOSTIC";}}
 bool parseRuntimeTestMode(const char* s,RuntimeTestMode* m){
   if(!s||!m)return false;
-  const RuntimeTestMode all[]={RuntimeTestMode::DIAGNOSTIC,RuntimeTestMode::FIXTURE_COMMISSIONING,RuntimeTestMode::GROUND_VALIDATION,RuntimeTestMode::AUTONOMOUS};
+  const RuntimeTestMode all[]={RuntimeTestMode::DIAGNOSTIC,RuntimeTestMode::FIXTURE_COMMISSIONING,RuntimeTestMode::GROUND_VALIDATION,RuntimeTestMode::AUTONOMOUS,RuntimeTestMode::OPERATIONAL};
   for(auto x:all)if(!std::strcmp(s,toString(x))){*m=x;return true;}
   return false;
 }
 bool runtimeModeAllowsScope(RuntimeTestMode mode,TrialScope scope){
-  if(mode==RuntimeTestMode::FIXTURE_COMMISSIONING)return scope==TrialScope::FIXTURE_COMMISSIONING;
+  if(mode==RuntimeTestMode::FIXTURE_COMMISSIONING||mode==RuntimeTestMode::OPERATIONAL)return scope==TrialScope::FIXTURE_COMMISSIONING;
   if(mode==RuntimeTestMode::AUTONOMOUS)return scope==TrialScope::AUTONOMOUS_STAND||scope==TrialScope::AUTONOMOUS_WALK;
   if(mode==RuntimeTestMode::GROUND_VALIDATION)return scope==TrialScope::FIXTURE_MICRO||
     scope==TrialScope::SUPERVISED_FIXTURE_STAND||scope==TrialScope::SUPERVISED_FIXTURE_WALK||

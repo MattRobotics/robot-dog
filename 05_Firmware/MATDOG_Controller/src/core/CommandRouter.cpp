@@ -1966,6 +1966,10 @@ void CommandRouter::printSourceSignature() {
                 (unsigned)schemas.marker_schema,
                 update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
   Serial.printf("  SUPERVISED_VALIDATION_CAPABLE=%u BOOT_MOTION_AUTHORIZED=0 LOCAL_PROFILE=RAM_ONLY\n",build::kSupervisedValidationCapable?1u:0u);
+  // 2026-10-14: no compile-time grant (MOTION_AUTHORIZED=0) and no motion at
+  // boot; MOTION authority is granted/revoked at runtime by operational
+  // readiness (census, RESTORE, feedback, limits, IMU, BMS, power, RUN).
+  Serial.println("  MOTION_AUTHORITY=RUNTIME_GOVERNED AUTO_RESTORE=LIVE_EVIDENCE TWIN=/twin/");
   Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY\n",
                 build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",

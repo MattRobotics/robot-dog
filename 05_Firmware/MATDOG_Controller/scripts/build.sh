@@ -368,7 +368,7 @@ python3 "$SCRIPT_DIR/build_manifest.py" write \
   --cal-record-schema 1 \
   --cal-marker-schema 2
 
-printf "SUPERVISED_VALIDATION_CAPABLE=%s\nBOOT_MOTION_AUTHORIZED=0\n" "$VALIDATION_ID" >> "$MANIFEST"
+printf "SUPERVISED_VALIDATION_CAPABLE=%s\nBOOT_MOTION_AUTHORIZED=0\nMOTION_AUTHORITY=RUNTIME_GOVERNED\n" "$VALIDATION_ID" >> "$MANIFEST"
 
 python3 - "$TLS_HEADER" "$MANIFEST" "$TLS_HEADER_SHA256" <<'PY_TLS'
 import hashlib,re,sys

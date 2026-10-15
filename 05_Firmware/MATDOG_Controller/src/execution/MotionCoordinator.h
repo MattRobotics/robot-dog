@@ -12,6 +12,20 @@ struct CommissioningStandConfig {
   bool enabled=false;
   motion::FixtureEntryCertificate certificate{};
   double minStageDurationS=3, proneMaxDeviationRad=0, proneMaxRmsRad=0;
+  // Operational mode (2026-10-14): plan the entry from the measured held pose
+  // (planMeasuredEntry) — no certificate tube. Keep-outs come from CAD/FCL.
+  bool measuredStart=false;
+  static constexpr unsigned kMaxKeepouts=8;
+  motion::startpose::JointKeepOut keepouts[kMaxKeepouts]{};
+  unsigned keepoutCount=0;
+  double pathMarginRad=.001;
+};
+// Arms the motion session on demand (prime at the measured pose -> energize
+// -> arm) for an explicit command. Implemented by the Controller.
+class SessionArmer {
+ public:
+  virtual ~SessionArmer()=default;
+  virtual const char* armForCommand(uint32_t now_ms)=0;  // nullptr = arming started
 };
 // The semantic service, planner and executor share one Controller thread.
 // Configuration/evidence are supplied locally by reviewed artifacts, never Web.
@@ -20,6 +34,9 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void begin(MotionExecutor*,actuator::SafeActuatorPolicy*);
   bool configure(const motion::FeedbackPolicy&,const motion::WalkSpecification&,const motion::AcquisitionRoute*);
   void bindSession(MotionSession* session){session_=session;}
+  void bindArmer(SessionArmer* armer){armer_=armer;}
+  bool arming() const override {return pending_stand_;}
+  const char* lastEntryReason() const {return entry_reason_;}
   unsigned proneSegment() const{return stand_.proneSegment();}
   bool approveProneSegment(unsigned s){return stand_.approveProneSegment(s);}
   bool configureCommissioning(const CommissioningStandConfig&);
@@ -39,6 +56,10 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   bool coordinatedStopping() const override { return walking_&&walk_.state()==motion::FeedbackWalkState::STOPPING; }
  private:
   void synchronizeSession();
+  const char* startStand(const motion::MotionCommand&,uint32_t now_ms);
+  SessionArmer* armer_=nullptr;
+  bool pending_stand_=false;motion::MotionCommand pending_command_{};uint32_t pending_since_ms_=0;
+  const char* entry_reason_="";
   MotionExecutor* executor_=nullptr;
   MotionSession* session_=nullptr;
   actuator::SafeActuatorPolicy* policy_=nullptr;

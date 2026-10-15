@@ -103,8 +103,8 @@ class NetworkAuditTest(unittest.TestCase):
           ('WifiManager.cpp','policy_.counters().connect_attempts - sta_attempt_base_ >= kStaEpisodeAttempts','false'),
           ('WifiManager.cpp','(admin_.phase.load() != NetworkPhase::ADMIN_AP || !WiFi.softAPgetStationNum())','true'),
           ('WifiManager.cpp','role_ = evaluateRole(now);','role_ = RoleReason::RUN_STA;'),
-          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(operating_mode_.mode() != OperatingMode::MAINTENANCE);'),
-          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.routerRole());','wifi_.setRunMode(operating_mode_.mode() != OperatingMode::MAINTENANCE);'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.routerRole());','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
           ('WifiManager.h','void setRunMode(bool run) { run_mode_.store(run); }','void setRunMode(bool run) { run_mode_.store(run); } OperatingModeManager *mode_ = nullptr;'),
           ('HttpTransport.cpp','service_->wifiStatus();','service_->wifiStatus(); service_->wifi().setRunMode(true);'),
         ]

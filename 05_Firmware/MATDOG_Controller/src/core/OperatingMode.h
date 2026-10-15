@@ -56,10 +56,21 @@ const char* toString(OperatingMode mode);
 class OperatingModeManager {
  public:
   OperatingMode mode() const { return mode_; }
-  void setMode(OperatingMode mode) { mode_ = mode; }
+  // Operator @MODE (CommandRouter): selects the mode AND the radio role
+  // (RUN = router first, MAINTENANCE = administrative AP), as before.
+  void setMode(OperatingMode mode) { mode_ = mode; router_role_ = mode == OperatingMode::RUN; operator_selected_ = true; }
+  // Automatic RUN entry by the Controller's operational readiness (directive
+  // 2026-10-14). The radio role is deliberately NOT changed: the AP that
+  // serves the Android Dashboard/Twin stays up. Blocking diagnostics are
+  // refused in RUN exactly as after @MODE RUN.
+  void enterRunAutomatic() { mode_ = OperatingMode::RUN; }
+  bool routerRole() const { return router_role_; }
+  // The operator explicitly chose MAINTENANCE: no automatic RUN re-entry.
+  bool operatorMaintenanceHold() const { return operator_selected_ && mode_ == OperatingMode::MAINTENANCE; }
 
  private:
   OperatingMode mode_ = OperatingMode::MAINTENANCE;
+  bool router_role_ = false, operator_selected_ = false;
 };
 
 }  // namespace core

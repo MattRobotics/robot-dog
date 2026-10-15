@@ -21,7 +21,7 @@ def main() -> int:
     shutil.copyfile(a.urdf, twin / 'matt_robodog_rev00.urdf')
     shutil.copyfile(a.mtw, twin / 'matdog_collision.mtw')
     files = []
-    for path in sorted(p for p in a.dist.rglob('*') if p.is_file() and p.suffix != '.gz' and p.name != 'MOBILE_TWIN_PACKAGE.json'):
+    for path in sorted(p for p in a.dist.rglob('*') if p.is_file() and p.suffix != '.gz' and p.name != 'MOBILE_TWIN_PACKAGE.json' and '.mtw-work' not in p.parts):
         raw = path.read_bytes(); gz = gzip.compress(raw, 9, mtime=0)
         path.with_name(path.name + '.gz').write_bytes(gz)
         files.append({'path': str(path.relative_to(a.dist)), 'raw_bytes': len(raw), 'gzip_bytes': len(gz),

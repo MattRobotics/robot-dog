@@ -12,6 +12,7 @@
 #include "../calibration/CalibrationPersistenceService.h"
 #include "../calibration/CalibrationRuntimeRestore.h"
 #include "../calibration/RestoreAttestationPolicy.h"
+#include "OperationalReadiness.h"
 #include "../execution/MotionCoordinator.h"
 #include "../execution/OperationalFeedback.h"
 #include "../execution/MotionSession.h"
@@ -76,7 +77,30 @@ class Controller {
   void unbindCommissioning(const char* reason);
   void updateLivePose();
   void emitTelemetry(uint32_t now_ms);
-  void updateBootRestore(uint32_t now_ms);
+  // Operator directive 2026-10-14: boot -> census -> preflight -> RESTORE ->
+  // feedback -> operational admission -> RUN -> MOTION authority (dynamic).
+  void updateOperationalReadiness(uint32_t now_ms);
+  bool admitRuntimePolicy(bool operational,uint32_t issued_ms,uint32_t now_ms,const char** reason);
+  bool operatorPresent(uint32_t now_ms) const;
+  uint32_t presenceWindowMs() const { return runtime_mode_==execution::RuntimeTestMode::OPERATIONAL?kOperationalHeartbeatMs:1000; }
+  const char* armOperationalSession(uint32_t now_ms);
+  static constexpr uint32_t kOperationalHeartbeatMs=3000;
+  core::OperationalReadiness readiness_core_{};
+  core::ReadinessAction last_readiness_action_=core::ReadinessAction::NONE;
+  AuthorityLease motion_authority_lease_{};
+  bool restore_refused_permanent_=false,restore_refused_transient_=false;
+  const char* restore_refusal_reason_="";
+  bool admit_failed_=false;const char* admit_reason_="";
+  bool installation_live_verified_=false;
+  bool auto_restore_suspended_=false;
+  struct OperationalArmer : execution::SessionArmer {
+    Controller* owner=nullptr;
+    const char* armForCommand(uint32_t now_ms) override { return owner?owner->armOperationalSession(now_ms):"NOT_BOUND"; }
+  } operational_armer_{};
+  struct HeartbeatHook : OperatorHeartbeatHook {
+    Controller* owner=nullptr;
+    void heartbeat(uint32_t now_ms) override;
+  } heartbeat_hook_{};
   struct RestoreHook : CalibrationRestoreHook {
     Controller* owner=nullptr;
     bool restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) override;
@@ -84,9 +108,6 @@ class Controller {
   // Read-only facts for the restore policy. live/torque come from 12 fresh
   // read-only ST3215 reads when read_live is true (never a write).
   calibration::RestoreFacts gatherRestoreFacts(bool read_live,calibration::RecordInspection*,calibration::LivePositionEvidence*);
-  enum class BootRestorePhase : uint8_t { WAIT_READY, PREFLIGHT, DECIDE, DONE };
-  BootRestorePhase boot_restore_phase_=BootRestorePhase::WAIT_READY;
-  uint32_t boot_restore_since_ms_=0;
   calibration::RestoreVerdict last_restore_verdict_{};
   const char* last_restore_trigger_="NONE";
   uint64_t last_restore_fingerprint_=0;

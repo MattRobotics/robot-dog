@@ -14,7 +14,7 @@ HERE = Path(__file__).resolve().parent
 SRC = HERE.parent.parent / 'src'
 controller = (SRC/'core/Controller.cpp').read_text()
 critical = (SRC/'core/ControllerService.h').read_text()
-assert 'wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);' in controller
+assert 'wifi_.setRunMode(operating_mode_.routerRole());' in controller  # operator @MODE drives the radio; automatic RUN keeps the AP
 assert 'operatingMode() != OperatingMode::MAINTENANCE ||' in critical
 fixture = (HERE/'test_wifi_mode_policy.cpp').read_text().split('int main() {', 1)[0]
 # Resolve the existing production headers from a temporary extracted unit.

@@ -305,9 +305,11 @@ void standRefusalsAndStop(){
 }
 }
 
+#ifndef MATDOG_FIXTURE_COMMISSIONING_NO_MAIN
 int main(){
  classifierOnMeasuredPose();primeClampAndRefusals();entryPlanner();
  standFromMeasuredPose(false);standFromMeasuredPose(true);standRefusalsAndStop();
  standFromMeasuredPose(false,.004,.0035);standFromMeasuredPose(true,.004,.0035);
  std::printf("FIXTURE_COMMISSIONING %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;
 }
+#endif

@@ -61,9 +61,24 @@ class CalibrationRestoreHook {
   virtual bool restoreJson(uint32_t generation, bool operator_confirmed, char* out, size_t cap) = 0;
 };
 
+// Operational deadman (2026-10-14): an authenticated AP/Dashboard request
+// proves a present operator. Lapsing heartbeats expire the motion permit.
+class OperatorHeartbeatHook {
+ public:
+  virtual ~OperatorHeartbeatHook() = default;
+  virtual void heartbeat(uint32_t now_ms) = 0;
+};
+
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
+  void bindOperatorHeartbeat(OperatorHeartbeatHook* hook) { heartbeat_hook_=hook; }
+  void operatorHeartbeat(uint32_t now_ms) { if(heartbeat_hook_)heartbeat_hook_->heartbeat(now_ms); }
+  // Operational readiness view for the Dashboard (static strings).
+  struct ReadinessView { const char* system_health="BOOTING"; const char* calibration="NOT_RESTORED";
+    const char* joint_feedback="UNAVAILABLE"; const char* motion_authority="NOT_GRANTED"; const char* phase="BOOTING"; const char* reason="BOOTING"; };
+  void setReadinessView(const ReadinessView& v) { readiness_view_=v; }
+  const ReadinessView& readinessView() const { return readiness_view_; }
   void bindCalibrationRestore(CalibrationRestoreHook* hook) { restore_hook_=hook; }
   bool calibrationRestore(uint32_t generation,bool confirmed,char* out,size_t cap) {
     return restore_hook_&&restore_hook_->restoreJson(generation,confirmed,out,cap);
@@ -247,6 +262,8 @@ class ControllerService {
   Modules modules_{};
   MotionService* motion_=nullptr;
   CalibrationRestoreHook* restore_hook_=nullptr;
+  OperatorHeartbeatHook* heartbeat_hook_=nullptr;
+  ReadinessView readiness_view_{};
   CalibrationPersistenceView calibration_persistence_{};
 };
 

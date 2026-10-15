@@ -88,6 +88,8 @@ private:
   static esp_err_t handleWifi(httpd_req_t *req);
   static esp_err_t handleMotion(httpd_req_t *req);
   static esp_err_t handleCalibrationRestore(httpd_req_t *req);
+  // Phone Digital Twin: static gzip assets from flash, no Controller dispatch.
+  static esp_err_t handleTwin(httpd_req_t *req);
   // Every Motion/RESTORE refusal is JSON with the true HTTP status.
   static esp_err_t sendJsonError(httpd_req_t* req,const char* status,const char* code,uint32_t elapsed_ms=0);
   static bool readBoundedBody(httpd_req_t* req,char* body,size_t cap,size_t* used);

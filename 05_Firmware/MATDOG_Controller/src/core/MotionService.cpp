@@ -13,7 +13,7 @@ bool sameCommand(const motion::MotionCommand& a,const motion::MotionCommand& b) 
  return a.version==b.version&&!strcmp(a.id,b.id)&&a.sequence==b.sequence&&a.issued_at_ms==b.issued_at_ms&&a.ttl_ms==b.ttl_ms&&a.owner==b.owner&&a.intent==b.intent&&a.target_height_m==b.target_height_m&&a.vx==b.vx&&a.vy==b.vy&&a.yaw_rate==b.yaw_rate&&a.x==b.x&&a.y==b.y&&a.z==b.z&&a.roll==b.roll&&a.pitch==b.pitch&&a.yaw==b.yaw&&!strcmp(a.gait,b.gait)&&!strcmp(a.action_id,b.action_id);
 }
 }
-void MotionService::begin(execution::MotionExecutor* e,SemanticMotionPlanner* p) { executor_=e;planner_=p;readiness_=MotionReadiness{};last_ack_=active_ack_=motion::MotionAck{};active_intent_=motion::Intent::UNKNOWN;active_command_=active_zero_velocity_=false;telemetry_=MotionTelemetry{};for(auto& r:replay_)r=Replay{};command_owner_=motion::ClientOwner::UNKNOWN;teleop_deadline_ms_=active_arm_generation_=0; }
+void MotionService::begin(execution::MotionExecutor* e,SemanticMotionPlanner* p) { executor_=e;planner_=p;readiness_=MotionReadiness{};last_ack_=active_ack_=motion::MotionAck{};active_intent_=motion::Intent::UNKNOWN;active_command_=active_zero_velocity_=false;arming_seen_=false;telemetry_=MotionTelemetry{};for(auto& r:replay_)r=Replay{};command_owner_=motion::ClientOwner::UNKNOWN;teleop_deadline_ms_=active_arm_generation_=0; }
 const char* MotionService::refusal() const {
  if(readiness_.fault)return "FAULT";
  if(readiness_.inhibited)return "INHIBITED";
@@ -44,6 +44,10 @@ void MotionService::finishActive(motion::CommandOutcome outcome,const char* reas
 }
 void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
  readiness_=r;
+ // An accepted operational STAND arms its own session: adopt that arm
+ // generation once, at the hand-over, instead of reading it as a change.
+ if(planner_&&planner_->arming()){if(executor_)active_arm_generation_=executor_->status().arm_generation;arming_seen_=true;}
+ else if(arming_seen_){arming_seen_=false;if(active_command_&&executor_&&executor_->active())active_arm_generation_=executor_->status().arm_generation;}
  if(active_command_&&executor_&&active_arm_generation_!=executor_->status().arm_generation)
   finishActive(motion::CommandOutcome::ABORTED,"SESSION_CHANGED");
  const char* gate=refusal();
@@ -56,6 +60,8 @@ void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
   if(executor_&&state==execution::ExecutorState::OFF&&!executor_->status().safe_off_required)
    finishActive(motion::CommandOutcome::COMPLETED,"SAFE_OFF_VERIFIED");
   else if(standing)finishActive(motion::CommandOutcome::COMPLETED,"COORDINATED_STOP_VERIFIED");
+ } else if(planner_&&planner_->arming()){
+  // Operational STAND waiting for its controlled torque sequence (session).
  } else if(executor_&&(!executor_->active()||executor_->status().safe_off_required)){
   finishActive(motion::CommandOutcome::ABORTED,executor_->status().reason);
  } else if(!gate&&standing&&active_intent_==motion::Intent::STAND){
@@ -165,6 +171,9 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
    mapped,mask,s&&s->accepted_sequence?"true":"false",stale?"true":"false");}
  w.add(",\"restore\":{\"decision\":\"%s\",\"reason\":\"%s\",\"trigger\":\"%s\",\"generation\":%lu,\"fingerprint\":\"%016llx\"}",
   telemetry_.restore_decision,telemetry_.restore_reason,telemetry_.restore_trigger,(unsigned long)telemetry_.restore_generation,(unsigned long long)telemetry_.restore_fingerprint);
+ w.add(",\"operational\":{\"system_health\":\"%s\",\"calibration\":\"%s\",\"joint_feedback\":\"%s\",\"motion_authority\":\"%s\",\"phase\":\"%s\",\"reason\":\"%s\",\"mode\":\"%s\",\"entry_reason\":\"%s\",\"operator_present\":%s}",
+  telemetry_.system_health,telemetry_.calibration_state,telemetry_.joint_feedback,telemetry_.motion_authority,telemetry_.readiness_phase,
+  telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false");
  w.add(",\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
  w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",

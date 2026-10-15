@@ -54,6 +54,7 @@ fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=fal
  static esp_err_t handleStatus(httpd_req_t*) {return 0;}
  static esp_err_t handleMotion(httpd_req_t*) {return 0;}
  static esp_err_t handleCalibrationRestore(httpd_req_t*) {return 0;}  // Issue #48 route (AP-only), exercised by its own tests
+ static esp_err_t handleTwin(httpd_req_t*) {return 0;}  // static flash assets, exercised by test_twin_assets
  static esp_err_t handleOtaChallenge(httpd_req_t*) {return 0;}
  static esp_err_t handleOtaUpdate(httpd_req_t*) {return 0;}
  static esp_err_t handleWifi''')
@@ -116,10 +117,11 @@ int main() {
  auto page=request(s,"/","");page.method=HTTP_GET;check(HttpTransport::handlePage(&page)==0&&page.status==403,"page denied in CLIENT_STA");
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  registered.clear();check(s.registerHandlers(nullptr,false),"register HTTPS role");
- check(registered.size()==10&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/wifi/")==0;}),"HTTPS exposes scoped motion/auth routes and no WiFi administration");
+ check(registered.size()==15&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/wifi/")==0;}),"HTTPS exposes scoped motion/auth + 5 twin routes and no WiFi administration");
  check(std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/api/calibration/")==0;}),"HTTPS never exposes the Issue #48 RESTORE route");
- // 19 = 18 + /api/calibration/restore (Issue #48, AP admin portal only; reviewed 2026-10-14).
- registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==19,"HTTP admin route inventory");
+ // 24 = 18 + /api/calibration/restore (Issue #48, AP only) + 5 static twin routes (2026-10-14).
+ registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==24,"HTTP admin route inventory");
+ check(std::count(registered.begin(),registered.end(),std::string("/twin/"))==1,"AP serves the phone Digital Twin");
  check(std::count(registered.begin(),registered.end(),std::string("/api/calibration/restore"))==1,"AP admin portal exposes exactly one RESTORE route");
  for(int mode:{WIFI_STA,WIFI_AP_STA}) {WiFi.mode_value=mode;check(action(s)==403,"driver STA/APSTA deny");}
  adminRadio();WiFi.mode_read_ok=false;check(action(s)==403,"driver unverifiable deny");WiFi.mode_read_ok=true;
