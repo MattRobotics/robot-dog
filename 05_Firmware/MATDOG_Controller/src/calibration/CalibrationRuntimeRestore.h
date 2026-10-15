@@ -34,8 +34,40 @@ enum class RuntimeRestoreStatus : uint8_t {
   REJECT_GENERATION,
   REJECT_RECORD,
   REJECT_ADMISSION,
+  // Appended (Issue #48): a live raw tick lies outside the joint's recorded
+  // mechanical contact span. A remounted/swapped unit is the usual cause.
+  REJECT_LIVE_POSITION,
 };
 const char* toString(RuntimeRestoreStatus status);
+
+// Read-only consistency evidence for RESTORE. Slot order = leg*3+JointKind,
+// the same order as the record and the operational feedback producer. It is
+// NOT an identity proof: ST3215 has no serial number. It only refuses a
+// mapping that would place a live joint outside its own recorded span.
+struct LivePositionEvidence {
+  bool present = false;
+  uint16_t raw[kRecordJointCount] = {};
+  // Added to each joint's recorded contact repeatability.
+  uint16_t extra_margin_ticks = 16;
+};
+
+// Read-only summary of the acknowledged record (no transform is published).
+// fingerprint: FNV-1a 64 over the semantic mapping content; a consistency
+// label for operator attestation, not a cryptographic authenticator.
+struct RecordInspection {
+  RuntimeRestoreStatus status = RuntimeRestoreStatus::NOT_RUN;
+  bool ok = false;
+  uint32_t generation = 0;
+  uint64_t fingerprint = 0;
+  bool calibration_accepted = false;
+  uint16_t contact_min[kRecordJointCount] = {};
+  uint16_t contact_max[kRecordJointCount] = {};
+  uint16_t repeatability[kRecordJointCount] = {};
+  char unit[kRecordJointCount][kPhysicalUnitLabelBytes] = {};
+};
+uint64_t calibrationRecordFingerprint(const CalibrationRecord& record);
+// Index of the first joint outside its recorded span, or kRecordJointCount.
+uint8_t firstLivePositionMismatch(const RecordInspection& record, const LivePositionEvidence& live);
 
 // A reviewed OFFLINE artifact, compiled into the Controller, not a request
 // accepted from a host. The SHA is pinned separately by the firmware caller.
@@ -121,7 +153,15 @@ class CalibrationRuntimeRestore {
       const actuator::CalibrationGeometryProfile& profile,
       const actuator::GeometryProvenance& expected_provenance,
       const RuntimeRestoreRequest& request,
-      actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits);
+      actuator::JointTransformTable& transforms, actuator::ActuatorLimitTable& limits,
+      const LivePositionEvidence* live = nullptr);
+
+  // Reads and validates the acknowledged record exactly like restore(), but
+  // publishes nothing and changes no snapshot field. Pure RAM.
+  RuntimeRestoreStatus inspect(CalibrationPersistenceService& persistence,
+                               const actuator::CalibrationGeometryProfile& profile,
+                               const actuator::GeometryProvenance& expected_provenance,
+                               RecordInspection* out) const;
 
   // All 12 limits are staged and published together. On an evidence rejection
   // in a safe idle context, all old limits are revoked. Contact endpoints only

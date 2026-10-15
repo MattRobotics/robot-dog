@@ -8,6 +8,7 @@
 #include "../motion/PairedProneRoute.h"
 
 #include "../config/BuildConfig.h"
+#include "../config/InstallationAttestation.h"
 #include "../config/OtaCredentials.h"
 #include "../config/Pins.h"
 
@@ -255,6 +256,7 @@ void Controller::begin() {
   boot_nonce_=esp_random();if(!boot_nonce_)boot_nonce_=1;
   service_.begin(modules);
   service_.bindMotionService(&motion_service_);
+  restore_hook_.owner=this;service_.bindCalibrationRestore(&restore_hook_);
   // Never starts the listening socket here — see network/HttpTransport.h.
   // The secret is passed as raw bytes (strlen of the configured string, or
   // 0 if none was configured); OtaSession fails closed on a zero-length
@@ -425,6 +427,123 @@ void Controller::updateStartupQualification() {
       startup_qualification_.nominal() ? "NOMINAL" : "RF_LOWER_MAX_RETURN",
       (unsigned long long)calibration::kStartupReferenceGeometry,startup_qualification_.reason());
   }
+}
+
+// --- Issue #48: conditional RAM-only RESTORE -------------------------------
+calibration::RestoreFacts Controller::gatherRestoreFacts(bool read_live,calibration::RecordInspection* in,
+                                                         calibration::LivePositionEvidence* live) {
+  calibration::RestoreFacts f;
+  f.maintenance=operating_mode_.mode()==OperatingMode::MAINTENANCE;
+  f.runtime_idle=authority_.current()==ActuatorAuthority::NONE&&!motion_executor_.active()&&
+    !motion_executor_.status().safe_off_required&&operational_session_.state()==execution::MotionSessionState::OFF&&
+    !motion_service_.busy()&&!calibration_.sessionLive()&&!operational_facts_.operator_permit&&!boot_safe_off_pending_;
+  f.nvs_ready=persistence_.snapshot().nvs==calibration::NvsInitStatus::READY;
+  f.write_outcome_uncertain=persistence_.writesBlocked();
+  f.record_valid_acknowledged=persistence_.calibrationAvailable()&&persistence_.snapshot().assessment.acknowledged_record_intact;
+  runtime_restore_.inspect(persistence_,geometry_profile_,actuator::geometry_data::kProvenance,in);
+  f.record_inspection_ok=in->ok;f.record_generation=in->generation;f.record_fingerprint=in->fingerprint;
+  const auto& pre=servo_preflight_.result();
+  f.preflight_complete=servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE&&pre.complete;
+  f.preflight_pass=pre.allPass()?12:pre.pass_count>11?11:pre.pass_count;
+  const auto& snap=runtime_restore_.snapshot();
+  f.already_restored=snap.restored;f.restored_generation=snap.restored_generation;
+  *live=calibration::LivePositionEvidence{};
+  if(read_live){
+    // Twelve read-only register reads; nothing is written to the bus.
+    live->present=true;
+    for(unsigned i=0;i<12;++i){
+      const auto* servo=servo::legServoAt((i/3)*3+2-i%3);servo::ServoBus::RuntimeState st;
+      const bool ok=servo&&servo_bus_.readRuntimeState(servo->bus_id,&st);
+      if(ok&&st.torque_enable==0)++f.torque_off;
+      live->raw[i]=ok&&st.present_position>=0&&st.present_position<4096?static_cast<uint16_t>(st.present_position):4096;
+    }
+    const uint8_t bad=calibration::firstLivePositionMismatch(*in,*live);
+    f.live_positions_inside_record=bad==calibration::kRecordJointCount;f.live_position_failed_joint=bad;
+  }
+  return f;
+}
+
+calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibration::RestoreRequestFacts& q) {
+  const bool manual=q.trigger==calibration::RestoreTrigger::OPERATOR_MANUAL;
+  const auto attestation=config::installationAttestation();
+  calibration::RecordInspection in;calibration::LivePositionEvidence live;
+  // Live reads only where they can change the outcome: an operator request,
+  // or a boot with an enabled pinned attestation.
+  const bool read_live=manual||(attestation.present&&attestation.auto_restore_enabled);
+  const auto facts=gatherRestoreFacts(read_live,&in,&live);
+  auto verdict=calibration::evaluateRestore(facts,attestation,q);
+  if(verdict.decision==calibration::RestoreDecision::ALLOW_AUTOMATIC||verdict.decision==calibration::RestoreDecision::ALLOW_OPERATOR){
+    calibration::RuntimeRestoreRequest request;
+    request.expected_generation=facts.record_generation;
+    request.current_installation_confirmed=true;  // pinned attestation or present operator, decided above
+    request.executor_idle=facts.runtime_idle;request.torque_off_confirmed=facts.torque_off==12;
+    request.motion_permit_revoked=!operational_facts_.operator_permit;
+    const auto result=runtime_restore_.restore(persistence_,geometry_profile_,actuator::geometry_data::kProvenance,
+        request,actuator_policy_.transforms(),actuator_policy_.limits(),&live);
+    if(result!=calibration::RuntimeRestoreStatus::RESTORED){
+      verdict.decision=calibration::RestoreDecision::REFUSED;
+      verdict.reason=result==calibration::RuntimeRestoreStatus::REJECT_LIVE_POSITION?calibration::RestoreReason::LIVE_POSITION_OUTSIDE_RECORD:
+                     result==calibration::RuntimeRestoreStatus::REJECT_UNSAFE_RUNTIME?calibration::RestoreReason::RUNTIME_NOT_IDLE:
+                     calibration::RestoreReason::RECORD_REJECTED;
+      verdict.failed_joint=runtime_restore_.snapshot().failed_joint;
+    }
+  }
+  last_restore_verdict_=verdict;last_restore_trigger_=manual?"OPERATOR":"BOOT";
+  last_restore_fingerprint_=facts.record_fingerprint;last_restore_generation_=facts.record_generation;
+  const auto& snap=runtime_restore_.snapshot();
+  Serial.printf("CALIBRATION_RESTORE_DECISION trigger=%s decision=%s reason=%s failed_joint=%u generation=%lu fingerprint=%016llx "
+                "attestation=%s restored=%u mapped=%u/12 limits_approved=0 motion_authorized=0\n",
+    last_restore_trigger_,calibration::toString(verdict.decision),calibration::toString(verdict.reason),(unsigned)verdict.failed_joint,
+    (unsigned long)facts.record_generation,(unsigned long long)facts.record_fingerprint,
+    attestation.present?(attestation.auto_restore_enabled?"PINNED_AUTO":"PINNED_MANUAL_ONLY"):"ABSENT",
+    snap.restored?1u:0u,(unsigned)snap.restored_joints);
+  return verdict;
+}
+
+void Controller::updateBootRestore(uint32_t now_ms) {
+  if(boot_restore_phase_==BootRestorePhase::DONE)return;
+  if(!boot_restore_since_ms_)boot_restore_since_ms_=now_ms?now_ms:1;
+  const uint32_t waited=now_ms-boot_restore_since_ms_;
+  const auto attestation=config::installationAttestation();
+  switch(boot_restore_phase_){
+    case BootRestorePhase::WAIT_READY:
+      // The census must have settled; a 30 s ceiling still yields a reasoned verdict.
+      if((system_state_.systemHealth()==SystemHealth::READY&&!boot_safe_off_pending_&&persistence_.snapshot().load_count>0)||waited>30000){
+        // The read-only preflight is started only for an operator-pinned auto
+        // RESTORE; otherwise it stays operator-initiated as before.
+        if(attestation.present&&attestation.auto_restore_enabled&&servo_preflight_.state()!=servo::ServoPreflight::State::RUNNING&&
+           servo_preflight_.state()!=servo::ServoPreflight::State::COMPLETE&&servo_preflight_.start()){
+          boot_restore_since_ms_=now_ms?now_ms:1;boot_restore_phase_=BootRestorePhase::PREFLIGHT;
+        } else boot_restore_phase_=BootRestorePhase::DECIDE;
+      }
+      break;
+    case BootRestorePhase::PREFLIGHT:
+      if(servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE||waited>10000)boot_restore_phase_=BootRestorePhase::DECIDE;
+      break;
+    case BootRestorePhase::DECIDE: {
+      calibration::RestoreRequestFacts boot;boot.trigger=calibration::RestoreTrigger::BOOT_AUTOMATIC;
+      requestCalibrationRestore(boot);
+      boot_restore_phase_=BootRestorePhase::DONE;
+      break;
+    }
+    case BootRestorePhase::DONE:break;
+  }
+}
+
+bool Controller::RestoreHook::restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) {
+  if(!owner||!out||!cap)return false;
+  calibration::RestoreRequestFacts q;q.trigger=calibration::RestoreTrigger::OPERATOR_MANUAL;
+  q.requested_generation=generation;q.operator_confirmed_installation=operator_confirmed;
+  const auto v=owner->requestCalibrationRestore(q);
+  const auto& snap=owner->runtime_restore_.snapshot();
+  const int n=snprintf(out,cap,"{\"version\":1,\"decision\":\"%s\",\"reason\":\"%s\",\"failed_joint\":%d,\"generation\":%lu,"
+    "\"fingerprint\":\"%016llx\",\"restored\":%s,\"mapped_joints\":%u,\"limits_approved\":false,\"motion_authorized\":false,"
+    "\"torque\":\"OFF_UNCHANGED\",\"authority\":\"%s\"}",
+    calibration::toString(v.decision),calibration::toString(v.reason),v.failed_joint<12?(int)v.failed_joint:-1,
+    (unsigned long)owner->last_restore_generation_,(unsigned long long)owner->last_restore_fingerprint_,
+    snap.restored?"true":"false",(unsigned)snap.restored_joints,
+    owner->authority_.current()==ActuatorAuthority::NONE?"NONE":"HELD");
+  return n>0&&static_cast<size_t>(n)<cap;
 }
 
 void Controller::updateCalibrationMotionPermit() {
@@ -1186,7 +1305,14 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     telemetry.joint_at_ms[i]=operational_feedback_.sampled_at_ms[i];
     telemetry.sampled_at_ms=telemetry.joint_at_ms[i]<telemetry.sampled_at_ms?telemetry.joint_at_ms[i]:telemetry.sampled_at_ms;
     telemetry.raw_ticks[i]=operational_producer_.raw(i).position;
+    telemetry.joint_mapped[i]=operational_feedback_.read_ok[i];
+    telemetry.raw_ok[i]=operational_producer_.raw(i).read_ok&&operational_producer_.raw(i).position<4096;
   }
+  telemetry.restore_decision=calibration::toString(last_restore_verdict_.decision);
+  telemetry.restore_reason=calibration::toString(last_restore_verdict_.reason);
+  if(!strcmp(last_restore_trigger_,"NONE")){telemetry.restore_decision="NOT_EVALUATED";telemetry.restore_reason="BOOT_EVALUATION_PENDING";}
+  telemetry.restore_trigger=last_restore_trigger_;telemetry.restore_generation=last_restore_generation_;
+  telemetry.restore_fingerprint=last_restore_fingerprint_;
   // base_link height/contact stay unknown until independent measured
   // observations and runtime transforms exist; IMU never invents height.
   updateLivePose();
@@ -1253,6 +1379,7 @@ void Controller::update(uint32_t now_ms) {
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
   servo_preflight_.update();
+  updateBootRestore(now_ms);
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();

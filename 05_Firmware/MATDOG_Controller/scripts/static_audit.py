@@ -6318,7 +6318,8 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
-                             (compact_transport,"self->admitAdmin(r)",1),
+                             # 2: + handleCalibrationRestore (Issue #48, AP-only, reviewed 2026-10-14)
+                             (compact_transport,"self->admitAdmin(r)",2),
                              (compact_transport,"gate.allowed(req.admin_generation)",2)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
@@ -6368,7 +6369,8 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "if(!device||!device[0])returnfalse;",
                   "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",2),("portal_.resume(",1),
+    # portal_.authorize 3: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof).
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",3),("portal_.resume(",1),
                         ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)

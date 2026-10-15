@@ -146,12 +146,26 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  const auto* s=executor_?&executor_->status():nullptr;const char* r=refusal();
  w.add("{\"version\":1,\"now_ms\":%lu,\"last_sequence\":%lu,\"owner\":\"%s\",\"executor_state\":\"%s\",\"stand_state\":\"%s\",\"fault\":%s,\"reason\":\"%s\",\"stale\":%s,\"tracking_error_rad\":%.6f,\"completed_sequence\":%lu,\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)now,(unsigned long)last_ack_.sequence,motion::toString(command_owner_),s?execution::toString(s->state):"OFF",planner_?planner_->state():"OBSERVE",readiness_.fault?"true":"false",r?r:(s?s->reason:"OFF"),stale?"true":"false",s?s->max_tracking_error_rad:0,(unsigned long)(s?s->completed_sequence:0),(unsigned long)telemetry_.sampled_at_ms);
  if(telemetry_.joints_valid){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);w.add("]");}else w.add("null");
+ // Per-joint measured angles: null where unmapped/unhealthy, never a zero.
+ w.add(",\"actual_rad_by_joint\":[");for(unsigned i=0;i<12;++i){if(telemetry_.joint_mapped[i])w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);else w.add("%snull",i?",":"");}w.add("]");
  w.add(",\"joint_at_ms\":[");for(unsigned i=0;i<12;++i)w.add("%s%lu",i?",":"",static_cast<unsigned long>(telemetry_.joint_at_ms[i]));w.add("]");
  w.add(",\"raw_ticks\":");if(telemetry_.raw_valid){w.add("[");for(unsigned i=0;i<12;++i)w.add("%s%u",i?",":"",telemetry_.raw_ticks[i]);w.add("]");}else w.add("null");
  w.add(",\"target_rad\":");if(s&&s->accepted_sequence){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",executor_->targetRadians()[i]);w.add("]");}else w.add("null");
  w.add(",\"quaternion\":");if(telemetry_.quaternion_valid&&now-telemetry_.quaternion_at_ms<=500){w.add("[%.8f,%.8f,%.8f,%.8f]",telemetry_.quaternion[0],telemetry_.quaternion[1],telemetry_.quaternion[2],telemetry_.quaternion[3]);}else w.add("null");
  w.add(",\"base_height_m\":");if(telemetry_.height_valid)w.add("%.6f",telemetry_.base_height_m);else w.add("null");
- w.add(",\"source\":\"%s\",\"feet\":null},\"active_command\":",telemetry_.source);
+ w.add(",\"source\":\"%s\",\"feet\":null},\"stale_scope\":\"MOTION_JOINT_FEEDBACK\"",telemetry_.source);
+ {unsigned mapped=0,raw=0;uint32_t raw_age=0;uint16_t mask=0;
+  for(unsigned i=0;i<12;++i){if(telemetry_.joint_mapped[i]){++mapped;mask|=static_cast<uint16_t>(1u<<i);}
+   if(telemetry_.raw_ok[i]&&static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0){++raw;const uint32_t a=now-telemetry_.joint_at_ms[i];if(a>raw_age)raw_age=a;}}
+  const bool imu=telemetry_.quaternion_valid&&static_cast<int32_t>(now-telemetry_.quaternion_at_ms)>=0;
+  w.add(",\"channels\":{\"imu\":{\"valid\":%s,\"age_ms\":",imu?"true":"false");
+  if(imu)w.add("%lu",static_cast<unsigned long>(now-telemetry_.quaternion_at_ms));else w.add("null");
+  w.add("},\"raw\":{\"count\":%u,\"max_age_ms\":",raw);if(raw)w.add("%lu",static_cast<unsigned long>(raw_age));else w.add("null");
+  w.add("},\"mapped\":{\"count\":%u,\"mask\":%u},\"target\":{\"valid\":%s},\"motion_feedback_stale\":%s}",
+   mapped,mask,s&&s->accepted_sequence?"true":"false",stale?"true":"false");}
+ w.add(",\"restore\":{\"decision\":\"%s\",\"reason\":\"%s\",\"trigger\":\"%s\",\"generation\":%lu,\"fingerprint\":\"%016llx\"}",
+  telemetry_.restore_decision,telemetry_.restore_reason,telemetry_.restore_trigger,(unsigned long)telemetry_.restore_generation,(unsigned long long)telemetry_.restore_fingerprint);
+ w.add(",\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
  w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",
  readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");

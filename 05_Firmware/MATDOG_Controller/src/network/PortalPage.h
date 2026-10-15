@@ -76,6 +76,11 @@ const PAGES=['dashboard','wifi','ap','performance','ota','diagnostics'];
 const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 let csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
+// One read at a time for the WHOLE page (portal + Motion): the AP listener has
+// two sockets with LRU purge, and two independent pollers plus any third
+// request forced purges of in-flight sockets (14 Oct HTTP_TIMEOUT). Motion
+// commands/STOP do not use this lane, so the second socket stays free for them.
+let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const message=$('#message');
 function show(text,kind){message.textContent=text;message.className=kind||'';message.hidden=!text}
@@ -207,7 +212,7 @@ function link(){
  // A temporary session ends on the controller after SESSION_MS.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}
 }
-async function get(path){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error(path);return await r.text()}finally{clearTimeout(t)}}
+async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error(path);return await r.text()}finally{clearTimeout(t)}})}
 async function refresh(){
  if(busy)return;busy=true;clearTimeout(timer);let ok=false;
  // Sequential on purpose: one keep-alive connection, never two at once.
@@ -220,7 +225,8 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeou
 // ---- Administrator session ---------------------------------------------------
 function authUi(){const on=!!csrf;chip('#adminState',on?'Amministratore connesso':'Sola lettura',on?'ok':'');$('#logout').hidden=!on;$('#loginOpen').hidden=on;if(on)$('#login').hidden=true}
 function needLogin(){$('#login').hidden=false;$('#login').scrollIntoView&&$('#login').scrollIntoView();const t=$('#loginForm').elements.token;t.focus&&t.focus()}
-async function send(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
+async function send(path,body){return window.mdNet(()=>sendNow(path,body))}
+async function sendNow(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
 // Reopens the session without the token: the live session cookie, or the
 // remembered-device cookie, is sent by the browser only to /wifi/session.
 async function resume(){resumeAt=Date.now();try{csrf='';csrf=await send(location.protocol==='https:'?'/api/motion/session':'/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}}

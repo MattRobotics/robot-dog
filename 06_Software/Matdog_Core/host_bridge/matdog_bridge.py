@@ -777,20 +777,28 @@ class TelemetryEngine:
                 "console_active": now - self.console_last_tx < self.console_pause_s,
                 "legacy_cycle_ms": self.legacy_cycle_ms}
 
-    def is_stale(self, now: float) -> bool:
+    def transport_stale(self, now: float) -> bool:
+        """Serial link / sample age only: independent of joint calibration (14 Oct)."""
         if self.status is None or self.last_sample_mono is None:
             return True
-        return (bool(self.status.get("stale")) or (now - self.last_sample_mono) * 1000 > STALE_AFTER_MS
+        return ((now - self.last_sample_mono) * 1000 > STALE_AFTER_MS
                 or self.serial_state not in (S_CONNECTED, S_SETTLING))
+
+    def is_stale(self, now: float) -> bool:
+        # Legacy aggregate kept for compatibility: Controller-declared OR transport.
+        if self.status is None or self.last_sample_mono is None:
+            return True
+        return bool(self.status.get("stale")) or self.transport_stale(now)
 
     def status_payload(self, now: float, serial_path: str = "") -> dict:
         with self.lock:
             if self.status is None:
-                payload: dict = {"version": 1, "available": False, "stale": True}
+                payload: dict = {"version": 1, "available": False, "stale": True, "transport_stale": True}
             else:
                 payload = dict(self.status)
                 payload["available"] = True
                 payload["stale"] = self.is_stale(now)
+                payload["transport_stale"] = self.transport_stale(now)
                 if self.fake_device:
                     telemetry = dict(payload.get("telemetry") or {})
                     telemetry["source"] = FAKE_SOURCE
@@ -1065,12 +1073,27 @@ class BridgeHTTPServer(http.server.ThreadingHTTPServer):
         self.sse_clients = 0
         self.sse_lock = threading.Lock()
         self.gzip_cache: dict[tuple[str, float], bytes] = {}
+        self.client_resets = 0
         super().__init__(address, BridgeHandler)
+
+    def handle_error(self, request, client_address) -> None:  # noqa: ANN001
+        # A phone leaving Wi-Fi resets its keep-alive socket: count it, one
+        # line, no traceback. It is not a bridge failure (14 Oct, 192.168.1.98).
+        error = sys.exc_info()[1]
+        if isinstance(error, (ConnectionResetError, BrokenPipeError, TimeoutError, socket.timeout)):
+            self.client_resets += 1
+            print(f"#BRIDGE HTTP client {client_address[0]} closed: {type(error).__name__} "
+                  f"(count={self.client_resets})", file=sys.stderr, flush=True)
+            return
+        super().handle_error(request, client_address)
 
 
 class BridgeHandler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "matdog_bridge/1"
+    # Idle keep-alive sockets (and stalled writes) end after this many
+    # seconds instead of pinning a thread forever.
+    timeout = 15
     server: BridgeHTTPServer
 
     def log_message(self, fmt: str, *args: Any) -> None:  # quiet: the serial log is the record

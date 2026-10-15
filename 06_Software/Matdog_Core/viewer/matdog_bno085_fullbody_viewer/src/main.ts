@@ -362,7 +362,8 @@ function renderMotion(): void {
   const error = frame.trackingErrorRad === null ? 'UNKNOWN' : `${frame.trackingErrorRad.toFixed(4)} rad`;
   element('twin-fault').textContent = `${frame.fault} / tracking ${error} · ${frame.reason}`;
   element('twin-feet').textContent = frame.feet.map((f) => `${f.leg} ${f.contact} phase ${f.phase?.toFixed(2) ?? '—'}`).join(' · ');
-  element('twin-joints').textContent = JOINT_NAMES.map((name) => `${name.padEnd(22)} ${frame.actual?.[name]?.toFixed(4) ?? 'UNKNOWN'} / ${frame.target?.[name]?.toFixed(4) ?? 'UNKNOWN'}`).join('\n');
+  // Per joint: measured angle (null = not measured, never 0) / target / raw tick provenance.
+  element('twin-joints').textContent = JOINT_NAMES.map((name, i) => `${name.padEnd(22)} ${(frame.actualByJoint ?? frame.actual)?.[name]?.toFixed(4) ?? 'UNMEASURED'} / ${frame.target?.[name]?.toFixed(4) ?? 'NONE'} · raw ${frame.rawTicks?.[i] ?? '—'}`).join('\n');
   element('twin-diagnostic').textContent = twin?.diagnostic || '';
 }
 function applyMotionStatus(value: unknown, live = false): boolean {

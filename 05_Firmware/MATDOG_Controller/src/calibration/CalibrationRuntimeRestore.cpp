@@ -23,7 +23,72 @@ bool validSha(const char* text) {
   return text[64] == '\0' && nonzero;
 }
 
+void fnv(uint64_t& h, const void* data, size_t n) {
+  const uint8_t* p = static_cast<const uint8_t*>(data);
+  for (size_t i = 0; i < n; ++i) { h ^= p[i]; h *= 1099511628211ull; }
+}
+
 }  // namespace
+
+uint64_t calibrationRecordFingerprint(const CalibrationRecord& r) {
+  uint64_t h = 14695981039346656037ull;
+  fnv(h, &r.schema, sizeof(r.schema));
+  fnv(h, &r.generation, sizeof(r.generation));
+  fnv(h, &r.geometry_tag, sizeof(r.geometry_tag));
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const CalibrationRecordJointV1& j = r.joint[i];
+    fnv(h, &j.leg, 1); fnv(h, &j.joint, 1); fnv(h, j.unit, sizeof(j.unit));
+    fnv(h, &j.bus_id, 1); fnv(h, &j.encoder_direction, 1); fnv(h, &j.q0_tick, sizeof(j.q0_tick));
+    for (uint8_t s = 0; s < kContactSideCount; ++s) {
+      fnv(h, &j.contact[s].fine_tick_2, sizeof(j.contact[s].fine_tick_2));
+      fnv(h, &j.contact[s].repeatability_ticks, sizeof(j.contact[s].repeatability_ticks));
+    }
+  }
+  return h;
+}
+
+uint8_t firstLivePositionMismatch(const RecordInspection& r, const LivePositionEvidence& live) {
+  if (!r.ok || !live.present) return 0;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const int32_t lo = r.contact_min[i], hi = r.contact_max[i], raw = live.raw[i];
+    const int32_t margin = static_cast<int32_t>(r.repeatability[i]) + live.extra_margin_ticks;
+    // A span across the 0/4095 seam is not modelled: fail closed.
+    if (raw >= 4096 || hi < lo || hi - lo > 2048 || raw < lo - margin || raw > hi + margin) return i;
+  }
+  return kRecordJointCount;
+}
+
+RuntimeRestoreStatus CalibrationRuntimeRestore::inspect(
+    CalibrationPersistenceService& persistence, const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance, RecordInspection* out) const {
+  if (out == nullptr) return RuntimeRestoreStatus::REJECT_ADMISSION;
+  *out = RecordInspection{};
+  auto done = [&](RuntimeRestoreStatus status) { out->status = status; return status; };
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      profile.jointCount() != kRecordJointCount) return done(RuntimeRestoreStatus::REJECT_GEOMETRY);
+  CalibrationRecord record;
+  const ServiceRecordReadResult read = persistence.readAcknowledgedRecord(profile, &record);
+  if (read.guard == ServiceGuard::NVS_NOT_READY) return done(RuntimeRestoreStatus::REJECT_NVS_UNAVAILABLE);
+  if (read.guard == ServiceGuard::WRITES_BLOCKED) return done(RuntimeRestoreStatus::REJECT_UNCERTAIN_WRITE);
+  if (read.load_status != LoadStatus::OK) return done(RuntimeRestoreStatus::REJECT_LOAD);
+  if (read.generation == 0 || record.generation != read.generation) return done(RuntimeRestoreStatus::REJECT_GENERATION);
+  if (validateCalibrationRecord(record, profile) != CalibrationRecordStatus::OK) return done(RuntimeRestoreStatus::REJECT_RECORD);
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const CalibrationRecordJointV1& j = record.joint[i];
+    if (j.leg * 3u + j.joint != i) return done(RuntimeRestoreStatus::REJECT_RECORD);
+    const uint16_t a = j.contact[0].fine_tick_2, b = j.contact[1].fine_tick_2;
+    out->contact_min[i] = a < b ? a : b;
+    out->contact_max[i] = a > b ? a : b;
+    const uint16_t ra = j.contact[0].repeatability_ticks, rb = j.contact[1].repeatability_ticks;
+    out->repeatability[i] = ra > rb ? ra : rb;
+    memcpy(out->unit[i], j.unit, kPhysicalUnitLabelBytes);
+  }
+  out->generation = record.generation;
+  out->fingerprint = calibrationRecordFingerprint(record);
+  out->calibration_accepted = record.calibration_accepted == 1;
+  out->ok = true;
+  return done(RuntimeRestoreStatus::RESTORED);  // "would restore"; nothing published
+}
 
 void CalibrationRuntimeRestore::invalidate(actuator::JointTransformTable& transforms,
                                           actuator::ActuatorLimitTable& limits) {
@@ -57,7 +122,7 @@ RuntimeRestoreStatus CalibrationRuntimeRestore::restore(
     const actuator::CalibrationGeometryProfile& profile,
     const actuator::GeometryProvenance& expected_provenance,
     const RuntimeRestoreRequest& request, actuator::JointTransformTable& transforms,
-    actuator::ActuatorLimitTable& limits) {
+    actuator::ActuatorLimitTable& limits, const LivePositionEvidence* live) {
   ++snapshot_.restore_attempts;
   auto reject = [&](RuntimeRestoreStatus status) {
     snapshot_.restore_status = status;
@@ -115,6 +180,22 @@ RuntimeRestoreStatus CalibrationRuntimeRestore::restore(
     contact_uncertainty_[i] = repeat_a > repeat_b ? repeat_a : repeat_b;
   }
   if (staged.size() != kRecordJointCount) return reject(RuntimeRestoreStatus::REJECT_ADMISSION);
+  if (live != nullptr) {
+    // Checked on the staged copy, before the one publication: never partial.
+    RecordInspection spans;
+    spans.ok = true;
+    for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+      if (record.joint[i].leg * 3u + record.joint[i].joint != i) return reject(RuntimeRestoreStatus::REJECT_RECORD);
+      spans.contact_min[i] = contact_min_[i];
+      spans.contact_max[i] = contact_max_[i];
+      spans.repeatability[i] = contact_uncertainty_[i];
+    }
+    const uint8_t bad = live->present ? firstLivePositionMismatch(spans, *live) : 0;
+    if (bad < kRecordJointCount) {
+      snapshot_.failed_joint = bad;
+      return reject(RuntimeRestoreStatus::REJECT_LIVE_POSITION);
+    }
+  }
   transforms = staged;  // one Controller-thread publication, never partial
   snapshot_.restored = true;
   snapshot_.calibration_accepted = record.calibration_accepted == 1;
@@ -310,6 +391,7 @@ const char* toString(RuntimeRestoreStatus status) {
     CASE(NOT_RUN); CASE(RESTORED); CASE(REJECT_UNSAFE_RUNTIME); CASE(REJECT_CURRENTNESS);
     CASE(REJECT_GEOMETRY); CASE(REJECT_NVS_UNAVAILABLE); CASE(REJECT_UNCERTAIN_WRITE);
     CASE(REJECT_LOAD); CASE(REJECT_GENERATION); CASE(REJECT_RECORD); CASE(REJECT_ADMISSION);
+    CASE(REJECT_LIVE_POSITION);
 #undef CASE
   }
   return "UNKNOWN";

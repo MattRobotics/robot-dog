@@ -11,6 +11,7 @@
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationPersistenceService.h"
 #include "../calibration/CalibrationRuntimeRestore.h"
+#include "../calibration/RestoreAttestationPolicy.h"
 #include "../execution/MotionCoordinator.h"
 #include "../execution/OperationalFeedback.h"
 #include "../execution/MotionSession.h"
@@ -60,6 +61,11 @@ class Controller {
   bool publishLocalMotionObservation(const motion::AdaptiveObservation&);
   bool publishLocalMotionAssessment(const motion::SegmentAssessment&);
   bool requestLocalFixtureMicro(unsigned joint,double delta_rad,double duration_s,const execution::FrameValidation&);
+  // Issue #48: the ONE RAM-only RESTORE entry for boot (automatic) and
+  // operator (USB / authenticated Dashboard) triggers. Never writes NVS,
+  // EEPROM or a servo register, never approves limits, authority or permit.
+  calibration::RestoreVerdict requestCalibrationRestore(const calibration::RestoreRequestFacts&);
+  const calibration::RestoreVerdict& lastRestoreVerdict() const { return last_restore_verdict_; }
 
  private:
   void printBootBanner();
@@ -70,6 +76,21 @@ class Controller {
   void unbindCommissioning(const char* reason);
   void updateLivePose();
   void emitTelemetry(uint32_t now_ms);
+  void updateBootRestore(uint32_t now_ms);
+  struct RestoreHook : CalibrationRestoreHook {
+    Controller* owner=nullptr;
+    bool restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) override;
+  } restore_hook_{};
+  // Read-only facts for the restore policy. live/torque come from 12 fresh
+  // read-only ST3215 reads when read_live is true (never a write).
+  calibration::RestoreFacts gatherRestoreFacts(bool read_live,calibration::RecordInspection*,calibration::LivePositionEvidence*);
+  enum class BootRestorePhase : uint8_t { WAIT_READY, PREFLIGHT, DECIDE, DONE };
+  BootRestorePhase boot_restore_phase_=BootRestorePhase::WAIT_READY;
+  uint32_t boot_restore_since_ms_=0;
+  calibration::RestoreVerdict last_restore_verdict_{};
+  const char* last_restore_trigger_="NONE";
+  uint64_t last_restore_fingerprint_=0;
+  uint32_t last_restore_generation_=0;
   bool profileActive() const { return validation_profile_.sealed()||commissioning_bound_; }
   execution::RuntimeTestMode runtime_mode_=execution::RuntimeTestMode::DIAGNOSTIC;
   execution::CommissioningParameters commissioning_params_{};

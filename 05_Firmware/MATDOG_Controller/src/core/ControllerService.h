@@ -53,9 +53,21 @@ struct CalibrationPersistenceView {
   const char* nvs = "NOT_INITIALIZED";
 };
 
+// Issue #48 Dashboard path. Implemented by the Controller; the transport
+// sees only generation + explicit confirmation in, a JSON verdict out.
+class CalibrationRestoreHook {
+ public:
+  virtual ~CalibrationRestoreHook() = default;
+  virtual bool restoreJson(uint32_t generation, bool operator_confirmed, char* out, size_t cap) = 0;
+};
+
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
+  void bindCalibrationRestore(CalibrationRestoreHook* hook) { restore_hook_=hook; }
+  bool calibrationRestore(uint32_t generation,bool confirmed,char* out,size_t cap) {
+    return restore_hook_&&restore_hook_->restoreJson(generation,confirmed,out,cap);
+  }
   void bindMotionService(MotionService* motion) { motion_=motion; }
   motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now_ms) {
     return motion_?motion_->command(command,now_ms):motion::MotionAck{};
@@ -124,6 +136,7 @@ class ControllerService {
   bool ledDataPinDriven() const { return modules_.led->dataPinDriven(); }
   status::LedPresentationState ledPresentationState() const { return modules_.led_status->state(); }
   const status::LedStatusSnapshot& ledSnapshot() const { return modules_.led_status->snapshot(); }
+  const status::LedStatusManager& ledManager() const { return *modules_.led_status; }
   status::LedDiagnostic ledDiagnostic() const { return modules_.led->diagnostic(); }
 
   // --- Wi-Fi / OTA / Calibration (already-aggregated structs) ------------------
@@ -233,6 +246,7 @@ class ControllerService {
  private:
   Modules modules_{};
   MotionService* motion_=nullptr;
+  CalibrationRestoreHook* restore_hook_=nullptr;
   CalibrationPersistenceView calibration_persistence_{};
 };
 

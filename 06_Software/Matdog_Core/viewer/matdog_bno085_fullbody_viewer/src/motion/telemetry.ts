@@ -30,7 +30,28 @@ export interface MotionFrame {
   readonly basePositionM: Point3 | null;
   readonly feet: readonly FootTelemetry[];
   readonly trackingErrorRad: number | null;
+  /**
+   * Frame-level staleness of MEASURED channels. A legacy Controller `stale`
+   * that only reflects an absent (null) joint channel is reported through
+   * `jointsStale`, never as a stale transport/IMU (14 Oct counterexample).
+   */
   readonly stale: boolean;
+  /** Joint feedback unusable for motion (legacy Controller `stale`). */
+  readonly jointsStale: boolean;
+  /** Per-joint measured radians; null = not measured (never 0). */
+  readonly actualByJoint: Readonly<Record<string, number | null>> | null;
+  /** Raw ST3215 ticks in Controller order, provenance only (never converted here). */
+  readonly rawTicks: readonly number[] | null;
+  readonly channels: MotionChannels;
+  /** Issue #48 RESTORE state as reported by the Controller (null on older firmware). */
+  readonly restore: { readonly decision: string; readonly reason: string; readonly generation: number | null } | null;
+}
+/** Independent freshness axes; null = not reported by this firmware. */
+export interface MotionChannels {
+  readonly imuValid: boolean | null;
+  readonly imuAgeMs: number | null;
+  readonly rawCount: number | null;
+  readonly mappedCount: number | null;
 }
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -52,6 +73,28 @@ function joints(value: unknown, names: unknown): Record<string, number> | null {
     !order.every((name) => typeof name === 'string' && JOINT_NAMES.includes(name))) return null;
   if (!Array.isArray(value) || value.length !== 12 || !value.every(finite)) return null;
   return Object.fromEntries(order.map((name, index) => [name as string, value[index] as number]));
+}
+function jointsByName(value: unknown, names: unknown): Record<string, number | null> | null {
+  if (!Array.isArray(value) || value.length !== 12) return null;
+  const order = names == null ? JOINT_NAMES : names;
+  if (!Array.isArray(order) || order.length !== 12 || new Set(order).size !== 12 ||
+    !order.every((name) => typeof name === 'string' && JOINT_NAMES.includes(name))) return null;
+  if (!value.every((v) => v === null || finite(v))) return null;
+  return Object.fromEntries(order.map((name, index) => [name as string, value[index] as number | null]));
+}
+function channelsOf(status: Record<string, unknown>, telemetry: Record<string, unknown>,
+  actualByJoint: Record<string, number | null> | null, rawTicks: readonly number[] | null, quaternion: unknown): MotionChannels {
+  const c = object(status.channels), imu = object(c?.imu), raw = object(c?.raw), mapped = object(c?.mapped);
+  const imuServo = object(status.imu);
+  return {
+    imuValid: typeof imu?.valid === 'boolean' ? imu.valid : typeof imuServo?.valid === 'boolean' ? imuServo.valid : quaternion != null ? true : null,
+    imuAgeMs: nonnegative(imu?.age_ms) ? imu.age_ms : nonnegative(imuServo?.stamp_ms) && nonnegative(status.now_ms) && status.now_ms >= imuServo.stamp_ms
+      ? status.now_ms - imuServo.stamp_ms : null,
+    rawCount: nonnegative(raw?.count) ? raw.count : rawTicks ? rawTicks.length : null,
+    mappedCount: nonnegative(mapped?.count) ? mapped.count
+      : actualByJoint ? Object.values(actualByJoint).filter((v) => v !== null).length
+        : Array.isArray(telemetry.actual_rad) ? 12 : telemetry.actual_rad === null ? 0 : null,
+  };
 }
 export function parseMotionFrame(value: unknown): MotionFrame | null {
   const status = object(value), telemetry = object(status?.telemetry);
@@ -76,16 +119,32 @@ export function parseMotionFrame(value: unknown): MotionFrame | null {
       trajectory: Array.isArray(source?.trajectory_m)
         ? source.trajectory_m.slice(-64).map(point).filter((p): p is Point3 => p !== null) : [] };
   });
+  const actual = joints(telemetry.actual_rad, telemetry.joint_names);
+  const actualByJoint = actual ?? jointsByName(telemetry.actual_rad_by_joint, telemetry.joint_names);
+  const rawTicks = Array.isArray(telemetry.raw_ticks) && telemetry.raw_ticks.length === 12 &&
+    telemetry.raw_ticks.every((t) => Number.isInteger(t) && (t as number) >= 0 && (t as number) < 4096)
+    ? telemetry.raw_ticks as number[] : null;
+  const legacyStale = status.stale === true || telemetry.stale === true;
+  const anyMeasured = actualByJoint !== null && Object.values(actualByJoint).some((v) => v !== null);
   return {
     controllerNowMs: status.now_ms, sampledAtMs: telemetry.sampled_at_ms,
     executorState: label(status.executor_state, 'UNKNOWN'), standState: label(status.stand_state, 'UNKNOWN'),
     owner: label(status.owner, 'NONE'), fault: status.fault === true ? 'FAULT' : label(status.fault, 'NONE'), reason: label(status.reason, ''),
-    quaternion, actual: joints(telemetry.actual_rad, telemetry.joint_names),
+    quaternion, actual, actualByJoint, rawTicks,
+    channels: channelsOf(status, telemetry, actualByJoint, rawTicks, telemetry.quaternion),
+    restore: object(status.restore) ? { decision: label(object(status.restore)!.decision, 'UNKNOWN'), reason: label(object(status.restore)!.reason, ''),
+      generation: nonnegative(object(status.restore)!.generation) ? object(status.restore)!.generation as number : null } : null,
+    jointsStale: legacyStale || actual === null,
     target: joints(telemetry.target_rad, telemetry.joint_names),
     baseHeightM: baseHeight ?? basePosition?.[2] ?? null,
     basePositionM: basePosition,
     feet, trackingErrorRad: nonnegative(telemetry.tracking_error_rad) ? telemetry.tracking_error_rad : nonnegative(status.tracking_error_rad) ? status.tracking_error_rad : null,
-    stale: status.stale === true || telemetry.stale === true,
+    // A stale flag can only age data that exists: with no measured joint the
+    // flag describes the missing joint channel, not the transport or the IMU.
+    // Firmware that declares stale_scope=MOTION_JOINT_FEEDBACK reports channel
+    // ages separately; its `stale` never ages the frame as a whole.
+    // A host bridge reports its own serial/sample freshness as transport_stale.
+    stale: status.transport_stale === true || (status.stale_scope === 'MOTION_JOINT_FEEDBACK' ? false : legacyStale && anyMeasured),
   };
 }
 /** Freshness combines Controller sample age and local transport age. No wall clock conversion. */

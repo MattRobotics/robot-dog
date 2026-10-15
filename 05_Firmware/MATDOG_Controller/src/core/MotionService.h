@@ -36,6 +36,13 @@ struct MotionTelemetry {
  double pose_max_dev_rad=-1,pose_rms_dev_rad=-1;
  const char* entry="NONE";const char* phase="";const char* commissioning_reason="";
  bool fixture_declared=false;uint8_t approved_joints=0,commissioning_joints=0;uint16_t prime_clamp_mask=0;
+ // Independent channel facts (14 Oct: one "stale" hid fresh IMU/raw data).
+ // joint_mapped[i]: a RESTORED transform produced actual_rad[i] from a fresh,
+ // healthy read. raw_ok[i]: the raw register read itself succeeded.
+ bool joint_mapped[12]{}, raw_ok[12]{};
+ // Issue #48 restore state (static strings owned by the policy layer).
+ const char* restore_decision="NOT_EVALUATED";const char* restore_reason="";const char* restore_trigger="NONE";
+ uint32_t restore_generation=0;uint64_t restore_fingerprint=0;
 };
 // Controller owns this transport-independent intention service. A transport
 // submits a typed command and receives an ack; it cannot acquire a lease.

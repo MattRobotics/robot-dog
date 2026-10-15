@@ -16,6 +16,7 @@
 #include "../update/Sha256.h"
 #include "PortalPage.h"
 #include "../core/MotionJson.h"
+#include "RestoreRequestJson.h"
 #include "WifiManager.h"
 
 namespace matdog {
@@ -190,9 +191,12 @@ bool HttpTransport::registerHandlers(httpd_handle_t server, bool admin) {
       {"/api/motion/command", HTTP_POST, &HttpTransport::handleMotion, this},
       {"/api/motion/login", HTTP_POST, &HttpTransport::handleWifi, this},
       {"/api/motion/session", HTTP_POST, &HttpTransport::handleWifi, this},
-      {"/api/motion/logout", HTTP_POST, &HttpTransport::handleWifi, this}};
+      {"/api/motion/logout", HTTP_POST, &HttpTransport::handleWifi, this},
+      {"/api/calibration/restore", HTTP_POST, &HttpTransport::handleCalibrationRestore, this}};
   for (const auto &uri : uris) {
-    if (!admin && strncmp(uri.uri, "/wifi/", 6) == 0) continue;
+    // AP-administration only: never on the TLS router listener. RESTORE
+    // (Issue #48) also refuses any non-AP socket inside its handler.
+    if (!admin && (strncmp(uri.uri, "/wifi/", 6) == 0 || strncmp(uri.uri, "/api/calibration/", 17) == 0)) continue;
     if (httpd_register_uri_handler(server, &uri) != ESP_OK) return false;
   }
   return true;
@@ -313,29 +317,36 @@ bool HttpTransport::admitMotion(HttpTransportRequest& r){
   return motionStaAdmitted(r);
 }
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
-                             HttpTransportResponse *response, char* large_text, size_t large_cap) {
-  if (xSemaphoreTake(slot_free_, pdMS_TO_TICKS(kDispatchTimeoutMs)) != pdTRUE)
-    return false;
+                             HttpTransportResponse *response, char* large_text, size_t large_cap,
+                             uint32_t budget_ms, const char** failure) {
+  const uint32_t entered = millis();
+  auto fail = [&](const char* why) { if (failure) *failure = why; return false; };
+  if (!budget_ms || budget_ms > kDispatchTimeoutMs) budget_ms = kDispatchTimeoutMs;
+  if (xSemaphoreTake(slot_free_, pdMS_TO_TICKS(budget_ms)) != pdTRUE) {
+    dispatch_busy_.fetch_add(1);
+    return fail("MAILBOX_BUSY");
+  }
   xSemaphoreTake(response_ready_,
                  0); // drain prior late wake; IDs remain authoritative
   if (request.kind >= HttpRequestKind::WIFI_STATUS &&
       !((request.kind>=HttpRequestKind::MOTION_STATUS||request.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(request)) && !readOnlyAdmitted(request) &&
       (!service_->networkAdminAccess().allowed(request.admin_generation) ||
        !WifiManager::verifyAdminRadio())) {
-    xSemaphoreGive(slot_free_); return false;
+    xSemaphoreGive(slot_free_); return fail("ADMIN_GATE_CLOSED");
   }
   pending_request_ = request;
   const uint32_t id = sequence_.fetch_add(1) + 1;
   pending_request_.sequence = id;
   mailbox_.beginDispatch();
   xSemaphoreGive(request_ready_);
-  const uint32_t since = millis();
+  // The slot wait already consumed part of the budget.
+  const uint32_t since = entered;
   do {
     const uint32_t elapsed = millis() - since;
-    if (elapsed >= kDispatchTimeoutMs)
+    if (elapsed >= budget_ms)
       break;
     if (xSemaphoreTake(response_ready_,
-                       pdMS_TO_TICKS(kDispatchTimeoutMs - elapsed)) != pdTRUE)
+                       pdMS_TO_TICKS(budget_ms - elapsed)) != pdTRUE)
       break;
     if (ready_sequence_.load() == id) {
       *response = pending_response_;
@@ -347,18 +358,41 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
         } else memcpy(large_text,motion_capabilities_,response->text_len+1);
       }
       xSemaphoreGive(slot_free_);
+      const uint32_t took = millis() - entered;
+      dispatch_last_ms_.store(took);
+      if (took > dispatch_max_ms_.load()) dispatch_max_ms_.store(took);
       return true;
     }
-  } while (millis() - since < kDispatchTimeoutMs);
+  } while (millis() - since < budget_ms);
+  dispatch_late_.fetch_add(1);
+  { const uint32_t took = millis() - entered; dispatch_last_ms_.store(took);
+    if (took > dispatch_max_ms_.load()) dispatch_max_ms_.store(took); }
   // If delivery won the atomic race, response bytes are already complete and
   // this reader owns release. Otherwise Controller releases after processing.
   if (!mailbox_.abandon())
     xSemaphoreGive(slot_free_);
-  return false;
+  return fail("CONTROLLER_LOOP_LATE");
+}
+void HttpTransport::appendTransportStats(char* text,size_t cap){
+  // Windowed maxima: each report starts a new window.
+  const size_t n=strlen(text);if(!n||text[n-1]!='}')return;
+  char extra[200];
+  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu}}",
+    (unsigned long)loop_last_ms_.load(),(unsigned long)loop_max_ms_.exchange(0),(unsigned long)dispatch_last_ms_.load(),
+    (unsigned long)dispatch_max_ms_.exchange(0),(unsigned long)dispatch_late_.load(),(unsigned long)dispatch_busy_.load());
+  if(k>0&&n-1+static_cast<size_t>(k)<cap)memcpy(text+n-1,extra,static_cast<size_t>(k)+1);
 }
 void HttpTransport::update(uint32_t now_ms) {
   if (!request_ready_)
     return;
+  // Called once per Controller loop: the gap IS the loop period that bounds
+  // every mailbox response. Measured, never inferred.
+  if (last_update_ms_) {
+    const uint32_t gap = now_ms - last_update_ms_;
+    loop_last_ms_.store(gap);
+    if (gap > loop_max_ms_.load()) loop_max_ms_.store(gap);
+  }
+  last_update_ms_ = now_ms;
   if (memcmp(previous_admin_digest_, service_->networkAdminDigest(), 32) != 0) {
     portal_.reset();
     memcpy(previous_admin_digest_, service_->networkAdminDigest(), 32);
@@ -501,6 +535,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   case HttpRequestKind::MOTION_STATUS:
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
+    if(resp.ok)appendTransportStats(resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"MOTION_STATUS_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(resp.text):0;break;
   case HttpRequestKind::MOTION_CAPABILITIES:
@@ -518,6 +553,16 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
     resp.ok=service_->motionAck(ack,resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"ACK_UNAVAILABLE";
+    resp.text_len=resp.ok?strlen(resp.text):0;break;
+  }
+  case HttpRequestKind::CALIBRATION_RESTORE: {
+    // Same local-origin + admin session + CSRF proof as a Motion command.
+    if(!req.ap_socket||!req.local_authorized||!portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,
+                                                req.peer,req.cookie,req.csrf)) {
+      resp.message="AUTH_FAILED";break;
+    }
+    resp.ok=service_->calibrationRestore(req.restore_generation,req.restore_confirmed,resp.text,sizeof(resp.text));
+    resp.message=resp.ok?"OK":"RESTORE_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(resp.text):0;break;
   }
   case HttpRequestKind::WIFI_STATUS: {
@@ -1099,32 +1144,28 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
 }
 esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
+  const uint32_t t0=millis();
   HttpTransportRequest r{};
   if(req->method==HTTP_GET)r.kind=!strcmp(req->uri,"/api/motion/status")?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
   if(!socketFacts(req,r) || (!(req->method==HTTP_GET&&self->admitReadOnly(r))&& !self->admitMotion(r)))
-    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_REQUIRED");
+    return sendJsonError(req,"403 Forbidden","ADMIN_AP_REQUIRED");
   char session_cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",session_cookie,sizeof(session_cookie));
   cookieValue(session_cookie,"md_session",r.cookie);
   if(req->method==HTTP_GET) {
     r.kind=strcmp(req->uri,"/api/motion/status")==0?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
   } else {
     if(!r.local_authorized || req->content_len<=0 || req->content_len>1024)
-      return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Origin or bounded body required");
+      return sendJsonError(req,"400 Bad Request","ORIGIN_OR_BOUNDED_BODY_REQUIRED");
     char type[64]{};httpd_req_get_hdr_value_str(req,"Content-Type",type,sizeof(type));
-    if(strcmp(type,"application/json"))return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"JSON required");
-    char body[1025]{};size_t used=0;const uint32_t since=millis();
-    while(used<static_cast<size_t>(req->content_len)) {
-      if(millis()-since>3000)return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Body timeout");
-      const int got=httpd_req_recv(req,body+used,req->content_len-used);
-      if(got<=0)return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Truncated body");
-      used+=got;
-    }
+    if(strcmp(type,"application/json"))return sendJsonError(req,"400 Bad Request","JSON_REQUIRED");
+    char body[1025]{};size_t used=0;
+    if(!readBoundedBody(req,body,sizeof(body),&used))return sendJsonError(req,"400 Bad Request","BODY_TIMEOUT_OR_TRUNCATED");
     const char* reason=nullptr;
     if(!core::parseMotionJson(body,used,&r.motion_command,&reason))
-      return httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,reason);
+      return sendJsonError(req,"400 Bad Request",reason);
     // The AP transport identifies the client; owner is not a bus authority.
     if(r.motion_command.owner!=motion::ClientOwner::DASHBOARD)
-      return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"Dashboard owner required");
+      return sendJsonError(req,"403 Forbidden","DASHBOARD_OWNER_REQUIRED");
     char cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",cookie,sizeof(cookie));
     cookieValue(cookie,"md_session",r.cookie);
     httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
@@ -1133,15 +1174,65 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   std::unique_ptr<char[]> catalog;
   if(r.kind==HttpRequestKind::MOTION_CAPABILITIES) {
     catalog.reset(new(std::nothrow) char[kMotionCapabilitiesBytes]);
-    if(!catalog)return httpd_resp_send_err(req,HTTPD_500_INTERNAL_SERVER_ERROR,"Capability buffer unavailable");
+    if(!catalog)return sendJsonError(req,"503 Service Unavailable","CAPABILITY_BUFFER_UNAVAILABLE",millis()-t0);
   }
-  HttpTransportResponse resp{};
-  if(!self->dispatch(r,&resp,catalog.get(),catalog?kMotionCapabilitiesBytes:0))return httpd_resp_send_err(req,HTTPD_500_INTERNAL_SERVER_ERROR,"Controller busy");
-  if(!resp.ok)return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,resp.message);
+  HttpTransportResponse resp{};const char* failure="CONTROLLER_LOOP_LATE";
+  // Reads have a shorter, explicit budget; a command keeps the full one.
+  const uint32_t budget=r.kind==HttpRequestKind::MOTION_COMMAND?kDispatchTimeoutMs:kMotionReadBudgetMs;
+  if(!self->dispatch(r,&resp,catalog.get(),catalog?kMotionCapabilitiesBytes:0,budget,&failure))
+    return sendJsonError(req,"503 Service Unavailable",failure,millis()-t0);
+  if(!resp.ok)return sendJsonError(req,"403 Forbidden",resp.message,millis()-t0);
   httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
   return httpd_resp_send(req,catalog?catalog.get():resp.text,resp.text_len);
 }
+esp_err_t HttpTransport::handleCalibrationRestore(httpd_req_t* req) {
+  auto* self=static_cast<HttpTransport*>(req->user_ctx);
+  const uint32_t t0=millis();
+  HttpTransportRequest r{};r.kind=HttpRequestKind::CALIBRATION_RESTORE;
+  // AP admin portal only: never the LAN, never the TLS router listener.
+  if(!socketFacts(req,r)||!r.ap_socket||!self->admitAdmin(r))return sendJsonError(req,"403 Forbidden","ADMIN_AP_REQUIRED");
+  if(!r.local_authorized)return sendJsonError(req,"403 Forbidden","LOCAL_ORIGIN_REQUIRED");
+  char type[64]{};httpd_req_get_hdr_value_str(req,"Content-Type",type,sizeof(type));
+  if(strcmp(type,"application/json"))return sendJsonError(req,"400 Bad Request","JSON_REQUIRED");
+  char body[257]{};size_t used=0;
+  if(!readBoundedBody(req,body,sizeof(body),&used))return sendJsonError(req,"400 Bad Request","BODY_TIMEOUT_OR_TRUNCATED");
+  const char* reason=nullptr;
+  if(!parseRestoreRequestJson(body,used,&r.restore_generation,&r.restore_confirmed,&reason))
+    return sendJsonError(req,"400 Bad Request",reason);
+  char cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",cookie,sizeof(cookie));
+  cookieValue(cookie,"md_session",r.cookie);
+  httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
+  HttpTransportResponse resp{};const char* failure="CONTROLLER_LOOP_LATE";
+  if(!self->dispatch(r,&resp,nullptr,0,kDispatchTimeoutMs,&failure))
+    return sendJsonError(req,"503 Service Unavailable",failure,millis()-t0);
+  if(!resp.ok)return sendJsonError(req,"403 Forbidden",resp.message,millis()-t0);
+  httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
+  return httpd_resp_send(req,resp.text,resp.text_len);
+}
 
+// Every Motion/RESTORE refusal is JSON with the real HTTP status, so a client
+// never has to guess from a non-JSON body (14 Oct: HTTP_INVALID_JSON hid it).
+esp_err_t HttpTransport::sendJsonError(httpd_req_t* req,const char* status,const char* code,uint32_t elapsed_ms){
+  char safe[64]{};size_t k=0;
+  for(const char* c=code?code:"ERROR";*c&&k+1<sizeof(safe);++c)
+    safe[k++]=((*c>='A'&&*c<='Z')||(*c>='a'&&*c<='z')||(*c>='0'&&*c<='9')||*c=='_')?*c:'_';
+  char body[128];
+  snprintf(body,sizeof(body),"{\"version\":1,\"ok\":false,\"error\":\"%s\",\"elapsed_ms\":%lu}",safe,(unsigned long)elapsed_ms);
+  httpd_resp_set_status(req,status);httpd_resp_set_type(req,"application/json");
+  httpd_resp_set_hdr(req,"Cache-Control","no-store");
+  return httpd_resp_sendstr(req,body);
+}
+bool HttpTransport::readBoundedBody(httpd_req_t* req,char* body,size_t cap,size_t* used){
+  *used=0;const uint32_t since=millis();
+  if(req->content_len<=0||static_cast<size_t>(req->content_len)>=cap)return false;
+  while(*used<static_cast<size_t>(req->content_len)){
+    if(millis()-since>3000)return false;
+    const int got=httpd_req_recv(req,body+*used,req->content_len-*used);
+    if(got<=0)return false;
+    *used+=got;
+  }
+  body[*used]=0;return true;
+}
 esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};

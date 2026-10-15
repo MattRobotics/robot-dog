@@ -53,6 +53,7 @@ fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=fal
  static esp_err_t handlePage(httpd_req_t*);
  static esp_err_t handleStatus(httpd_req_t*) {return 0;}
  static esp_err_t handleMotion(httpd_req_t*) {return 0;}
+ static esp_err_t handleCalibrationRestore(httpd_req_t*) {return 0;}  // Issue #48 route (AP-only), exercised by its own tests
  static esp_err_t handleOtaChallenge(httpd_req_t*) {return 0;}
  static esp_err_t handleOtaUpdate(httpd_req_t*) {return 0;}
  static esp_err_t handleWifi''')
@@ -116,7 +117,10 @@ int main() {
  s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  registered.clear();check(s.registerHandlers(nullptr,false),"register HTTPS role");
  check(registered.size()==10&&std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/wifi/")==0;}),"HTTPS exposes scoped motion/auth routes and no WiFi administration");
- registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==18,"HTTP admin route inventory");
+ check(std::none_of(registered.begin(),registered.end(),[](auto &u){return u.find("/api/calibration/")==0;}),"HTTPS never exposes the Issue #48 RESTORE route");
+ // 19 = 18 + /api/calibration/restore (Issue #48, AP admin portal only; reviewed 2026-10-14).
+ registered.clear();check(s.registerHandlers(nullptr,true)&&registered.size()==19,"HTTP admin route inventory");
+ check(std::count(registered.begin(),registered.end(),std::string("/api/calibration/restore"))==1,"AP admin portal exposes exactly one RESTORE route");
  for(int mode:{WIFI_STA,WIFI_AP_STA}) {WiFi.mode_value=mode;check(action(s)==403,"driver STA/APSTA deny");}
  adminRadio();WiFi.mode_read_ok=false;check(action(s)==403,"driver unverifiable deny");WiFi.mode_read_ok=true;
  WiFi.STA.running=true;check(action(s)==403,"operational STA bits deny");adminRadio();

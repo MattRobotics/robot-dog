@@ -32,7 +32,9 @@ enum class HttpRequestKind : uint8_t {
   MOTION_STATUS,
   MOTION_CAPABILITIES,
   MOTION_COMMAND,
-  MOTION_LOGIN, MOTION_SESSION, MOTION_LOGOUT
+  MOTION_LOGIN, MOTION_SESSION, MOTION_LOGOUT,
+  // Issue #48: AP admin portal only (handler refuses any non-AP socket).
+  CALIBRATION_RESTORE
 };
 constexpr size_t kMotionCapabilitiesBytes=20480;
 constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
@@ -50,6 +52,8 @@ struct HttpTransportRequest {
   char cookie[65]{}, csrf[65]{}, login[65]{}, device[65]{};
   ConfigPatch patch{};
   motion::MotionCommand motion_command{};
+  uint32_t restore_generation = 0;
+  bool restore_confirmed = false;
 };
 struct HttpTransportResponse {
   bool ok = false;
@@ -83,6 +87,10 @@ private:
   static esp_err_t handlePage(httpd_req_t *req);
   static esp_err_t handleWifi(httpd_req_t *req);
   static esp_err_t handleMotion(httpd_req_t *req);
+  static esp_err_t handleCalibrationRestore(httpd_req_t *req);
+  // Every Motion/RESTORE refusal is JSON with the true HTTP status.
+  static esp_err_t sendJsonError(httpd_req_t* req,const char* status,const char* code,uint32_t elapsed_ms=0);
+  static bool readBoundedBody(httpd_req_t* req,char* body,size_t cap,size_t* used);
   static void lifecycleEntry(void *self);
   void lifecycle();
   void lifecycleTick();
@@ -96,8 +104,12 @@ private:
   bool admitMotion(HttpTransportRequest&);
   bool motionStaAdmitted(const HttpTransportRequest&) const;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
+  // failure (optional) names why false was returned: MAILBOX_BUSY,
+  // ADMIN_GATE_CLOSED or CONTROLLER_LOOP_LATE. timeout_ms bounds the wait.
   bool dispatch(const HttpTransportRequest &request,
-                HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0);
+                HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0,
+                uint32_t timeout_ms=kDispatchTimeoutMs, const char** failure=nullptr);
+  void appendTransportStats(char* text,size_t cap);
   void serviceRequest(uint32_t now_ms);
   void wifiResponse(HttpTransportResponse &response,bool redact_network_names=false);
   void statusExtension(HttpTransportResponse &response,
@@ -119,6 +131,14 @@ private:
   HttpTransportResponse pending_response_{};
   char motion_capabilities_[kMotionCapabilitiesBytes]{};
   static constexpr uint32_t kDispatchTimeoutMs = 3000;
+  // Motion READS answer within this budget or return a structured 503, so a
+  // browser never has to abort first and retry behind a still-busy handler.
+  static constexpr uint32_t kMotionReadBudgetMs = 1200;
+  // Instrumentation (no behaviour): Controller-loop gap seen by update() and
+  // HTTP dispatch latency. Max values are windowed: reset when reported.
+  std::atomic<uint32_t> loop_last_ms_{0}, loop_max_ms_{0}, dispatch_last_ms_{0},
+      dispatch_max_ms_{0}, dispatch_late_{0}, dispatch_busy_{0};
+  uint32_t last_update_ms_ = 0;
 };
 } // namespace network
 } // namespace matdog

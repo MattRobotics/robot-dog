@@ -36,9 +36,29 @@ class LedStatusManager {
   LedPresentationState state() const { return policy_.state(); }
   const LedStatusSnapshot& snapshot() const { return policy_.snapshot(); }
 
+  // Diagnostics only (14 Oct cyan transient): every presentation change with
+  // the inputs that selected it. A cyan flash WITHOUT a recorded
+  // WIFI_CONNECTING transition points at the pixel transport, not policy.
+  struct Transition {
+    LedPresentationState from = LedPresentationState::BOOTING;
+    LedPresentationState to = LedPresentationState::BOOTING;
+    uint32_t at_ms = 0;
+    bool wifi_connecting = false;
+    bool firmware_update = false;
+  };
+  static constexpr uint8_t kTransitionHistory = 8;
+  uint32_t transitionCount() const { return transition_count_; }
+  // 0 = newest. Valid for i < min(count, kTransitionHistory).
+  const Transition& transition(uint8_t i) const {
+    return history_[(transition_count_ + kTransitionHistory - 1 - (i % kTransitionHistory)) % kTransitionHistory];
+  }
+
  private:
   LedRing* ring_ = nullptr;
   LedStatusPolicy policy_;
+  Transition history_[kTransitionHistory]{};
+  uint32_t transition_count_ = 0;
+  bool first_update_ = true;
 };
 
 }  // namespace status

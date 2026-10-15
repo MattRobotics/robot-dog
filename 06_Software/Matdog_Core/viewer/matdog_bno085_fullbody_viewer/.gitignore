@@ -7,3 +7,4 @@ public/canonical/
 
 # Optional local offline Motion Core trace staging; never hardware telemetry.
 public/motion/
+dist-mobile/

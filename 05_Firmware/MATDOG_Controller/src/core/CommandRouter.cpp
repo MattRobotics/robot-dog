@@ -2022,6 +2022,16 @@ void CommandRouter::printLedStatus() {
                 led.charge_complete_verified ? "YES" : "NO",
                 led.battery_warning ? "YES" : "NO", led.battery_critical ? "YES" : "NO",
                 status::toString(s->ledDiagnostic()));
+  const status::LedStatusManager& manager = s->ledManager();
+  const uint32_t count = manager.transitionCount();
+  Serial.printf("  presentation_transitions=%lu (newest first, at most %u)\n", (unsigned long)count,
+                (unsigned)status::LedStatusManager::kTransitionHistory);
+  for (uint8_t i = 0; i < status::LedStatusManager::kTransitionHistory && i < count; ++i) {
+    const auto& t = manager.transition(i);
+    Serial.printf("  LED_TRANSITION at_ms=%lu from=%s to=%s wifi_connecting=%s firmware_update=%s\n",
+                  (unsigned long)t.at_ms, status::toString(t.from), status::toString(t.to),
+                  t.wifi_connecting ? "YES" : "NO", t.firmware_update ? "YES" : "NO");
+  }
 }
 
 void CommandRouter::printServoScanResult() {

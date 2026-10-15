@@ -695,6 +695,11 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_wifi_mode_policy"
+# 14 Oct hardware-fail regressions: independent telemetry channels and the
+# Issue #48 conditional RAM-only RESTORE (policy, live-span gate, body parser).
+bash "$SCRIPT_DIR/run_telemetry_channels_tests.sh"
+bash "$SCRIPT_DIR/run_calibration_restore_tests.sh"
+bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"

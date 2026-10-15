@@ -1,7 +1,24 @@
 import { BufferGeometry, Group, Line, LineBasicMaterial, Mesh, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry, Vector3 } from 'three';
 import { sh2ToThree } from '../frame/orientation';
 import type { MatdogRobot } from '../urdf/buildRobot';
-import { LEGS, type MotionFrame } from './telemetry';
+import { JOINT_NAMES, LEGS, type MotionFrame } from './telemetry';
+
+/**
+ * Display state of one link of the ACTUAL model. Never upgraded by a target,
+ * a synthetic feed or an interpolation: only a measured, in-range joint chain
+ * renders as MEASURED.
+ *  - UNMEASURED: no calibrated angle for a joint above this link (or, for
+ *    base_link, no valid IMU). Drawn grey/translucent at URDF neutral. It is
+ *    NOT a measured posture.
+ *  - OUT_OF_RANGE: measured value beyond the canonical URDF limit (drawn at
+ *    the limit, red; the true number is reported in the diagnostic).
+ *  - IMPLAUSIBLE: measured value far outside any limit (> 0.35 rad); the
+ *    joint is held at neutral and drawn red. Never silently accepted.
+ */
+export type LinkDisplayState = 'MEASURED' | 'UNMEASURED' | 'OUT_OF_RANGE' | 'IMPLAUSIBLE';
+export type ActualModelState = 'MEASURED' | 'PARTIAL' | 'UNMEASURED';
+const IMPLAUSIBLE_MARGIN_RAD = .35;
+const STATE_RANK: Record<LinkDisplayState, number> = { MEASURED: 0, UNMEASURED: 1, OUT_OF_RANGE: 2, IMPLAUSIBLE: 3 };
 
 /** Actual articulation and target articulation share IMU orientation, never each other's joint values. */
 export class MotionTwinController {
@@ -13,8 +30,16 @@ export class MotionTwinController {
    * come from the received sample; only the rendered pose eases towards it.
    */
   interpolationMs = 0;
+  /** Per-link display state of the actual model after the last apply(). */
+  readonly linkStates = new Map<string, LinkDisplayState>();
+  actualState: ActualModelState = 'UNMEASURED';
+  orientationMeasured = false;
   private readonly tweens = new Map<MatdogRobot, { from: Record<string, number>; to: Readonly<Record<string, number>>; t0: number }>();
   private rejectedChannel = '';
+  private readonly measuredMaterials = new Map<string, MeshStandardMaterial>();
+  private readonly stateMaterials = new Map<string, Map<LinkDisplayState, MeshStandardMaterial>>();
+  /** Links whose pose depends on each joint (the joint's child and descendants). */
+  private readonly downstream = new Map<string, string[]>();
   constructor(readonly actual: MatdogRobot, readonly target: MatdogRobot) {
     this.overlay.name = 'motion_feet_support_plane';
     this.target.rootObject.name = 'motion_target_ghost';
@@ -33,14 +58,46 @@ export class MotionTwinController {
       const line = new Line(new BufferGeometry(), new LineBasicMaterial({ color: 0x36dcdf }));
       line.name = `trajectory_${leg}`; this.trails.set(leg, line); this.overlay.add(line);
     }
+    const children = new Map<string, string[]>();
+    for (const joint of actual.model.joints) children.set(joint.parent, [...(children.get(joint.parent) ?? []), joint.child]);
+    const below = (link: string): string[] => [link, ...(children.get(link) ?? []).flatMap(below)];
+    for (const joint of actual.model.joints) this.downstream.set(joint.name, below(joint.child));
+    for (const link of actual.collisionLinkNames) {
+      const mesh = actual.collisionMesh(link)!;
+      const base = mesh.material as MeshStandardMaterial;
+      this.measuredMaterials.set(link, base);
+      const variants = new Map<LinkDisplayState, MeshStandardMaterial>();
+      const unmeasured = base.clone(); unmeasured.color.setHex(0x6b7480); unmeasured.transparent = true; unmeasured.opacity = .38; unmeasured.depthWrite = false;
+      const bad = base.clone(); bad.color.setHex(0xe5484d); bad.emissive.setHex(0x3a0000);
+      variants.set('UNMEASURED', unmeasured); variants.set('OUT_OF_RANGE', bad); variants.set('IMPLAUSIBLE', bad);
+      this.stateMaterials.set(link, variants);
+    }
+    this.paint(new Map(actual.collisionLinkNames.map((link) => [link, 'UNMEASURED' as LinkDisplayState])));
+  }
+  private limitsOf(name: string): { lower: number | null; upper: number | null } | null {
+    const joint = this.actual.model.joints.find((entry) => entry.name === name);
+    return joint ? { lower: joint.lower, upper: joint.upper } : null;
+  }
+  private classify(name: string, value: number): LinkDisplayState {
+    const limit = this.limitsOf(name);
+    if (!limit || !Number.isFinite(value)) return 'IMPLAUSIBLE';
+    const below = limit.lower !== null ? limit.lower - value : -Infinity, above = limit.upper !== null ? value - limit.upper : -Infinity;
+    const excess = Math.max(below, above);
+    if (excess > IMPLAUSIBLE_MARGIN_RAD) return 'IMPLAUSIBLE';
+    if (excess > 1e-9) return 'OUT_OF_RANGE';
+    return 'MEASURED';
   }
   private validJoints(values: Readonly<Record<string, number>>): boolean {
-    for (const [name, value] of Object.entries(values)) {
-      const joint = this.actual.model.joints.find((entry) => entry.name === name);
-      if (!joint || !Number.isFinite(value) || (joint.lower !== null && value < joint.lower - 1e-9) ||
-        (joint.upper !== null && value > joint.upper + 1e-9)) return false;
+    return Object.entries(values).every(([name, value]) => this.classify(name, value) === 'MEASURED');
+  }
+  private paint(states: Map<string, LinkDisplayState>): void {
+    this.linkStates.clear();
+    for (const link of this.actual.collisionLinkNames) {
+      const state = states.get(link) ?? 'MEASURED';
+      this.linkStates.set(link, state);
+      const mesh = this.actual.collisionMesh(link)!;
+      mesh.material = state === 'MEASURED' ? this.measuredMaterials.get(link)! : this.stateMaterials.get(link)!.get(state)!;
     }
-    return true;
   }
   private setJoints(robot: MatdogRobot, values: Readonly<Record<string, number>>, nowMs: number | undefined): void {
     if (this.interpolationMs <= 0 || nowMs === undefined) { this.tweens.delete(robot); robot.setJointAngles(values); return; }
@@ -61,6 +118,7 @@ export class MotionTwinController {
   }
   apply(frame: MotionFrame, nowMs?: number): void {
     this.rejectedChannel = '';
+    this.orientationMeasured = frame.quaternion !== null;
     if (frame.quaternion) {
       const q = sh2ToThree(frame.quaternion);
       this.actual.setRootOrientation(q); this.target.setRootOrientation(q);
@@ -75,10 +133,34 @@ export class MotionTwinController {
       this.actual.rootObject.position.z = frame.baseHeightM;
       this.target.rootObject.position.z = frame.baseHeightM;
     }
-    // Reject an entire invalid joint channel. Do not silently clamp measured states.
-    this.actual.rootObject.visible = frame.actual !== null && this.validJoints(frame.actual);
-    if (frame.actual && this.actual.rootObject.visible) this.setJoints(this.actual, frame.actual, nowMs);
-    else this.rejectedChannel = frame.actual ? 'actual joints outside canonical URDF limits' : 'actual joint channel unavailable';
+    // The actual model is ALWAYS shown. Each link carries what is known about it.
+    this.actual.rootObject.visible = true;
+    const measured = frame.actualByJoint ?? frame.actual;
+    const pose: Record<string, number> = {}, states = new Map<string, LinkDisplayState>();
+    const mark = (joint: string, state: LinkDisplayState): void => {
+      for (const link of this.downstream.get(joint) ?? []) {
+        const prior = states.get(link) ?? 'MEASURED';
+        if (STATE_RANK[state] > STATE_RANK[prior]) states.set(link, state);
+      }
+    };
+    const problems: string[] = [];
+    let known = 0;
+    for (const name of JOINT_NAMES) {
+      const value = measured?.[name];
+      if (value === null || value === undefined) { pose[name] = 0; mark(name, 'UNMEASURED'); continue; }
+      const state = this.classify(name, value);
+      if (state === 'IMPLAUSIBLE') { pose[name] = 0; mark(name, state); problems.push(`${name}=${value.toFixed(4)} implausible`); continue; }
+      known += 1; pose[name] = value; mark(name, state);
+      if (state === 'OUT_OF_RANGE') problems.push(`${name}=${value.toFixed(4)} outside canonical URDF limit`);
+    }
+    if (!this.orientationMeasured) states.set(this.actual.model.rootLink, 'UNMEASURED');
+    this.actualState = known === 12 ? 'MEASURED' : known === 0 ? 'UNMEASURED' : 'PARTIAL';
+    this.setJoints(this.actual, pose, known === 12 ? nowMs : undefined);
+    this.paint(states);
+    if (this.actualState !== 'MEASURED') this.rejectedChannel = this.actualState === 'UNMEASURED'
+      ? 'actual joint channel unavailable: UNMEASURED URDF neutral (not a measured posture)'
+      : `actual joints PARTIAL ${known}/12: unmeasured links grey at URDF neutral`;
+    if (problems.length) this.rejectedChannel += (this.rejectedChannel ? ' · ' : '') + problems.join(' · ');
     this.target.rootObject.visible = frame.target !== null && this.validJoints(frame.target);
     if (this.target.rootObject.visible && frame.target) this.setJoints(this.target, frame.target, nowMs);
     else if (frame.target) this.rejectedChannel += ' target joints outside canonical URDF limits';
@@ -94,9 +176,14 @@ export class MotionTwinController {
       prior.dispose(); trail.visible = foot.trajectory.length > 1;
     }
   }
+  /**
+   * Stale transport: overlays and the commanded ghost hide; the actual model
+   * stays visible but every link is marked UNMEASURED (old data is not current).
+   */
   setStale(stale: boolean): void {
     this.overlay.visible = !stale;
     this.target.rootObject.visible = this.target.rootObject.visible && !stale;
+    if (stale) this.paint(new Map(this.actual.collisionLinkNames.map((link) => [link, 'UNMEASURED' as LinkDisplayState])));
   }
   get diagnostic(): string { return this.rejectedChannel; }
 }

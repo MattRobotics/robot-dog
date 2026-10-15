@@ -19,7 +19,7 @@ assert.strictEqual(actions.length, 48, 'test uses all 48 actual Controller catal
 const settle = async () => { for (let i = 0; i < 20; i++) await new Promise(r => setImmediate(r)); };
 async function boot(enabled = false, options = {}) {
   let clock = 1000;
-  const device = { down: false, holdCommand: null, commands: [], failures: {}, rtt: options.rtt || {}, caps: { version: 1, hardware_approved: enabled, teleoperation: enabled,
+  const device = { down: false, holdCommand: null, commands: [], restores: [], inflight: 0, maxReadInflight: 0, failures: {}, rtt: options.rtt || {}, caps: { version: 1, hardware_approved: enabled, teleoperation: enabled,
     limits: { vx_m_s: .03, vy_m_s: .02, yaw_rate_rad_s: .15 }, actions: actions.map(a => ({ ...a, label: a.id === 'action.wave' ? '<img src=x onerror=alert(1)>' : a.label, available: enabled && a.implemented || a.id.startsWith('motion.') })) },
     status: { version: 1, now_ms: 1000, last_sequence: 10, executor_state: 'OFF', stand_state: 'OBSERVE', stale: false, fault: false, owner: 'none', readiness: { restore: true, permit: enabled } } };
   const intervals = [], timers = [], errors = [], calls = [];
@@ -31,6 +31,11 @@ async function boot(enabled = false, options = {}) {
       w.addEventListener('error', e => errors.push(e.message));
       w.fetch = async (url, init = {}) => {
         calls.push({ url, method: init.method || 'GET' });
+        const read = !init.method || init.method === 'GET';
+        if (read) { device.inflight++; device.maxReadInflight = Math.max(device.maxReadInflight, device.inflight); }
+        try { return await serve(url, init); } finally { if (read) device.inflight--; }
+      };
+      const serve = async (url, init) => {
         if (url === '/api/motion/command') device.commands.push(JSON.parse(init.body));
         if (device.down) throw Error('fixture connection lost');
         clock += device.rtt[url] || 0;
@@ -41,9 +46,15 @@ async function boot(enabled = false, options = {}) {
         const reply = (text, status = 200) => ({ ok: status === 200, status, text: async () => text, json: async () => JSON.parse(text) });
         if (url === '/status') return reply('mode=MAINTENANCE\nauthority=NONE\nimu_rv_count=10\n');
         if (url === '/wifi/status') return reply(JSON.stringify({ profiles: [], scan: [], active_profile: 0, sta_test: { seq: 0 }, policy: {} }));
-        if (failure === 'body_timeout') return { ok: true, status: 200, json: aborted };
+        if (failure === 'body_timeout') return { ok: true, status: 200, json: aborted, text: aborted };
         if (failure === 'invalid_json') return reply('invalid JSON');
         if (failure === 'http_error') return reply('{"reason":"SERVICE_UNAVAILABLE"}', 503);
+        if (failure === 'text403') return reply('<html>403 Forbidden ADMIN_AP_REQUIRED</html>', 403);
+        if (failure === 'json503') return reply('{"version":1,"ok":false,"error":"CONTROLLER_LOOP_LATE","elapsed_ms":1201}', 503);
+        if (url === '/api/calibration/restore') {
+          device.restores.push({ body: JSON.parse(init.body), csrf: init.headers['X-Csrf-Token'], type: init.headers['Content-Type'] });
+          return reply(JSON.stringify({ version: 1, decision: 'ALLOW_OPERATOR', reason: 'OK', restored: true, mapped_joints: 12, limits_approved: false, motion_authorized: false }));
+        }
         if (url === '/api/motion/status') return reply(JSON.stringify(device.status));
         if (url === '/api/motion/capabilities') return reply(JSON.stringify(device.caps));
         if (url === '/api/motion/command') {
@@ -155,9 +166,9 @@ async function boot(enabled = false, options = {}) {
   p.q('#motion-control').hidden = false;
   p.device.failures['/api/motion/status'] = ['timeout', 'body_timeout'];
   await p.motionPoll();
-  await p.fireTimer(750);
+  await p.fireTimer(2000);
   await p.fireTimer(250);
-  await p.fireTimer(750);
+  await p.fireTimer(2000);
   await p.pulse();
   badge = p.q('#motion-fresh').textContent;
   assert(badge.includes('HTTP_TIMEOUT') && badge.includes('TELEMETRY_STALE'));
@@ -173,7 +184,7 @@ async function boot(enabled = false, options = {}) {
   p = await boot(true);
   p.device.failures['/api/motion/command'] = ['timeout'];
   p.q('#motion-stand').click(); await settle();
-  await p.fireTimer(750);
+  await p.fireTimer(2000);
   assert.strictEqual(p.device.commands.length, 1, 'unconfirmed POST is never replayed');
   assert(p.q('#motion-stand').disabled, 'unconfirmed command revokes cached capability');
   assert(p.q('#motion-result').textContent.includes('HTTP_TIMEOUT'));
@@ -221,18 +232,18 @@ async function boot(enabled = false, options = {}) {
   p.device.failures['/api/motion/capabilities'] = ['timeout', 'timeout'];
   await p.motionPoll();
   assert(p.q('#motion-stand').disabled, 'changed Controller gate invalidates old capabilities before refresh completes');
-  await p.fireTimer(750); await p.fireTimer(250); await p.fireTimer(750);
+  await p.fireTimer(2000); await p.fireTimer(250); await p.fireTimer(2000);
   p.close();
 
   p = await boot(true, { rtt: { '/api/motion/status': 80, '/api/motion/capabilities': 40 } });
   assert(p.q('#motion-state').textContent.includes('RTT 40 ms, max 80 ms, media 60 ms'), 'RTT is observed, not a preset');
-  assert(p.q('#motion-state').textContent.includes('timeout 750 ms'), 'default timeout preserved pending hardware measurement');
+  assert(p.q('#motion-state').textContent.includes('timeout 2000 ms'), 'default read timeout exceeds the 1200 ms server read budget');
   p.close();
   p = await boot(false, { url: 'http://192.168.4.1/?motion_timeout_ms=1000' });
   assert(p.q('#motion-state').textContent.includes('timeout 1000 ms'), 'bounded browser override preserved');
   p.close();
   p = await boot(false, { url: 'http://192.168.4.1/?motion_timeout_ms=99999' });
-  assert(p.q('#motion-state').textContent.includes('timeout 750 ms'), 'out-of-bounds timeout rejected');
+  assert(p.q('#motion-state').textContent.includes('timeout 2000 ms'), 'out-of-bounds timeout rejected');
   p.close();
 
   p = await boot();
@@ -249,6 +260,60 @@ async function boot(enabled = false, options = {}) {
   assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), link.href);
   assert(!link.textContent.includes('LIVE'), 'configured link alone is not evidence of a hardware LIVE feed');
   p.close();
+
+  // --- 14 Oct regressions -----------------------------------------------
+  for (const [failure, code, text] of [['text403', 'HTTP_403', '403 Forbidden ADMIN_AP_REQUIRED'], ['json503', 'HTTP_503', 'CONTROLLER_LOOP_LATE']]) {
+    p = await boot(true);
+    p.device.failures['/api/motion/status'] = [failure];
+    await p.motionPoll();
+    const badge14 = p.q('#motion-fresh').textContent;
+    assert(badge14.includes(code) && !badge14.includes('HTTP_INVALID_JSON'), failure + ': real status, not a JSON-parse diagnosis');
+    assert(p.q('#motion-result').textContent.includes(text), failure + ': server text/code is shown');
+    p.close();
+  }
+  p = await boot(true);
+  p.q('#motion-control').hidden = false;
+  p.device.failures['/api/motion/status'] = ['timeout'];
+  await p.motionPoll();                              // read in flight, stalled
+  const portalPoll = p.timers.find(t => t.active && t.ms === 4000 && t.fn.name === 'refresh');
+  assert(portalPoll, 'portal poll timer');
+  const before = p.calls.length; portalPoll.active = false; portalPoll.fn(); await settle();
+  assert.strictEqual(p.calls.length, before, 'portal read waits for the in-flight Motion read (single-flight lane)');
+  p.q('#motion-stop-button').click(); await settle();
+  assert.strictEqual(p.device.commands.at(-1).type, 'MOTION.STOP', 'STOP is sent while a read is stalled: it never queues behind reads');
+  await p.fireTimer(2000);                           // read aborts -> lane frees
+  await settle();
+  assert(p.calls.slice(before).some(c => c.url === '/status'), 'queued portal read runs after the stalled read');
+  assert(p.device.maxReadInflight <= 1, 'never two concurrent reads from one page');
+  p.close();
+
+  p = await boot(true);
+  p.device.status.now_ms += 100;
+  p.device.status.readiness.restore = false;
+  p.device.status.restore = { decision: 'PENDING_OPERATOR_REVIEW', reason: 'INSTALLATION_ATTESTATION_ABSENT', trigger: 'BOOT', generation: 1, fingerprint: '9d5323b7d59bb080' };
+  p.device.status.channels = { imu: { valid: true, age_ms: 8 }, raw: { count: 12, max_age_ms: 352 }, mapped: { count: 0, mask: 0 } };
+  await p.motionPoll();
+  const restoreText = p.q('#motion-restore').textContent;
+  assert(restoreText.includes('PENDING_OPERATOR_REVIEW') && restoreText.includes('INSTALLATION_ATTESTATION_ABSENT') && restoreText.includes('9d5323b7d59bb080'));
+  assert(restoreText.includes('Giunti mappati0/12') && restoreText.includes('IMUvalida · 8 ms') && restoreText.includes('Encoder raw12/12'));
+  const button = p.q('#motion-restore-button'), confirm = p.q('#motion-restore-confirm');
+  assert(button.disabled, 'no admin session: disabled');
+  p.dom.window.eval("csrf='c'.repeat(64)");
+  confirm.checked = false; confirm.onchange(); assert(button.disabled, 'no explicit confirmation: disabled');
+  confirm.checked = true; confirm.onchange(); assert(!button.disabled, 'admin + per-attempt confirmation: enabled');
+  button.onclick(); await settle();
+  assert.strictEqual(p.device.restores.length, 1);
+  assert.deepStrictEqual(p.device.restores[0].body, { generation: 1, confirm: 'CONFIRM_CURRENT_INSTALLATION' });
+  assert.strictEqual(p.device.restores[0].csrf, 'c'.repeat(64));
+  assert.strictEqual(p.device.restores[0].type, 'application/json');
+  assert(!confirm.checked, 'confirmation is consumed by one attempt');
+  assert(p.q('#motion-result').textContent.includes('"motion_authorized": false'));
+  assert.strictEqual(p.device.commands.length, 0, 'RESTORE sends no Motion command');
+  p.device.status.readiness.restore = true; p.device.status.now_ms += 100;
+  await p.motionPoll();
+  confirm.checked = true; confirm.onchange();
+  assert(button.disabled && button.textContent.includes('già attivo'), 'idempotent UI once restored');
+  p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
-  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL; FIXTURE_ONLY)');
+  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate; FIXTURE_ONLY)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

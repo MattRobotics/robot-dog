@@ -121,6 +121,11 @@ export class MatdogRobot {
     return this.collisionMeshes.size;
   }
 
+  /** The collision mesh of one link (display state only; geometry untouched). */
+  collisionMesh(linkName: string): Mesh | undefined {
+    return this.collisionMeshes.get(linkName);
+  }
+
   get collisionLinkNames(): readonly string[] {
     return [...this.collisionMeshes.keys()];
   }

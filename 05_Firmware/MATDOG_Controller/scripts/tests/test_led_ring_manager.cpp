@@ -295,6 +295,33 @@ static void testManagerOwnership() {
   CHECK(unbound.state() == LedPresentationState::DEGRADED);
 }
 
+// 14 Oct cyan transient: the manager records every presentation change with
+// its selecting inputs, without altering any frame.
+static void testTransitionHistory() {
+  LedStatusManager manager;  // unbound: no frames, pure policy history
+  LedStatusInputs in;
+  manager.update(0, in);
+  CHECK(manager.transitionCount() == 1);
+  CHECK(manager.transition(0).to == LedPresentationState::BOOTING);
+  in.system_health = core::SystemHealth::READY;
+  in.sample_valid = true; in.daly_comm_ok = true; in.telemetry_age_ms = 0; in.soc_percent = 74;
+  manager.update(10, in);
+  CHECK(manager.transitionCount() == 2 && manager.transition(0).to == LedPresentationState::READY);
+  manager.update(20, in);  // unchanged state: no new record
+  CHECK(manager.transitionCount() == 2);
+  in.wifi_connecting = true;
+  manager.update(30, in);
+  in.wifi_connecting = false;
+  manager.update(80, in);
+  CHECK(manager.transitionCount() == 4);
+  CHECK(manager.transition(1).to == LedPresentationState::WIFI_CONNECTING && manager.transition(1).wifi_connecting);
+  CHECK(manager.transition(1).at_ms == 30 && manager.transition(0).at_ms == 80);
+  CHECK(manager.transition(0).from == LedPresentationState::WIFI_CONNECTING && manager.transition(0).to == LedPresentationState::READY);
+  for (uint32_t i = 0; i < 20; ++i) { in.wifi_connecting = (i % 2) == 0; manager.update(100 + i, in); }
+  CHECK(manager.transitionCount() == 24);
+  CHECK(manager.transition(0).at_ms == 119 && manager.transition(7).at_ms == 112);  // ring keeps the newest 8
+}
+
 int main() {
   CHECK(std::strcmp(toString(LedDiagnostic::NONE), "NONE") == 0);
   CHECK(std::strcmp(toString(LedDiagnostic::CHASE), "CHASE") == 0);
@@ -304,6 +331,7 @@ int main() {
     testNativeChase();
     testSocDiagnostic();
     testManagerOwnership();
+    testTransitionHistory();
   } else {
     testUsbOnly();
   }
