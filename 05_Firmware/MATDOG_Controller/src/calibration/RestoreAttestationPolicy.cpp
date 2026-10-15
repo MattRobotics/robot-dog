@@ -48,6 +48,17 @@ RestoreVerdict evaluateRestore(const RestoreFacts& f, const InstallationAttestat
   v.decision = RestoreDecision::ALLOW_AUTOMATIC; v.reason = RestoreReason::OK; return v;
 }
 
+bool restoreRefusalIsTransient(RestoreReason r) {
+  switch (r) {
+    case RestoreReason::RUNTIME_NOT_IDLE: case RestoreReason::TORQUE_NOT_OFF:
+    case RestoreReason::PREFLIGHT_NOT_COMPLETE: case RestoreReason::NOT_MAINTENANCE:
+    case RestoreReason::NVS_NOT_READY: case RestoreReason::LIVE_POSITION_OUTSIDE_RECORD:
+      return true;
+    default:
+      return false;
+  }
+}
+
 const char* toString(RestoreDecision d) {
   switch (d) {
     case RestoreDecision::ALLOW_AUTOMATIC: return "ALLOW_AUTOMATIC";

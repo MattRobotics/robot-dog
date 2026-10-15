@@ -33,7 +33,9 @@ function render(): void {
 async function poll(): Promise<void> {
   const abort = new AbortController(), timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(STATUS_URL, { cache: 'no-store', signal: abort.signal });
+    // credentials: 'omit' — a read-only viewer must never act as the operator
+    // heartbeat that keeps a Motion session alive (it has no STOP).
+    const response = await fetch(STATUS_URL, { cache: 'no-store', credentials: 'omit', signal: abort.signal });
     const text = await response.text();
     let body: unknown = null; try { body = JSON.parse(text); } catch { /* reported below */ }
     if (!response.ok) throw new Error(`HTTP_${response.status} ${(body as { error?: string } | null)?.error ?? text.slice(0, 60)}`);
@@ -44,12 +46,13 @@ async function poll(): Promise<void> {
     failures += 1; lastError = abort.signal.aborted ? 'HTTP_TIMEOUT' : error instanceof Error ? error.message : String(error);
   } finally { clearTimeout(timer); render(); setTimeout(() => void poll(), POLL_MS); }
 }
-async function boot(): Promise<void> {
-  const viewer = createViewerScene(el('viewport'));
+const MODEL_RETRY_MS = 5000;
+async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<void> {
   try {
+    // The robot defers large downloads while Motion is active (503 + Retry-After).
     const [urdfText, pack] = await Promise.all([
-      fetch(URDF_URL).then((r) => { if (!r.ok) throw new Error(`URDF HTTP ${r.status}`); return r.text(); }),
-      fetch(MESH_URL).then((r) => { if (!r.ok) throw new Error(`MESH HTTP ${r.status}`); return r.arrayBuffer(); }),
+      fetch(URDF_URL, { credentials: 'omit' }).then((r) => { if (!r.ok) throw new Error(`URDF HTTP ${r.status}`); return r.text(); }),
+      fetch(MESH_URL, { credentials: 'omit' }).then((r) => { if (!r.ok) throw new Error(`MESH HTTP ${r.status}`); return r.arrayBuffer(); }),
     ]);
     const model = parseUrdf(urdfText);
     const loadMeshGeometry = mtwMeshLoader(model, URDF_URL, parseMtw(pack));
@@ -63,9 +66,14 @@ async function boot(): Promise<void> {
     viewer.start();
     if (actual.collisionMeshCount !== 17) lastError = `ASSETS_MISSING ${actual.collisionMeshCount}/17`;
   } catch (error) {
-    lastError = `MODEL_LOAD_FAILED ${error instanceof Error ? error.message : String(error)}`;
+    lastError = `MODEL_LOAD_FAILED ${error instanceof Error ? error.message : String(error)} (retry ${MODEL_RETRY_MS / 1000} s)`;
+    setTimeout(() => void loadModel(viewer), MODEL_RETRY_MS);
   }
   render();
+}
+async function boot(): Promise<void> {
+  const viewer = createViewerScene(el('viewport'));
+  await loadModel(viewer);
   void poll();
   setInterval(render, 1000);
 }

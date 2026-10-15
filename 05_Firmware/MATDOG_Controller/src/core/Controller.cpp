@@ -496,7 +496,7 @@ calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibrat
   {using R=calibration::RestoreReason;const R r=verdict.reason;
    const bool ok=verdict.decision==calibration::RestoreDecision::ALLOW_AUTOMATIC||verdict.decision==calibration::RestoreDecision::ALLOW_OPERATOR||
                  verdict.decision==calibration::RestoreDecision::ALREADY_RESTORED;
-   restore_refused_transient_=!ok&&(r==R::RUNTIME_NOT_IDLE||r==R::TORQUE_NOT_OFF||r==R::PREFLIGHT_NOT_COMPLETE||r==R::NOT_MAINTENANCE||r==R::NVS_NOT_READY);
+   restore_refused_transient_=!ok&&calibration::restoreRefusalIsTransient(r);
    restore_refused_permanent_=!ok&&!restore_refused_transient_;
    restore_refusal_reason_=ok?"":calibration::toString(r);}
   Serial.printf("CALIBRATION_RESTORE_DECISION trigger=%s decision=%s reason=%s failed_joint=%u generation=%lu fingerprint=%016llx "

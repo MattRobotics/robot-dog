@@ -109,7 +109,12 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   if(operational){
    // Measured-start entry: no certificate tube. Keep-outs from CAD/FCL
    // (GEOMETRY_ENTRY_REPORT 2026-10-14): LF LOWER first zero separation
-   // -92.070442 deg. Other legs: measured gen-1 contact limits only.
+   // -92.070442 deg. All four legs: MATDOG_MEASURED_ENTRY_REGION_CERTIFICATE_V1
+   // (2026-10-15) proves 120 non-adjacent pairs and 12 adjacent revolutes clear
+   // for every start the recognizer admits (head +/-10 deg, 6 mrad tube, LOWER
+   // down to -93.04 deg); every LOWER command stays above the URDF -92.0 deg
+   // limit, below which the adjacent UPPER-LOWER pair was not certified.
+   // MotionCoordinator refuses a band/tube wider than the certified one.
    cc.measuredStart=true;cc.pathMarginRad=.001;cc.keepoutCount=1;
    auto& k=cc.keepouts[0];k.id="LF_UPPER_LOWER_CONTACT";k.a=k.b=2;k.ca=1;k.cb=0;k.bound=-92.070442*3.14159265358979323846/180.0;
   }

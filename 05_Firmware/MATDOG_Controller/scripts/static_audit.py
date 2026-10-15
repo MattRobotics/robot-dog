@@ -6369,8 +6369,12 @@ def check_network_v3_boundaries(files, sketch_dir):
                   "if(!device||!device[0])returnfalse;",
                   "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    # portal_.authorize 3: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof).
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",3),("portal_.resume(",1),
+    # portal_.authorize 4: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof)
+    # + the operator heartbeat (2026-10-15): only a poll proving session AND CSRF (the Dashboard,
+    # which holds STOP) keeps the deadman alive; the read-only Twin and anonymous polls never do.
+    if "if(req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))service_->operatorHeartbeat(now_ms);" not in compact_transport:
+        fail("Operator heartbeat must require the AP admin session and its CSRF token")
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",4),("portal_.resume(",1),
                         ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)

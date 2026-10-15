@@ -88,6 +88,12 @@ struct RestoreVerdict {
 
 RestoreVerdict evaluateRestore(const RestoreFacts& facts, const InstallationAttestation& attestation,
                                const RestoreRequestFacts& request);
+// Boot automation: a refusal that can clear without a reboot or a
+// maintenance action is retried (read-only re-evaluation every few seconds).
+// LIVE_POSITION_OUTSIDE_RECORD is retried too: a leg held or displaced at boot
+// must not lock the robot until reboot, while a remounted unit keeps failing
+// with its joint on every attempt. Record/geometry/preflight defects are not.
+bool restoreRefusalIsTransient(RestoreReason reason);
 const char* toString(RestoreDecision decision);
 const char* toString(RestoreReason reason);
 

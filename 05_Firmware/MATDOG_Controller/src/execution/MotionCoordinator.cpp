@@ -1,5 +1,6 @@
 #include "MotionCoordinator.h"
 #include <cmath>
+#include "../motion/FixturePoseClassifier.h"
 namespace matdog { namespace execution {
 void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;submitted_sequence_=0;arm_generation_=0;}
 void MotionCoordinator::synchronizeSession(){
@@ -18,6 +19,8 @@ bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c
  if(!c.enabled){clearCommissioning();return true;}
  if(!configured_||feedback_policy_.mode!=motion::FeedbackMode::FIXTURE_REVIEW||!feedback_policy_.fixtureLimitVariant||!acquisition_.pairedProne||
     (!c.measuredStart&&!c.certificate.present)||c.keepoutCount>CommissioningStandConfig::kMaxKeepouts||
+    (c.measuredStart&&(!(c.proneMaxDeviationRad<=CommissioningStandConfig::kCertifiedBandRad+1e-12)||
+                       !(feedback_policy_.maxTrackingErrorRad<=CommissioningStandConfig::kCertifiedTubeRad+1e-12)))||
     !std::isfinite(c.pathMarginRad)||c.pathMarginRad<=0||!std::isfinite(c.minStageDurationS)||c.minStageDurationS<=0||
     !std::isfinite(c.proneMaxDeviationRad)||!std::isfinite(c.proneMaxRmsRad)||c.proneMaxRmsRad<=0||c.proneMaxRmsRad>c.proneMaxDeviationRad)return false;
  commissioning_=c;entry_plan_=motion::FixtureEntryPlan{};return true;
@@ -49,6 +52,28 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
    entry_reason_="";
    return stand_.request(r,feedback_policy_,now/1000.0)?nullptr:motion::feedbackReasonName(stand_.reason());
 }
+const char* MotionCoordinator::preArmCheck(){
+ const auto& o=observation_;
+ if(!o.actual.valid||!o.stationary){entry_reason_="PRE_ARM_FEEDBACK_REQUIRED";return entry_reason_;}
+ const auto head=motion::pairedProneSample(0,0,true);if(!head.target.valid)return "ROUTE_HEAD_INVALID";
+ double actual[12]{},nominal[12]{};
+ for(unsigned i=0;i<12;++i){const auto& a=o.actual.legs[i/3];const auto& n=head.target.legs[i/3];
+  actual[i]=i%3==0?a.hip:i%3==1?a.upper:a.lower;nominal[i]=i%3==0?n.hip:i%3==1?n.upper:n.lower;}
+ const auto prone=motion::classifyFixtureProne(actual,nominal,o.externalSupportConfirmed,o.stationary,
+                                              commissioning_.proneMaxDeviationRad,commissioning_.proneMaxRmsRad);
+ if(prone.kind!=motion::FixturePoseKind::PRONE_COMPATIBLE){entry_reason_=motion::fixturePoseReasonName(prone.reason);return "PRE_ARM_NOT_PRONE";}
+ // The session primes a LOWER resting past its folded limit just inside it
+ // (MotionSession::insideTick, bounded there); plan from that same start.
+ motion::JointTargetFrame start;start.valid=true;
+ for(unsigned i=0;i<12;++i){double q=actual[i];
+  const double lo=feedback_policy_.jointLimits[i/3][i%3].lower;
+  if(i%3==2&&q<lo)q=lo+kPrimeInwardMarginTicks*2*3.14159265358979323846/4096;
+  auto& s=start.legs[i/3];(i%3==0?s.hip:i%3==1?s.upper:s.lower)=q;}
+ motion::MeasuredEntryConfig m;m.keepouts=commissioning_.keepouts;m.keepoutCount=commissioning_.keepoutCount;m.pathMarginRad=commissioning_.pathMarginRad;
+ entry_plan_=motion::planMeasuredEntry(start,head.target,feedback_policy_,m,commissioning_.minStageDurationS);
+ if(entry_plan_.status!=motion::EntryStatus::OK){entry_reason_=motion::entryStatusName(entry_plan_.status);return entry_reason_;}
+ entry_reason_="";return nullptr;
+}
 const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t now){
  synchronizeSession();
  if(!configured_)return "PLANNER_ARTIFACT_REQUIRED";
@@ -56,6 +81,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
  if((!executor_||!executor_->active())&&executor_&&c.intent==motion::Intent::STAND&&commissioning_.enabled&&commissioning_.measuredStart&&armer_){
   // Operational STAND from READY: the explicit command starts the controlled
   // torque sequence; the planner starts only once the session is ARMED.
+  if(const char* why=preArmCheck())return why;
   if(const char* why=armer_->armForCommand(now))return why;
   pending_stand_=true;pending_command_=c;pending_since_ms_=now;return nullptr;
  }

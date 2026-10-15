@@ -44,4 +44,15 @@ for path in ("/twin", "/twin/", "/twin/assets/twin.js", "/twin/matdog_collision.
 handler = transport[transport.index("esp_err_t HttpTransport::handleTwin("):transport.index("esp_err_t HttpTransport::handleWifi(")]
 check("dispatch(" not in handler and "service_" not in handler, "twin handler never reaches the Controller")
 check('"Content-Encoding","gzip"' in handler and '"If-None-Match"' in handler and "304 Not Modified" in handler, "gzip + ETag revalidation")
+# 2026-10-15: the single httpd task never streams a large Twin asset while a
+# Motion torque sequence/motion is in progress (STOP/heartbeat are not queued
+# behind it); revalidation (304) stays available and comes first.
+check("twin_deferred_.load()" in handler and "503 Service Unavailable" in handler and "TWIN_DEFERRED_MOTION_ACTIVE" in handler, "large assets deferred during Motion")
+check(handler.index("304 Not Modified") < handler.index("twin_deferred_.load()"), "304 revalidation precedes the deferral")
+check("twin_deferred_.store(service_->motionEngaged());" in transport, "deferral flag published by the Controller thread")
+# The read-only Twin is never the operator heartbeat: no credentials, no CSRF.
+check(re.search(r'credentials:\s*["\']omit["\']', js) is not None, "twin fetches omit credentials")
+check("X-Csrf-Token" not in js, "twin never presents a CSRF token")
+status = transport[transport.index("case HttpRequestKind::MOTION_STATUS:"):transport.index("case HttpRequestKind::MOTION_CAPABILITIES:")]
+check("portal_.authorize(" in status and "req.csrf" in status and "portal_.current(" not in status, "heartbeat requires session + CSRF (Dashboard only)")
 print(f"TWIN_ASSETS: {checks} checks PASS (total gzip {total} B; static, same-origin, read-only)")

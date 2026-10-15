@@ -1,0 +1,134 @@
+base_link lf_upper_leg_link PASS 6.047 mm
+base_link lf_lower_leg_link PASS 6.0 mm
+base_link lf_foot_link PASS 6.099 mm
+base_link rf_upper_leg_link PASS 6.047 mm
+base_link rf_lower_leg_link PASS 6.0 mm
+base_link rf_foot_link PASS 6.093 mm
+base_link rh_upper_leg_link PASS 6.014 mm
+base_link rh_lower_leg_link PASS 6.042 mm
+base_link rh_foot_link PASS 6.051 mm
+base_link lh_upper_leg_link PASS 6.014 mm
+base_link lh_lower_leg_link PASS 6.042 mm
+base_link lh_foot_link PASS 6.055 mm
+lf_hip_link lf_lower_leg_link PASS 3.537 mm
+lf_hip_link lf_foot_link PASS 4.439 mm
+lf_hip_link rf_hip_link PASS 44.467 mm
+lf_hip_link rf_upper_leg_link PASS 48.323 mm
+lf_hip_link rf_lower_leg_link PASS 21.271 mm
+lf_hip_link rf_foot_link PASS 8.115 mm
+lf_hip_link rh_hip_link PASS 157.571 mm
+lf_hip_link rh_upper_leg_link PASS 160.382 mm
+lf_hip_link rh_lower_leg_link PASS 100.264 mm
+lf_hip_link rh_foot_link PASS 99.86 mm
+lf_hip_link lh_hip_link PASS 141.906 mm
+lf_hip_link lh_upper_leg_link PASS 128.237 mm
+lf_hip_link lh_lower_leg_link PASS 62.064 mm
+lf_hip_link lh_foot_link PASS 60.263 mm
+lf_upper_leg_link lf_foot_link PASS 4.062 mm
+lf_upper_leg_link rf_hip_link PASS 48.323 mm
+lf_upper_leg_link rf_upper_leg_link PASS 51.622 mm
+lf_upper_leg_link rf_lower_leg_link PASS 10.99 mm
+lf_upper_leg_link rf_foot_link PASS 11.596 mm
+lf_upper_leg_link rh_hip_link PASS 91.344 mm
+lf_upper_leg_link rh_upper_leg_link PASS 102.242 mm
+lf_upper_leg_link rh_lower_leg_link PASS 48.356 mm
+lf_upper_leg_link rh_foot_link PASS 49.126 mm
+lf_upper_leg_link lh_hip_link PASS 36.604 mm
+lf_upper_leg_link lh_upper_leg_link PASS 22.093 mm
+lf_upper_leg_link lh_lower_leg_link PASS 3.809 mm
+lf_upper_leg_link lh_foot_link PASS 5.366 mm
+lf_lower_leg_link rf_hip_link PASS 21.271 mm
+lf_lower_leg_link rf_upper_leg_link PASS 10.99 mm
+lf_lower_leg_link rf_lower_leg_link PASS 5.687 mm
+lf_lower_leg_link rf_foot_link PASS 7.116 mm
+lf_lower_leg_link rh_hip_link PASS 21.521 mm
+lf_lower_leg_link rh_upper_leg_link PASS 34.031 mm
+lf_lower_leg_link rh_lower_leg_link PASS 17.116 mm
+lf_lower_leg_link rh_foot_link PASS 17.855 mm
+lf_lower_leg_link lh_hip_link PASS 16.44 mm
+lf_lower_leg_link lh_upper_leg_link PASS 7.836 mm
+lf_lower_leg_link lh_lower_leg_link PASS 3.356 mm
+lf_lower_leg_link lh_foot_link PASS 3.002 mm
+lf_foot_link rf_hip_link PASS 8.124 mm
+lf_foot_link rf_upper_leg_link PASS 11.602 mm
+lf_foot_link rf_lower_leg_link PASS 7.122 mm
+lf_foot_link rf_foot_link PASS 12.225 mm
+lf_foot_link rh_hip_link PASS 119.406 mm
+lf_foot_link rh_upper_leg_link PASS 126.786 mm
+lf_foot_link rh_lower_leg_link PASS 59.77 mm
+lf_foot_link rh_foot_link PASS 59.229 mm
+lf_foot_link lh_hip_link PASS 84.446 mm
+lf_foot_link lh_upper_leg_link PASS 69.547 mm
+lf_foot_link lh_lower_leg_link PASS 19.87 mm
+lf_foot_link lh_foot_link PASS 17.134 mm
+rf_hip_link rf_lower_leg_link PASS 3.537 mm
+rf_hip_link rf_foot_link PASS 4.438 mm
+rf_hip_link rh_hip_link PASS 141.906 mm
+rf_hip_link rh_upper_leg_link PASS 128.237 mm
+rf_hip_link rh_lower_leg_link PASS 62.064 mm
+rf_hip_link rh_foot_link PASS 60.241 mm
+rf_hip_link lh_hip_link PASS 157.571 mm
+rf_hip_link lh_upper_leg_link PASS 160.382 mm
+rf_hip_link lh_lower_leg_link PASS 100.264 mm
+rf_hip_link lh_foot_link PASS 99.865 mm
+rf_upper_leg_link rf_foot_link PASS 4.068 mm
+rf_upper_leg_link rh_hip_link PASS 36.604 mm
+rf_upper_leg_link rh_upper_leg_link PASS 22.093 mm
+rf_upper_leg_link rh_lower_leg_link PASS 3.809 mm
+rf_upper_leg_link rh_foot_link PASS 5.357 mm
+rf_upper_leg_link lh_hip_link PASS 91.344 mm
+rf_upper_leg_link lh_upper_leg_link PASS 102.242 mm
+rf_upper_leg_link lh_lower_leg_link PASS 48.356 mm
+rf_upper_leg_link lh_foot_link PASS 49.135 mm
+rf_lower_leg_link rh_hip_link PASS 16.44 mm
+rf_lower_leg_link rh_upper_leg_link PASS 7.836 mm
+rf_lower_leg_link rh_lower_leg_link PASS 3.356 mm
+rf_lower_leg_link rh_foot_link PASS 3.016 mm
+rf_lower_leg_link lh_hip_link PASS 21.521 mm
+rf_lower_leg_link lh_upper_leg_link PASS 34.031 mm
+rf_lower_leg_link lh_lower_leg_link PASS 17.116 mm
+rf_lower_leg_link lh_foot_link PASS 17.863 mm
+rf_foot_link rh_hip_link PASS 84.43 mm
+rf_foot_link rh_upper_leg_link PASS 69.541 mm
+rf_foot_link rh_lower_leg_link PASS 19.864 mm
+rf_foot_link rh_foot_link PASS 17.124 mm
+rf_foot_link lh_hip_link PASS 119.405 mm
+rf_foot_link lh_upper_leg_link PASS 126.778 mm
+rf_foot_link lh_lower_leg_link PASS 59.76 mm
+rf_foot_link lh_foot_link PASS 59.229 mm
+rh_hip_link rh_lower_leg_link PASS 3.571 mm
+rh_hip_link rh_foot_link PASS 5.07 mm
+rh_hip_link lh_hip_link PASS 44.467 mm
+rh_hip_link lh_upper_leg_link PASS 48.319 mm
+rh_hip_link lh_lower_leg_link PASS 22.339 mm
+rh_hip_link lh_foot_link PASS 9.095 mm
+rh_upper_leg_link rh_foot_link PASS 4.118 mm
+rh_upper_leg_link lh_hip_link PASS 48.319 mm
+rh_upper_leg_link lh_upper_leg_link PASS 51.921 mm
+rh_upper_leg_link lh_lower_leg_link PASS 12.618 mm
+rh_upper_leg_link lh_foot_link PASS 12.125 mm
+rh_lower_leg_link lh_hip_link PASS 22.339 mm
+rh_lower_leg_link lh_upper_leg_link PASS 12.618 mm
+rh_lower_leg_link lh_lower_leg_link PASS 9.195 mm
+rh_lower_leg_link lh_foot_link PASS 8.181 mm
+rh_foot_link lh_hip_link PASS 9.086 mm
+rh_foot_link lh_upper_leg_link PASS 12.119 mm
+rh_foot_link lh_lower_leg_link PASS 8.176 mm
+rh_foot_link lh_foot_link PASS 3.104 mm
+lh_hip_link lh_lower_leg_link PASS 3.571 mm
+lh_hip_link lh_foot_link PASS 5.064 mm
+lh_upper_leg_link lh_foot_link PASS 4.113 mm
+lf_hip_joint PASS_CONTINUOUS
+lf_upper_leg_joint PASS_CONTINUOUS
+lf_lower_leg_joint PASS_CONTINUOUS
+rf_hip_joint PASS_CONTINUOUS
+rf_upper_leg_joint PASS_CONTINUOUS
+rf_lower_leg_joint PASS_CONTINUOUS
+rh_hip_joint PASS_CONTINUOUS
+rh_upper_leg_joint PASS_CONTINUOUS
+rh_lower_leg_joint PASS_CONTINUOUS
+lh_hip_joint PASS_CONTINUOUS
+lh_upper_leg_joint PASS_CONTINUOUS
+lh_lower_leg_joint PASS_CONTINUOUS
+MEASURED_ENTRY_REGION PASS nonadjacent=120/120 adjacent=12/12 calls=83382
+EXIT=0

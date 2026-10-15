@@ -39,7 +39,9 @@ struct Operational {
   }
   MotionReadiness readiness(){auto r=ready();r.walk_qualified=false;r.local_operator_owns_session=false;return r;}
   void refresh(){b.service.refresh(readiness(),b.now);}
-  motion::MotionAck stand(uint32_t seq=1){auto c=command(motion::Intent::STAND,seq,motion::ClientOwner::DASHBOARD);c.target_height_m=.150;c.issued_at_ms=b.now;c.ttl_ms=1000;return b.service.command(c,b.now);}
+  // As every Controller tick: the measured pose is published before a command is served.
+  void publish(){motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];observe(o,q,b.now);b.coordinator.observe(o);}
+  motion::MotionAck stand(uint32_t seq=1){publish();auto c=command(motion::Intent::STAND,seq,motion::ClientOwner::DASHBOARD);c.target_height_m=.150;c.issued_at_ms=b.now;c.ttl_ms=1000;return b.service.command(c,b.now);}
   // One Controller tick: session lifecycle, coordinator, service, with a servo that follows.
   void tickArming(){
     b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);
@@ -104,20 +106,44 @@ void operationalStandEndToEnd(double fold_offset_deg){
 }
 
 void operationalRefusals(){
-  // A path that would cross the keep-out: refused with the joint and reason, nothing moves beyond the prime.
-  { Operational op(0,-80.0);auto& b=op.b;CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
-    for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
-    REASON(b.coordinator.lastEntryReason(),"PATH_START_IN_KEEPOUT");CHECK(b.session.safeOffRequired()||b.session.state()==MotionSessionState::OFF);
-    op.refresh();CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ABORTED);
-    CHECK(b.coordinator.entryPlan().failedJoint==2); }
+  // A start inside the keep-out: refused BEFORE arming (2026-10-15 pre-arm dry run):
+  // no session, no prime, no torque, not a single write.
+  { Operational op(0,-80.0);auto& b=op.b;const auto ack=op.stand();
+    CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PATH_START_IN_KEEPOUT");
+    REASON(b.coordinator.lastEntryReason(),"PATH_START_IN_KEEPOUT");CHECK(b.coordinator.entryPlan().failedJoint==2);
+    CHECK(op.armer.calls==0&&b.session.state()==MotionSessionState::OFF&&b.r.backend.writes.empty()&&!b.coordinator.arming()); }
   { // A contact on the UNFOLDING side (free only for LF LOWER <= -89.5 deg): the start is clear,
-    // the specific path towards the -88.5 deg route head is not. Denied with joint, sample and clearance.
-    Operational op(0,-89.5,-1);auto& b=op.b;CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
-    for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+    // the specific path towards the -88.5 deg route head is not. Denied with joint, sample and
+    // clearance, before any torque.
+    Operational op(0,-89.5,-1);auto& b=op.b;const auto ack=op.stand();
     const auto& p=b.coordinator.entryPlan();
     std::printf("keepout unfolding side: %s joint=%u sample=%u clearance_mrad=%.2f required_mrad=%.2f\n",b.coordinator.lastEntryReason(),p.failedJoint,p.failedSample,p.clearanceRad*1e3,p.requiredClearanceRad*1e3);
+    CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PATH_KEEPOUT");
     REASON(b.coordinator.lastEntryReason(),"PATH_KEEPOUT");CHECK(p.failedJoint==2&&p.failedSample>0&&p.clearanceRad<p.requiredClearanceRad);
-    op.refresh();CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ABORTED);CHECK(b.session.safeOffRequired()||b.session.state()==MotionSessionState::OFF); }
+    CHECK(op.armer.calls==0&&b.session.state()==MotionSessionState::OFF&&b.r.backend.writes.empty()); }
+  // Not PRONE at command time (e.g. legs hanging after a SAFE_OFF): refused before
+  // arming with the recognizer's reason; nothing is energized.
+  { Operational op;auto& b=op.b;b.r.feedback.actual_rad[0]=.6;const auto ack=op.stand();
+    CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PRE_ARM_NOT_PRONE");REASON(b.coordinator.lastEntryReason(),"HIP_BAND");
+    CHECK(op.armer.calls==0&&b.session.state()==MotionSessionState::OFF&&b.r.backend.writes.empty()); }
+  { Operational op;auto& b=op.b;b.r.feedback.actual_rad[4]=94.3*kDeg;const auto ack=op.stand();   // inside the family band, >10 deg off the 83.7 deg head
+    CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PRE_ARM_NOT_PRONE");REASON(b.coordinator.lastEntryReason(),"MAX_DEVIATION");
+    CHECK(op.armer.calls==0&&b.r.backend.writes.empty()); }
+  // The runtime cannot leave the offline-certified entry region (2026-10-15):
+  // a wider recognition band or tracking tube is refused at configuration.
+  { Operational op;auto& b=op.b;CommissioningStandConfig cc=b.coordinator.commissioning();
+    CHECK(cc.measuredStart&&cc.proneMaxDeviationRad<=CommissioningStandConfig::kCertifiedBandRad);
+    cc.proneMaxDeviationRad=CommissioningStandConfig::kCertifiedBandRad*1.01;CHECK(!b.coordinator.configureCommissioning(cc));
+    cc.proneMaxDeviationRad=CommissioningStandConfig::kCertifiedBandRad;CHECK(b.coordinator.configureCommissioning(cc)); }
+  { Bench wide(.008);CommissioningStandConfig cc;cc.enabled=true;cc.measuredStart=true;cc.minStageDurationS=4;
+    cc.proneMaxDeviationRad=wide.params.prone_max_deviation_rad;cc.proneMaxRmsRad=wide.params.prone_max_rms_rad;
+    wide.coordinator.begin(&wide.r.executor,&wide.r.policy);motion::AcquisitionRoute route;route.pairedProne=true;route.geometryIdentityVerified=true;
+    route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;route.timeScale=wide.runtime.stand_time_scale;
+    CHECK(wide.coordinator.configure(wide.runtime.feedback,wide.runtime.walk,&route));
+    CHECK(!wide.coordinator.configureCommissioning(cc)); }                       // 8 mrad tube > certified 6 mrad
+  // Feedback not published / moving: refused before arming.
+  { Operational op;auto& b=op.b;auto c=command(motion::Intent::STAND,1,motion::ClientOwner::DASHBOARD);c.target_height_m=.150;c.issued_at_ms=b.now;c.ttl_ms=1000;
+    const auto ack=b.service.command(c,b.now);CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PRE_ARM_FEEDBACK_REQUIRED");CHECK(op.armer.calls==0); }
   // Arming refused (e.g. no operator heartbeat): command rejected, nothing written.
   { Operational op;op.armer.refuse="OPERATOR_HEARTBEAT_REQUIRED";const auto ack=op.stand();
     CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"OPERATOR_HEARTBEAT_REQUIRED");CHECK(op.b.r.backend.writes.empty()); }

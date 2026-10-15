@@ -23,7 +23,12 @@ enum class SegmentApproval : uint8_t { SEGMENT, PHASE, CONTINUOUS };
 const char* toString(SegmentApproval approval);
 struct CommissioningParameters {
   uint16_t inset_ticks=5;              // hard limit inset from gen-1 contacts
-  uint16_t prime_clamp_ticks=6;        // folded-rest prime into the limit
+  // Folded-rest prime into the limit (LOWER only, inward). A LOWER resting AT
+  // its folded stop sits inset_ticks past the hard limit; the prime target is
+  // kPrimeInwardMarginTicks inside it. 12 = inset 5 + margin 2 + recorded
+  // contact repeatability <= 3 + 2 ticks of rest settling (2026-10-15):
+  // a robot lying on its stop must not depend on a 1-2 tick corridor.
+  uint16_t prime_clamp_ticks=12;
   double max_velocity_rad_s=.15, max_acceleration_rad_s2=.6;
   double tracking_tolerance_rad=.006, max_step_rad=.006, sample_period_s=.05;
   double entry_min_stage_s=4, route_time_scale=2;
@@ -37,7 +42,7 @@ struct CommissioningParameters {
 };
 // Compiled caps. A runtime value outside its cap is refused, never clamped.
 struct CommissioningCaps {
-  static constexpr uint16_t kMaxPrimeClampTicks=8;
+  static constexpr uint16_t kMaxPrimeClampTicks=16;  // ~1.4 deg, inward only
   static constexpr double kMaxVelocityRadS=.35, kMaxAccelerationRadS2=2, kMaxTrackingRad=.010;
   static constexpr double kMaxStepRad=.01, kMinSamplePeriodS=.02, kMaxSamplePeriodS=.1;
   static constexpr double kMinStageS=1, kMaxStageS=60, kMinRouteScale=1, kMaxRouteScale=100;

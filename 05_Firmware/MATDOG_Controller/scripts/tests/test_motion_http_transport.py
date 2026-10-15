@@ -22,6 +22,9 @@ fixture = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast
 fixture = fixture[:fixture.index('int main(int argc,char**)')]
 fixture = fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "network/NetworkPolicy.h"\n#include "network/NetworkPolicy.h"\n#include "core/MotionService.h"\n#include "core/MotionJson.h"')
 fixture = fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0', 'constexpr int HTTP_GET=0')
+# 2026-10-14/15 production handlers: Issue #48 RESTORE, Twin assets, JSON errors with real status.
+fixture = fixture.replace('#include <mutex>', '#include <mutex>\n#include <atomic>\n#include <cstdlib>\n#include "network/TwinAssets.h"\n#include "network/RestoreRequestJson.h"', 1)
+fixture = fixture.replace('int httpd_resp_sendstr(', 'int httpd_resp_set_status(httpd_req_t*r,const char*s) { r->status=atoi(s);return 0; }\nint httpd_resp_sendstr(', 1)
 fixture = fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture = fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
 struct FakeService {
@@ -36,6 +39,9 @@ struct FakeService {
  bool motionCapabilities(char* out,size_t cap) { ++catalog_calls;return motion.capabilitiesJson(out,cap); }
  motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now) { ++command_calls;return motion.command(command,now); }
  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) { return motion.ackJson(ack,out,cap); }
+ unsigned heartbeats=0,restore_calls=0;
+ void operatorHeartbeat(uint32_t) { ++heartbeats; }
+ bool calibrationRestore(uint32_t,bool,char*,size_t) { ++restore_calls;return false; }
 ''')
 fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' bool portal_sta_=false;
  bool admitReadOnly(HttpTransportRequest&);
@@ -47,9 +53,17 @@ fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' boo
  char motion_capabilities_[kMotionCapabilitiesBytes]{};
  bool admitAdmin(HttpTransportRequest&);
  static esp_err_t handleMotion(httpd_req_t*);
+ static esp_err_t handleCalibrationRestore(httpd_req_t*);
+ static esp_err_t handleTwin(httpd_req_t*);
+ static esp_err_t sendJsonError(httpd_req_t*,const char*,const char*,uint32_t elapsed_ms=0);
+ static bool readBoundedBody(httpd_req_t*,char*,size_t,size_t*);
+ void appendTransportStats(char*,size_t) {}
+ std::atomic<bool> twin_deferred_{false};
+ static constexpr size_t kTwinDeferBytes=8192;
+ static constexpr uint32_t kDispatchTimeoutMs=3000,kMotionReadBudgetMs=1200;
  static esp_err_t handleWifi(httpd_req_t*);''')
-fixture = fixture.replace('bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){', '''bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out,char* large_text=nullptr,size_t large_cap=0){
-  if(busy)return false;
+fixture = fixture.replace('bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){', '''bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out,char* large_text=nullptr,size_t large_cap=0,uint32_t=3000,const char** failure=nullptr){
+  if(busy){if(failure)*failure="MAILBOX_BUSY";return false;}
   if(revoke_before_service)service.gate.revoke();''')
 fixture = fixture.replace('  switch(req.kind){', '''  auto serviceRequest = [&]() {
   // PRODUCTION_SERVICE_ADMISSION
@@ -101,6 +115,12 @@ int main() {
  auto unauth=motionRequest(s,command("MOTION.STOP"),false);runMotion(unauth);check(unauth.status==403&&s.service.command_calls==0,"cookie and CSRF required even for semantic writes");
  login(s);
  auto stop=motionRequest(s,command("MOTION.STOP","{\"reason\":\"fixture\"}"));runMotion(stop);check(stop.status==200&&stop.response.find("COMPLETED")!=std::string::npos,"authorized semantic STOP acknowledges without actuator binding");
+ // Deadman heartbeat (2026-10-15): only a status poll proving session AND CSRF (the Dashboard).
+ {const unsigned h=s.service.heartbeats;auto g=request(s,"/api/motion/status","");g.method=HTTP_GET;g.headers["Cookie"]="md_session="+std::string(s.portal_.cookie());
+  runMotion(g);check(g.status==200&&s.service.heartbeats==h,"cookie-only status poll (read-only Twin) is never the operator heartbeat");
+  g.status=200;g.headers["X-Csrf-Token"]=std::string(64,'0');runMotion(g);check(g.status==200&&s.service.heartbeats==h,"wrong CSRF is never the heartbeat");
+  g.status=200;g.headers["X-Csrf-Token"]=s.portal_.csrf();runMotion(g);check(g.status==200&&s.service.heartbeats==h+1,"Dashboard poll with session + CSRF is the heartbeat");
+  auto a=request(s,"/api/motion/status","");a.method=HTTP_GET;runMotion(a);check(a.status==200&&s.service.heartbeats==h+1,"anonymous AP status poll is never the heartbeat");}
  expectReject(s,"POSTURE.STAND","{\"target_height_m\":0.15}","RESTORE_REQUIRED",2);
  expectReject(s,"GAIT.SELECT","{\"gait\":\"TROT\"}","GAIT_NOT_VALIDATED",3);
  expectReject(s,"ACTION.EXECUTE","{\"action_id\":\"action.wave\"}","ACTION_NOT_VALIDATED",4);
@@ -119,7 +139,7 @@ int main() {
  {auto r=motionRequest(s,command("MOTION.STOP"));r.headers["Cookie"]="md_session="+std::string(64,'0');runMotion(r);check(r.status==403,"cookie mismatch denied");}
  {auto r=motionRequest(s,command("MOTION.STOP"));r.headers["Cookie"]="md_device="+std::string(s.portal_.cookie());runMotion(r);check(r.status==403,"device cookie alone grants no motion session");}
  check(s.service.command_calls==calls,"all rejected transport envelopes bypass semantic service");
- recv_chunk=1;recv_delay_ms=1000;auto timeout=motionRequest(s,command("MOTION.STOP"));runMotion(timeout);check(timeout.status==400&&timeout.response=="Body timeout","bounded production receive timeout");recv_chunk=4096;recv_delay_ms=0;
+ recv_chunk=1;recv_delay_ms=1000;auto timeout=motionRequest(s,command("MOTION.STOP"));runMotion(timeout);check(timeout.status==400&&timeout.response.find("BODY_TIMEOUT_OR_TRUNCATED")!=std::string::npos,"bounded production receive timeout (JSON error, real status)");recv_chunk=4096;recv_delay_ms=0;
  login(s);
  endpoints(true,0xc0a80401u,0xc0a80403u);auto peer=motionRequest(s,command("MOTION.STOP"));runMotion(peer);check(peer.status==403,"session remains peer-bound");endpoints();
  for(auto phase:{NetworkPhase::CLIENT_STA,NetworkPhase::ENTER_ADMIN,NetworkPhase::LEAVE_ADMIN,NetworkPhase::CLOSED,NetworkPhase::FAULT}){
@@ -149,7 +169,7 @@ int main() {
  login(s);
  s.revoke_before_service=true;auto pending=motionRequest(s,command("MOTION.STOP"));runMotion(pending);check(pending.status==403,"revocation between handler and Controller service fences request");s.revoke_before_service=false;s.service.gate.open();
  auto old=motionRequest(s,command("MOTION.STOP"));runMotion(old);check(old.status==403,"generation change resets portal session");login(s);
- s.busy=true;auto busy=request(s,"/api/motion/status","");busy.method=HTTP_GET;runMotion(busy);check(busy.status==500&&busy.response=="Controller busy","mailbox failure explicit");s.busy=false;
+ s.busy=true;auto busy=request(s,"/api/motion/status","");busy.method=HTTP_GET;runMotion(busy);check(busy.status==503&&busy.response.find("MAILBOX_BUSY")!=std::string::npos,"mailbox failure explicit (JSON 503)");s.busy=false;
  // MAINTENANCE LAN has a separate GET-only contract; no session or command.
  s.service.gate.phase.store(NetworkPhase::CLIENT_STA);s.service.gate.radio_fault.store(false);
  s.service.motion_wifi.run_mode=false;s.service.motion_wifi.connected=true;s.service.motion_wifi.role_reason=static_cast<uint8_t>(RoleReason::MAINTENANCE_STA_READONLY);

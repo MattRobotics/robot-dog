@@ -285,7 +285,8 @@ void standRefusalsAndStop(){
  {execution::CommissioningParameters p;const char* why=nullptr;
   CHECK(!execution::setCommissioningParameter(p,"tracking_tolerance_rad","0.05",&why));REASON(why,"TRACKING_TOLERANCE");
   CHECK(!execution::setCommissioningParameter(p,"max_velocity_rad_s","1",&why));
-  CHECK(!execution::setCommissioningParameter(p,"prime_clamp_ticks","9",&why));
+  CHECK(!execution::setCommissioningParameter(p,"prime_clamp_ticks","17",&why));REASON(why,"PRIME_CLAMP_TICKS");
+  CHECK(execution::setCommissioningParameter(p,"prime_clamp_ticks","16",&why)&&p.prime_clamp_ticks==16);p.prime_clamp_ticks=12;
   CHECK(!execution::setCommissioningParameter(p,"inset_ticks","1",&why));
   CHECK(!execution::setCommissioningParameter(p,"approval","ANY",&why));
   CHECK(!execution::setCommissioningParameter(p,"bypass_limits","1",&why));REASON(why,"UNKNOWN_PARAMETER");

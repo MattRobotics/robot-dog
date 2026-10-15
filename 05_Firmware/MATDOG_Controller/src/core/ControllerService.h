@@ -91,6 +91,7 @@ class ControllerService {
   bool motionCapabilities(char* out,size_t cap) const { return motion_&&motion_->capabilitiesJson(out,cap); }
   bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) const { return motion_&&motion_->ackJson(ack,out,cap); }
   bool motionActive() const { return motion_&&motion_->busy(); }
+  bool motionEngaged() const { return motion_&&motion_->engaged(); }
   void motionDisconnected(uint32_t now_ms) { if(motion_)motion_->disconnected(now_ms); }
 
 

@@ -405,6 +405,7 @@ void HttpTransport::update(uint32_t now_ms) {
     if (gap > loop_max_ms_.load()) loop_max_ms_.store(gap);
   }
   last_update_ms_ = now_ms;
+  twin_deferred_.store(service_->motionEngaged());
   if (memcmp(previous_admin_digest_, service_->networkAdminDigest(), 32) != 0) {
     portal_.reset();
     memcpy(previous_admin_digest_, service_->networkAdminDigest(), 32);
@@ -545,9 +546,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   }
 
   case HttpRequestKind::MOTION_STATUS:
-    // An authenticated AP Dashboard/Twin poll is the operational operator
-    // heartbeat (deadman). Anonymous or LAN read-only polls never count.
-    if(req.ap_socket&&!readonly&&portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie))
+    // The operational operator heartbeat (deadman) is an AP poll that proves
+    // the admin session AND its CSRF token: only the Dashboard page, which
+    // holds STOP, has both. The read-only Twin, anonymous and LAN read-only
+    // polls never keep a session alive (2026-10-15).
+    if(req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))
       service_->operatorHeartbeat(now_ms);
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
@@ -1170,6 +1173,7 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   cookieValue(session_cookie,"md_session",r.cookie);
   if(req->method==HTTP_GET) {
     r.kind=strcmp(req->uri,"/api/motion/status")==0?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
+    httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));  // heartbeat proof only, never a write
   } else {
     if(!r.local_authorized || req->content_len<=0 || req->content_len>1024)
       return sendJsonError(req,"400 Bad Request","ORIGIN_OR_BOUNDED_BODY_REQUIRED");
@@ -1266,6 +1270,11 @@ esp_err_t HttpTransport::handleTwin(httpd_req_t* req) {
   char tag[48]{};
   if(httpd_req_get_hdr_value_str(req,"If-None-Match",tag,sizeof(tag))==ESP_OK&&!strcmp(tag,asset->etag)){
     httpd_resp_set_status(req,"304 Not Modified");httpd_resp_set_hdr(req,"ETag",asset->etag);return httpd_resp_send(req,nullptr,0);
+  }
+  auto* self=static_cast<HttpTransport*>(req->user_ctx);
+  if(self&&asset->gz_len>kTwinDeferBytes&&self->twin_deferred_.load()){
+    httpd_resp_set_hdr(req,"Retry-After","5");
+    return sendJsonError(req,"503 Service Unavailable","TWIN_DEFERRED_MOTION_ACTIVE");
   }
   httpd_resp_set_type(req,asset->type);
   httpd_resp_set_hdr(req,"Content-Encoding","gzip");

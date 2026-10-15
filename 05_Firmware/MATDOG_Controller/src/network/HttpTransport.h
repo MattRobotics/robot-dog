@@ -141,6 +141,11 @@ private:
   std::atomic<uint32_t> loop_last_ms_{0}, loop_max_ms_{0}, dispatch_last_ms_{0},
       dispatch_max_ms_{0}, dispatch_late_{0}, dispatch_busy_{0};
   uint32_t last_update_ms_ = 0;
+  // Set by the Controller thread each loop: a Motion torque sequence or motion
+  // is in progress. The single httpd task then defers large Twin downloads so a
+  // STOP or heartbeat is never queued behind a ~100 KB send (304 still served).
+  std::atomic<bool> twin_deferred_{false};
+  static constexpr size_t kTwinDeferBytes = 8192;
 };
 } // namespace network
 } // namespace matdog

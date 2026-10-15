@@ -30,7 +30,7 @@ async function boot(enabled = false, options = {}) {
       w.setInterval = (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; };
       w.addEventListener('error', e => errors.push(e.message));
       w.fetch = async (url, init = {}) => {
-        calls.push({ url, method: init.method || 'GET' });
+        calls.push({ url, method: init.method || 'GET', csrf: (init.headers || {})['X-Csrf-Token'] });
         const read = !init.method || init.method === 'GET';
         if (read) { device.inflight++; device.maxReadInflight = Math.max(device.maxReadInflight, device.inflight); }
         try { return await serve(url, init); } finally { if (read) device.inflight--; }
@@ -329,6 +329,13 @@ async function boot(enabled = false, options = {}) {
   assert.strictEqual(p.q('#motion-twin-local').getAttribute('href'), '/twin/', 'Digital Twin served by the robot');
   p.q('#motion-stand').click(); await settle();
   assert.strictEqual(p.device.commands.at(-1).type, 'POSTURE.STAND');
+  // Deadman proof (2026-10-15): status reads carry the admin CSRF token, so the
+  // controller can tell the Dashboard (which holds STOP) from a read-only Twin.
+  p.dom.window.eval("csrf='d'.repeat(64)"); p.device.status.now_ms += 100;
+  await p.motionPoll();
+  const read = p.calls.filter(c => c.url === '/api/motion/status').at(-1);
+  assert.strictEqual(read.csrf, 'd'.repeat(64), 'status poll presents the CSRF heartbeat proof');
+  assert(p.q('#motion-stand').closest('.card').textContent.includes('Solo con MATDOG sospeso sulla fixture'), 'fixture-only SAFE_OFF warning is visible');
   p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
   console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY)');

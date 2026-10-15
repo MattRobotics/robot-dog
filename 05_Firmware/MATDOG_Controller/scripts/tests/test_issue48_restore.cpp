@@ -5,6 +5,7 @@
 // live raw outside the recorded span refuses atomically; no storage writes;
 // idempotence; nothing here grants limits/permit/authority.
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <vector>
@@ -180,6 +181,58 @@ int main() {
     GeometryProvenance other = geometry_data::kProvenance; other.urdf_sha256[0] = other.urdf_sha256[0] == 'a' ? 'b' : 'a';
     RecordInspection x;
     CHECK(wrong.restore.inspect(wrong.persistence, wrong.profile, other, &x) == RuntimeRestoreStatus::REJECT_GEOMETRY && !x.ok);
+  }
+  // --- 2026-10-15: the live gate is the MECHANICAL span, never a PRONE window ---
+  {
+    // Every tick between the two recorded contacts is accepted, joint by joint,
+    // with all other joints anywhere else inside their own spans.
+    unsigned swept = 0;
+    for (unsigned j = 0; j < kRecordJointCount; ++j) {
+      auto live = midSpan(in);
+      for (int t = in.contact_min[j]; t <= in.contact_max[j]; ++t) {
+        live.raw[j] = static_cast<uint16_t>(t); ++swept;
+        if (firstLivePositionMismatch(in, live) != kRecordJointCount) { CHECK(!"span tick refused"); break; }
+      }
+      // Slack past each contact: repeatability + 16 ticks (~1.4 deg) is tolerated.
+      live.raw[j] = static_cast<uint16_t>(in.contact_min[j] - in.repeatability[j] - live.extra_margin_ticks);
+      CHECK(firstLivePositionMismatch(in, live) == kRecordJointCount);
+      live.raw[j] = static_cast<uint16_t>(in.contact_min[j] - in.repeatability[j] - live.extra_margin_ticks - 1);
+      CHECK(firstLivePositionMismatch(in, live) == j);
+    }
+    CHECK(swept > 12 * 1000);  // spans are ~1000-2000 ticks, not a few around PRONE
+    std::printf("ISSUE48 span sweep: %u live ticks accepted across 12 recorded mechanical spans\n", swept);
+    // Real rest of 14 Oct 2026 (hardware check, torque OFF, raw ticks): inside.
+    const uint16_t rest14[12] = {2018, 3002, 3146, 1999, 1196, 944, 2063, 1127, 994, 2049, 3023, 3131};
+    LivePositionEvidence live; live.present = true; for (unsigned i = 0; i < 12; ++i) live.raw[i] = rest14[i];
+    CHECK(firstLivePositionMismatch(in, live) == kRecordJointCount);
+    // A remounted unit is refused with its joint; the refusal is retried at
+    // boot (not a lock until reboot), record defects are not retried.
+    CHECK(restoreRefusalIsTransient(RestoreReason::LIVE_POSITION_OUTSIDE_RECORD));
+    CHECK(restoreRefusalIsTransient(RestoreReason::TORQUE_NOT_OFF) && restoreRefusalIsTransient(RestoreReason::PREFLIGHT_NOT_COMPLETE));
+    CHECK(restoreRefusalIsTransient(RestoreReason::RUNTIME_NOT_IDLE) && restoreRefusalIsTransient(RestoreReason::NOT_MAINTENANCE));
+    CHECK(restoreRefusalIsTransient(RestoreReason::NVS_NOT_READY));
+    CHECK(!restoreRefusalIsTransient(RestoreReason::NO_VALID_ACKNOWLEDGED_RECORD) && !restoreRefusalIsTransient(RestoreReason::RECORD_REJECTED));
+    CHECK(!restoreRefusalIsTransient(RestoreReason::WRITE_OUTCOME_UNCERTAIN) && !restoreRefusalIsTransient(RestoreReason::PREFLIGHT_FAILED));
+    CHECK(!restoreRefusalIsTransient(RestoreReason::GENERATION_MISMATCH) && !restoreRefusalIsTransient(RestoreReason::OK));
+  }
+  // Optional, LOCAL ONLY: the real persisted gen-1 record (private dump path in
+  // MATDOG_REAL_GEN1_RECORD). Never copied into the repository.
+  if (const char* path = std::getenv("MATDOG_REAL_GEN1_RECORD")) {
+    std::FILE* f = std::fopen(path, "rb"); CHECK(f != nullptr);
+    if (f) {
+      Rig real(false); real.storage.slot[0].resize(kCalibrationRecordV1EncodedBytes);
+      const size_t n = std::fread(real.storage.slot[0].data(), 1, real.storage.slot[0].size(), f); std::fclose(f);
+      CHECK(n == kCalibrationRecordV1EncodedBytes); real.storage.putMarker(1); real.persistence.load(real.profile);
+      RecordInspection rin; CHECK(real.restore.inspect(real.persistence, real.profile, geometry_data::kProvenance, &rin) == RuntimeRestoreStatus::RESTORED && rin.ok);
+      const uint16_t rest14[12] = {2018, 3002, 3146, 1999, 1196, 944, 2063, 1127, 994, 2049, 3023, 3131};
+      LivePositionEvidence live; live.present = true; for (unsigned i = 0; i < 12; ++i) live.raw[i] = rest14[i];
+      CHECK(firstLivePositionMismatch(rin, live) == kRecordJointCount);
+      const int w = real.storage.writes;
+      CHECK(real.restore.restore(real.persistence, real.profile, geometry_data::kProvenance, real.facts(), real.transforms, real.limits, &live)
+            == RuntimeRestoreStatus::RESTORED && real.transforms.size() == kRecordJointCount && real.limits.size() == 0 && real.storage.writes == w);
+      CHECK(evaluateRestore(goodFacts(rin), pinned, boot).decision == RestoreDecision::ALLOW_AUTOMATIC);
+      std::printf("ISSUE48 REAL gen=%lu fingerprint=%016llx rest14=INSIDE restore=RESTORED writes=0\n", (unsigned long)rin.generation, (unsigned long long)rin.fingerprint);
+    }
   }
   // --- Dashboard body parser: strict, bounded, no implicit confirmation ---
   {

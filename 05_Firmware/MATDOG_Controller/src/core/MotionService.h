@@ -65,6 +65,8 @@ class MotionService {
   bool ackJson(const motion::MotionAck&,char*,size_t) const;
   void publishTelemetry(const MotionTelemetry& t) { telemetry_=t; }
   bool busy() const { return executor_&&(executor_->active()||executor_->status().safe_off_required); }
+ // Torque sequence or motion in progress (arming a STAND included).
+ bool engaged() const { return busy()||(planner_&&planner_->arming()); }
   const MotionReadiness& readiness() const { return readiness_; }
   const motion::MotionAck& lastAck() const { return last_ack_; }
   const motion::MotionAck& activeAck() const { return active_ack_; }

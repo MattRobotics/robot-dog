@@ -707,6 +707,9 @@ bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
 "$OUT/test_operational_readiness"
 python3 "$SCRIPT_DIR/run_operational_motion_tests.py"
 python3 -I "$SCRIPT_DIR/test_twin_assets.py"
+# Production Motion/RESTORE/Twin HTTP handlers, security envelope and operator
+# heartbeat proof (2026-10-15: was only in the release list and had regressed).
+python3 "$SCRIPT_DIR/test_motion_http_transport.py"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"
