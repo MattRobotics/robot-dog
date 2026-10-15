@@ -24,7 +24,7 @@ REQUIRED = {
         "motion::pairedProneMatch(local_motion_observation_", "e.scope!=reviewed_motion_.scope",
         "motion_service_.begin(&motion_executor_, &motion_coordinator_);",
         "service_.bindMotionService(&motion_service_);",
-        "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);",
+        "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));",
         "motion_executor_.update(operational_facts_,operational_feedback_,now_ms);",
         "motion_service_.refresh(ready,now_ms);",
         "servo_bus_.safeOff(joint->bus_id)", "motion_safe_off_mask_==0x0fff",
@@ -75,7 +75,7 @@ def violations(files):
     if re.search(r"motion_executor_\.arm\s*\(", controller):
         bad.append("Controller must arm only through the scoped local MotionSession")
     ordering = [controller.find(token) for token in (
-        "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);",
+        "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));",
         "motion_executor_.update(operational_facts_,operational_feedback_,now_ms);",
         "motion_service_.refresh(ready,now_ms);")]
     if any(index < 0 for index in ordering) or ordering != sorted(ordering):
@@ -110,7 +110,7 @@ def main():
         if not violations(changed):
             failures.append(f"undetected ownership mutation: {mutation}")
     changed = dict(files)
-    planner = "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms);"
+    planner = "motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));"
     executor = "motion_executor_.update(operational_facts_,operational_feedback_,now_ms);"
     changed["core/Controller.cpp"] = files["core/Controller.cpp"].replace(planner, "SWAP_PLACEHOLDER").replace(executor, planner).replace("SWAP_PLACEHOLDER", executor)
     checks += 1

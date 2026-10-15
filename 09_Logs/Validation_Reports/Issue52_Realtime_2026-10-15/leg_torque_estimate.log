@@ -1,0 +1,23 @@
+== 30,7.0,15,0.80
+URDF mass 2.480 kg (+0.0 kg), URDF effort limit 0.902244 N*m per joint, stance feet 3
+LF FIXTURE peak hip/upper/lower = 0.132/0.059/0.019 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.195/0.457 N*m
+RF FIXTURE peak hip/upper/lower = 0.132/0.059/0.019 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.195/0.457 N*m
+RH FIXTURE peak hip/upper/lower = 0.132/0.113/0.013 N*m rms 0.131/0.104/0.009 | GROUND quasi-static peak 0.246/0.344/0.314 N*m
+LH FIXTURE peak hip/upper/lower = 0.132/0.113/0.013 N*m rms 0.131/0.104/0.009 | GROUND quasi-static peak 0.246/0.344/0.314 N*m
+== 60,3.0,10,0.75
+URDF mass 2.480 kg (+0.0 kg), URDF effort limit 0.902244 N*m per joint, stance feet 3
+LF FIXTURE peak hip/upper/lower = 0.133/0.064/0.018 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.274/0.446 N*m
+RF FIXTURE peak hip/upper/lower = 0.133/0.064/0.018 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.274/0.446 N*m
+RH FIXTURE peak hip/upper/lower = 0.135/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.246/0.433/0.362 N*m
+LH FIXTURE peak hip/upper/lower = 0.135/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.246/0.433/0.362 N*m
+== 60,2.4,10,0.75
+URDF mass 2.480 kg (+0.0 kg), URDF effort limit 0.902244 N*m per joint, stance feet 3
+LF FIXTURE peak hip/upper/lower = 0.134/0.064/0.017 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.274/0.446 N*m
+RF FIXTURE peak hip/upper/lower = 0.134/0.064/0.017 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.246/0.274/0.446 N*m
+RH FIXTURE peak hip/upper/lower = 0.136/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.246/0.433/0.362 N*m
+LH FIXTURE peak hip/upper/lower = 0.136/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.246/0.433/0.362 N*m
+URDF mass 2.480 kg (+0.82 kg), URDF effort limit 0.902244 N*m per joint, stance feet 3
+LF FIXTURE peak hip/upper/lower = 0.133/0.064/0.018 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.370/0.359/0.600 N*m
+RF FIXTURE peak hip/upper/lower = 0.133/0.064/0.018 N*m rms 0.131/0.044/0.015 | GROUND quasi-static peak 0.370/0.359/0.600 N*m
+RH FIXTURE peak hip/upper/lower = 0.135/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.370/0.615/0.487 N*m
+LH FIXTURE peak hip/upper/lower = 0.135/0.118/0.015 N*m rms 0.131/0.103/0.010 | GROUND quasi-static peak 0.370/0.615/0.487 N*m

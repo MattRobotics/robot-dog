@@ -13,6 +13,7 @@
 #include "../calibration/CalibrationRuntimeRestore.h"
 #include "../calibration/RestoreAttestationPolicy.h"
 #include "OperationalReadiness.h"
+#include "MotionClock.h"
 #include "../execution/MotionCoordinator.h"
 #include "../execution/OperationalFeedback.h"
 #include "../execution/MotionSession.h"
@@ -20,6 +21,7 @@
 #include "../execution/ReviewedMotionRuntime.h"
 #include "../execution/CommissioningPolicy.h"
 #include "../motion/FixturePoseClassifier.h"
+#include "../motion/OperationalWalkProfile.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -86,6 +88,8 @@ class Controller {
   const char* armOperationalSession(uint32_t now_ms);
   static constexpr uint32_t kOperationalHeartbeatMs=3000;
   bool operational_walk_bound_=false;const char* operational_walk_reason_="WALK_NOT_BOUND";
+  bool walk_drive_latched_=false;
+  motion::operational_walk::DriveProfile walk_drive_{};
   core::OperationalReadiness readiness_core_{};
   core::ReadinessAction last_readiness_action_=core::ReadinessAction::NONE;
   AuthorityLease motion_authority_lease_{};
@@ -262,6 +266,17 @@ class Controller {
   uint8_t operational_poll_next_=0;
   uint32_t operational_poll_at_ms_=0;
   uint16_t motion_safe_off_mask_=0;
+  // Issue #52 (2026-10-15): ONE monotonic 64-bit clock for Motion (encoder
+  // stamps, planner, scheduler); slow control-block reads rotate separately;
+  // SAFE_OFF starts with one SYNC TorqueEnable=0 to the twelve leg ids, then
+  // per-id readback verification (no VERIFIED_OFF from a TX). Metrics are
+  // offline budgets to qualify, never hardware measurements.
+  core::MonotonicClock64 motion_clock_;
+  uint8_t canonical_leg_ids_[12]{};
+  uint8_t operational_control_next_=0;uint32_t operational_control_at_ms_=0;
+  bool safe_off_burst_sent_=false;
+  struct StopMetrics { uint64_t latched_us=0,last_target_tx_us=0,off_tx_start_us=0,off_tx_done_us=0,all_off_verified_us=0;uint16_t off_bytes=0;uint8_t verify_rounds=0; } stop_metrics_{};
+  void emergencyTorqueOffBurst();
   uint8_t motion_safe_off_next_=0;
 
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct

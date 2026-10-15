@@ -50,7 +50,8 @@ struct MotionTelemetry {
  const char* system_health="BOOTING";const char* calibration_state="NOT_RESTORED";const char* joint_feedback="UNAVAILABLE";
  const char* motion_authority="NOT_GRANTED";const char* readiness_phase="BOOTING";const char* readiness_reason="";
  const char* operating_mode="MAINTENANCE";const char* entry_reason="";bool operator_present=false;
- const char* walk="WALK_NOT_BOUND";  // operational first stride binding/reason
+ const char* walk="WALK_NOT_BOUND";  // operational WALK state or binding reason
+ double walk_cycles=0;bool walk_drive=false;
 };
 // Controller owns this transport-independent intention service. A transport
 // submits a typed command and receives an ack; it cannot acquire a lease.

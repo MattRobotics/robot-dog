@@ -2,6 +2,7 @@
 // USB console only (never registered with HTTP). RAM-only state; nothing here
 // writes NVS/EEPROM or changes a servo configuration register. Every actuation
 // still goes through MotionSession -> MotionExecutor -> Safe Actuator layer.
+#include "../motion/OperationalWalkProfile.h"
 #include "Controller.h"
 #include "LocalMotionCommand.h"
 #include "../motion/FirstStrideReference.h"
@@ -95,11 +96,14 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
       actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
     unbindCommissioning("LIMIT_TRANSFORM_FAILED");reason=commissioning_reason_;return false;}
    limits[i][0]=std::fmin(lo,hi)*1e-6;limits[i][1]=std::fmax(lo,hi)*1e-6;}
-  // Operational (2026-10-15): the compiled, certified first stride is bound as
-  // a SPECIFICATION when it fits the live gen-1 limits; motion still needs a
-  // verified STAND and one explicit Dashboard command per stride.
+  // Operational (2026-10-15): the continuous fixture WALK profile is bound as a
+  // SPECIFICATION when its certified target union (+ tracking tube) fits the
+  // live gen-1 limits; motion still needs a verified STAND and an explicit
+  // Dashboard WALK START. The compiled first stride stays a USB/historical path.
   execution::CommissioningParameters params=commissioning_params_;
-  if(operational)params.walk_enabled=true;
+  if(operational){params.walk_enabled=false;
+    // Issue #52: operational STAND rates/frame period derived in kStandProfile.
+    if(!execution::applyOperationalStandProfile(params,&reason)){unbindCommissioning("STAND_PROFILE_REJECTED");return false;}}
   operational_walk_bound_=false;operational_walk_reason_="WALK_NOT_BOUND";
   execution::ReviewedMotionRuntime r;
   if(!execution::buildCommissioningRuntime(params,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return false;}
@@ -108,13 +112,21 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
    for(unsigned i=0;i<12;++i){const auto& q=f.target.legs[i/3];const double v=i%3==0?q.hip:i%3==1?q.upper:q.lower;
     if(!f.target.valid||v<limits[i][0]||v>limits[i][1]){unbindCommissioning("ROUTE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}}
   if(params.walk_enabled){unsigned joint=0;
-   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){
-    if(!operational){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}
-    r.walk=motion::WalkSpecification{};operational_walk_reason_="WALK_TUBE_OUTSIDE_LIMITS";  // STAND stays available, WALK does not
-   } else if(operational){operational_walk_bound_=true;operational_walk_reason_="FIRST_STRIDE_BOUND";}}
+   if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}
+  if(operational){unsigned joint=12;
+   if(motion::operational_walk::fitsLimits(r.feedback,r.execution.tracking_tolerance_rad,&joint)){
+    r.walk=motion::operational_walk::specification();operational_walk_bound_=true;operational_walk_reason_="WALK_BOUND";
+    // The EXPERIMENTAL fast profile is offered (never selected by default) only
+    // when its own certified box +/- tube fits these live limits too.
+    if(motion::operational_walk::fitsLimits(motion::operational_walk::kFastProfile,r.feedback,r.execution.tracking_tolerance_rad))
+      r.walk.maxVxMps=std::fmax(r.walk.maxVxMps,motion::operational_walk::profileVelocity(motion::operational_walk::kFastProfile,0));
+   } else {r.walk=motion::WalkSpecification{};operational_walk_reason_="WALK_RANGE_OUTSIDE_LIMITS";}  // STAND stays available
+  }
   motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
+  if(operational){route.phaseTimed=true;route.phaseVelocityRadS=params.max_velocity_rad_s;route.phaseAccelerationRadS2=params.max_acceleration_rad_s2;
+    r.execution.frame_writes=true;}   // one SYNC frame per tracked STAND frame
   route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
-  execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=commissioning_params_.entry_min_stage_s;
+  execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=params.entry_min_stage_s;
   if(operational){
    // Measured-start entry: no certificate tube. Keep-outs from CAD/FCL
    // (GEOMETRY_ENTRY_REPORT 2026-10-14): LF LOWER first zero separation
@@ -133,7 +145,7 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   servo_bus_.setValidationTimeout(commissioning_params_.transaction_timeout_ms);servo_bus_.setValidationDrive(commissioning_params_.drive_speed,commissioning_params_.drive_acceleration);
   // Fixture support is the operator's declaration (this token + the deadman),
   // never a load measurement. The body pose is the route's virtual reference.
-  motion::AdaptiveObservation o;o.body=motion::pairedProneSample(0,0,true).cartesian.body;o.stampS=issued/1000.0;
+  motion::AdaptiveObservation o;o.body=motion::pairedProneSample(0,0,true).cartesian.body;o.supportStampS=issued/1000.0;
   o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;
   local_motion_observation_=o;local_trial_evidence_={};
   if(operational)runtime_mode_=execution::RuntimeTestMode::OPERATIONAL;
@@ -237,7 +249,7 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
  }
  if(!commissioning_bound_){reason="COMMISSIONING_ADMIT_REQUIRED";return reply();}
  if(!strcmp(t[0],"PRESENT")&&n==3&&!strcmp(t[2],"CONFIRM_PRESENT_FIXTURE_POWER_CUT_FREE_VOLUME")){
-  validation_present_=true;validation_presence_ms_=issued;local_motion_observation_.stampS=issued/1000.0;
+  validation_present_=true;validation_presence_ms_=issued;local_motion_observation_.supportStampS=issued/1000.0;
   local_trial_evidence_.local_operator_present=true;ok=true;reason="LOCAL_DEADMAN_REFRESHED";return reply();
  }
  if(!strcmp(t[0],"GRANT")&&n==4){

@@ -2,6 +2,7 @@
 
 #include "../config/Pins.h"
 #include "ServoProfile.h"
+#include "ServoPacket.h"
 
 namespace matdog {
 namespace servo {
@@ -285,6 +286,53 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
   out->present_temperature = feedback[SMS_STS_PRESENT_TEMPERATURE - f0];
   out->status = feedback[kServoStatusRegister - f0];
   out->present_current = le16(feedback, SMS_STS_PRESENT_CURRENT_L - f0);
+  return true;
+}
+
+bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report) {
+  FrameTx local{};FrameTx& r=report?*report:local;r=FrameTx{};
+  if(!validation_speed_||!validation_acceleration_)return false;   // no reviewed drive pair: nothing sent
+  uint8_t packet[packet::kGoalFrameBytes];
+  const size_t n=packet::buildGoalFrame(ids,ticks,12,validation_speed_,validation_acceleration_,packet,sizeof(packet));
+  if(n!=packet::kGoalFrameBytes)return false;
+  // Bounded drain of stale RX (a late reply must not be parsed later as ours).
+  for(unsigned k=0;k<64&&servo_uart_.available();++k)servo_uart_.read();
+  r.started=true;r.started_us=micros();
+  const size_t written=servo_uart_.write(packet,n);
+  servo_uart_.flush();                       // returns when the TX FIFO and shifter are empty
+  r.complete_us=micros();r.bytes=static_cast<uint16_t>(written);r.complete=written==n;
+  return r.complete;
+}
+uint16_t ServoBus::syncTorqueOff(const uint8_t* ids, unsigned count) {
+  uint8_t packet[packet::kTorqueOffBytesMax];
+  const size_t n=packet::buildTorqueOff(ids,count,packet,sizeof(packet));
+  if(!n)return 0;
+  const size_t written=servo_uart_.write(packet,n);
+  servo_uart_.flush();
+  return static_cast<uint16_t>(written);
+}
+SafeOffResult ServoBus::verifyTorqueOff(int id, uint32_t timeout_ms) {
+  if(id<0||id>253||timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  ScopedIOTimeout guard(st_,timeout_ms);
+  const int torque_enable=st_.readByte(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE);
+  if(torque_enable<0){last_detected_=core::DetectedState::NO_RESPONSE;return SafeOffResult::UNVERIFIED_NO_RESPONSE;}
+  last_detected_=core::DetectedState::ONLINE;
+  return torque_enable==0?SafeOffResult::VERIFIED_OFF:SafeOffResult::VERIFY_FAILED;
+}
+bool ServoBus::readFastFeedback(int id, FastFeedback* out, uint32_t timeout_ms) {
+  if(id<0||id>253||out==nullptr)return false;
+  *out=FastFeedback{};
+  if(timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return false;
+  ScopedIOTimeout guard(st_,timeout_ms);
+  uint8_t feedback[SMS_STS_PRESENT_CURRENT_H - SMS_STS_PRESENT_POSITION_L + 1] = {0};
+  if(st_.Read(static_cast<uint8_t>(id),SMS_STS_PRESENT_POSITION_L,feedback,sizeof(feedback))!=static_cast<int>(sizeof(feedback))){
+    last_detected_=core::DetectedState::NO_RESPONSE;return false;}
+  last_detected_=core::DetectedState::ONLINE;
+  auto le16=[&](int a){const int o=a-SMS_STS_PRESENT_POSITION_L;return static_cast<int>(feedback[o])|(static_cast<int>(feedback[o+1])<<8);};
+  out->present_position=le16(SMS_STS_PRESENT_POSITION_L);out->present_speed=le16(SMS_STS_PRESENT_SPEED_L);
+  out->present_load=le16(SMS_STS_PRESENT_LOAD_L);out->present_voltage=feedback[SMS_STS_PRESENT_VOLTAGE-SMS_STS_PRESENT_POSITION_L];
+  out->present_temperature=feedback[SMS_STS_PRESENT_TEMPERATURE-SMS_STS_PRESENT_POSITION_L];
+  out->status=feedback[kServoStatusRegister-SMS_STS_PRESENT_POSITION_L];out->present_current=le16(SMS_STS_PRESENT_CURRENT_L);
   return true;
 }
 

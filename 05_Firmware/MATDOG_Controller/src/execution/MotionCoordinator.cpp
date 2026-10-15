@@ -2,13 +2,17 @@
 #include <cmath>
 #include <cstring>
 #include "../motion/FixturePoseClassifier.h"
+#include "../motion/OperationalWalkProfile.h"
+static_assert(matdog::motion::operational_walk::kMaxProfileVelocityRadS<=matdog::execution::MotionExecutor::kWalkRateCeilingRadS&&
+              matdog::motion::operational_walk::kMaxProfileAccelerationRadS2<=matdog::execution::MotionExecutor::kWalkAccelerationCeilingRadS2,
+              "every walk profile envelope must fit the executor ceilings");
 namespace matdog { namespace execution {
 void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;submitted_sequence_=0;arm_generation_=0;}
 void MotionCoordinator::synchronizeSession(){
  if(!executor_||arm_generation_==executor_->status().arm_generation)return;
  arm_generation_=executor_->status().arm_generation;
  submitted_sequence_=0;assessment_={};frame_=motion::FeedbackFrame{};walking_=false;
- stand_.stop();walk_=motion::FeedbackWalk{};
+ stand_.stop();walk_=motion::FeedbackWalk{};scheduler_.stop();walk_profile_=nullptr;
 }
 bool MotionCoordinator::configure(const motion::FeedbackPolicy& p,const motion::WalkSpecification& w,const motion::AcquisitionRoute* a){
  if(executor_&&executor_->active())return false;
@@ -28,7 +32,7 @@ bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c
 }
 void MotionCoordinator::observe(const motion::AdaptiveObservation& o){observation_=o;}
 bool MotionCoordinator::assess(const motion::SegmentAssessment& a,uint32_t now){
- const bool ok=walking_?walk_.assess(a,now/1000.0):stand_.assess(a,now/1000.0);
+ const bool ok=walking_?walk_.assess(a,walkTime(now)):stand_.assess(a,walkTime(now));
  if(ok)assessment_=a;
  return ok;
 }
@@ -51,7 +55,7 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
     r.entry=&entry_plan_;r.proneMaxDeviationRad=commissioning_.proneMaxDeviationRad;r.proneMaxRmsRad=commissioning_.proneMaxRmsRad;
    }
    entry_reason_="";
-   return stand_.request(r,feedback_policy_,now/1000.0)?nullptr:motion::feedbackReasonName(stand_.reason());
+   return stand_.request(r,feedback_policy_,walkTime(now))?nullptr:motion::feedbackReasonName(stand_.reason());
 }
 const char* MotionCoordinator::preArmCheck(){
  const auto& o=observation_;
@@ -99,16 +103,26 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
     // contract; the stride runs on the Controller clock with the reviewed
     // internal TTL, renewed only by the operator heartbeat (renewWalk).
     const bool zero=v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0;
-    if(walking_&&!zero)return "WALK_IN_PROGRESS";            // one explicit stride per command
-    if(!walking_&&!zero&&stand_.state()!=motion::AdaptiveStandState::STAND)return "STAND_VERIFIED_REQUIRED";
-    v.stampS=now/1000.0;v.ttlS=std::fmin(v.ttlS,walk_specification_.maxCommandTtlS);
+    if(walking_&&!zero)return "WALK_IN_PROGRESS";            // change speed: WALK STOP, then START
+    if(!walking_&&!zero){
+     if(stand_.state()!=motion::AdaptiveStandState::STAND)return "STAND_VERIFIED_REQUIRED";
+     const auto* profile=motion::operational_walk::profileForVelocity(v.vxMps);
+     if(!profile||v.vyMps!=0||v.yawRateRadS!=0)return "WALK_SPEED_NOT_CERTIFIED";
+     // The profile's certified box +/- the tube must sit inside the live limits.
+     if(!motion::operational_walk::fitsLimits(*profile,feedback_policy_,feedback_policy_.maxTrackingErrorRad))return "WALK_PROFILE_OUTSIDE_LIMITS";
+     // Walk-only joint rates, selected between frames; stand rates come back at STAND.
+     if(!executor_->selectRates(profile->maxVelocityRadS,profile->maxAccelerationRadS2))return "EXECUTOR_NOT_READY";
+     walk_profile_=profile;
+    }
+    v.stampS=walkTime(now);v.ttlS=std::fmin(v.ttlS,walk_specification_.maxCommandTtlS);
     if(walking_)v.sequence=walk_command_.sequence+1;           // after the internal renewals
    }
-   if(walking_)return walk_.command(v,now/1000.0)?nullptr:motion::feedbackReasonName(walk_.reason());
+   if(walking_)return walk_.command(v,walkTime(now))?nullptr:motion::feedbackReasonName(walk_.reason());
    if(v.vxMps==0&&v.vyMps==0&&v.yawRateRadS==0)return nullptr;
-   auto spec=walk_specification_;spec.firstTargetSequence=executor_->status().accepted_sequence+1;
-   if(!walk_.start(stand_,observation_,v,spec,feedback_policy_,now/1000.0))return motion::feedbackReasonName(walk_.reason());
-   walk_command_=v;walking_=true;return nullptr;
+   auto spec=commissioning_.measuredStart&&walk_profile_?motion::operational_walk::specification(*walk_profile_):walk_specification_;
+   spec.firstTargetSequence=executor_->status().accepted_sequence+1;
+   if(!walk_.start(stand_,observation_,v,spec,feedback_policy_,walkTime(now))){executor_->restoreArmedRates();walk_profile_=nullptr;return motion::feedbackReasonName(walk_.reason());}
+   walk_command_=v;walking_=true;active_spec_=spec;return nullptr;
   }
   default:return "ACTION_NOT_VALIDATED";
  }
@@ -117,15 +131,51 @@ void MotionCoordinator::stop(uint32_t){pending_stand_=false;if(session_&&(sessio
 bool MotionCoordinator::renewWalk(uint32_t now){
  if(!walking_||!commissioning_.measuredStart)return false;
  const auto st=walk_.state();if(st!=motion::FeedbackWalkState::STARTING&&st!=motion::FeedbackWalkState::WALK)return false;
- auto v=walk_command_;v.stampS=now/1000.0;v.sequence=walk_command_.sequence+1;
- if(!walk_.command(v,now/1000.0))return false;
+ auto v=walk_command_;v.stampS=walkTime(now);v.sequence=walk_command_.sequence+1;
+ if(!walk_.command(v,walkTime(now)))return false;
  walk_command_=v;return true;
 }
 const char* MotionCoordinator::state() const {
  if(!walking_)return motion::adaptiveStandStateName(stand_.state());
- switch(walk_.state()){case motion::FeedbackWalkState::IDLE:return "IDLE";case motion::FeedbackWalkState::STARTING:return "WALK_STARTING";case motion::FeedbackWalkState::WALK:return "WALK";case motion::FeedbackWalkState::STOPPING:return "STOPPING";case motion::FeedbackWalkState::STAND:return "STAND";default:return "REJECTED";}
+ switch(walk_.state()){case motion::FeedbackWalkState::IDLE:return "IDLE";case motion::FeedbackWalkState::STARTING:return "WALK_STARTING";case motion::FeedbackWalkState::WALK:return "WALK";case motion::FeedbackWalkState::STOPPING:case motion::FeedbackWalkState::HOLD:return "STOPPING";case motion::FeedbackWalkState::STAND:return "STAND";default:return "REJECTED";}
 }
-void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now){
+void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now){update(facts,fb,now,static_cast<uint64_t>(now)*1000);}
+// Time-driven WALK (Issue #52): the reference follows the monotonic clock at
+// the scheduler's absolute release instants; one coordinated frame per
+// release, never waiting for the previous frame to be reached. Tracking is the
+// executor's asynchronous per-joint monitor; HOLD -> STAND only when the final
+// target is settled by measurement.
+void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
+ const auto& w=active_spec_;
+ if(!executor_->streaming()){
+  if(executor_->status().state!=ExecutorState::READY)return;
+  StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=w.streamMaxLagS;c.settle_speed_rad_s=w.streamSettleSpeedRadS;
+  c.feedback_max_age_us=static_cast<uint32_t>(std::llround(w.streamFeedbackMaxAgeS*1e6));c.hold_timeout_us=static_cast<uint32_t>(std::llround(w.streamHoldTimeoutS*1e6));
+  c.max_frame_gap_us=static_cast<uint32_t>(std::llround(w.streamMaxGapS*1e6));c.persist_samples=static_cast<uint8_t>(w.streamPersistSamples);
+  c.region_min_rad=w.regionMinRad;c.region_max_rad=w.regionMaxRad;
+  if(!executor_->beginStream(c,fb,now_us)||!scheduler_.start(now_us+static_cast<uint64_t>(std::llround(w.streamPeriodS*1e6)),static_cast<uint32_t>(std::llround(w.streamPeriodS*1e6)))){executor_->stop("STREAM_BEGIN_REFUSED");return;}
+ }
+ executor_->monitor(facts,fb,now,now_us);
+ if(!executor_->streaming())return;   // stopped by the monitor: SAFE_OFF path
+ auto o=observation_;const auto& st=executor_->status();
+ o.acknowledged=st.settled_sequence!=0;o.acknowledgedSequence=st.settled_sequence;
+ const auto release=scheduler_.poll(now_us);
+ if(!release.release&&walk_.state()!=motion::FeedbackWalkState::HOLD)return;
+ frame_=walk_.streamUpdate(o,(now_us/1e6));
+ if(walk_.state()==motion::FeedbackWalkState::STAND){
+  if(!executor_->endStream()){executor_->stop("HOLD_NOT_SETTLED");return;}
+  walking_=false;scheduler_.stop();executor_->restoreArmedRates();walk_profile_=nullptr;return;}
+ if(walk_.state()==motion::FeedbackWalkState::REJECTED){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
+ if(!release.release||!frame_.target.valid||!frame_.executable||frame_.target.sequence==submitted_sequence_)return;
+ // streamUpdate validated continuity/rates over the real interval, limits,
+ // support and the certified region box for this frame; the executor repeats
+ // the joint-space checks against the live mapping before the first byte.
+ FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();
+ v.collision_clear=v.support_valid=v.path_continuous=v.configuration_valid=true;
+ const bool final=walk_.state()==motion::FeedbackWalkState::HOLD;
+ if(executor_->stream(frame_.target,v,now_us,now_us+scheduler_.periodUs(),final,facts,fb,now,now_us))submitted_sequence_=frame_.target.sequence;
+}
+void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
  synchronizeSession();
  if(pending_stand_&&executor_){
   if(executor_->active()&&session_&&session_->state()==MotionSessionState::ARMED){
@@ -138,11 +188,12 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
   }
  }
  if(!configured_||!executor_||!policy_||!executor_->active())return;
+ if(walking_&&active_spec_.timeDriven){streamWalk(facts,fb,now,now_us);return;}
  auto o=observation_;o.acknowledged=executor_->status().completed_sequence!=0;o.acknowledgedSequence=executor_->status().completed_sequence;
  // Observations remain externally measured. Targets never overwrite actual
  // joints, base height or contact evidence in order to manufacture tracking.
- frame_=walking_?walk_.update(o,now/1000.0):stand_.update(o,now/1000.0);
- if(walking_&&walk_.state()==motion::FeedbackWalkState::STAND){walking_=false;return;}
+ frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6));
+ if(walking_&&walk_.state()==motion::FeedbackWalkState::STAND){walking_=false;executor_->restoreArmedRates();return;}
  if((walking_&&walk_.state()==motion::FeedbackWalkState::REJECTED)||(!walking_&&stand_.state()==motion::AdaptiveStandState::REJECTED)){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
  if(feedback_policy_.mode==motion::FeedbackMode::SIMULATION||!frame_.physicalReadiness)return;
  if(!frame_.target.valid||!frame_.executable||frame_.target.sequence==submitted_sequence_)return;

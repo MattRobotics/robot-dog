@@ -4,7 +4,10 @@
 #include "../actuator/CalibrationTargetResolver.h"
 #include "../motion/StandTrajectory.h"
 namespace matdog { namespace execution {
-enum class ExecutorState : uint8_t { OFF, READY, WRITING, TRACKING, SAFE_OFF_REQUIRED, FAULT };
+// STREAMING/HOLD (Issue #52): time-driven frames, one coordinated bus transaction
+// per frame, asynchronous per-joint tracking. WRITING/TRACKING stay the finite
+// segment mode of prime/entry/STAND.
+enum class ExecutorState : uint8_t { OFF, READY, WRITING, TRACKING, SAFE_OFF_REQUIRED, FAULT, STREAMING, HOLD };
 struct MotionExecutionFacts {
   core::AuthorityLease lease{};
   core::OperatingMode mode = core::OperatingMode::MAINTENANCE;
@@ -19,11 +22,18 @@ struct ExecutionEnvelope {
   double max_velocity_rad_s=0, max_acceleration_rad_s2=0, tracking_tolerance_rad=0;
   uint32_t feedback_max_age_ms=0, batch_timeout_ms=0, tracking_timeout_ms=0;
   bool approved=false;
+  // Issue #52: segment frames (prime/entry/STAND) as ONE coordinated frame
+  // transaction instead of twelve single writes; tracking per frame unchanged.
+  bool frame_writes=false;
 };
 struct JointFeedback {
   bool read_ok[12]{}, torque_on[12]{};
   uint32_t sampled_at_ms[12]{};
   double actual_rad[12]{};
+  // Issue #52: real per-joint sample instant on the monotonic 64-bit clock
+  // (read completion), and the measured speed (rad/s, signed). 0 = unknown.
+  uint64_t sampled_at_us[12]{};
+  double speed_rad_s[12]{};
 };
 struct FrameValidation {
   uint32_t sequence=0, policy_epoch=0;
@@ -38,6 +48,25 @@ struct ExecutorStatus {
   uint8_t next_joint=0;
   double max_tracking_error_rad=0;
   bool safe_off_required=false;
+  // Streaming sequences (Issue #52). TX is NOT application; observed = every
+  // joint sampled after that frame's TX-complete; settled = HOLD target reached
+  // by fresh samples, inside the tube, with zero measured speed.
+  uint32_t validated_sequence=0, tx_sequence=0, observed_sequence=0, settled_sequence=0;
+  uint32_t frames_tx=0, frames_refused=0;
+  uint64_t last_tx_complete_us=0;
+  double stream_error_rad[12]{}, stream_peak_error_rad=0;
+  uint8_t worst_joint=0xff;
+};
+// Streaming contract. Tracking is a following monitor: geometry safety comes
+// from the certified box (every target inside region, measured inside region
+// +/- tube or immediate stop); a joint further than tube_rad from every
+// reference it was commanded during the last max_lag_s for persist_samples
+// consecutive fresh samples is a physical failure to follow -> stop.
+struct StreamConfig {
+  double tube_rad=0, max_lag_s=0, settle_speed_rad_s=0;
+  uint32_t feedback_max_age_us=0, hold_timeout_us=0, max_frame_gap_us=0;
+  uint8_t persist_samples=0;
+  const double* region_min_rad=nullptr; const double* region_max_rad=nullptr;
 };
 // Owns neither bus nor authority. The Controller supplies an existing lease and
 // the ONE ActuatorRuntime. No raw write or authority grant API exists here.
@@ -46,11 +75,32 @@ class MotionExecutor {
   void begin(actuator::SafeActuatorPolicy*,actuator::ActuatorRuntime*,const actuator::CalibrationGeometryProfile*,const actuator::GeometryProvenance*,const core::ActuatorAuthorityArbiter*);
   bool arm(const MotionExecutionFacts&, const ExecutionEnvelope&, const JointFeedback&,uint32_t now_ms);
   bool submit(const motion::JointTargetFrame&,const FrameValidation&,uint32_t issued_at_ms,uint32_t ttl_ms,double segment_duration_s,const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
+  // Walk-only joint rate envelope (2026-10-15). Accepted only between frames
+  // (READY), never above the compiled ceilings, never touching tracking,
+  // feedback or timeouts. restoreArmedRates() returns to the armed envelope.
+  // Covers every operational walk profile envelope (OperationalWalkProfile.h,
+  // static_assert in MotionCoordinator.cpp); FAST experimental = 1.55 / 13.0.
+  static constexpr double kWalkRateCeilingRadS=1.6, kWalkAccelerationCeilingRadS2=13.5;
+  bool selectRates(double max_velocity_rad_s,double max_acceleration_rad_s2);
+  void restoreArmedRates(){ if(armed_envelope_.approved){envelope_.max_velocity_rad_s=armed_envelope_.max_velocity_rad_s;envelope_.max_acceleration_rad_s2=armed_envelope_.max_acceleration_rad_s2;} }
+  double maxVelocityRadS() const { return envelope_.max_velocity_rad_s; }
   void update(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
+  // ---- streaming (Issue #52) ----
+  bool beginStream(const StreamConfig&,const JointFeedback&,uint64_t now_us);
+  // Validates the WHOLE frame (12 identities, raw ticks, URDF/gen-1 limits,
+  // region box, rates over the real interval, lease/epoch/permit, deadline)
+  // before one coordinated transaction. final=true enters HOLD.
+  bool stream(const motion::JointTargetFrame&,const FrameValidation&,uint64_t release_us,uint64_t deadline_us,bool final,
+              const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
+  // Asynchronous tracking/settle for one feedback snapshot.
+  void monitor(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
+  // HOLD settled -> READY holding the final target (segment mode resumes).
+  bool endStream();
+  bool streaming() const { return status_.state==ExecutorState::STREAMING||status_.state==ExecutorState::HOLD; }
   void stop(const char* reason="STOP");
   void confirmSafeOff(bool all_verified_off);
   const ExecutorStatus& status() const { return status_; }
-  bool active() const { return status_.state==ExecutorState::READY||status_.state==ExecutorState::WRITING||status_.state==ExecutorState::TRACKING; }
+  bool active() const { return status_.state==ExecutorState::READY||status_.state==ExecutorState::WRITING||status_.state==ExecutorState::TRACKING||streaming(); }
   const double* targetRadians() const { return target_; }
  private:
   const char* gate(const MotionExecutionFacts&,uint32_t) const;
@@ -63,12 +113,24 @@ class MotionExecutor {
   const actuator::GeometryProvenance* provenance_=nullptr;
   const core::ActuatorAuthorityArbiter* arbiter_=nullptr;
   ExecutionEnvelope envelope_{};
+  ExecutionEnvelope armed_envelope_{};
   ExecutorStatus status_{};
   FrameValidation validation_{};
   double target_[12]{},previous_[12]{},velocity_[12]{},pending_velocity_[12]{};
   uint32_t deadline_ms_=0,tracking_since_ms_=0,policy_epoch_=0,permit_generation_=0;
   core::AuthorityLease lease_{};
   uint32_t arm_generation_=0;
+  // streaming state
+  bool frameTx(const double target[12],const MotionExecutionFacts&,uint64_t now_us,const char** why);
+  double referenceRange(unsigned joint,uint64_t from_us,uint64_t to_us,double* lo,double* hi) const;
+  StreamConfig stream_{};
+  static constexpr unsigned kHistory=48;
+  struct Sent { uint64_t at_us=0; uint32_t sequence=0; double q[12]{}; };
+  Sent history_[kHistory]{};
+  unsigned history_count_=0, history_head_=0;
+  uint64_t last_release_us_=0, hold_since_us_=0, checked_us_[12]{};
+  uint8_t exceed_[12]{};
+  uint32_t hold_sequence_=0;
 };
 const char* toString(ExecutorState);
 } }

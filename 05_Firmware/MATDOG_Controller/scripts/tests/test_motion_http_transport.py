@@ -20,7 +20,7 @@ def between(text, start, end):
 tree = ast.parse((HERE/'test_ap_transport.py').read_text())
 fixture = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'fixture' for t in n.targets))
 fixture = fixture[:fixture.index('int main(int argc,char**)')]
-fixture = fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "network/NetworkPolicy.h"\n#include "network/NetworkPolicy.h"\n#include "core/MotionService.h"\n#include "core/MotionJson.h"')
+fixture = fixture.replace('#include <map>', '#include <map>\n#include <functional>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "network/NetworkPolicy.h"\n#include "network/NetworkPolicy.h"\n#include "core/MotionService.h"\n#include "core/MotionJson.h"')
 fixture = fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0', 'constexpr int HTTP_GET=0')
 # 2026-10-14/15 production handlers: Issue #48 RESTORE, Twin assets, JSON errors with real status.
 fixture = fixture.replace('#include <mutex>', '#include <mutex>\n#include <atomic>\n#include <cstdlib>\n#include "network/TwinAssets.h"\n#include "network/RestoreRequestJson.h"', 1)
@@ -49,7 +49,7 @@ fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' boo
  bool admitMotion(HttpTransportRequest&);
  bool motionStaAdmitted(const HttpTransportRequest&) const;
  uint32_t portal_generation_=0;
- bool busy=false,revoke_before_service=false;
+ bool busy=false,revoke_before_service=false,stop_before_service=false;
  char motion_capabilities_[kMotionCapabilitiesBytes]{};
  bool admitAdmin(HttpTransportRequest&);
  static esp_err_t handleMotion(httpd_req_t*);
@@ -61,10 +61,15 @@ fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' boo
  std::atomic<bool> twin_deferred_{false};
  static constexpr size_t kTwinDeferBytes=8192;
  static constexpr uint32_t kDispatchTimeoutMs=3000,kMotionReadBudgetMs=1200;
+ // Issue #52 STOP lane (production serviceStopLane is extracted with the handlers).
+ std::atomic<bool> stop_lock_{false};HttpTransportRequest stop_request_{};std::atomic<bool> stop_pending_{false};
+ std::atomic<uint32_t> stop_epoch_{0},stop_done_{0},stop_ticket_{0};char stop_ack_[512]{};std::atomic<bool> stop_ack_ok_{false};
+ static constexpr uint32_t kStopLaneBudgetMs=600;bool serviceStopLane(uint32_t now_ms);
  static esp_err_t handleWifi(httpd_req_t*);''')
 fixture = fixture.replace('bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){', '''bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out,char* large_text=nullptr,size_t large_cap=0,uint32_t=3000,const char** failure=nullptr){
   if(busy){if(failure)*failure="MAILBOX_BUSY";return false;}
-  if(revoke_before_service)service.gate.revoke();''')
+  if(revoke_before_service)service.gate.revoke();
+  if(stop_before_service)stop_epoch_.fetch_add(1);   // a STOP applied while this request waited''')
 fixture = fixture.replace('  switch(req.kind){', '''  auto serviceRequest = [&]() {
   // PRODUCTION_SERVICE_ADMISSION
   switch(req.kind){''')
@@ -84,6 +89,9 @@ esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t*) { if(WiFi.connected)return
 SemaphoreHandle_t xSemaphoreCreateMutex() { static std::vector<std::unique_ptr<std::mutex>> m;m.emplace_back(new std::mutex);return m.back().get(); }
 BaseType_t xSemaphoreTake(SemaphoreHandle_t h,TickType_t t) { if(t)abort();return static_cast<std::mutex*>(h)->try_lock(); }
 BaseType_t xSemaphoreGive(SemaphoreHandle_t h) {static_cast<std::mutex*>(h)->unlock();return 1;}
+// The Controller loop serving the STOP lane while the httpd handler waits (single-threaded double).
+std::function<void()> g_stop_lane;
+void vTaskDelay(TickType_t) { if(g_stop_lane)g_stop_lane(); }
 '''
 fixture = fixture.replace('namespace matdog { namespace network {', platform+'\nnamespace matdog { namespace network {', 1)
 fixture += r'''
@@ -103,7 +111,7 @@ void expectReject(HttpTransport& s,const char* type,const char* params,const cha
  check(r.status==200&&r.response.find("\"outcome\":\"REJECTED\"")!=std::string::npos&&r.response.find(reason)!=std::string::npos,reason);
 }
 int main() {
- adminRadio();endpoints();HttpTransport s;provision(s);
+ adminRadio();endpoints();HttpTransport s;provision(s);g_stop_lane=[&s]{if(s.revoke_before_service)s.service.gate.revoke();s.serviceStopLane(static_cast<uint32_t>(clock_ms));};
  auto status=request(s,"/api/motion/status","");status.method=HTTP_GET;runMotion(status);
  check(status.status==200&&status.response.find("\"version\":1")!=std::string::npos,"production GET status");
  check(status.response_headers["Content-Type"]=="application/json"&&status.response_headers["Cache-Control"]=="no-store","JSON/no-store response");
@@ -167,6 +175,8 @@ int main() {
  endpoint(local_addr,local_len,0xc0a80110u,true,443);s.service.motion_wifi.connected=false;auto lost=tlsStop;runMotion(lost);check(lost.status==403,"STA link loss fences command");
  s.service.motion_wifi.run_mode=false;adminRadio();endpoints();s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  login(s);
+ {const unsigned before=s.service.command_calls;s.stop_before_service=true;auto late=motionRequest(s,command("POSTURE.STAND","{\"target_height_m\":0.15}"));runMotion(late);s.stop_before_service=false;
+  check(late.status==403&&late.response.find("SUPERSEDED_BY_STOP")!=std::string::npos&&s.service.command_calls==before,"a command received before an applied STOP never executes after it (Issue #52)");}
  s.revoke_before_service=true;auto pending=motionRequest(s,command("MOTION.STOP"));runMotion(pending);check(pending.status==403,"revocation between handler and Controller service fences request");s.revoke_before_service=false;s.service.gate.open();
  auto old=motionRequest(s,command("MOTION.STOP"));runMotion(old);check(old.status==403,"generation change resets portal session");login(s);
  s.busy=true;auto busy=request(s,"/api/motion/status","");busy.method=HTTP_GET;runMotion(busy);check(busy.status==503&&busy.response.find("MAILBOX_BUSY")!=std::string::npos,"mailbox failure explicit (JSON 503)");s.busy=false;
@@ -201,5 +211,5 @@ unit = fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPE
 with tempfile.TemporaryDirectory(prefix='matdog-motion-http-') as temp:
     cpp, exe = Path(temp)/'probe.cpp', Path(temp)/'probe';cpp.write_text(unit)
     sources = ['network/AdminAccess.cpp','network/PortalSecurity.cpp','network/NetworkConfig.cpp','update/Sha256.cpp','update/Hmac256.cpp','core/MotionService.cpp','core/MotionJson.cpp','execution/MotionExecutor.cpp','actuator/ActuatorRuntime.cpp','actuator/ActuatorWritePolicy.cpp','actuator/CalibrationGeometryProfile.cpp','actuator/CalibrationTargetResolver.cpp','actuator/CalibrationSequencePlan.cpp','calibration/StartupRecoveryReference.cpp','calibration/CalibrationDomain.cpp','servo/ServoPopulation.cpp','core/ActuatorAuthority.cpp','core/OperatingMode.cpp']
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['FirstStrideReference.cpp','PairedProneRoute.cpp','StlContactGait.cpp','MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FixtureEntryPlanner.cpp','StartPoseArchitecture.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['FirstStrideReference.cpp','PairedProneRoute.cpp','PhaseTimedRoute.cpp','OperationalWalkProfile.cpp','StlContactGait.cpp','MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FixtureEntryPlanner.cpp','StartPoseArchitecture.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)

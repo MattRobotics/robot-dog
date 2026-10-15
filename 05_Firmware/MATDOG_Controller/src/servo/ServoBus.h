@@ -243,8 +243,39 @@ class ServoBus {
   bool readControlFeedback(int id, ControlFeedbackSnapshot* out);
   bool readControlFeedbackBudgeted(int id,ControlFeedbackSnapshot* out,uint32_t timeout_ms);
   ServoWriteVerifyResult reduceValidationOutputWhileOff(int id,uint16_t ceiling);
-  void setValidationDrive(uint16_t speed,uint8_t acceleration){validation_speed_=speed>=1&&speed<=40?speed:0;validation_acceleration_=acceleration>=1&&acceleration<=10?acceleration:0;}
+  // The commissioning range (1..40 / 1..10) or EXACTLY the reviewed fixture
+  // WALK pair (2026-10-15, motion/OperationalWalkProfile.h): a register
+  // ceiling only; every target is still bounded by limits and per-frame steps.
+  // Issue #52: + the EXPERIMENTAL fast walk pair (1200 steps/s, ACC 100), RAM only.
+  static constexpr uint16_t kWalkDriveSpeed=1000;static constexpr uint8_t kWalkDriveAcceleration=50;
+  static constexpr uint16_t kFastWalkDriveSpeed=1200;static constexpr uint8_t kFastWalkDriveAcceleration=100;
+  static constexpr uint16_t kStandDriveSpeed=300;static constexpr uint8_t kStandDriveAcceleration=20;   // operational STAND frames
+  void setValidationDrive(uint16_t speed,uint8_t acceleration){
+    const bool walk=(speed==kWalkDriveSpeed&&acceleration==kWalkDriveAcceleration)||(speed==kFastWalkDriveSpeed&&acceleration==kFastWalkDriveAcceleration)||
+                    (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
+    validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
+
+  // ---- Issue #52 streaming primitives (2026-10-15) -------------------------
+  // ONE SYNC_WRITE (servo/ServoPacket.h) of the twelve committed GoalPositions
+  // at SRAM 41..47 with the latched validation drive pair. Only reachable
+  // through ServoBusActuatorBackend::writeGoalPositionFrame (SafeActuator
+  // commitFrame). No ACK exists: the report says whether every byte left the
+  // UART (HardwareSerial::flush = TX complete), never that a servo applied it.
+  // Refuses (zero bytes) without a validation drive pair or with invalid ids.
+  struct FrameTx { bool started=false, complete=false; uint32_t started_us=0, complete_us=0; uint16_t bytes=0; };
+  bool syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report);
+  // Emergency de-escalation: ONE SYNC_WRITE TorqueEnable=0 to an explicit id
+  // list (no reply, no readback, no retry). Never claims VERIFIED_OFF: each id
+  // must still be verified by verifyTorqueOff() (readback only, no write).
+  uint16_t syncTorqueOff(const uint8_t* ids, unsigned count);
+  SafeOffResult verifyTorqueOff(int id, uint32_t timeout_ms);
+  // Fast per-joint feedback: ONE read of the contiguous block 56..70
+  // (position, speed, load, voltage, temperature, status, current). The slow
+  // 40..49 control block stays in readControlFeedbackBudgeted().
+  struct FastFeedback { int present_position=-1, present_speed=-1, present_load=-1, present_voltage=-1,
+                        present_temperature=-1, status=-1, present_current=-1; };
+  bool readFastFeedback(int id, FastFeedback* out, uint32_t timeout_ms);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.

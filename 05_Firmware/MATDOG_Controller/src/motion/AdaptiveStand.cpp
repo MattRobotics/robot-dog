@@ -56,6 +56,15 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
        r.proneMaxDeviationRad<=0||r.proneMaxRmsRad<=0){reject(FeedbackReason::ROUTE_REQUIRED);return false;}
     entry_=*r.entry;entryActive_=true;
   }
+  timedActive_=false;timedPhase_=0;
+  if(route_.pairedProne&&route_.phaseTimed){
+    // Only behind a staged entry (the route then starts exactly at knot 0).
+    // 0.999: the law's peaks sit strictly inside the checkSegment limits (an
+    // exactly-equal analytic peak can exceed them by rounding).
+    if(!r.entry||!buildPhaseTimedRoute(p.fixtureLimitVariant,.999*route_.phaseVelocityRadS,.999*route_.phaseAccelerationRadS2/2,p.samplePeriodS,&timed_)||
+       route_.phaseVelocityRadS>p.maxVelocityRadS[0].upper+1e-12){reject(FeedbackReason::INVALID_POLICY);return false;}
+    timedActive_=true;
+  }
   request_.acquisition=nullptr;request_.entry=nullptr;state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
 FeedbackFrame AdaptiveStand::reject(FeedbackReason r){state_=AdaptiveStandState::REJECTED;reason_=r;pendingValid_=false;physicalReady_=false;FeedbackFrame f;f.reason=r;return f;}
@@ -88,7 +97,18 @@ bool AdaptiveStand::beginEntryStage(){
   if(!std::isfinite(n)||n<2||n>1000000)return false;
   segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
 }
+bool AdaptiveStand::beginTimedPhase(){
+  if(timedPhase_>=5)return false;
+  const AdaptiveStandState states[]={AdaptiveStandState::PRE_ALIGN,AdaptiveStandState::REAR_DEPLOY,
+    AdaptiveStandState::FRONT_DEPLOY,AdaptiveStandState::LOAD_TRANSFER,AdaptiveStandState::PAIRED_RISE};
+  state_=states[timedPhase_];pairedSegment_=static_cast<uint16_t>(timed_.first[timedPhase_]);
+  endpoint_.durationS=timed_.durationS[timedPhase_];
+  const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS-1e-9);
+  if(!std::isfinite(n)||n<1||n>1000000)return false;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
+}
 bool AdaptiveStand::beginPairedSegment(){
+  if(timedActive_)return beginTimedPhase();
   if(pairedSegment_>=kPairedProneSegments)return false;
   const AdaptiveStandState states[]={AdaptiveStandState::PRE_ALIGN,AdaptiveStandState::REAR_DEPLOY,
     AdaptiveStandState::FRONT_DEPLOY,AdaptiveStandState::LOAD_TRANSFER,AdaptiveStandState::PAIRED_RISE};
@@ -103,6 +123,17 @@ FeedbackFrame AdaptiveStand::generate(double now){
   if(entryPending()){
     auto f=fixtureEntrySample(entry_,entryStage_,static_cast<double>(segmentIndex_+1)/segmentIntervals_,previous_.cartesian.body);
     if(!f.target.valid)return reject(FeedbackReason::INVALID_COMMAND);
+    auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
+    if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
+    pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
+    pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;
+    pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
+  }
+  if(route_.pairedProne&&timedActive_){
+    unsigned segment=0;
+    auto f=phaseTimedSample(timed_,timedPhase_,endpoint_.durationS*(segmentIndex_+1)/segmentIntervals_,policy_.fixtureLimitVariant,&segment);
+    if(!f.target.valid)return reject(FeedbackReason::IK_FAILURE);
+    pairedSegment_=static_cast<uint16_t>(segment);
     auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
     if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
     pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
@@ -181,7 +212,10 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
       if(entryPending()){
         // The last entry sample IS the route head (fixture variant knot 0).
         if(++entryStage_<kFixtureEntryStages){if(!beginEntryStage())return reject(FeedbackReason::ROUTE_MISMATCH);}
-        else {pairedSegment_=0;entry_knot_=UINT16_MAX;entry_progress_=0;if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}
+        else {pairedSegment_=0;entry_knot_=UINT16_MAX;entry_progress_=0;timedPhase_=0;if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}
+      } else if(route_.pairedProne&&timedActive_){
+        if(++timedPhase_<5){if(!beginTimedPhase())return reject(FeedbackReason::ROUTE_MISMATCH);}
+        else {pairedSegment_=kPairedProneSegments-1;state_=AdaptiveStandState::VERIFY_STAND;verifySince_=now;}
       } else if(route_.pairedProne){
         ++pairedSegment_;
         if(pairedSegment_<kPairedProneSegments){if(!beginPairedSegment())return reject(FeedbackReason::ROUTE_MISMATCH);}

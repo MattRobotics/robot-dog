@@ -45,6 +45,18 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
     return translate(bus_->writeGoalPosition(bus_id, target_tick, goal_profile));
   }
 
+  // Frame (Issue #52): one SYNC_WRITE; never VERIFIED_APPLIED (no ACK exists).
+  actuator::BackendWriteOutcome writeGoalPositionFrame(const uint8_t bus_ids[12], const uint16_t ticks[12],
+                                                       FrameTxReport* report) override {
+    if (report) *report = FrameTxReport{};
+    if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    ServoBus::FrameTx tx{};
+    bus_->syncWriteGoalPositions(bus_ids, ticks, &tx);
+    if (report) { report->tx_started = tx.started; report->tx_complete = tx.complete; report->tx_started_us = tx.started_us;
+                  report->tx_complete_us = tx.complete_us; report->bytes = tx.bytes; }
+    return tx.started ? actuator::BackendWriteOutcome::UNCERTAIN : actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+  }
+
   actuator::BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) override {
     if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
     return translate(bus_->writeReviewedRamTorqueLimit(bus_id));

@@ -97,7 +97,7 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
   const bool suspended=fixture(reviewed_motion_.scope);
   if(strcmp(t[2],suspended?"CONFIRM_PRESENT_FIXTURE_POWER_CUT_FIXED_POSE_UNCHANGED":"CONFIRM_PRESENT_POWER_CUT_AND_CURRENT_EXTERNAL_SUPPORT_OBSERVER"))return reply();
   uint32_t nonce;if(!uintToken(t[1],nonce)||nonce!=validation_nonce_||!reviewed_motion_bound_||local_motion_observation_.heightSource!=motion::EvidenceSource::EXTERNAL_MEASURED)return reply();
-  validation_present_=true;validation_presence_ms_=issued;if(suspended)local_motion_observation_.stampS=issued/1000.0;
+  validation_present_=true;validation_presence_ms_=issued;if(suspended)local_motion_observation_.supportStampS=issued/1000.0;
   local_trial_evidence_.local_operator_present=true;ok=true;reason="LOCAL_DEADMAN_REFRESHED";return reply();
  }
  if(!strcmp(t[0],"POSE")&&n==9&&!strcmp(t[8],"CONFIRM_MEASURED_FIXED_FIXTURE_NO_FOOT_LOAD")){

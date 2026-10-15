@@ -4,6 +4,8 @@
 #include "../motion/AdaptiveStand.h"
 #include "../motion/FeedbackWalk.h"
 #include "MotionSession.h"
+#include "../core/MotionClock.h"
+#include "../motion/OperationalWalkProfile.h"
 namespace matdog { namespace execution {
 // Fixture commissioning STAND: broad PRONE recognition plus a staged entry
 // from the armed pose to the fixture route head, certified offline from the
@@ -44,6 +46,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   bool arming() const override {return pending_stand_;}
   const char* lastEntryReason() const {return entry_reason_;}
   bool walking() const {return walking_;}
+  double walkCycles() const {return walking_?walk_.cycles():0;}
   // Operational first stride (2026-10-15): the 250 ms walk TTL is renewed by
   // the Controller ONLY while the authenticated operator heartbeat is current;
   // without it the stride expires (COMMAND_EXPIRED -> SAFE_OFF). Never starts one.
@@ -63,6 +66,16 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void stop(uint32_t now_ms) override;
   const char* state() const override;
   void update(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
+  // now_us: the Controller's monotonic 64-bit clock (Issue #52 streaming).
+  void update(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
+  const core::SchedulerCounters& schedulerCounters() const {return scheduler_.counters();}
+  // The Controller's monotonic clock: the walk uses ONE time base (seconds of
+  // this clock) for start, commands, renewals and streaming. Unbound (host
+  // tests): now_ms/1000, with update(...,now_ms) passing now_ms*1000 us.
+  void bindClock(const core::MonotonicClock64* clock){clock_=clock;}
+  bool streamingWalk() const {return walking_&&active_spec_.timeDriven;}
+  // The running walk profile (drive pair latched by the Controller), or nullptr.
+  const motion::operational_walk::WalkProfile* walkProfile() const {return walking_?walk_profile_:nullptr;}
   const motion::FeedbackFrame& frame() const { return frame_; }
   bool coordinatedStopping() const override { return walking_&&walk_.state()==motion::FeedbackWalkState::STOPPING; }
  private:
@@ -90,6 +103,12 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   CommissioningStandConfig commissioning_{};
   motion::FixtureEntryPlan entry_plan_{};
   bool configured_=false,walking_=false;
+  core::PeriodicScheduler scheduler_{};
+  motion::WalkSpecification active_spec_{};
+  const motion::operational_walk::WalkProfile* walk_profile_=nullptr;
+  const core::MonotonicClock64* clock_=nullptr;
+  double walkTime(uint32_t now_ms) const {return clock_?(clock_->now()/1e6):now_ms/1000.0;}
+  void streamWalk(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
   uint32_t submitted_sequence_=0,arm_generation_=0;
 };
 } }

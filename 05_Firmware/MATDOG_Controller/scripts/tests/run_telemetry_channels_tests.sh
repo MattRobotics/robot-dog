@@ -11,7 +11,7 @@ CXX="${CXX:-g++}"
   "$SKETCH_DIR/src/execution/MotionSession.cpp" "$SKETCH_DIR/src/execution/MotionExecutor.cpp" "$SKETCH_DIR/src/execution/MotionCoordinator.cpp" \
   "$SKETCH_DIR/src/core/MotionService.cpp" "$SKETCH_DIR/src/core/MotionJson.cpp" \
   "$SKETCH_DIR/src/motion/MotionContract.cpp" "$SKETCH_DIR/src/motion/MotionFeedback.cpp" \
-  "$SKETCH_DIR/src/motion/FirstStrideReference.cpp" "$SKETCH_DIR/src/motion/StlContactGait.cpp" "$SKETCH_DIR/src/motion/PairedProneRoute.cpp" "$SKETCH_DIR/src/motion/AdaptiveStand.cpp" "$SKETCH_DIR/src/motion/FixtureEntryPlanner.cpp" "$SKETCH_DIR/src/motion/StartPoseArchitecture.cpp" "$SKETCH_DIR/src/motion/FeedbackWalk.cpp" \
+  "$SKETCH_DIR/src/motion/FirstStrideReference.cpp" "$SKETCH_DIR/src/motion/StlContactGait.cpp" "$SKETCH_DIR/src/motion/PairedProneRoute.cpp" "$SKETCH_DIR/src/motion/PhaseTimedRoute.cpp" "$SKETCH_DIR/src/motion/OperationalWalkProfile.cpp" "$SKETCH_DIR/src/motion/AdaptiveStand.cpp" "$SKETCH_DIR/src/motion/FixtureEntryPlanner.cpp" "$SKETCH_DIR/src/motion/StartPoseArchitecture.cpp" "$SKETCH_DIR/src/motion/FeedbackWalk.cpp" \
   "$SKETCH_DIR/src/motion/BodyPose.cpp" "$SKETCH_DIR/src/motion/PoseSupport.cpp" \
   "$SKETCH_DIR/src/motion/Gait.cpp" "$SKETCH_DIR/src/motion/Locomotion.cpp" \
   "$SKETCH_DIR/src/motion/MotionState.cpp" "$SKETCH_DIR/src/motion/StartupAcquisition.cpp" \

@@ -13,6 +13,7 @@
 #include "../../src/execution/MotionExecutor.h"
 #include "../../src/execution/MotionCoordinator.h"
 #include "../../src/core/MotionService.h"
+#include "../../src/servo/ServoPopulation.h"
 #include "../../src/core/MotionJson.h"
 
 using namespace matdog;
@@ -36,7 +37,20 @@ class Backend : public ActuatorBackend {
   BackendWriteOutcome writeGoalPosition(uint8_t bus, uint16_t tick, actuator::MotionProfile) override {
     writes.push_back({bus, tick}); return outcome;
   }
+  // Issue #52 frame: one SYNC_WRITE double. TX_OK = every byte left (no ACK
+  // exists, so UNCERTAIN + tx_complete); REFUSE = zero bytes; PARTIAL = TX
+  // started but not completed.
+  enum class FrameMode { TX_OK, REFUSE, PARTIAL } frame_mode = FrameMode::TX_OK;
+  unsigned frames = 0; uint32_t tx_us = 1040;
+  BackendWriteOutcome writeGoalPositionFrame(const uint8_t bus[12], const uint16_t tick[12], FrameTxReport* r) override {
+    if (r) *r = FrameTxReport{};
+    if (frame_mode == FrameMode::REFUSE) return BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+    ++frames; for (unsigned i = 0; i < 12; ++i) writes.push_back({bus[i], tick[i]});
+    if (r) { r->tx_started = true; r->tx_complete = frame_mode == FrameMode::TX_OK; r->tx_started_us = 0; r->tx_complete_us = tx_us; r->bytes = 104; }
+    return BackendWriteOutcome::UNCERTAIN;
+  }
 };
+uint8_t gCanonicalIds[12];
 
 class Planner : public SemanticMotionPlanner {
  public:
@@ -88,6 +102,8 @@ struct Rig {
     envelope.feedback_max_age_ms = 100; envelope.batch_timeout_ms = 100;
     envelope.tracking_timeout_ms = 100;
     runtime.begin(&policy, &backend);
+    for (unsigned k = 0; k < 12; ++k) gCanonicalIds[k] = servo::legServoAt(k)->bus_id;
+    runtime.bindCanonicalBusIds(gCanonicalIds, 12);
     executor.begin(&policy, &runtime, &geometry, &geometry_data::kProvenance, &arbiter);
   }
   bool arm() { return executor.arm(facts, envelope, feedback, 100); }

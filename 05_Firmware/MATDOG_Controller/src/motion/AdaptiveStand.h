@@ -3,6 +3,7 @@
 #include "PairedProneRoute.h"
 #include "FixtureEntryPlanner.h"
 #include "FixturePoseClassifier.h"
+#include "PhaseTimedRoute.h"
 namespace matdog { namespace motion {
 enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED, PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY, LOAD_TRANSFER, PAIRED_RISE,
   ENTRY_DISENGAGE, ENTRY_ALIGN };
@@ -26,6 +27,9 @@ struct AcquisitionRoute {
   bool supervisedSegments=false;
   double timeScale=1;
   bool pairedProne=false; // immutable profile, no editable waypoint copy
+  // Issue #52: junction-limited time law along the SAME paired polyline (PhaseTimedRoute.h);
+  // fixture-variant entry path only. 0 = the per-segment rest-to-rest law.
+  bool phaseTimed=false; double phaseVelocityRadS=0, phaseAccelerationRadS2=0;
   bool geometryIdentityVerified=false;
   EvidenceSource source=EvidenceSource::UNKNOWN;
 };
@@ -92,6 +96,10 @@ class AdaptiveStand {
   uint8_t entryStage_=0, entryApproved_=UINT8_MAX;
   uint16_t approvedThrough_=UINT16_MAX;
   bool beginEntryStage();
+  bool beginTimedPhase();
+  PhaseTimedRoute timed_{};
+  uint8_t timedPhase_=0;
+  bool timedActive_=false;
 };
 } }
 #endif

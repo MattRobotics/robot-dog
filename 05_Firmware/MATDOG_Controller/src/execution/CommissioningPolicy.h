@@ -53,6 +53,10 @@ struct CommissioningCaps {
 // Sets one parameter by name. Returns false with a reason; nothing changes.
 bool setCommissioningParameter(CommissioningParameters& p, const char* key, const char* value, const char** reason);
 bool validCommissioningParameters(const CommissioningParameters& p, const char** reason);
+// OPERATIONAL STAND profile (Issue #52, motion/OperationalWalkProfile.h
+// kStandProfile): rates, frame period and entry floor for the operational
+// fixture STAND, inside the compiled caps (refused, never clamped, otherwise).
+bool applyOperationalStandProfile(CommissioningParameters& p, const char** reason);
 // Prints "key=value ..." into out. Returns false on truncation.
 bool formatCommissioningParameters(const CommissioningParameters& p, char* out, size_t size);
 // Builds the scoped runtime from validated parameters and twelve hard limits

@@ -1,4 +1,5 @@
 #include "MotionService.h"
+#include "../motion/OperationalWalkProfile.h"
 #include <cstring>
 #include <cmath>
 #include <cstdio>
@@ -142,7 +143,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  if(!out||!cap)return false;
  JsonWriter w{out,cap};const auto* refusal_reason=refusal();
- w.add("{\"version\":1,\"first_stride_only\":%s,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",readiness_.first_stride_only?"true":"false",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
+ w.add("{\"version\":1,\"walk\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"strides_m\":[%.17g,%.17g,%.17g],\"fast\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"stride_m\":%.17g,\"experimental\":true}},\"first_stride_only\":%s,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",motion::operational_walk::kPeriodS,motion::operational_walk::kLiftM,motion::operational_walk::kStrideM[0],motion::operational_walk::kStrideM[1],motion::operational_walk::kStrideM[2],motion::operational_walk::kFastProfile.periodS,motion::operational_walk::kFastProfile.liftM,motion::operational_walk::kFastStrideM[0],readiness_.first_stride_only?"true":"false",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
  for(size_t i=0;i<motion::kMotionActionCount;i++){const auto& a=motion::actionCatalog()[i];w.add("%s{\"id\":\"%s\",\"category\":\"%s\",\"label\":\"%s\",\"parameters\":\"%s\",\"prerequisites\":\"%s\",\"capability\":\"%s\",\"implemented\":%s,\"implementation\":\"%s\",\"available\":%s,\"reason\":\"%s\"}",i?",":"",a.id,a.category,a.label,a.parameters,(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)?"none":a.prerequisites,a.capability,a.implemented?"true":"false",a.implemented?"software_tested":"planned",available(a)?"true":"false",available(a)?"OK":a.implemented?(refusal_reason?refusal_reason:(readiness_.local_operator_owns_session||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"LOCAL_OPERATOR_CONTROLS_SESSION":a.intent==motion::Intent::BASE_VELOCITY&&!readiness_.walk_qualified?"LOCAL_WALK_ADMISSION_REQUIRED":"UNAVAILABLE"):"ACTION_NOT_VALIDATED");}
  w.add("]}");return w.ok;
 }
@@ -171,9 +172,9 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
    mapped,mask,s&&s->accepted_sequence?"true":"false",stale?"true":"false");}
  w.add(",\"restore\":{\"decision\":\"%s\",\"reason\":\"%s\",\"trigger\":\"%s\",\"generation\":%lu,\"fingerprint\":\"%016llx\"}",
   telemetry_.restore_decision,telemetry_.restore_reason,telemetry_.restore_trigger,(unsigned long)telemetry_.restore_generation,(unsigned long long)telemetry_.restore_fingerprint);
- w.add(",\"operational\":{\"system_health\":\"%s\",\"calibration\":\"%s\",\"joint_feedback\":\"%s\",\"motion_authority\":\"%s\",\"phase\":\"%s\",\"reason\":\"%s\",\"mode\":\"%s\",\"entry_reason\":\"%s\",\"operator_present\":%s,\"walk\":\"%s\"}",
+ w.add(",\"operational\":{\"system_health\":\"%s\",\"calibration\":\"%s\",\"joint_feedback\":\"%s\",\"motion_authority\":\"%s\",\"phase\":\"%s\",\"reason\":\"%s\",\"mode\":\"%s\",\"entry_reason\":\"%s\",\"operator_present\":%s,\"walk\":\"%s\",\"walk_cycles\":%.3f,\"walk_drive\":%s}",
   telemetry_.system_health,telemetry_.calibration_state,telemetry_.joint_feedback,telemetry_.motion_authority,telemetry_.readiness_phase,
-  telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false",telemetry_.walk);
+  telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false",telemetry_.walk,telemetry_.walk_cycles,telemetry_.walk_drive?"true":"false");
  w.add(",\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
  w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",

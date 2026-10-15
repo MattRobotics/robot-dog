@@ -855,6 +855,122 @@ void SafeActuatorPolicy::abort(ActuatorTransaction* transaction) {
   }
 }
 
+WriteDecision SafeActuatorPolicy::evaluateFrame(const ActuatorFrameCommand& frame,
+                                                const core::AuthorityLease& lease,
+                                                core::OperatingMode mode, uint8_t* failed) const {
+  *failed = 0xff;
+  // Shape first: exactly the twelve canonical (leg, joint) slots, each once,
+  // each a bounded POSITION_COMMAND. Nothing else may ride in a frame.
+  uint16_t seen = 0;
+  for (unsigned i = 0; i < ActuatorFrameCommand::kJoints; ++i) {
+    const ActuatorCommand& c = frame.joints[i];
+    const unsigned leg = static_cast<unsigned>(c.joint.leg);
+    const unsigned kind = static_cast<unsigned>(c.joint.joint);
+    if (c.operation != ActuatorOperation::POSITION_COMMAND ||
+        c.motion_profile != MotionProfile::BOUNDED_DEFAULT || c.calibration_search ||
+        c.sequence_move != SequenceMoveKind::NONE || leg >= 4 || kind >= 3 ||
+        (seen & (1u << (leg * 3 + kind))) != 0) {
+      *failed = static_cast<uint8_t>(i);
+      return WriteDecision::REJECT_FRAME_SHAPE;
+    }
+    seen = static_cast<uint16_t>(seen | (1u << (leg * 3 + kind)));
+  }
+  if (seen != 0x0fff) return WriteDecision::REJECT_FRAME_SHAPE;
+  for (unsigned i = 0; i < ActuatorFrameCommand::kJoints; ++i) {
+    const WriteDecision d = evaluate(frame.joints[i], lease, mode);
+    if (d != WriteDecision::ACCEPT) { *failed = static_cast<uint8_t>(i); return d; }
+  }
+  return WriteDecision::ACCEPT;
+}
+
+WriteDecision SafeActuatorPolicy::planFrame(const ActuatorFrameCommand& frame,
+                                            const core::AuthorityLease& lease,
+                                            core::OperatingMode mode,
+                                            ActuatorFrameTransaction* out) {
+  if (out == nullptr) {
+    counters_.plan_rejections++;
+    return record(WriteDecision::REJECT_TRANSACTION_STATE);
+  }
+  *out = ActuatorFrameTransaction{};
+  if (outstanding_id_ != 0) {
+    out->state = TransactionState::REJECTED;
+    out->last_decision = WriteDecision::REJECT_TRANSACTION_STATE;
+    counters_.plan_rejections++;
+    return record(WriteDecision::REJECT_TRANSACTION_STATE);
+  }
+  uint8_t failed = 0xff;
+  const WriteDecision decision = evaluateFrame(frame, lease, mode, &failed);
+  out->frame = frame;
+  out->lease = lease;
+  out->mode = mode;
+  out->policy_epoch = epoch_;
+  out->last_decision = decision;
+  out->failed_joint = failed;
+  if (decision != WriteDecision::ACCEPT) {
+    out->state = TransactionState::REJECTED;
+    counters_.plan_rejections++;
+    return record(decision);
+  }
+  out->id = next_id_++;
+  if (next_id_ == 0) next_id_ = 1;
+  out->state = TransactionState::PLANNED;
+  outstanding_id_ = out->id;
+  counters_.plans++;
+  return record(WriteDecision::ACCEPT);
+}
+
+WriteDecision SafeActuatorPolicy::commitFrame(ActuatorFrameTransaction* transaction) {
+  if (transaction == nullptr) {
+    counters_.commit_rejections++;
+    return record(WriteDecision::REJECT_TRANSACTION_STATE);
+  }
+  // Identity first, exactly as commit(): replay, copy, resumed abort and a
+  // transaction from before a reset fail before their contents are read.
+  if (!transaction->planned()) {
+    transaction->last_decision = WriteDecision::REJECT_TRANSACTION_STATE;
+    counters_.commit_rejections++;
+    return record(WriteDecision::REJECT_TRANSACTION_STATE);
+  }
+  if (transaction->policy_epoch != epoch_) {
+    transaction->state = TransactionState::REJECTED;
+    transaction->last_decision = WriteDecision::REJECT_STALE_EPOCH;
+    counters_.commit_rejections++;
+    return record(WriteDecision::REJECT_STALE_EPOCH);
+  }
+  if (transaction->id != outstanding_id_) {
+    transaction->state = TransactionState::REJECTED;
+    transaction->last_decision = WriteDecision::REJECT_TRANSACTION_STATE;
+    counters_.commit_rejections++;
+    return record(WriteDecision::REJECT_TRANSACTION_STATE);
+  }
+  // All twelve re-verified against the live arbiter, before the first byte.
+  uint8_t failed = 0xff;
+  const WriteDecision decision =
+      evaluateFrame(transaction->frame, transaction->lease, transaction->mode, &failed);
+  outstanding_id_ = 0;  // consumed either way
+  transaction->last_decision = decision;
+  transaction->failed_joint = failed;
+  if (decision != WriteDecision::ACCEPT) {
+    transaction->state = TransactionState::REJECTED;
+    counters_.commit_rejections++;
+    return record(decision);
+  }
+  transaction->state = TransactionState::COMMITTED;
+  counters_.commits++;
+  return record(WriteDecision::ACCEPT);
+}
+
+void SafeActuatorPolicy::abortFrame(ActuatorFrameTransaction* transaction) {
+  if (transaction == nullptr) return;
+  if (transaction->id != 0 && transaction->id == outstanding_id_) outstanding_id_ = 0;
+  if (transaction->state == TransactionState::PLANNED ||
+      transaction->state == TransactionState::IDLE) {
+    transaction->state = TransactionState::ABORTED;
+    transaction->last_decision = WriteDecision::REJECT_TRANSACTION_STATE;
+    counters_.aborts++;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Names
 // ---------------------------------------------------------------------------
@@ -922,6 +1038,7 @@ const char* toString(WriteDecision decision) {
     case WriteDecision::REJECT_SEQUENCE_TARGET:        return "REJECT_SEQUENCE_TARGET";
     case WriteDecision::REJECT_SEQUENCE_PRIME:         return "REJECT_SEQUENCE_PRIME";
     case WriteDecision::REJECT_SEQUENCE_PREREQUISITES: return "REJECT_SEQUENCE_PREREQUISITES";
+    case WriteDecision::REJECT_FRAME_SHAPE:            return "REJECT_FRAME_SHAPE";
   }
   return "UNKNOWN";
 }

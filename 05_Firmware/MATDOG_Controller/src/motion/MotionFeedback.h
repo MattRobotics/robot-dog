@@ -32,7 +32,10 @@ struct FeedbackPolicy {
 struct AdaptiveObservation {
   JointTargetFrame actual{};
   BodyPose body{}; // world support plane Z=0; translation is base_link, NOT IMU height
-  double stampS=0;
+  // stampS = the ENCODER vector: the oldest of its per-joint sample instants.
+  // supportStampS = the support/presence declaration (heartbeat); it never
+  // refreshes stampS (Issue #52: a heartbeat is not a new encoder reading).
+  double stampS=0, supportStampS=0;
   EvidenceSource heightSource=EvidenceSource::UNKNOWN;
   EvidenceSource supportSource=EvidenceSource::UNKNOWN;
   uint8_t confirmedFeet=0;

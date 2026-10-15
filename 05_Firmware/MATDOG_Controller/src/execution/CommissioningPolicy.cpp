@@ -1,4 +1,5 @@
 #include "CommissioningPolicy.h"
+#include "../motion/OperationalWalkProfile.h"
 #include "../motion/FirstStrideReference.h"
 #include "../motion/PairedProneRoute.h"
 #include <cmath>
@@ -102,6 +103,14 @@ bool formatCommissioningParameters(const CommissioningParameters& p,char* out,si
     p.prone_max_deviation_rad,p.prone_max_rms_rad,(unsigned long)p.feedback_max_age_ms,(unsigned long)p.batch_timeout_ms,(unsigned long)p.tracking_timeout_ms,(unsigned long)p.segment_timeout_ms,(unsigned long)p.max_imu_age_ms,
     p.max_temperature_c,p.min_voltage_dv,p.max_voltage_dv,p.drive_speed,p.drive_acceleration,p.transaction_timeout_ms,toString(p.approval),p.walk_enabled?1u:0u,p.walk_clock);
   return n>0&&static_cast<size_t>(n)<size;
+}
+bool applyOperationalStandProfile(CommissioningParameters& p,const char** reason){
+  const auto& s=motion::operational_walk::kStandProfile;
+  CommissioningParameters next=p;
+  next.max_velocity_rad_s=s.velocityRadS;next.max_acceleration_rad_s2=s.accelerationRadS2;next.sample_period_s=s.samplePeriodS;
+  next.max_step_rad=s.maxStepRad;next.entry_min_stage_s=s.minEntryStageS;
+  if(!validCommissioningParameters(next,reason))return false;
+  p=next;return true;
 }
 bool buildCommissioningRuntime(const CommissioningParameters& p,const double limits[12][2],uint32_t generation,uint32_t epoch,ReviewedMotionRuntime* out){
   if(!out||!validCommissioningParameters(p,nullptr)||!generation||!epoch)return false;

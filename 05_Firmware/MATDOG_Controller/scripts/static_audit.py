@@ -215,6 +215,11 @@ def check_forbidden_literals(files):
     ]
     for path, code in files:
         for token in forbidden:
+            # Issue #52: the ONE host test that proves ServoPacket.h byte-equal
+            # to the installed library's sync position packet must name that
+            # library method. Host-only (scripts/tests), never in the firmware.
+            if token == "SyncWritePosEx" and path.name == "test_servo_packet.cpp" and "/scripts/tests/" in str(path):
+                continue
             if token.lower() in code.lower():
                 fail(f"{path}: forbidden token found: {token!r}")
 
@@ -264,6 +269,44 @@ def check_torque_enable(files):
                 fail(f"{path}: enableTorqueOn() appears to condition its verdict on the "
                      f"write's own ACK/status again - the readback alone must decide "
                      f"(CR3 uncertain-write safety)")
+
+
+def check_sync_frame_boundary(files):
+    """Issue #52 (2026-10-15): the ONLY multi-ID bus operations are the two
+    SYNC_WRITE packets of src/servo/ServoPacket.h, each to an explicit list of
+    distinct ids (never the all-ID broadcast instruction):
+      buildGoalFrame  - SRAM 41..47 (ACC, GoalPosition 0..4095, GoalTime=0, GoalSpeed)
+      buildTorqueOff  - SRAM 40 TorqueEnable := 0 (de-escalation only)
+    They are built only inside ServoBus.cpp; the goal frame is reachable only
+    through ServoBusActuatorBackend::writeGoalPositionFrame (SafeActuator
+    commitFrame + ActuatorRuntime::executeFrame); torque ON, EEPROM, offsets
+    and RegWrite/Action stay forbidden; the stock library sync READ is unused."""
+    packet = next((c for p, c in files if p.name == "ServoPacket.h"), None)
+    if packet is None:
+        fail("ServoPacket.h missing (Issue #52 frame packet builder)")
+        return
+    for pinned in ("kAddrTorqueEnable = 40", "kAddrAcc = 41", "kGoalWidth = 7", "kInstSync = 0x83",
+                   "ticks[i] > 4095", "distinctIds(ids, n)", "out[k++] = 0; out[k++] = 0;"):
+        if pinned not in packet:
+            fail(f"ServoPacket.h: reviewed frame invariant missing {pinned!r}")
+    if re.search(r"out\[k\+\+\]\s*=\s*1;\s*\}", packet):
+        fail("ServoPacket.h: a multi-ID packet writes a non-zero TorqueEnable")
+    for path, code in files:
+        if path.name in ("ServoPacket.h",) or "/scripts/tests/" in str(path):
+            continue   # host tests exercise the pure builders; they are never linked into the firmware
+        for token in ("buildGoalFrame", "buildTorqueOff"):
+            if token in code and path.name != "ServoBus.cpp":
+                fail(f"{path}: {token} may be used only inside ServoBus.cpp")
+        if "syncWriteGoalPositions(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "ServoBusActuatorBackend.h"):
+            fail(f"{path}: syncWriteGoalPositions may be called only by ServoBusActuatorBackend")
+        if "syncTorqueOff(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "Controller.cpp"):
+            fail(f"{path}: syncTorqueOff is the Controller SAFE_OFF burst only")
+        for token in ("syncReadPacketRx", "syncReadPacketTx", "SyncRead(", "RegWriteAction"):
+            if token in code:
+                fail(f"{path}: {token} (unverified library RX / latent RegWrite target) is not used")
+    backend = next((c for p, c in files if p.name == "ServoBusActuatorBackend.h"), "")
+    if "VERIFIED_APPLIED" in re.sub(r"//.*", "", backend.split("writeGoalPositionFrame", 1)[-1].split("writeCalibrationTorqueLimit", 1)[0]):
+        fail("ServoBusActuatorBackend.h: a frame (no ACK) must never be reported VERIFIED_APPLIED")
 
 
 def check_servo_motion_write_surface(files):
@@ -6320,7 +6363,9 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
                              # 2: + handleCalibrationRestore (Issue #48, AP-only, reviewed 2026-10-14)
                              (compact_transport,"self->admitAdmin(r)",2),
-                             (compact_transport,"gate.allowed(req.admin_generation)",2)):
+                             # 3: + serviceStopLane (Issue #52, 2026-10-15): the priority STOP lane runs the
+                             # SAME admission as an AP Motion command (lease + generation + radio), pinned below.
+                             (compact_transport,"gate.allowed(req.admin_generation)",3)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
         fail("WifiManager must never restore AP+STA")
@@ -6374,7 +6419,12 @@ def check_network_v3_boundaries(files, sketch_dir):
     # which holds STOP) keeps the deadman alive; the read-only Twin and anonymous polls never do.
     if "if(req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))service_->operatorHeartbeat(now_ms);" not in compact_transport:
         fail("Operator heartbeat must require the AP admin session and its CSRF token")
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",4),("portal_.resume(",1),
+    # 5th portal_.authorize: the Issue #52 STOP lane (same session + CSRF proof as a Motion
+    # command, after the admin lease/generation/radio admission, AP socket only).
+    if "constbooladmitted=lease&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio();" not in compact_transport or \
+       "if(admitted&&req.local_authorized&&req.ap_socket&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){" not in compact_transport:
+        fail("STOP lane must require the admin lease/generation/radio AND the AP session + CSRF proof")
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",5),("portal_.resume(",1),
                         ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
@@ -6509,6 +6559,7 @@ def main():
     check_operational_session_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
+    check_sync_frame_boundary(files)
     check_servo_id_write(files)
     check_daly_write(files)
     check_bms_command_surface(files)

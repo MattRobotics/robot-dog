@@ -567,6 +567,8 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
                                                   req.peer,req.cookie,req.csrf)) {
       resp.message="AUTH_FAILED";break;
     }
+    // Received before a STOP that was applied meanwhile: never executed late.
+    if(req.stop_epoch!=stop_epoch_.load()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
     if(req.ap_socket)service_->operatorHeartbeat(now_ms);  // the command itself proves presence
@@ -1191,6 +1193,20 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
     cookieValue(cookie,"md_session",r.cookie);
     httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
     r.kind=HttpRequestKind::MOTION_COMMAND;
+    r.stop_epoch=self->stop_epoch_.load();
+    if(r.motion_command.intent==motion::Intent::STOP&&r.ap_socket){
+      // STOP lane: never waits for the ordinary mailbox (a status or command
+      // request may hold it for up to its budget). The Controller validates
+      // and applies it first thing in its next loop.
+      const uint32_t ticket=self->stop_ticket_.fetch_add(1)+1;r.sequence=ticket;
+      while(self->stop_lock_.exchange(true,std::memory_order_acquire)){vTaskDelay(1);}
+      self->stop_request_=r;self->stop_pending_.store(true);self->stop_lock_.store(false,std::memory_order_release);
+      while(self->stop_done_.load()!=ticket&&millis()-t0<kStopLaneBudgetMs)vTaskDelay(pdMS_TO_TICKS(2));
+      if(self->stop_done_.load()!=ticket)return sendJsonError(req,"503 Service Unavailable","STOP_LANE_LATE",millis()-t0);
+      if(!self->stop_ack_ok_.load())return sendJsonError(req,"403 Forbidden","AUTH_FAILED",millis()-t0);
+      httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
+      return httpd_resp_send(req,self->stop_ack_,strlen(self->stop_ack_));
+    }
   }
   std::unique_ptr<char[]> catalog;
   if(r.kind==HttpRequestKind::MOTION_CAPABILITIES) {
@@ -1206,6 +1222,29 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
   return httpd_resp_send(req,catalog?catalog.get():resp.text,resp.text_len);
 }
+bool HttpTransport::serviceStopLane(uint32_t now_ms) {
+  if(!stop_pending_.load())return false;
+  HttpTransportRequest req;
+  if(stop_lock_.exchange(true,std::memory_order_acquire))return false;   // writer mid-copy: next loop
+  req=stop_request_;stop_pending_.store(false);stop_lock_.store(false,std::memory_order_release);
+  bool applied=false;stop_ack_ok_.store(false);stop_ack_[0]=0;
+  // Same admission as an AP MOTION_COMMAND in serviceRequest(): admin AP lease
+  // of the request's generation, verified radio, portal of that generation,
+  // then session + CSRF + local origin. A revocation in between fences it.
+  auto &gate = service_->networkAdminAccess();
+  AdminLease lease(gate);
+  const bool admitted=lease&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio();
+  if(admitted&&(portal_generation_!=req.admin_generation||portal_sta_)){portal_.reset();portal_generation_=req.admin_generation;portal_sta_=false;}
+  if(admitted&&req.local_authorized&&req.ap_socket&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
+    stop_epoch_.fetch_add(1);             // every command received before this STOP is superseded
+    service_->operatorHeartbeat(now_ms);
+    const auto ack=service_->motionCommand(req.motion_command,now_ms);
+    stop_ack_ok_.store(service_->motionAck(ack,stop_ack_,sizeof(stop_ack_)));applied=true;
+  }
+  stop_done_.store(req.sequence);
+  return applied;
+}
+
 esp_err_t HttpTransport::handleCalibrationRestore(httpd_req_t* req) {
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
   const uint32_t t0=millis();

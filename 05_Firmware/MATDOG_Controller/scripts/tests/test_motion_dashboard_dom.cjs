@@ -122,7 +122,9 @@ async function boot(enabled = false, options = {}) {
   // Relying only on fetch completion loses a release. The UI queues STOP behind an in-flight command.
   let release; p.device.holdCommand = new Promise(resolve => { release = resolve; });
   const b = p.q('[data-velocity="1,0"]'); b.setPointerCapture = () => {};
-  b.onpointerdown({ pointerId: 9 }); await settle(); b.onpointerup();
+  b.onpointerdown({ pointerId: 9 }); await settle(); b.onpointerup(); await settle();
+  // Issue #52: STOP has its own lane - it is on the wire BEFORE the held command returns.
+  assert.deepStrictEqual(p.device.commands.map(c => c.type), ['BASE_VELOCITY', 'MOTION.STOP'], 'STOP not queued behind the in-flight command');
   release(); p.device.holdCommand = null; await settle();
   assert.deepStrictEqual(p.device.commands.map(c => c.type), ['BASE_VELOCITY', 'MOTION.STOP']);
   p.dom.window.dispatchEvent(new p.dom.window.Event('offline')); await settle();
@@ -337,30 +339,43 @@ async function boot(enabled = false, options = {}) {
   assert.strictEqual(read.csrf, 'd'.repeat(64), 'status poll presents the CSRF heartbeat proof');
   assert(p.q('#motion-stand').closest('.card').textContent.includes('Solo con MATDOG sospeso sulla fixture'), 'fixture-only SAFE_OFF warning is visible');
   p.close();
-  // --- Certified first stride (2026-10-15): explicit, exact speed, only from verified STAND ---
+  // --- Continuous WALK (2026-10-15, Issue #52): START only from verified STAND, STOP never queued ---
   p = await boot(true);
-  const strideVx = 0.005 / 810;
-  p.device.caps.first_stride_only = true; p.device.caps.limits = { vx_m_s: strideVx, vy_m_s: 0, yaw_rate_rad_s: 0 };
-  p.device.status.now_ms += 100; p.device.status.reason = 'OBSERVE_GATE';
-  p.device.status.operational = { system_health: 'READY', calibration: 'RESTORED', joint_feedback: 'AVAILABLE', motion_authority: 'GRANTED', phase: 'READY', reason: 'OK', mode: 'RUN', entry_reason: '', operator_present: true, walk: 'FIRST_STRIDE_BOUND' };
+  p.device.caps.walk = { period_s: 7, lift_m: 0.015, strides_m: [0.02, 0.03, 0.04], fast: { period_s: 3, lift_m: 0.010, stride_m: 0.06, experimental: true } };
+  p.device.status.now_ms += 100;
+  p.device.status.operational = { system_health: 'READY', calibration: 'RESTORED', joint_feedback: 'AVAILABLE', motion_authority: 'GRANTED', phase: 'READY', reason: 'OK', mode: 'RUN', entry_reason: '', operator_present: true, walk: 'WALK_BOUND' };
   await p.motionPoll();
-  assert(p.q('#motion-first-stride').disabled, 'no stride before a verified STAND');
-  assert(p.q('#motion-state').textContent.includes('Passo (WALK)FIRST_STRIDE_BOUND'), 'walk binding is shown');
+  assert(p.q('#motion-walk-start').disabled, 'no WALK before a verified STAND');
   p.device.status.stand_state = 'STAND'; p.device.status.reason = 'STAND_VERIFIED'; p.device.status.now_ms += 100;
   await p.motionPoll();
-  assert(!p.q('#motion-first-stride').disabled, 'verified STAND + bound stride + teleoperation = one explicit stride command available');
-  assert(p.q('[data-velocity="1,0"]').disabled, 'free joystick stays disabled while only the certified stride is qualified');
-  const strideBefore = p.device.commands.length;
-  p.q('#motion-first-stride').click(); await settle();
-  assert.strictEqual(p.device.commands.length, strideBefore + 1, 'exactly one command per click');
-  const stride = p.device.commands.at(-1);
-  assert.strictEqual(stride.type, 'BASE_VELOCITY');
-  assert.strictEqual(stride.params.vx, strideVx, 'exact reviewed stride speed, no slider rounding');
-  assert.strictEqual(stride.params.vy, 0); assert.strictEqual(stride.params.yaw_rate, 0);
-  p.device.status.operational.walk = 'WALK_TUBE_OUTSIDE_LIMITS'; p.device.status.reason = 'WALK_UNBOUND'; p.device.status.now_ms += 100;
-  await p.motionPoll();
-  assert(p.q('#motion-first-stride').disabled, 'unbound stride (limits) keeps the button disabled');
+  assert(!p.q('#motion-walk-start').disabled, 'verified STAND + bound walk: WALK START available');
+  const walkBefore = p.device.commands.length;
+  p.q('#motion-walk-start').click(); await settle();
+  assert.strictEqual(p.device.commands.length, walkBefore + 1, 'exactly one command per click');
+  const start = p.device.commands.at(-1);
+  assert.strictEqual(start.type, 'BASE_VELOCITY'); assert.strictEqual(start.params.vx, 0.03 / 7, 'preset stride / period, exact');
+  assert.strictEqual(start.params.vy, 0); assert.strictEqual(start.params.yaw_rate, 0);
+  assert.strictEqual(p.q('#motion-walk-stride').value, '1', 'default stays the 30 mm STANDARD preset, never the experimental FAST');
+  assert(p.q('#motion-walk-stride option[value="3"]').textContent.includes('SPERIMENTALE'), 'FAST is labelled experimental');
+  p.device.status.operational.walk = 'WALK'; p.device.status.now_ms += 100; await p.motionPoll();
+  p.q('#motion-walk-stop').click(); await settle();
+  const wstop = p.device.commands.at(-1);
+  assert(wstop.type === 'BASE_VELOCITY' && wstop.params.vx === 0 && wstop.params.vy === 0 && wstop.params.yaw_rate === 0, 'WALK STOP = coordinated zero velocity');
+  // Red STOP while a command is held by a slow Controller: sent immediately on its own lane.
+  let releaseWalk; p.device.holdCommand = new Promise(resolve => { releaseWalk = resolve; });
+  p.q('#motion-walk-stop').click(); await settle();
+  const n0 = p.device.commands.length;
+  p.q('#motion-stop-button').click(); await settle();
+  assert.strictEqual(p.device.commands.length, n0 + 1, 'emergency STOP is not queued behind a pending command');
+  assert.strictEqual(p.device.commands.at(-1).type, 'MOTION.STOP');
+  releaseWalk(); p.device.holdCommand = null; await settle();
+  // Explicit FAST selection: exact 0.06 m / 3 s, never rounded.
+  p.device.status.operational.walk = 'WALK_BOUND'; p.device.status.stand_state = 'STAND'; p.device.status.now_ms += 100; await p.motionPoll();
+  p.q('#motion-walk-stride').value = '3'; p.q('#motion-walk-start').click(); await settle();
+  assert.strictEqual(p.device.commands.at(-1).params.vx, 0.06 / 3, 'FAST preset speed exact');
+  p.device.status.operational.walk = 'WALK_RANGE_OUTSIDE_LIMITS'; p.device.status.stand_state = 'STAND'; p.device.status.now_ms += 100; await p.motionPoll();
+  assert(p.q('#motion-walk-start').disabled, 'unbound walk keeps WALK START disabled');
   p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
-  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY; FIRST_STRIDE)');
+  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY; WALK START/STOP; FAST experimental opt-in; STOP not queued behind a pending command)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

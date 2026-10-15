@@ -22,15 +22,19 @@ const char* pairedProneDigest(bool variant){return variant?"ba83dbcb38483d03a9a6
 double pairedProneDuration(unsigned i){return i<kPairedProneSegments?paired_data::kSegments[i].duration:0;}
 PronePhase pairedPronePhase(unsigned i){return static_cast<PronePhase>(i<kPairedProneSegments?paired_data::kSegments[i].phase:4);}
 LocomotionFrame pairedProneSample(unsigned i,double u,bool variant,double beginProgress){
+ if(i>=kPairedProneSegments||!std::isfinite(beginProgress)||beginProgress<0||beginProgress>=1||!std::isfinite(u)||u<0||u>1)return {};
+ const auto law=quinticTimeLaw(u,pairedProneDuration(i));if(!law.valid)return {};
+ return pairedProneSampleAt(i,beginProgress+(1-beginProgress)*law.progress,(1-beginProgress)*law.velocity,(1-beginProgress)*law.acceleration,variant);
+}
+LocomotionFrame pairedProneSampleAt(unsigned i,double progress,double rate,double acceleration,bool variant){
  LocomotionFrame f;
- if(i>=kPairedProneSegments||!std::isfinite(beginProgress)||beginProgress<0||beginProgress>=1||!std::isfinite(u)||u<0||u>1)return f;
- const auto law=quinticTimeLaw(u,pairedProneDuration(i));if(!law.valid)return f;
+ if(i>=kPairedProneSegments||!std::isfinite(progress)||progress<0||progress>1||!std::isfinite(rate)||!std::isfinite(acceleration))return f;
  double p[8],v[8],a[8];
  for(unsigned j=0;j<8;++j){const double floor=j==3?-88.5*3.14159265358979323846/180:-89.0*3.14159265358979323846/180;
   const bool constrained=variant&&(j==1||j==3);
   const double start=constrained?std::fmax(floor,paired_data::kKnots[i].p[j]):paired_data::kKnots[i].p[j];
   const double end=constrained?std::fmax(floor,paired_data::kKnots[i+1].p[j]):paired_data::kKnots[i+1].p[j],delta=end-start;
-  p[j]=start+delta*(beginProgress+(1-beginProgress)*law.progress);v[j]=delta*(1-beginProgress)*law.velocity;a[j]=delta*(1-beginProgress)*law.acceleration;}
+  p[j]=start+delta*progress;v[j]=delta*rate;a[j]=delta*acceleration;}
  auto& body=f.cartesian.body;body.translationM={p[5],0,p[6]};
  const double c=std::cos(p[4]),s=std::sin(p[4]);
  body.rotation[0][0]=c;body.rotation[0][2]=s;body.rotation[2][0]=-s;body.rotation[2][2]=c;

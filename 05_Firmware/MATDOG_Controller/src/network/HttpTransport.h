@@ -54,6 +54,7 @@ struct HttpTransportRequest {
   motion::MotionCommand motion_command{};
   uint32_t restore_generation = 0;
   bool restore_confirmed = false;
+  uint32_t stop_epoch = 0;   // STOP epoch at receipt (Issue #52 ordering)
 };
 struct HttpTransportResponse {
   bool ok = false;
@@ -79,6 +80,11 @@ public:
   bool tlsStarted() const { return tls_listening_.load(); }
   bool manuallyStopped() const { return manual_stop_.load(); }
   void update(uint32_t now_ms);
+  // Issue #52 STOP lane: called FIRST in every Controller loop. Validates the
+  // pending STOP with the same session+CSRF proof as any Motion command, applies
+  // it through the ControllerService, and advances the STOP epoch that makes
+  // every motion command received before it SUPERSEDED_BY_STOP. True = applied.
+  bool serviceStopLane(uint32_t now_ms);
 
 private:
   static esp_err_t handleStatus(httpd_req_t *req);
@@ -145,6 +151,14 @@ private:
   // is in progress. The single httpd task then defers large Twin downloads so a
   // STOP or heartbeat is never queued behind a ~100 KB send (304 still served).
   std::atomic<bool> twin_deferred_{false};
+  // One-slot STOP lane (httpd task -> Controller), independent of slot_free_.
+  std::atomic<bool> stop_lock_{false};   // tiny spin lock around stop_request_ copies
+  HttpTransportRequest stop_request_{};
+  std::atomic<bool> stop_pending_{false};
+  std::atomic<uint32_t> stop_epoch_{0}, stop_done_{0}, stop_ticket_{0};
+  char stop_ack_[512]{};
+  std::atomic<bool> stop_ack_ok_{false};
+  static constexpr uint32_t kStopLaneBudgetMs = 600;
   static constexpr size_t kTwinDeferBytes = 8192;
 };
 } // namespace network
