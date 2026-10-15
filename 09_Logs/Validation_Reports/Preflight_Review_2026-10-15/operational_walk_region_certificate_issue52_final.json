@@ -61,10 +61,10 @@
  "minimum_centre_distance_m": 0.013787832260131826,
  "all_pass": true,
  "distance_calls": 174,
- "elapsed_s": 67.0,
+ "elapsed_s": 63.1,
  "identity": {
   "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
-  "profile_sha256": "482930f267ee396df3587e65a2f77dd306db178abefb6751978a0bb720f33735",
+  "profile_sha256": "ad7f92fe75324db0cc7f5dc6fcd4c3dd2294b866c1b831e49d4adacb4192f569",
   "tool_sha256": "22dad46e0c72e352124513d35e91853697c852e2d34dd198fe8fdbbce79ef41c",
   "meshes": {
    "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",

@@ -72,6 +72,8 @@ struct WalkProfile {
   const double* regionMinRad; const double* regionMaxRad;
 };
 constexpr double kFastStrideM[1] = {0.060};
+constexpr double kFastPeriodS = 3.0, kFastRampS = 3.0, kFastLiftM = 0.010, kFastDuty = 0.75;
+constexpr double kFastMaxVelocityRadS = 1.55, kFastMaxAccelerationRadS2 = 13.0, kFastMaxJointStepRad = 0.08;
 constexpr DriveProfile kStandardDrive{kDriveSpeed, kDriveAcceleration};
 constexpr DriveProfile kFastDrive{1200, 100};
 extern const double kFastTargetMinRad[12];
@@ -98,7 +100,7 @@ constexpr StandProfile kStandProfile{0.29, 2.0, 0.020, 0.006, 1.0, {300, 20}};
 static_assert(kStandProfile.velocityRadS * kStandProfile.samplePeriodS <= kStandProfile.maxStepRad, "STAND frame step must stay inside the tube");
 
 // Executor/planner ceilings must cover every profile (checked in MotionCoordinator.cpp).
-constexpr double kMaxProfileVelocityRadS = 1.55, kMaxProfileAccelerationRadS2 = 13.0;
+constexpr double kMaxProfileVelocityRadS = kFastMaxVelocityRadS, kMaxProfileAccelerationRadS2 = kFastMaxAccelerationRadS2;
 
 inline double strideVelocity(unsigned i) { return i < kStrideCount ? kStrideM[i] / kPeriodS : 0; }
 inline double profileVelocity(const WalkProfile& p, unsigned i) { return i < p.strideCount ? p.strides[i] / p.periodS : 0; }

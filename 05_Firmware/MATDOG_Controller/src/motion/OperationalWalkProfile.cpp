@@ -26,8 +26,8 @@ static const double kSurveyMax[12] = {10,10,10,10,10,10,10,10,10,10,10,10};
 #endif
 const WalkProfile kStandardProfile{"STANDARD", false, kPeriodS, kRampS, kLiftM, kDuty, kStrideM, kStrideCount,
   kMaxVelocityRadS, kMaxAccelerationRadS2, kMaxJointStepRad, kStandardDrive, MATDOG_REGION(kTargetMinRad, kTargetMaxRad)};
-const WalkProfile kFastProfile{"FAST", true, 3.0, 3.0, 0.010, 0.75, kFastStrideM, 1,
-  1.55, 13.0, 0.08, kFastDrive, MATDOG_REGION(kFastTargetMinRad, kFastTargetMaxRad)};
+const WalkProfile kFastProfile{"FAST", true, kFastPeriodS, kFastRampS, kFastLiftM, kFastDuty, kFastStrideM, 1,
+  kFastMaxVelocityRadS, kFastMaxAccelerationRadS2, kFastMaxJointStepRad, kFastDrive, MATDOG_REGION(kFastTargetMinRad, kFastTargetMaxRad)};
 const WalkProfile* const kProfiles[kProfileCount] = {&kStandardProfile, &kFastProfile};
 const WalkProfile* profileForVelocity(double vx) {
   for (const WalkProfile* p : kProfiles)
