@@ -68,7 +68,7 @@ async function boot(enabled = false, options = {}) {
   await settle();
   const q = s => dom.window.document.querySelector(s);
   const pulse = async (advance = 0) => { clock += advance; intervals.forEach(i => i.fn()); await settle(); };
-  const motionPoll = async () => { const poll = timers.find(t => t.active && (t.ms === 1000 || t.ms === 4000) && t.fn.name === 'refreshMotion'); assert(poll); poll.active = false; poll.fn(); await settle(); };
+  const motionPoll = async () => { const poll = timers.find(t => t.active && (t.ms >= 50 && t.ms <= 1000) && t.fn.name === 'refreshMotion'); assert(poll); poll.active = false; poll.fn(); await settle(); };
   const fireTimer = async delay => { const t = timers.find(t => t.active && t.ms === delay); assert(t, 'active timer ' + delay); t.active = false; clock += delay; t.fn(); await settle(); };
   return { dom, device, q, calls, errors, pulse, motionPoll, fireTimer, timers, close: () => dom.window.close() };
 }
@@ -263,6 +263,12 @@ async function boot(enabled = false, options = {}) {
   assert(!link.textContent.includes('LIVE'), 'configured link alone is not evidence of a hardware LIVE feed');
   p.close();
 
+  p=await boot(true);
+  p.device.status.readiness.permit=false;p.device.status.now_ms+=100;await p.motionPoll();
+  assert(p.q('#motion-stand').disabled,'current permit=false wins over available=true capability');
+  assert(p.device.caps.actions.find(a=>a.id==='posture.stand').available,'fixture retains cached available=true');
+  p.close();
+
   // --- 14 Oct regressions -----------------------------------------------
   for (const [failure, code, text] of [['text403', 'HTTP_403', '403 Forbidden ADMIN_AP_REQUIRED'], ['json503', 'HTTP_503', 'CONTROLLER_LOOP_LATE']]) {
     p = await boot(true);
@@ -328,12 +334,15 @@ async function boot(enabled = false, options = {}) {
   assert(!p.q('#motion-stand').disabled, 'READY + Controller-available STAND: no extra consent step in the UI');
   assert(p.q('[data-action="posture.lie_down"]').disabled, 'unimplemented action stays disabled');
   assert(p.q('[data-action="posture.lie_down"]').closest('.motion-action').textContent.includes('planned'), 'unimplemented action is labelled as such');
-  assert.strictEqual(p.q('#motion-twin-local').getAttribute('href'), '/twin/', 'Digital Twin served by the robot');
+  assert(p.q('header #motion-stop-button'),'STOP visible on every tab');
+  assert(p.q('#dashboard-twin-card')&&p.q('#dashboard-twin-frame'), 'Twin integrated in initial Dashboard');
+  assert.strictEqual(p.q('nav').children[1].dataset.page,'motion-control','Motion is second tab');
+  assert(p.q('#motion-restore-card').hidden,'automatic RESTORE hides repeated confirmation');
   p.q('#motion-stand').click(); await settle();
   assert.strictEqual(p.device.commands.at(-1).type, 'POSTURE.STAND');
   // Deadman proof (2026-10-15): status reads carry the admin CSRF token, so the
   // controller can tell the Dashboard (which holds STOP) from a read-only Twin.
-  p.dom.window.eval("csrf='d'.repeat(64)"); p.device.status.now_ms += 100;
+  p.dom.window.eval("csrf='d'.repeat(64);sessionAt=Date.now()"); p.device.status.now_ms += 100;
   await p.motionPoll();
   const read = p.calls.filter(c => c.url === '/api/motion/status').at(-1);
   assert.strictEqual(read.csrf, 'd'.repeat(64), 'status poll presents the CSRF heartbeat proof');

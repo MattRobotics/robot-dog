@@ -63,7 +63,7 @@ export class MotionTwinController {
     const below = (link: string): string[] => [link, ...(children.get(link) ?? []).flatMap(below)];
     for (const joint of actual.model.joints) this.downstream.set(joint.name, below(joint.child));
     for (const link of actual.collisionLinkNames) {
-      const mesh = actual.collisionMesh(link)!;
+      const mesh = actual.visualMesh(link) ?? actual.collisionMesh(link)!;
       const base = mesh.material as MeshStandardMaterial;
       this.measuredMaterials.set(link, base);
       const variants = new Map<LinkDisplayState, MeshStandardMaterial>();
@@ -95,7 +95,7 @@ export class MotionTwinController {
     for (const link of this.actual.collisionLinkNames) {
       const state = states.get(link) ?? 'MEASURED';
       this.linkStates.set(link, state);
-      const mesh = this.actual.collisionMesh(link)!;
+      const mesh = this.actual.visualMesh(link) ?? this.actual.collisionMesh(link)!;
       mesh.material = state === 'MEASURED' ? this.measuredMaterials.get(link)! : this.stateMaterials.get(link)!.get(state)!;
     }
   }

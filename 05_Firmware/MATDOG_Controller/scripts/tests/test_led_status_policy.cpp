@@ -593,7 +593,23 @@ void testNamesAndInitialState() {
 }
 }  // namespace
 
+void testCellAndPackWarnings(){
+ LedStatusPolicy p;LedStatusInputs in;in.system_health=matdog::core::SystemHealth::READY;
+ in.sample_valid=in.daly_comm_ok=true;in.telemetry_age_ms=0;in.soc_percent=80;
+ in.cell_min_mv=3700;in.pack_voltage_v=11.1f;p.update(in,1,30);CHECK(!p.snapshot().battery_warning&&!p.snapshot().battery_critical);
+ in.cell_min_mv=3500;p.update(in,2,30);CHECK(p.snapshot().battery_warning);
+ in.cell_min_mv=3190;in.pack_voltage_v=9.7f;in.soc_percent=33.2f;p.update(in,3,30);CHECK(p.snapshot().battery_critical);
+ in.cell_min_mv=3400;in.pack_voltage_v=10.4f;p.update(in,4,30);CHECK(p.snapshot().battery_critical);
+ in.cell_min_mv=3450;p.update(in,5,30);CHECK(!p.snapshot().battery_critical&&p.snapshot().battery_warning);
+ in.cell_min_mv=3600;in.pack_voltage_v=10.8f;p.update(in,6,30);CHECK(!p.snapshot().battery_warning);
+ in.pack_voltage_v=10.05f;p.update(in,7,30);CHECK(p.snapshot().battery_critical);
+ in.telemetry_age_ms=10000;p.update(in,8,30);CHECK(!p.snapshot().battery_critical);
+ in.telemetry_age_ms=0;in.battery_charging=true;p.update(in,9,30);CHECK(!p.snapshot().battery_critical);
+ in.battery_charging=false;in.soc_percent=NAN;p.update(in,10,30);CHECK(p.snapshot().battery_critical);
+}
+
 int main() {
+  testCellAndPackWarnings();
   testPriorityAndFacts();
   testReservedBatteryFacts();
   testReservedBatteryEffects();

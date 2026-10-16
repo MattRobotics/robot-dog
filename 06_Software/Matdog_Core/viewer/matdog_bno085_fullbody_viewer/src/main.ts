@@ -549,9 +549,10 @@ async function boot(): Promise<void> {
       if (!geometry) { geometry = fetchGeometry(url); meshCache.set(url, geometry); }
       return geometry;
     };
-    robot = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
-    const target = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink });
+    robot = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink, visualGeometry: true });
+    const target = await buildRobot({ model, urdfUrl: CANONICAL_URDF_URL, loadMeshGeometry, styleForLink, visualGeometry: true });
     twin = new MotionTwinController(robot, target);
+    (element('collision-layer') as HTMLInputElement).onchange=(event)=>robot?.setCollisionVisible((event.target as HTMLInputElement).checked);
     // Visual-only joint easing for the live feed; numbers stay the received sample.
     viewer.setBeforeRender((nowMs) => twin?.animate(nowMs));
     viewer.robotAnchor.add(target.rootObject);

@@ -171,6 +171,19 @@ LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
       snapshot_.battery_warning=inputs.battery_warning || soc_level_==1;
     }
   }
+  // Advisory margins above DALY's 3.20 V/cell and 9.60 V/pack cutoffs.
+  // No writes or motion gates: conservative candidate thresholds require a
+  // loaded hardware capture. Hysteresis prevents threshold chatter.
+  const bool voltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&
+    std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;
+  if(voltage_valid){
+    const auto cell=inputs.cell_min_mv;const auto pack=inputs.pack_voltage_v;
+    if(cell<=3350||pack<=10.05f)voltage_level_=2;
+    else if(voltage_level_==2&&(cell<3450||pack<10.35f)){}
+    else if(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))voltage_level_=1;
+    else voltage_level_=0;
+    if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}
+  }
   snapshot_.presentation=selectFromFacts(inputs,snapshot_);
   if (state() == LedPresentationState::READY || state() == LedPresentationState::CHARGING) {
     if (!snapshot_.soc_valid) {

@@ -6,7 +6,7 @@
  *   1. locates the canonical URDF in the repository;
  *   2. parses it and extracts every <collision> mesh reference;
  *   3. verifies that every referenced collision STL exists;
- *   4. copies the URDF verbatim plus ONLY the collision STLs into
+ *   4. copies the URDF verbatim plus separate collision and visual STLs into
  *      public/canonical/<model>/ so Vite can serve them;
  *   5. writes CANONICAL_PROVENANCE.json (sha256 of every staged file,
  *      counts, source paths) so the staged copy's origin is obvious.
@@ -89,6 +89,8 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
   const urdfDir = dirname(urdfPath);
   const urdfBuffer = readFileSync(urdfPath);
   const references = collisionMeshReferences(urdfBuffer.toString('utf8'));
+  const visualReferences=collisionMeshReferences(urdfBuffer.toString('utf8').replace(/<collision\b[\s\S]*?<\/collision>/g,'').replaceAll('<visual','<collision').replaceAll('</visual>','</collision>'));
+  const allReferences=[...references,...visualReferences];
 
   if (references.length === 0) {
     throw new Error(`No <collision> meshes found in ${urdfPath}`);
@@ -103,7 +105,7 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
 
   const meshes = [];
   const seen = new Set();
-  for (const { linkName, filename } of references) {
+  for (const { linkName, filename } of allReferences) {
     const relativeMeshPath = stripUriScheme(filename);
     const sourcePath = resolve(urdfDir, relativeMeshPath);
     if (!existsSync(sourcePath)) {
@@ -149,8 +151,9 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
       sha256: sha256(urdfBuffer),
       staged_as: stagedUrdfName,
     },
-    collision_mesh_count: meshes.length,
-    collision_meshes: meshes.sort((a, b) => a.link.localeCompare(b.link)),
+    collision_mesh_count: references.length,
+    collision_meshes: meshes.filter(m=>references.some(r=>r.filename===m.urdf_filename)).sort((a,b)=>a.link.localeCompare(b.link)),
+    visual_meshes: meshes.filter(m=>!references.some(r=>r.filename===m.urdf_filename)).sort((a,b)=>a.link.localeCompare(b.link)),
   };
 
   writeFileSync(

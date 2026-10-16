@@ -10,6 +10,7 @@
 #include "../servo/ServoPopulation.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
 #include <esp_random.h>
+#include <esp_heap_caps.h>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -64,7 +65,9 @@ void Controller::emitTelemetry(uint32_t now){
  for(unsigned i=0;i<12;++i){const auto& r=operational_producer_.raw(i);const auto* servo=servo::legServoAt((i/3)*3+2-i%3);
   add("%s{\"slot\":%u,\"id\":%u,\"raw\":%u,\"mapped\":%s,\"energized\":%d,\"speed\":%d,\"goal\":%d,\"temp\":%d,\"volt_dv\":%d,\"status\":%d,\"age_ms\":%lu}",i?",":"",i,servo?servo->bus_id:0,r.position,operational_feedback_.read_ok[i]?"true":"false",
    r.torque,r.speed,r.goal_position,r.temperature,r.voltage,r.status,(unsigned long)(now-r.sampled_at_ms));}
- add("]}\r\n");
+ add("],\"runtime\":{\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu}}\r\n",
+   (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),(unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+   (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
  // Admit a complete record only; USB backpressure must never delay Motion.
  // tel_seq advances on a dropped record so the bridge can observe the gap.
  if(used<sizeof(buffer)-1&&Serial.availableForWrite()>=static_cast<int>(used))

@@ -101,7 +101,7 @@ async function boot(options = {}) {
   const d = dom.window.document;
   // The page's only other timer is the 6 s abort guard of a request.
   // poll() runs the scheduled refresh and returns the delay of the next one.
-  const poll = async () => { const t = timers.filter(x => x.ms !== 6000).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 6000).pop() || {}).ms; };
+  const poll = async () => { const t = timers.filter(x => x.ms !== 800).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 800).pop() || {}).ms; };
   const tick = () => intervals.forEach(i => i.fn());
   return {dom, d, device, errors, timers, intervals, poll, tick, q: s => d.querySelector(s),
     close: () => dom.window.close()};
@@ -235,7 +235,7 @@ const row = (page, list, label) => {
   p = await boot();
   const gets = p.device.calls.filter(c => c.method === 'GET').map(c => c.url);
   eq(gets.join(','), '/status,/wifi/status', 'one sequential pair per refresh');
-  eq(p.timers.filter(x => x.ms !== 6000).pop().ms, 4000, 'poll interval');
+  eq(p.timers.filter(x => x.ms !== 800).pop().ms, 4000, 'poll interval');
   eq(await p.poll(), 4000, 'steady poll interval');
   eq(p.device.calls.filter(c => c.method === 'GET').length, 4, 'exactly two requests per poll');
   p.device.down = true;

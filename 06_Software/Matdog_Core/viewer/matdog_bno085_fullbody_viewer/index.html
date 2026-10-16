@@ -18,7 +18,7 @@
       <aside id="panel">
         <header>
           <h1>MATDOG Motion Digital Twin</h1>
-          <p class="subtitle">actual / target · canonical collision geometry</p>
+          <p class="subtitle">actual / target · visual + collision layers</p>
         </header>
 
         <section class="block" id="dashboard-block" hidden>
@@ -152,6 +152,7 @@
             <dd id="model-counts">—</dd>
             <dt>world axes</dt>
             <dd id="model-legend" class="legend"></dd>
+            <dt>Collision layer</dt><dd><label><input id="collision-layer" type="checkbox"> Show certified collision meshes (purple)</label></dd>
           </dl>
           <p class="detail">
             World is Z-up and identical to base_link. The robot uses one neutral material;

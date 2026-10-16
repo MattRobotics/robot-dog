@@ -191,6 +191,12 @@ int main() {
  auto rologin=request(s,"/api/motion/login","token="+token);run(rologin);check(rologin.status==403,"LAN cannot create operational session");
  s.service.gate.closing.store(true);auto closed=ro;runMotion(closed);check(closed.status==403,"LAN read revoked during radio transition");
  s.service.gate.closing.store(false);WiFi.mode_value=WIFI_AP_STA;auto dual=ro;runMotion(dual);check(dual.status==403,"LAN APSTA never admitted");
+ // Heavy assets cannot monopolize the control listener, idle or engaged.
+ endpoints();s.service.gate.phase.store(NetworkPhase::ADMIN_AP);adminRadio();
+ auto asset=request(s,"/twin/assets/twin.js","");asset.method=HTTP_GET;
+ asset.uri=asset.uri_store.c_str();HttpTransport::handleTwin(&asset);check(asset.status==503&&asset.response.find("TWIN_HOST_REQUIRED")!=std::string::npos,"idle heavy 3D must use host");
+ s.twin_deferred_.store(true);auto active_asset=request(s,"/twin/assets/twin.js","");active_asset.method=HTTP_GET;
+ active_asset.uri=active_asset.uri_store.c_str();HttpTransport::handleTwin(&active_asset);check(active_asset.status==503&&active_asset.response.find("TWIN_DEFERRED_MOTION_ACTIVE")!=std::string::npos,"active heavy 3D denied before transfer");
  check(s.service.mutations==0,"no configuration or actuator writes from motion API harness");
  printf("MOTION_HTTP_TRANSPORT = PASS (%u production-handler/security/service checks; HTTPD/socket/mailbox/driver facts are doubles)\n",checks);
 }

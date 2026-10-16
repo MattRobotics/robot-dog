@@ -83,6 +83,15 @@ int main() {
   j = status(service, now);
   CHECK(has(j, "\"raw\":{\"count\":10"));
   CHECK(has(j, "\"restore\":{\"decision\":\"PENDING_OPERATOR_REVIEW\",\"reason\":\"INSTALLATION_ATTESTATION_ABSENT\",\"trigger\":\"BOOT\",\"generation\":1,\"fingerprint\":\"9d5323b7d59bb080\"}"));
+  // Dashboard HTTP used the loop-entry clock while USB used completion time:
+  // one future slot explains RAW 11/12 without a missing encoder.
+  t.raw_ok[0]=t.raw_ok[1]=true;
+  t.joint_at_ms[0]=now+5;service.publishTelemetry(t);
+  CHECK(has(status(service,now),"\"raw\":{\"count\":11"));
+  CHECK(has(status(service,now+6),"\"raw\":{\"count\":12"));
+  t.joint_at_ms[0]=now-501;service.publishTelemetry(t);
+  CHECK(has(status(service,now),"\"raw\":{\"count\":11"));
+  t.joint_at_ms[0]=at[0];
   // Size budget: the status must fit the 4096-byte HTTP text buffer with the
   // transport_readonly and transport stats suffixes (~230 bytes) appended.
   for (unsigned i = 0; i < 12; ++i) t.actual_rad[i] = -1.60570291 + i * 1e-8;

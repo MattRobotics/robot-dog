@@ -26,6 +26,7 @@ class SemanticMotionPlanner {
 struct MotionTelemetry {
  bool joints_valid=false, quaternion_valid=false, height_valid=false,raw_valid=false;
  uint32_t joint_at_ms[12]{};
+ uint32_t feedback_max_age_ms=500;
  uint16_t raw_ticks[12]{};
  uint32_t sampled_at_ms=0, quaternion_at_ms=0;
  double actual_rad[12]{}, quaternion[4]{1,0,0,0}, base_height_m=0;

@@ -388,10 +388,12 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
 void HttpTransport::appendTransportStats(char* text,size_t cap){
   // Windowed maxima: each report starts a new window.
   const size_t n=strlen(text);if(!n||text[n-1]!='}')return;
-  char extra[200];
-  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu}}",
+  char extra[400];
+  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu,\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu}}",
     (unsigned long)loop_last_ms_.load(),(unsigned long)loop_max_ms_.exchange(0),(unsigned long)dispatch_last_ms_.load(),
-    (unsigned long)dispatch_max_ms_.exchange(0),(unsigned long)dispatch_late_.load(),(unsigned long)dispatch_busy_.load());
+    (unsigned long)dispatch_max_ms_.exchange(0),(unsigned long)dispatch_late_.load(),(unsigned long)dispatch_busy_.load(),
+    (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),(unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
+    (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
   if(k>0&&n-1+static_cast<size_t>(k)<cap)memcpy(text+n-1,extra,static_cast<size_t>(k)+1);
 }
 void HttpTransport::update(uint32_t now_ms) {
@@ -1317,9 +1319,9 @@ esp_err_t HttpTransport::handleTwin(httpd_req_t* req) {
     httpd_resp_set_status(req,"304 Not Modified");httpd_resp_set_hdr(req,"ETag",asset->etag);return httpd_resp_send(req,nullptr,0);
   }
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
-  if(self&&asset->gz_len>kTwinDeferBytes&&self->twin_deferred_.load()){
+  if(asset->gz_len>kTwinDeferBytes){
     httpd_resp_set_hdr(req,"Retry-After","5");
-    return sendJsonError(req,"503 Service Unavailable","TWIN_DEFERRED_MOTION_ACTIVE");
+    return sendJsonError(req,"503 Service Unavailable",self&&self->twin_deferred_.load()?"TWIN_DEFERRED_MOTION_ACTIVE":"TWIN_HOST_REQUIRED");
   }
   httpd_resp_set_type(req,asset->type);
   httpd_resp_set_hdr(req,"Content-Encoding","gzip");

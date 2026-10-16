@@ -9,6 +9,7 @@
 #define MATDOG_FIXTURE_COMMISSIONING_NO_MAIN
 #include "../../src/motion/FirstStrideReference.h"
 #include "../../src/motion/OperationalWalkProfile.h"
+#include "../../src/execution/OperationalFeedback.h"
 #include <algorithm>
 #include <array>
 #include "../../src/core/MotionClock.h"
@@ -633,7 +634,35 @@ void operationalRefusals(){
 }
 }  // namespace
 
+// Reproduce loop-entry vs read-completion ordering at every RR phase.
+// Future samples stay invalid; changing the evaluation clock fixes admission.
+void postValidationAdmissionClock(){
+ for(unsigned newest=0;newest<12;++newest){
+  Operational op;auto& b=op.b;b.now=10000;
+  for(unsigned j=0;j<12;++j)b.r.feedback.sampled_at_ms[j]=9940+((j+12-newest)%12)*5;
+  b.r.feedback.sampled_at_ms[newest]=10005;
+  execution::OperationalFeedback producer;
+  for(unsigned j=0;j<12;++j){execution::RawJointObservation raw;raw.read_ok=true;raw.position=tickOf(b.r,j,b.r.feedback.actual_rad[j]);
+    raw.torque=0;raw.temperature=30;raw.voltage=114;raw.status=0;raw.speed=0;
+    raw.sampled_at_ms=b.r.feedback.sampled_at_ms[j];raw.sampled_at_us=raw.sampled_at_ms*1000ull;
+    producer.ingest(j,raw,b.r.geometry,geometry_data::kProvenance,b.r.policy.transforms());}
+  CHECK(!producer.snapshot(b.now,b.r.envelope.feedback_max_age_ms).read_ok[newest]);
+  CHECK(producer.snapshot(10006,b.r.envelope.feedback_max_age_ms).read_ok[newest]);
+  CHECK(!producer.rawFresh(10407,b.r.envelope.feedback_max_age_ms));
+  auto rejected=op.stand();CHECK(rejected.outcome==motion::CommandOutcome::REJECTED);REASON(rejected.reason,"STALE_FEEDBACK");
+  CHECK(b.r.backend.writes.empty()&&b.session.state()==MotionSessionState::OFF);
+  b.now=10006;auto accepted=op.stand(2);CHECK(accepted.outcome==motion::CommandOutcome::ACCEPTED);
+  CHECK(b.session.state()==MotionSessionState::PRIMING&&b.r.backend.writes.empty());
+ }
+ for(unsigned stale=0;stale<12;++stale){
+  Operational op;auto& b=op.b;b.now=10000;for(auto& t:b.r.feedback.sampled_at_ms)t=b.now;
+  b.r.feedback.sampled_at_ms[stale]=b.now-b.r.envelope.feedback_max_age_ms-1;
+  auto rejected=op.stand();CHECK(rejected.outcome==motion::CommandOutcome::REJECTED);REASON(rejected.reason,"STALE_FEEDBACK");CHECK(b.r.backend.writes.empty());
+ }
+}
+
 int main(){
+  postValidationAdmissionClock();
   clockAndScheduler();frameTransactionContract();legacyHeartbeatContract();
   const bool stand_only=std::getenv("MATDOG_STAND_ONLY")!=nullptr;
   if(!stand_only)denseWalkRanges();
@@ -645,7 +674,7 @@ int main(){
     const double legacy=standTiming(true,b,0);
     for(double fold:{0.,.8,-2.0}){standTiming(false,a,fold);const double t=standTiming(false,b,fold);if(fold==0&&legacy>0&&t>0)std::printf("STAND_AB [SIMULATO] model=B legacy=%.1f s issue52=%.1f s speedup=%.1fx\n",legacy,t,legacy/t);}
     standTiming(false,c,0); }
-  if(stand_only){std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND only)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
+  if(stand_only){operationalRefusals();heartbeatCoupling();std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND only)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
   operationalRefusals();
   walkGates();heartbeatCoupling();streamFaults();
   const double step=2*kPi/4096;

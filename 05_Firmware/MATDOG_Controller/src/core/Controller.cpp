@@ -610,6 +610,10 @@ void Controller::HeartbeatHook::heartbeat(uint32_t now_ms) {
 }
 
 const char* Controller::armOperationalSession(uint32_t now) {
+  // preArmCheck may do substantial geometry work. Re-evaluate the SAME
+  // producer at admission time; never relax future/stale feedback checks.
+  now=millis();
+  operational_feedback_=operational_producer_.snapshot(now,reviewed_motion_.execution.feedback_max_age_ms);
   if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL||!commissioning_bound_)return "OPERATIONAL_MODE_REQUIRED";
   if(authority_.current()!=ActuatorAuthority::MOTION||!motion_authority_lease_.valid())return "MOTION_AUTHORITY_REQUIRED";
   if(!operatorPresent(now))return "OPERATOR_HEARTBEAT_REQUIRED";
@@ -631,8 +635,16 @@ const char* Controller::armOperationalSession(uint32_t now) {
   operational_facts_.lease=motion_authority_lease_;
   local_trial_evidence_=e;
   // Runtime-governed: no compile-time motion flag is consulted on this path.
-  if(!operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now)){
-    operational_facts_.operator_permit=false;return operational_session_.reason();}
+  const bool admitted=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now);
+  // One trace per admission, after the decision, never before the gate. These
+  // are the actual inputs, not a later USB telemetry snapshot.
+  Serial.printf("MOTION_ADMISSION now_ms=%lu epoch=%lu generation=%lu lease=%lu result=%s joints=",
+    (unsigned long)now,(unsigned long)actuator_policy_.epoch(),(unsigned long)e.generation,
+    (unsigned long)motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason());
+  for(unsigned i=0;i<12;++i)Serial.printf("%s%u:%lu:%ld:%u",i?",":"",i,
+    (unsigned long)operational_feedback_.sampled_at_ms[i],(long)static_cast<int32_t>(now-operational_feedback_.sampled_at_ms[i]),operational_feedback_.read_ok[i]?1:0);
+  Serial.println();
+  if(!admitted){operational_facts_.operator_permit=false;return operational_session_.reason();}
   Serial.printf("OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\n",(unsigned long)e.generation);
   return nullptr;
 }
@@ -1262,7 +1274,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   }
   if(validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs()){
     validation_present_=false;validation_walk_admitted_=false;local_trial_evidence_.local_operator_present=false;
-    operational_session_.revoke("LOCAL_PRESENCE_DEADMAN_EXPIRED");
+    operational_facts_.operator_permit=false;
+    if(operational_session_.state()!=execution::MotionSessionState::OFF)
+      operational_session_.revoke("LOCAL_PRESENCE_DEADMAN_EXPIRED");
   }
   // OPERATIONAL: while the authenticated operator keeps polling, the declared
   // fixture-support observation stays current and the finite permit of a
@@ -1499,12 +1513,13 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   if(telemetry.height_valid)telemetry.base_height_m=observation.body.translationM.z;
   for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
   telemetry.source="HARDWARE_SERVO_FEEDBACK";telemetry.joints_valid=true;telemetry.raw_valid=operational_producer_.rawFresh(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
+  telemetry.feedback_max_age_ms=reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500;
   telemetry.sampled_at_ms=now_ms;
   for(unsigned i=0;i<12;++i){
     telemetry.joints_valid=telemetry.joints_valid&&operational_feedback_.read_ok[i];
     telemetry.actual_rad[i]=operational_feedback_.actual_rad[i];
     telemetry.joint_at_ms[i]=operational_feedback_.sampled_at_ms[i];
-    telemetry.sampled_at_ms=telemetry.joint_at_ms[i]<telemetry.sampled_at_ms?telemetry.joint_at_ms[i]:telemetry.sampled_at_ms;
+    telemetry.sampled_at_ms=static_cast<int32_t>(now_ms-telemetry.joint_at_ms[i])>static_cast<int32_t>(now_ms-telemetry.sampled_at_ms)?telemetry.joint_at_ms[i]:telemetry.sampled_at_ms;
     telemetry.raw_ticks[i]=operational_producer_.raw(i).position;
     telemetry.joint_mapped[i]=operational_feedback_.read_ok[i];
     telemetry.raw_ok[i]=operational_producer_.raw(i).read_ok&&operational_producer_.raw(i).position<4096;
@@ -1723,6 +1738,8 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.daly_comm_ok = daly_.lastCommResult() == power::DalyCommResult::OK;
     led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms;
     led_inputs.soc_percent = battery.soc_percent;
+    led_inputs.cell_min_mv = battery.cell_min_mv;
+    led_inputs.pack_voltage_v = battery.pack_voltage_v;
     led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0;
     // Presentation only: the one informational KEY-OFF charging bit (word 3,
     // 0x0010) does not show as CHARGING_FAULT; every other bit does. The raw
@@ -1752,7 +1769,9 @@ void Controller::update(uint32_t now_ms) {
   // started (see @WEB SERVER START). A no-op, bounded check when it was
   // not — see network/HttpTransport.h for the cross-thread handoff this
   // advances.
-  http_transport_.update(now_ms);
+  // Admission/status must use a clock AFTER this loop's completed servo reads.
+  // The loop-entry clock makes the newest joint look future-dated.
+  http_transport_.update(millis());
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

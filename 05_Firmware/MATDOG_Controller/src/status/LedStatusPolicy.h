@@ -45,6 +45,8 @@ struct LedStatusInputs {
   bool daly_comm_ok = false;
   uint32_t telemetry_age_ms = UINT32_MAX;
   float soc_percent = 0;
+  uint16_t cell_min_mv = 0;
+  float pack_voltage_v = 0;
   bool battery_charging = false;
   // A DALY alarm that BLOCKS the charging presentation - produced by
   // dalyAlarmBlocksChargingPresentation() below, never by "any word != 0".
@@ -112,6 +114,7 @@ class LedStatusPolicy {
 
  private:
   LedStatusSnapshot snapshot_;
+  uint8_t voltage_level_ = 0; // advisory only; independent of DALY SOC
   uint8_t soc_level_ = 0; // presentation-only hysteresis: 0 normal, 1 warning, 2 critical
 };
 

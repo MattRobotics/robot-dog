@@ -149,7 +149,7 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  if(!out||!cap)return false;
- JsonWriter w{out,cap};const bool stale=!telemetry_.joints_valid||now-telemetry_.sampled_at_ms>500;
+ JsonWriter w{out,cap};const bool stale=!telemetry_.joints_valid||static_cast<int32_t>(now-telemetry_.sampled_at_ms)<0||now-telemetry_.sampled_at_ms>telemetry_.feedback_max_age_ms;
  const auto* s=executor_?&executor_->status():nullptr;const char* r=refusal();
  w.add("{\"version\":1,\"now_ms\":%lu,\"last_sequence\":%lu,\"owner\":\"%s\",\"executor_state\":\"%s\",\"stand_state\":\"%s\",\"fault\":%s,\"reason\":\"%s\",\"stale\":%s,\"tracking_error_rad\":%.6f,\"completed_sequence\":%lu,\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)now,(unsigned long)last_ack_.sequence,motion::toString(command_owner_),s?execution::toString(s->state):"OFF",planner_?planner_->state():"OBSERVE",readiness_.fault?"true":"false",r?r:(s?s->reason:"OFF"),stale?"true":"false",s?s->max_tracking_error_rad:0,(unsigned long)(s?s->completed_sequence:0),(unsigned long)telemetry_.sampled_at_ms);
  if(telemetry_.joints_valid){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);w.add("]");}else w.add("null");
@@ -163,7 +163,7 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  w.add(",\"source\":\"%s\",\"feet\":null},\"stale_scope\":\"MOTION_JOINT_FEEDBACK\"",telemetry_.source);
  {unsigned mapped=0,raw=0;uint32_t raw_age=0;uint16_t mask=0;
   for(unsigned i=0;i<12;++i){if(telemetry_.joint_mapped[i]){++mapped;mask|=static_cast<uint16_t>(1u<<i);}
-   if(telemetry_.raw_ok[i]&&static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0){++raw;const uint32_t a=now-telemetry_.joint_at_ms[i];if(a>raw_age)raw_age=a;}}
+   if(telemetry_.raw_ok[i]&&static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0&&now-telemetry_.joint_at_ms[i]<=telemetry_.feedback_max_age_ms){++raw;const uint32_t a=now-telemetry_.joint_at_ms[i];if(a>raw_age)raw_age=a;}}
   const bool imu=telemetry_.quaternion_valid&&static_cast<int32_t>(now-telemetry_.quaternion_at_ms)>=0;
   w.add(",\"channels\":{\"imu\":{\"valid\":%s,\"age_ms\":",imu?"true":"false");
   if(imu)w.add("%lu",static_cast<unsigned long>(now-telemetry_.quaternion_at_ms));else w.add("null");

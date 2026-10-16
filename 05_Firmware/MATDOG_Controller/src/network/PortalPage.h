@@ -53,7 +53,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{
 <div class="link" role="status"><span id="linkDot" class="dot"></span><span id="linkText">Connessione al dispositivo…</span></div>
 <div id="message" role="status" hidden></div>
 <nav><button data-page="dashboard" class="on">Dashboard</button><button data-page="wifi">Wi-Fi</button><button data-page="ap">Access Point</button><button data-page="performance">Performance</button><button data-page="ota">OTA</button><button data-page="diagnostics">Diagnostics</button></nav>
-<section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, l'accesso dura 5 minuti.</p><button>Accedi</button></form></section>
+<section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, la sessione dura 5 minuti; la Dashboard visibile la rinnova. La presenza Motion scade dopo 3 s senza heartbeat.</p><button>Accedi</button></form></section>
 <section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">MOVIMENTO NON AUTORIZZATO<span id="motionWhy"></span></div></div>
 <div id="staleNote">Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.</div>
 <div class="cards">
@@ -75,6 +75,7 @@ const POLL_MS=4000,STALE_MS=12000,BAT_LOW=30,BAT_CRIT=15,SESSION_MS=300000;
 const PAGES=['dashboard','wifi','ap','performance','ota','diagnostics'];
 const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+let authReady=Promise.resolve();
 let csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
 // One read at a time for the WHOLE page (portal + Motion): the AP listener has
 // two sockets with LRU purge, and two independent pollers plus any third
@@ -130,7 +131,7 @@ function renderStatus(){
   valid&&!fresh&&isFinite(soc)?['Ultimo valore (non attuale)',soc.toFixed(0)+' % · '+s.bms_pack_v+' V','na']:null,
   valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null]);
  const alarms=s.bms_alarms||'',clear=/^[0 ]+$/.test(alarms);
- rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Soglie colore barra','bassa ≤ '+BAT_LOW+' % · critica ≤ '+BAT_CRIT+' %','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
+ rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Avvisi energia','SOC stimato ≤30/15%; cella ≤3500/3350 mV; pacco ≤10,50/10,05 V. SOC non prova autonomia.','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
  // IMU: the rotation-vector counter must advance between two polls.
  const count=+s.imu_rv_count,now=Date.now();let rate=null;
  if(rv&&isFinite(count)&&now>rv.t&&count>=rv.c)rate=(count-rv.c)*1000/(now-rv.t);
@@ -212,7 +213,9 @@ function link(){
  // A temporary session ends on the controller after SESSION_MS.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}
 }
-async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error(path);return await r.text()}finally{clearTimeout(t)}})}
+// Diagnostics get 800 ms: the 3 s deadman budget minus a 1 s poll and
+// the Controller's 1200 ms Motion-read budget. STOP has a separate socket.
+async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),800);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error(path);return await r.text()}finally{clearTimeout(t)}})}
 async function refresh(){
  if(busy)return;busy=true;clearTimeout(timer);let ok=false;
  // Sequential on purpose: one keep-alive connection, never two at once.
@@ -263,7 +266,7 @@ document.querySelectorAll('form').forEach(f=>{if(f.id!=='loginForm')f.addEventLi
 // ---- Start -----------------------------------------------------------------
 try{const w=JSON.parse(store.get('md_watch'));if(w&&Date.now()-w.t<600000)watch=w;else store.set('md_watch',null)}catch(e){}
 authUi();setInterval(link,1000);
-(async()=>{if(store.get('md_remember')||Date.now()-(+store.get('md_login')||0)<SESSION_MS)await resume();refresh()})();
+authReady=(async()=>{if(store.get('md_remember')||store.get('md_login'))await resume();refresh()})();
 </script>)MATDOG" MATDOG_MOTION_DASHBOARD "</html>";
 } }
 #endif
