@@ -1224,9 +1224,15 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
 }
 bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   if(!stop_pending_.load())return false;
-  HttpTransportRequest req;
+  // Only the fields the STOP admission needs (the full request is ~2 KB of
+  // loop stack). Copied under the lane lock.
+  struct { uint32_t sequence,peer,admin_generation; bool local_authorized,ap_socket; char cookie[65],csrf[65]; motion::MotionCommand motion_command; } req;
   if(stop_lock_.exchange(true,std::memory_order_acquire))return false;   // writer mid-copy: next loop
-  req=stop_request_;stop_pending_.store(false);stop_lock_.store(false,std::memory_order_release);
+  req.sequence=stop_request_.sequence;req.peer=stop_request_.peer;req.admin_generation=stop_request_.admin_generation;
+  req.local_authorized=stop_request_.local_authorized;req.ap_socket=stop_request_.ap_socket;
+  memcpy(req.cookie,stop_request_.cookie,sizeof(req.cookie));memcpy(req.csrf,stop_request_.csrf,sizeof(req.csrf));
+  req.motion_command=stop_request_.motion_command;
+  stop_pending_.store(false);stop_lock_.store(false,std::memory_order_release);
   bool applied=false;stop_ack_ok_.store(false);stop_ack_[0]=0;
   // Same admission as an AP MOTION_COMMAND in serviceRequest(): admin AP lease
   // of the request's generation, verified radio, portal of that generation,

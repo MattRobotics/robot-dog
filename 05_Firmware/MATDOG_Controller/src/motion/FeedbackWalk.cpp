@@ -20,7 +20,8 @@ bool FeedbackWalk::validCommand(const PlanarVelocityCommand& c,double now) const
 }
 bool FeedbackWalk::start(const AdaptiveStand& stand,const AdaptiveObservation& o,const PlanarVelocityCommand& c,
                          const WalkSpecification& s,const FeedbackPolicy& p,double now){
-  *this=FeedbackWalk{};policy_=p;if(s.maxJointStepRad>0)policy_.maxJointStepRad=s.maxJointStepRad;
+  static const FeedbackWalk kIdle{};*this=kIdle;policy_=p;   // no multi-KB temporary on the loop stack
+if(s.maxJointStepRad>0)policy_.maxJointStepRad=s.maxJointStepRad;
   if(s.maxVelocityRadS>0||s.maxAccelerationRadS2>0){
     if(!positive(s.maxVelocityRadS)||!positive(s.maxAccelerationRadS2)){reject(FeedbackReason::INVALID_POLICY);return false;}
     for(unsigned i=0;i<4;++i){policy_.maxVelocityRadS[i]={s.maxVelocityRadS,s.maxVelocityRadS,s.maxVelocityRadS};policy_.maxAccelerationRadS2[i]={s.maxAccelerationRadS2,s.maxAccelerationRadS2,s.maxAccelerationRadS2};}

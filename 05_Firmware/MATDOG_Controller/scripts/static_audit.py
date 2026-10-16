@@ -271,6 +271,15 @@ def check_torque_enable(files):
                      f"(CR3 uncertain-write safety)")
 
 
+def check_loop_task_stack(files):
+    """2026-10-16: the Controller loop task needs 16 KB (measured worst call
+    chains 8.5-10 KB; the 8 KB default overflowed into the heap and boot-looped
+    the Issue #52 flash). The sketch must keep the explicit size."""
+    ino = next((c for p, c in files if p.suffix == ".ino"), "")
+    if "SET_LOOP_TASK_STACK_SIZE(16 * 1024);" not in ino:
+        fail("MATDOG_Controller.ino must set SET_LOOP_TASK_STACK_SIZE(16 * 1024) (loop stack budget)")
+
+
 def check_sync_frame_boundary(files):
     """Issue #52 (2026-10-15): the ONLY multi-ID bus operations are the two
     SYNC_WRITE packets of src/servo/ServoPacket.h, each to an explicit list of
@@ -6560,6 +6569,7 @@ def main():
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
     check_sync_frame_boundary(files)
+    check_loop_task_stack(files)
     check_servo_id_write(files)
     check_daly_write(files)
     check_bms_command_surface(files)

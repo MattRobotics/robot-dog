@@ -12,12 +12,15 @@ void MotionCoordinator::synchronizeSession(){
  if(!executor_||arm_generation_==executor_->status().arm_generation)return;
  arm_generation_=executor_->status().arm_generation;
  submitted_sequence_=0;assessment_={};frame_=motion::FeedbackFrame{};walking_=false;
- stand_.stop();walk_=motion::FeedbackWalk{};scheduler_.stop();walk_profile_=nullptr;
+ static const motion::FeedbackWalk kIdleWalk{};
+ stand_.stop();walk_=kIdleWalk;scheduler_.stop();walk_profile_=nullptr;
 }
 bool MotionCoordinator::configure(const motion::FeedbackPolicy& p,const motion::WalkSpecification& w,const motion::AcquisitionRoute* a){
  if(executor_&&executor_->active())return false;
  if(!motion::validFeedbackPolicy(p))return false;
- feedback_policy_=p;walk_specification_=w;acquisition_=a?*a:motion::AcquisitionRoute{};configured_=true;return true;
+ feedback_policy_=p;walk_specification_=w;
+ static const motion::AcquisitionRoute kEmptyRoute{};   // no multi-KB temporary on the loop stack
+ if(a)acquisition_=*a;else acquisition_=kEmptyRoute;configured_=true;return true;
 }
 bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c){
  if(executor_&&executor_->active())return false;

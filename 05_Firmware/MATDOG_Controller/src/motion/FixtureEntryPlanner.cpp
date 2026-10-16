@@ -70,7 +70,10 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
   plan.middle=start;for(unsigned i=2;i<12;i+=3)at(plan.middle,i)=at(goal,i);
   // The specific swept path, sampled, against limits and keep-outs.
   double s[12],g[12];for(unsigned i=0;i<12;++i){s[i]=at(start,i);g[i]=at(goal,i);}
-  double path[startpose::kEntryPathSamples][12];startpose::buildTwoStageEntry(s,g,path);
+  // Stack budget (2026-10-16 boot-loop root cause): ~8 KB of samples never live
+  // on the 8 KB Controller loop stack. Static storage; the planner runs only on
+  // the Controller thread (and single-threaded host tests) - not reentrant.
+  static double path[startpose::kEntryPathSamples][12];startpose::buildTwoStageEntry(s,g,path);
   startpose::JointLimits12 limits;for(unsigned i=0;i<12;++i){limits.lower[i]=p.jointLimits[i/3][i%3].lower;limits.upper[i]=p.jointLimits[i/3][i%3].upper;}
   startpose::TrackingTolerance tracking;tracking.rad=p.maxTrackingErrorRad;tracking.settle_s=p.segmentTimeoutS>0?p.segmentTimeoutS:1;
   startpose::PathClearance margin;margin.margin_rad=c.pathMarginRad;

@@ -17,12 +17,13 @@ Trap trap(double L, double v0, double v1, double a, double vmax) {
 }
 bool buildPhaseTimedRoute(bool variant, double v, double a, double dt, PhaseTimedRoute* out) {
   if (!out) return false;
-  *out = PhaseTimedRoute{};
+  static const PhaseTimedRoute kEmpty{};
+  *out = kEmpty;
   if (!std::isfinite(v) || v <= 0 || !std::isfinite(a) || a <= 0 || !std::isfinite(dt) || dt <= 0) return false;
   // Junction caps: v by default; 0 at the 5 phase boundaries and the route end;
   // at an interior corner a*dt/|jump| (jump between the nearest non-zero
   // segments on each side; zero-length segments move no joint and take no time).
-  double cap[kPairedProneSegments + 1];
+  double* cap = out->junctionCap;
   for (unsigned k = 0; k <= kPairedProneSegments; ++k) cap[k] = v;
   double prev[12]{}; bool havePrev = false;
   unsigned phase = 0; out->first[0] = 0;
@@ -30,7 +31,9 @@ bool buildPhaseTimedRoute(bool variant, double v, double a, double dt, PhaseTime
     const unsigned ph = static_cast<unsigned>(pairedPronePhase(i));
     if (ph < phase || ph > 4) return false;   // contiguous, ordered phases
     while (phase < ph) { out->first[++phase] = i; cap[i] = 0; havePrev = false; }
-    const auto s0 = pairedProneSampleAt(i, 0, 0, 0, variant), s1 = pairedProneSampleAt(i, 1, 0, 0, variant);
+    // Controller-thread static scratch: two LocomotionFrames (~1.7 KB) off the loop stack.
+    static LocomotionFrame s0, s1;
+    s0 = pairedProneSampleAt(i, 0, 0, 0, variant); s1 = pairedProneSampleAt(i, 1, 0, 0, variant);
     if (!s0.target.valid || !s1.target.valid) return false;
     double d[12], l = 0;
     for (unsigned k = 0; k < 12; ++k) { d[k] = slotOf(s1.target.legs[k / 3], k % 3) - slotOf(s0.target.legs[k / 3], k % 3); l = std::fmax(l, std::fabs(d[k])); }

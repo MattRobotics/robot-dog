@@ -1200,7 +1200,7 @@ bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntim
          static_cast<actuator::MicroRad>(std::llround(q*1e6)),&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
     }
   }
-  if(r.scope!=execution::TrialScope::FIXTURE_MICRO){motion::AcquisitionRoute route;route.pairedProne=true;
+  if(r.scope!=execution::TrialScope::FIXTURE_MICRO){static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;route.pairedProne=true;   // off the loop stack
     route.supervisedSegments=true;route.timeScale=r.stand_time_scale;
     route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
     if(!motion_coordinator_.configure(r.feedback,r.walk,&route))return false;}

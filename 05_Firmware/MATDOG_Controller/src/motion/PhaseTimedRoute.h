@@ -22,6 +22,7 @@ struct PhaseTimedRoute {
   double entrySpeed[kPairedProneSegments + 1]{};  // s' at each knot (rad/s along the inf-norm arclength)
   double startS[kPairedProneSegments + 1]{};      // time of each knot from the start of its phase
   double durationS[5]{};
+  double junctionCap[kPairedProneSegments + 1]{};  // build scratch (kept off the loop stack)
   double velocityRadS = 0, accelerationRadS2 = 0, frameS = 0, totalS = 0;
 };
 bool buildPhaseTimedRoute(bool fixtureLimitVariant, double velocityRadS, double accelerationRadS2, double frameS,

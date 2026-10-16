@@ -105,7 +105,9 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
     // Issue #52: operational STAND rates/frame period derived in kStandProfile.
     if(!execution::applyOperationalStandProfile(params,&reason)){unbindCommissioning("STAND_PROFILE_REJECTED");return false;}}
   operational_walk_bound_=false;operational_walk_reason_="WALK_NOT_BOUND";
-  execution::ReviewedMotionRuntime r;
+  // Stack budget (2026-10-16 boot-loop root cause): the runtime, route and
+  // entry config are kilobytes; Controller-thread static storage, reset here.
+  static execution::ReviewedMotionRuntime r;static const execution::ReviewedMotionRuntime kEmptyRuntime{};r=kEmptyRuntime;
   if(!execution::buildCommissioningRuntime(params,limits,cal.restored_generation,actuator_policy_.epoch(),&r)){unbindCommissioning("RUNTIME_PROFILE_REJECTED");reason=commissioning_reason_;return false;}
   // The certified fixture route must fit the hard limits as a whole.
   for(unsigned k=0;k<=motion::kPairedProneSegments;++k){const auto f=motion::pairedProneSample(k==motion::kPairedProneSegments?k-1:k,k==motion::kPairedProneSegments?1:0,true);
@@ -122,11 +124,12 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
       r.walk.maxVxMps=std::fmax(r.walk.maxVxMps,motion::operational_walk::profileVelocity(motion::operational_walk::kFastProfile,0));
    } else {r.walk=motion::WalkSpecification{};operational_walk_reason_="WALK_RANGE_OUTSIDE_LIMITS";}  // STAND stays available
   }
-  motion::AcquisitionRoute route;route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
+  static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;
+  route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
   if(operational){route.phaseTimed=true;route.phaseVelocityRadS=params.max_velocity_rad_s;route.phaseAccelerationRadS2=params.max_acceleration_rad_s2;
     r.execution.frame_writes=true;}   // one SYNC frame per tracked STAND frame
   route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
-  execution::CommissioningStandConfig cc;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=params.entry_min_stage_s;
+  static execution::CommissioningStandConfig cc;static const execution::CommissioningStandConfig kEmptyConfig{};cc=kEmptyConfig;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=params.entry_min_stage_s;
   if(operational){
    // Measured-start entry: no certificate tube. Keep-outs from CAD/FCL
    // (GEOMETRY_ENTRY_REPORT 2026-10-14): LF LOWER first zero separation
