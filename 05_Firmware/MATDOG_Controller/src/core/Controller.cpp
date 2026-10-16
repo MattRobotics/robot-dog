@@ -33,6 +33,13 @@ static_assert(matdog::motion::operational_walk::kStandProfile.drive.goalSpeed==m
 
 namespace matdog {
 namespace core {
+namespace {
+// Age of a sample against a loop-start timestamp: a sample taken later in the
+// same loop (negative age) is fresh, never 'stale by underflow'.
+bool sampleFresh(uint32_t now_ms,uint32_t sampled_at_ms,uint32_t max_age_ms){
+  return static_cast<int32_t>(now_ms-sampled_at_ms)<=static_cast<int32_t>(max_age_ms);
+}
+}  // namespace
 
 namespace {
 const char* resetReasonName(esp_reset_reason_t reason) {
@@ -538,8 +545,12 @@ void Controller::updateOperationalReadiness(uint32_t now_ms) {
   {const auto fb=operational_producer_.snapshot(now_ms,1000);bool all=true;for(unsigned i=0;i<12;++i)all=all&&fb.read_ok[i];f.mapped_fresh=all;}
   f.operational_bound=runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_;
   f.admit_failed=admit_failed_;f.admit_reason=admit_reason_;
-  {const auto imu=imu_.orientationSnapshot();f.imu_fresh=imu.valid&&static_cast<int32_t>(now_ms-imu.sampled_at_ms)>=0&&now_ms-imu.sampled_at_ms<=600;}
-  {const auto& b=daly_.sample();f.bms_ok=b.valid&&now_ms-b.sampled_at_ms<=3000;for(unsigned i=0;i<4;++i)f.bms_ok=f.bms_ok&&b.alarms[i]==0;}
+  // now_ms is the loop START; a BMS/IMU sample completed later in this same
+  // loop is newer than now_ms. Unsigned now-sampled then underflowed to 'stale'
+  // and the Motion Authority flapped GRANTED/REVOKED reason=BMS every 2 s DALY
+  // poll (seen on hardware 2026-10-16). Signed age: newer = fresh.
+  {const auto imu=imu_.orientationSnapshot();f.imu_fresh=imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,600);}
+  {const auto& b=daly_.sample();f.bms_ok=b.valid&&sampleFresh(now_ms,b.sampled_at_ms,3000);for(unsigned i=0;i<4;++i)f.bms_ok=f.bms_ok&&b.alarms[i]==0;}
   f.power_ok=power_state_.state()==PowerState::RUN;
   f.inhibited=authority_.inhibited();
   f.mode=operating_mode_.mode();
@@ -1343,7 +1354,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // observation, prime/torque startup or bounded sequential bus timing.
   const auto imu=imu_.orientationSnapshot();
   bool scoped=reviewed_motion_bound_&&execution::runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope)&&reviewed_motion_.calibration_generation==calibration.restored_generation&&
-      reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&!radio.closing.load()&&!radio.radio_fault.load()&&imu.valid&&now_ms-imu.sampled_at_ms<=reviewed_motion_.max_imu_age_ms;
+      reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&!radio.closing.load()&&!radio.radio_fault.load()&&imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,reviewed_motion_.max_imu_age_ms);
   bool prime_profiles=true;
   // Reviewed cards or the commissioning policy: the same drive-profile checks.
   // Commissioning reduces no output ceiling (ST3215 default 1000 = no claim).
@@ -1429,7 +1440,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   ready.fault=system_state_.systemHealth()==SystemHealth::FAULT;
   ready.power_ok=power_state_.state()==PowerState::RUN;
   const auto& battery=daly_.sample();
-  ready.bms_ok=battery.valid && now_ms-battery.sampled_at_ms<=3000;
+  ready.bms_ok=battery.valid && sampleFresh(now_ms,battery.sampled_at_ms,3000);
   for(unsigned i=0;i<4;i++)ready.bms_ok=ready.bms_ok && battery.alarms[i]==0;
   operational_facts_.mode=ready.mode;
   operational_facts_.calibration_accepted=ready.calibration_accepted;
