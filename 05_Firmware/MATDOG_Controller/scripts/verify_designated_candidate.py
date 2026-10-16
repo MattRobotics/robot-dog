@@ -28,6 +28,9 @@ def verify_host_serial_patch(root,source,image_sha,changed):
   pair=r['files'][name]
   if pair.get('compiled_source_file_sha256')!=hashlib.sha256(original).hexdigest() or pair.get('current_file_sha256')!=hashlib.sha256((root/name).read_bytes()).hexdigest():raise ValueError('host serial repair byte identity mismatch: '+name)
 def verify(path):
+ if json.loads(path.read_text()).get('schema')==3:
+  from release_candidate_gate import verify as verify_v3
+  return verify_v3(path,ROOT)
  if git('status','--porcelain'):raise ValueError('current worktree must be clean')
  d=json.loads(path.read_text());source=d['source_commit'];head=git('rev-parse','HEAD')
  subprocess.run(['git','-C',str(ROOT),'merge-base','--is-ancestor',source,head],check=True)
@@ -82,4 +85,6 @@ def verify_frozen_qualification(root,source):
  logs([dict(status=reuse['result'],log=reuse['log'],log_sha256=reuse['log_sha256'])])
  return 'STATIC_AUDIT = PASS (frozen source/log identities; separately qualified host repairs; no repeated firmware suites)'
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory','qualification'),required=True);a=p.parse_args();source,root=verify(a.designation);print(verify_frozen_qualification(ROOT,source) if a.field=='qualification' else source if a.field=='source' else root)
+ p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory','qualification'),required=True);a=p.parse_args();source,root=verify(a.designation)
+ modern=json.loads(a.designation.read_text()).get('schema')==3
+ print(('STATIC_AUDIT = PASS (V3 final-source inventories and exact campaign evidence)' if modern else verify_frozen_qualification(ROOT,source)) if a.field=='qualification' else source if a.field=='source' else root)
