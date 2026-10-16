@@ -2619,11 +2619,33 @@ def check_led_status_boundaries(files):
             r"charge_complete_verified\s*\(\s*(?!false\b)", policy_h):
         fail("LedStatusPolicy.h: reserved verified-full fact must default false")
 
-    # These facts have no battery-policy owner today. Pin their entire
-    # production vocabulary, including read sites, so a new constructor,
-    # alias, compound assignment, or policy-side threshold cannot quietly
-    # become a producer. Only the two false defaults, exact passthrough,
-    # selector read, and read-only @LED STATUS observation are permitted.
+    # 16 Oct post-validation candidate: permit exactly the presentation-only
+    # voltage producer requested by the operator. Pin the whole decision block,
+    # including freshness, plausibility, thresholds, hysteresis and charge mask.
+    # Other aliases/constructors/compound producers remain forbidden below.
+    voltage_advisory = (
+        'constboolvoltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;'
+        'if(voltage_valid){constautocell=inputs.cell_min_mv;'
+        'constautopack=inputs.pack_voltage_v;'
+        'if(cell<=3350||pack<=10.05f)voltage_level_=2;'
+        'elseif(voltage_level_==2&&(cell<3450||pack<10.35f)){}elseif(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))voltage_level_=1;'
+        'elsevoltage_level_=0;'
+        'if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;'
+        'snapshot_.battery_warning|=voltage_level_==1;'
+        '}}'
+    )
+    voltage_policy = by_name.get("LedStatusPolicy.cpp", (None, ""))[1]
+    if re.sub(r"\s+", "", voltage_policy).count(voltage_advisory) != 1:
+        fail("LedStatusPolicy.cpp: candidate cell/pack advisory must retain exact freshness, thresholds, hysteresis and charging gate")
+    if re.sub(r"\s+", "", policy_h).count("uint8_tvoltage_level_=0;") != 1:
+        fail("LedStatusPolicy.h: voltage advisory latch must initialize to zero")
+    controller_voltage = by_name.get("Controller.cpp", (None, ""))[1]
+    for field in ("cell_min_mv", "pack_voltage_v"):
+        expected = f"led_inputs.{field} = battery.{field};"
+        copies = re.findall(rf"led_inputs\.{field}\s*=\s*[^;]+;", controller_voltage)
+        if len(copies) != 1 or re.sub(r"\s+", "", copies[0]) != re.sub(r"\s+", "", expected):
+            fail(f"Controller.cpp: voltage advisory must consume exactly the cached battery.{field}")
+
     for fact, state in (("battery_warning", "BATTERY_WARNING"),
                         ("battery_critical", "BATTERY_CRITICAL")):
         declaration = rf"\bbool\s+{fact}\s*=\s*false\s*;"
@@ -2639,6 +2661,11 @@ def check_led_status_boundaries(files):
                 if count != 2:
                     fail(f"{path}: {fact} must have exactly two false defaults")
             elif path.name == "LedStatusPolicy.cpp":
+                voltage_body = re.search(r"\bconst\s+bool\s+voltage_valid\s*=.*?(?=snapshot_\.presentation\s*=\s*selectFromFacts)", remaining, re.DOTALL)
+                if voltage_body and re.sub(r"\s+", "", voltage_body.group(0)) == voltage_advisory:
+                    remaining = remaining[:voltage_body.start()] + remaining[voltage_body.end():]
+                if "voltage_level_" in remaining:
+                    fail(f"{path}: voltage advisory latch has an unreviewed producer/read")
                 level = "2" if fact == "battery_critical" else "1"
                 remaining, count = re.subn(rf"snapshot_\.{fact}\s*=\s*inputs\.{fact}\s*\|\|\s*soc_level_=={level};", "", remaining)
                 if count != 1:
@@ -2658,8 +2685,8 @@ def check_led_status_boundaries(files):
                 if count != 1 or (f"{fact}=%s" not in code and f"led_{fact}=%s" not in code):
                     fail(f"{path}: @LED STATUS must observe reserved {fact}")
             if re.search(rf"\b{fact}\b", remaining):
-                fail(f"{path}: {fact} has no reviewed production producer; "
-                     "only false defaults, exact cached passthrough and presentation reads are allowed")
+                fail(f"{path}: {fact} has an unreviewed production producer; "
+                     "only pinned SOC/voltage advisory, false defaults, exact cached passthrough and presentation reads are allowed")
 
     manager_path, manager = by_name.get("LedStatusManager.cpp", (None, ""))
     if manager.count("ring_->setFrame(frame)") != 1:

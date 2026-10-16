@@ -183,6 +183,17 @@ for fact in ("battery_warning", "battery_critical"):
              f"bool {fact} = false;", f"bool {fact};", struct),
         ])
 
+# The voltage advisory is admitted only as the exact bounded cached producer.
+STATIC_MUTATIONS.extend([
+    ("voltage ignores freshness", "LedStatusPolicy.cpp", "voltage_valid=telemetryFresh(inputs)&&", "voltage_valid=true&&"),
+    ("cell critical threshold drifts", "LedStatusPolicy.cpp", "if(cell<=3350||pack<=10.05f)", "if(cell<=3200||pack<=10.05f)"),
+    ("pack critical threshold drifts", "LedStatusPolicy.cpp", "if(cell<=3350||pack<=10.05f)", "if(cell<=3350||pack<=9.60f)"),
+    ("voltage loses hysteresis", "LedStatusPolicy.cpp", "voltage_level_==2&&(cell<3450||pack<10.35f)", "voltage_level_==2&&false"),
+    ("voltage presented while charging", "LedStatusPolicy.cpp", "if(!snapshot_.charging){snapshot_.battery_critical|=", "if(true){snapshot_.battery_critical|="),
+    ("cell advisory substitutes SOC", "Controller.cpp", "led_inputs.cell_min_mv = battery.cell_min_mv;", "led_inputs.cell_min_mv = battery.soc_percent;"),
+    ("pack advisory substitutes constant", "Controller.cpp", "led_inputs.pack_voltage_v = battery.pack_voltage_v;", "led_inputs.pack_voltage_v = 12.6f;"),
+])
+
 # Compile-valid semantic changes prove the suite checks behavior, rather
 # than merely grepping matching production expressions.
 POLICY_MUTATIONS = [

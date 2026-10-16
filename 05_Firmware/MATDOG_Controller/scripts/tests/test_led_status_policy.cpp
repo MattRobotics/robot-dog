@@ -594,6 +594,12 @@ void testNamesAndInitialState() {
 }  // namespace
 
 void testCellAndPackWarnings(){
+ for(const auto cell:{3350,3351,3500,3501}){
+  LedStatusPolicy boundary;LedStatusInputs in;in.system_health=SystemHealth::READY;
+  in.sample_valid=in.daly_comm_ok=true;in.telemetry_age_ms=0;in.soc_percent=80;in.pack_voltage_v=11.1f;in.cell_min_mv=cell;
+  boundary.update(in,0,30);CHECK(boundary.snapshot().battery_critical==(cell<=3350));CHECK(boundary.snapshot().battery_warning==(cell>3350&&cell<=3500));
+ }
+
  LedStatusPolicy p;LedStatusInputs in;in.system_health=matdog::core::SystemHealth::READY;
  in.sample_valid=in.daly_comm_ok=true;in.telemetry_age_ms=0;in.soc_percent=80;
  in.cell_min_mv=3700;in.pack_voltage_v=11.1f;p.update(in,1,30);CHECK(!p.snapshot().battery_warning&&!p.snapshot().battery_critical);
