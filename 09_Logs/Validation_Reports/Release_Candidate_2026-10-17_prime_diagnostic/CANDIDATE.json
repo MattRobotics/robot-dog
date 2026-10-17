@@ -2,17 +2,17 @@
   "schema": 3,
   "release_ready": "PASS",
   "purpose": "APP_ONLY_PRIME_DIAGNOSTIC_8b9ee70",
-  "scope": "OFFLINE_GATE_WORKFLOW_BOOTSTRAP_ONLY_NO_HARDWARE",
+  "scope": "SUPERVISED_PRIME_ONLY_TORQUE_ON_INHIBITED_NO_ENERGIZE; hardware_qualified=false",
   "source_commit": "8b9ee70a60bfa777ed50484c5e9546ceffd72f3b",
   "qualification_commit": "1772b896caefedfc3407746f890cadd491c733ff",
   "artifact_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_DIAGNOSTIC_20261017/build-powered/artifacts/ROBOT_POWERED-ota0",
   "application_sha256": "45843799db102804627674d7ed51ae9a6def9ce5d6a850cc842cc95773fa2601",
   "artifacts": {
-    "MATDOG_Controller.ino.partitions.bin": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
     "sdkconfig": "534f3457aaf3ffbc82c45dc21d6b3ac57388c82d0d9a24bd2b8e6cadc3e48d9d",
     "MATDOG_Controller.ino.bin": "45843799db102804627674d7ed51ae9a6def9ce5d6a850cc842cc95773fa2601",
-    "matdog_build_manifest.txt": "41ff99e1fcfc32d0c8a9e9add02b0ebb58faa0666fab706cffc8a6a2acf0263c",
-    "MATDOG_Controller.ino.elf": "3ae7720008ad188cc6f9afe1852338f2496aa0a727b671e69fef420e32071b10"
+    "MATDOG_Controller.ino.elf": "3ae7720008ad188cc6f9afe1852338f2496aa0a727b671e69fef420e32071b10",
+    "MATDOG_Controller.ino.partitions.bin": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
+    "matdog_build_manifest.txt": "41ff99e1fcfc32d0c8a9e9add02b0ebb58faa0666fab706cffc8a6a2acf0263c"
   },
   "compiled_files": {
     "05_Firmware/MATDOG_Controller/MATDOG_Controller.ino": "9e0f06d085adf653b2dd98f4d3bdff5d8c37fdad22d6bde36150fb4b29b94d9d",
@@ -603,8 +603,8 @@
       "exit_code": 0
     },
     "workflow": {
-      "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_DIAGNOSTIC_20261017/release/gate-regressions.log",
-      "sha256": "7e798e34050f6f9d34189c04aba6426ad467314634dd55da56e9b89a0046a776",
+      "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_DIAGNOSTIC_20261017/release/frozen-workflow.log",
+      "sha256": "cf653fb7a928d120bfc969c8afe6b146c752199baad0f1db673dae87580415be",
       "source_commit": "8b9ee70a60bfa777ed50484c5e9546ceffd72f3b",
       "qualification_commit": "1772b896caefedfc3407746f890cadd491c733ff",
       "result": "PASS",
