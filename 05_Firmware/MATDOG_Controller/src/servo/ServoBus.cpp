@@ -208,13 +208,13 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
       last_detected_=core::DetectedState::NO_RESPONSE;
       return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
     }
-    auto word=[&](unsigned address){const unsigned i=address-SMS_STS_TORQUE_ENABLE;return static_cast<uint16_t>(control[i]|(control[i+1]<<8));};
+    auto readGoalWord=[&](unsigned address){const unsigned i=address-SMS_STS_TORQUE_ENABLE;return static_cast<uint16_t>(control[i]|(control[i+1]<<8));};
     last_detected_=core::DetectedState::ONLINE;
-    goal_capture_.position_read=word(SMS_STS_GOAL_POSITION_L);goal_capture_.speed_read=word(SMS_STS_GOAL_SPEED_L);
+    goal_capture_.position_read=readGoalWord(SMS_STS_GOAL_POSITION_L);goal_capture_.speed_read=readGoalWord(SMS_STS_GOAL_SPEED_L);
     goal_capture_.acc_read=control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE];
     goal_capture_.mismatch=(goal_capture_.position_read!=target_tick?1u:0u)|(goal_capture_.speed_read!=validation_speed_?2u:0u)|(goal_capture_.acc_read!=validation_acceleration_?4u:0u);
     goal_capture_.finished_ms=millis();
-    return word(SMS_STS_GOAL_POSITION_L)==target_tick&&word(SMS_STS_GOAL_SPEED_L)==validation_speed_&&control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE]==validation_acceleration_?
+    return readGoalWord(SMS_STS_GOAL_POSITION_L)==target_tick&&readGoalWord(SMS_STS_GOAL_SPEED_L)==validation_speed_&&control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE]==validation_acceleration_?
         ServoWriteVerifyResult::VERIFIED_APPLIED:ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   }
 
