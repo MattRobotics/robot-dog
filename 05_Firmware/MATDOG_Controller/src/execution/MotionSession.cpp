@@ -89,6 +89,7 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
     arbiter_->generation()==f.lease.generation)lease_=f.lease;
  else if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}
  evidence_=e;epoch_=policy_->epoch();permit_generation_=f.permit_generation;next_=0;started_at_ms_=now;
+ write_attempts_=0;failed_joint_=-1;failure_detail_="";last_revoke_="";
  state_=MotionSessionState::PRIMING;reason_="PRIMING_PRESENT";return true;
 }
 bool MotionSession::requestFixtureMicro(unsigned joint,double delta,double duration,const FrameValidation& path,
@@ -110,7 +111,7 @@ bool MotionSession::requestFixtureMicro(unsigned joint,double delta,double durat
  micro_path_=path;micro_joint_=joint;micro_delta_=delta;micro_duration_=duration;micro_intervals_=static_cast<unsigned>(std::ceil(duration/.05));
  micro_step_=0;micro_sequence_=executor_->status().completed_sequence;micro_issued_at_ms_=now;micro_active_=true;reason_="FIXTURE_MICRO_ACTIVE";return true;
 }
-void MotionSession::revoke(const char* r){micro_active_=false;reason_=r;if(state_!=MotionSessionState::OFF){state_=MotionSessionState::SAFE_OFF_REQUIRED;executor_->stop(r);}}
+void MotionSession::revoke(const char* r){micro_active_=false;reason_=r;if(state_!=MotionSessionState::OFF&&state_!=MotionSessionState::SAFE_OFF_REQUIRED)last_revoke_=r;if(state_!=MotionSessionState::OFF){state_=MotionSessionState::SAFE_OFF_REQUIRED;executor_->stop(r);}}
 void MotionSession::confirmSafeOff(){
  if(state_!=MotionSessionState::SAFE_OFF_REQUIRED)return;
  arbiter_->release(lease_);lease_={};state_=MotionSessionState::OFF;reason_="SAFE_OFF_VERIFIED";
@@ -153,8 +154,24 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
  actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(next_,primed_rad_[next_],cmd,bus)){revoke("PRIME_MAPPING_OR_LIMITS");return;}
  if(state_==MotionSessionState::PRIMING && fb.torque_on[next_]){revoke("TORQUE_CHANGED_DURING_PRIME");return;}
  if(state_==MotionSessionState::ENERGIZING)cmd.operation=actuator::ActuatorOperation::TORQUE_ENABLE;
+ const bool energize=state_==MotionSessionState::ENERGIZING;
  actuator::ActuatorTransaction tx;
- if(policy_->plan(cmd,lease_,f.mode,&tx)!=actuator::WriteDecision::ACCEPT||runtime_->execute(&tx,bus,nullptr)!=actuator::ExecuteResult::WRITTEN){revoke("PRIME_BACKEND_OR_POLICY");return;}
+ const auto decision=policy_->plan(cmd,lease_,f.mode,&tx);
+ if(decision!=actuator::WriteDecision::ACCEPT){
+  failed_joint_=static_cast<int8_t>(next_);failure_detail_=actuator::toString(decision);
+  revoke(energize?"ENERGIZE_POLICY_REJECTED":"PRIME_POLICY_REJECTED");return;}
+ actuator::WriteDecision commit=actuator::WriteDecision::ACCEPT;
+ const auto result=runtime_->execute(&tx,bus,&commit);
+ if(result!=actuator::ExecuteResult::WRITTEN){
+  failed_joint_=static_cast<int8_t>(next_);
+  failure_detail_=result==actuator::ExecuteResult::NOT_EXECUTED?actuator::toString(commit):actuator::toString(result);
+  const bool backend=result==actuator::ExecuteResult::BACKEND_REJECTED||result==actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF;
+  if(backend&&++write_attempts_<kWriteAttempts){reason_=energize?"ENERGIZE_WRITE_RETRY":"PRIME_WRITE_RETRY";return;}
+  revoke(result==actuator::ExecuteResult::NOT_EXECUTED?(energize?"ENERGIZE_COMMIT_REJECTED":"PRIME_COMMIT_REJECTED"):
+         result==actuator::ExecuteResult::BACKEND_REJECTED?(energize?"ENERGIZE_BACKEND_NOT_APPLIED":"PRIME_BACKEND_NOT_APPLIED"):
+         result==actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF?(energize?"ENERGIZE_BACKEND_NO_RESPONSE":"PRIME_BACKEND_NO_RESPONSE"):
+         (energize?"ENERGIZE_BACKEND_UNAVAILABLE":"PRIME_BACKEND_UNAVAILABLE"));return;}
+ write_attempts_=0;
  if(++next_==12){next_=0;started_at_ms_=now;state_=state_==MotionSessionState::PRIMING?MotionSessionState::ENERGIZING:MotionSessionState::ARMING;}
 }
 } }

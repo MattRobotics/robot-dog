@@ -7,6 +7,9 @@ namespace matdog { namespace network {
 static constexpr char kDashboardContentSecurityPolicy[] =
     "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
     "connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; "
+    // img-src: only the bridge reachability probe (/api/bridge/ping.gif), so the
+    // Dashboard finds the Twin host without an address field (2026-10-17).
+    "img-src 'self' http://192.168.4.2:8765 http://192.168.1.149:8765; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 } }
 #endif

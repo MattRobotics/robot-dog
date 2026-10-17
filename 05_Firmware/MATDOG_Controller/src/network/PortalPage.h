@@ -132,7 +132,8 @@ function renderStatus(){
  }
  rows('#bmsList',[['Comunicazione',s.bms_comm,s.bms_comm==='OK'?'ok':'bad'],['Età ultimo dato valido',valid?dur(+s.bms_sample_age_ms):'nessun dato',fresh?'':'warn'],
   valid&&!fresh&&isFinite(soc)?['Ultimo valore (non attuale)',soc.toFixed(0)+' % · '+s.bms_pack_v+' V','na']:null,
-  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null]);
+  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null,valid?['Cella minima',s.bms_cell_min_mv+' mV']:null,
+  valid&&parseFloat(s.bms_remaining_ah)>0?['Capacità residua (DALY)',s.bms_remaining_ah+' Ah · valore BMS']:null,valid&&s.bms_remaining_estimate_ah!=null?['Capacità residua STIMA',s.bms_remaining_estimate_ah+' Ah · STIMA = SOC × '+s.bms_capacity_config_ah+' Ah','na']:null,valid&&s.bms_capacity_config_ah?['Capacità nominale configurata',s.bms_capacity_config_ah+' Ah (3S)','na']:null]);
  const alarms=s.bms_alarms||'',clear=/^[0 ]+$/.test(alarms);
  rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Avvisi energia','SOC stimato ≤30/15%; cella ≤3500/3350 mV; pacco ≤10,50/10,05 V. SOC non prova autonomia.','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
  // IMU: the rotation-vector counter must advance between two polls.

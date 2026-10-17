@@ -209,6 +209,11 @@ const char* toString(DalyCommResult result);
 // this bound never excuses a failed poll. Age is inclusive and wrap-safe.
 constexpr uint32_t kDalyTelemetryFreshnessMs = 5000;
 
+// MATDOG pack as installed: Zeee LiPo 3S1P 9000 mAh (04_Electronics/
+// MATDOG_POWER_STATES_AND_CHARGING.md). Configured nominal, used only to
+// display SOC x capacity as an ESTIMATE; never written to the BMS.
+constexpr float kPackNominalCapacityAh = 9.0f;
+
 struct DalySample {
   bool valid = false;
   uint32_t sampled_at_ms = 0;

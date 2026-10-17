@@ -522,5 +522,86 @@ class IntegrationTests(unittest.TestCase):
             self.assertEqual(stack.request("GET", path)[0].status, 404, path)
 
 
+class HttpSourceTests(unittest.TestCase):
+    """Read-only Wi-Fi source (2026-10-17): no USB, no robot writes, real telemetry passthrough."""
+
+    def robot(self):
+        import http.server
+        state = {"now": 1000, "gets": 0, "posts": 0, "down": False}
+
+        class Robot(http.server.BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                if state["down"]:
+                    self.send_error(503)
+                    return
+                state["gets"] += 1
+                state["now"] += 250
+                body = json.dumps({"version": 1, "now_ms": state["now"], "boot_nonce": 7, "stale": False,
+                                   "telemetry": {"source": "HARDWARE_SERVO_FEEDBACK", "actual_rad": [0.1] * 12}}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                state["posts"] += 1
+                self.send_error(405)
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Robot)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return server, state
+
+    def test_http_source_feeds_twin_without_usb_or_writes(self):
+        server, state = self.robot()
+        url = f"http://127.0.0.1:{server.server_address[1]}"
+        self.assertTrue(mb.robot_reachable(url))
+        tmp = tempfile.mkdtemp(prefix="matdog_bridge_http_")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        log = mb.SessionLog(os.path.join(tmp, "log"))
+        self.addCleanup(log.close)
+        with mock.patch.object(mb, "safe_open", side_effect=AssertionError("USB must not be opened")):
+            bridge = mb.Bridge("/dev/does-not-exist", log, tmp, source_url=url,
+                               engine_kwargs={"settle_s": 0.2, "detect_s": 0.5, "silence_s": 1.0})
+            httpd = mb.BridgeHTTPServer(("127.0.0.1", 0), bridge, os.path.join(tmp, "dist"))
+            bridge.start()
+            threading.Thread(target=httpd.serve_forever, daemon=True).start()
+            self.addCleanup(httpd.server_close)
+            self.addCleanup(httpd.shutdown)
+            self.addCleanup(bridge.stop)
+
+            def get(path):
+                c = http.client.HTTPConnection("127.0.0.1", httpd.server_address[1], timeout=5)
+                c.request("GET", path)
+                r = c.getresponse()
+                data = r.read()
+                c.close()
+                return r, data
+
+            def fresh():
+                status = json.loads(get("/api/motion/status")[1])
+                return status.get("available") is True and not status["stale"]
+
+            self.assertTrue(wait_until(fresh, 6.0))
+            status = json.loads(get("/api/motion/status")[1])
+            self.assertEqual(status["telemetry"]["source"], "HARDWARE_SERVO_FEEDBACK")  # passthrough, never synthesized
+            self.assertFalse(status["bridge"]["fake_device"])
+            self.assertEqual(status["bridge"]["serial_path"], url)
+            self.assertIsNone(bridge.link.lock_fd)
+            r, gif = get("/api/bridge/ping.gif")
+            self.assertEqual(r.status, 200)
+            self.assertEqual(r.getheader("Content-Type"), "image/gif")
+            self.assertTrue(gif.startswith(b"GIF89a"))
+            self.assertEqual(bridge.request_stop("http")["error"], "HTTP_SOURCE_READONLY")
+            self.assertEqual(state["posts"], 0)
+            state["down"] = True
+            self.assertTrue(wait_until(lambda: json.loads(get("/api/motion/status")[1])["stale"], 6.0))
+
+
 if __name__ == "__main__":
     unittest.main()

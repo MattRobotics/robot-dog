@@ -1473,7 +1473,15 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_facts_.fault=ready.fault;
   // Validate measured support/pose before the next actuator step. A revoked
   // fixture or lost held contact must stop WRITING without waiting for its ACK.
+  const auto session_before=operational_session_.state();
   operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
+  if(session_before!=operational_session_.state()&&operational_session_.state()==execution::MotionSessionState::SAFE_OFF_REQUIRED&&
+     (session_before==execution::MotionSessionState::PRIMING||session_before==execution::MotionSessionState::ENERGIZING||session_before==execution::MotionSessionState::ARMING)){
+    static char line[160];   // static: this loop function is on the stack-budgeted WALK chain
+    const int n=snprintf(line,sizeof(line),"OPERATIONAL_SESSION=REVOKED reason=%s joint=%d detail=%s\r\n",operational_session_.lastRevoke(),
+                         operational_session_.failedJoint(),operational_session_.failureDetail());
+    if(n>0&&static_cast<size_t>(n)<sizeof(line))writeAdmissionTrace(Serial,line,static_cast<size_t>(n));
+  }
   if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
   // The stride's internal TTL lives only as long as the operator heartbeat.
   // During the coordinated stop too: losing the heartbeat at any phase = SAFE_OFF.
@@ -1506,6 +1514,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // Terminal service results must use this tick's validated planner/executor.
   motion_service_.refresh(ready,now_ms);
   MotionTelemetry telemetry;telemetry.validation_capable=build::kSupervisedValidationCapable;telemetry.fixture_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;telemetry.load_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW;telemetry.foot_load_proven=telemetry.load_scope&&ready.support_observable&&observation.confirmedFeet==15;telemetry.supervised_segment=motion_coordinator_.proneSegment();telemetry.session_profile_sha256=validation_profile_.sealed()?validation_profile_.workspace.artifact_sha256:"";telemetry.session_state=operational_session_.stateName();telemetry.session_reason=operational_session_.reason();
+  telemetry.session_last_revoke=operational_session_.lastRevoke();telemetry.session_failure=operational_session_.failureDetail();telemetry.session_failed_joint=operational_session_.failedJoint();
   const auto orientation=imu_.orientationSnapshot();
   telemetry.quaternion_valid=orientation.valid;
   telemetry.quaternion_at_ms=orientation.sampled_at_ms;

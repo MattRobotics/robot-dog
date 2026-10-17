@@ -91,7 +91,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
   // torque sequence; the planner starts only once the session is ARMED.
   if(const char* why=preArmCheck())return why;
   if(const char* why=armer_->armForCommand(now))return why;
-  pending_stand_=true;pending_command_=c;pending_since_ms_=now;return nullptr;
+  pending_stand_=true;arming_failure_=nullptr;pending_command_=c;pending_since_ms_=now;return nullptr;
  }
  if(!executor_||!executor_->active())return "EXECUTOR_NOT_ARMED";
  switch(c.intent){
@@ -183,10 +183,13 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  if(pending_stand_&&executor_){
   if(executor_->active()&&session_&&session_->state()==MotionSessionState::ARMED){
    pending_stand_=false;
-   if(const char* why=startStand(pending_command_,now)){entry_reason_=why;if(session_)session_->revoke(why);return;}
+   if(const char* why=startStand(pending_command_,now)){entry_reason_=why;arming_failure_=why;if(session_)session_->revoke(why);return;}
   } else if(!session_||session_->state()==MotionSessionState::OFF||session_->state()==MotionSessionState::SAFE_OFF_REQUIRED||
             static_cast<uint32_t>(now-pending_since_ms_)>15000){
-   pending_stand_=false;entry_reason_=session_&&session_->state()!=MotionSessionState::OFF?session_->reason():"ARMING_FAILED";
+   pending_stand_=false;entry_reason_=session_&&session_->state()!=MotionSessionState::OFF?session_->reason():
+     session_&&*session_->lastRevoke()?session_->lastRevoke():"ARMING_FAILED";
+   arming_failure_=static_cast<uint32_t>(now-pending_since_ms_)>15000&&session_&&session_->state()!=MotionSessionState::OFF&&
+     session_->state()!=MotionSessionState::SAFE_OFF_REQUIRED?"ARMING_TIMEOUT":entry_reason_;
    if(session_&&session_->state()!=MotionSessionState::OFF&&session_->state()!=MotionSessionState::SAFE_OFF_REQUIRED)session_->revoke("ARMING_TIMEOUT");
   }
  }

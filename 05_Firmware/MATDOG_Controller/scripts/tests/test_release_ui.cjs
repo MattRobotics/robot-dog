@@ -6,6 +6,7 @@ const motion=fs.readFileSync(path.join(src,'network/MotionDashboard.h'),'utf8');
 const origins=JSON.parse(motion.match(/const authorizedTwinOrigins=(\[[^\n]+\]);/)[1].replace(/'/g,'"'));
 assert.deepStrictEqual(csp.match(/frame-src ([^;]+);/)[1].split(' '),origins);
 assert(csp.includes("connect-src 'self';")&&!csp.includes('*'));
+assert.deepStrictEqual(csp.match(/img-src 'self' ([^;]+);/)[1].split(' '),origins,'Twin probe images only from the same allowlist');
 const http=fs.readFileSync(path.join(src,'network/HttpTransport.cpp'),'utf8');
 assert(http.includes('"Content-Security-Policy",\n      kDashboardContentSecurityPolicy'));
 const portal=fs.readFileSync(path.join(src,'network/PortalPage.h'),'utf8');
@@ -19,6 +20,8 @@ const fallback=vm.createContext({Date,Intl:{DateTimeFormat(){throw Error('unsupp
 const controller=fs.readFileSync(path.join(src,'core/Controller.cpp'),'utf8');
 const arm=controller.split('const char* Controller::armOperationalSession(')[1].split('bool Controller::RestoreHook')[0];
 assert(!arm.includes('Serial.printf')&&arm.includes('writeAdmissionTrace'));
-assert(fs.readFileSync(path.join(src,'core/Commissioning.cpp'),'utf8').includes('operational&&!build::kStandOnlyCandidate'));
-assert(fs.readFileSync(path.join(src,'config/BuildConfig.h'),'utf8').includes('kStandOnlyCandidate = true'));
-console.log('RELEASE_UI PASS: exact CSP allowlist/header, UTC/Rome both DST transitions, no Print formatter, STAND-only fence');
+// ADR-006: no compile-time validation fence; qualification is reported.
+assert(!fs.readFileSync(path.join(src,'config/BuildConfig.h'),'utf8').includes('kStandOnlyCandidate'));
+assert(fs.readFileSync(path.join(src,'core/Commissioning.cpp'),'utf8').includes('if(operational){unsigned joint=12;'));
+assert(fs.readFileSync(path.join(src,'core/MotionService.cpp'),'utf8').includes('\\"hardware_qualified\\":{'));
+console.log('RELEASE_UI PASS: exact CSP allowlist/header (frame+img), UTC/Rome both DST transitions, no Print formatter, ADR-006 no STAND-only fence');

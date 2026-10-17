@@ -56,6 +56,7 @@ import threading
 from zoneinfo import ZoneInfo
 import time
 import urllib.parse
+import urllib.request
 from typing import Any, Callable, Optional
 
 BRIDGE_NAME = "matdog_bridge"
@@ -63,6 +64,12 @@ BRIDGE_VERSION = 1
 DEFAULT_PORT = "/dev/serial/by-id/usb-Espressif_USB_JTAG_serial_debug_unit_14:C1:9F:22:75:94-if00"
 DEFAULT_HTTP = "0.0.0.0:8765"
 DEFAULT_CONSOLE = "127.0.0.1:8766"
+DEFAULT_ROBOT_URL = "http://192.168.4.1"   # MATDOG AP address (Controller)
+HTTP_SOURCE_PERIOD_S = 0.25                 # 4 Hz read-only status poll
+HTTP_SOURCE_TIMEOUT_S = 1.5
+HTTP_SOURCE_FAILS_TO_CLOSE = 3
+# 1x1 transparent GIF: the Dashboard's Twin host reachability probe.
+PING_GIF = bytes.fromhex("47494638396101000100800000000000ffffff21f90401000000002c00000000010001000002024401003b")
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_VIEWER_DIST = os.path.normpath(
     os.path.join(HERE, "..", "viewer", "matdog_bno085_fullbody_viewer", "dist"))
@@ -391,6 +398,96 @@ class SerialLink:
 # ------------------------------------------------------- protocol engine ---
 
 _KV = re.compile(r"(\w+)=(\S+)")
+
+
+class HttpStatusLink:
+    """Read-only Controller source over Wi-Fi (2026-10-17): polls the public
+    /api/motion/status and feeds it to the engine as @TEL lines. It never sends
+    anything to the robot, never holds the USB port and never renews the
+    operator heartbeat (anonymous polls cannot). Same surface as SerialLink."""
+
+    def __init__(self, url: str, log: SessionLog, on_open: Callable[[float], None],
+                 on_line: Callable[[str, float], None], on_close: Callable[[float, str, str], None],
+                 period_s: float = HTTP_SOURCE_PERIOD_S, timeout_s: float = HTTP_SOURCE_TIMEOUT_S,
+                 fetch: Optional[Callable[[str, float], bytes]] = None):
+        self.path = url.rstrip("/")
+        self.lock_path = ""
+        self.lock_fd = None
+        self.fd = None
+        self.log = log
+        self.on_open, self.on_line, self.on_close = on_open, on_line, on_close
+        self.period_s, self.timeout_s = period_s, timeout_s
+        self.fetch = fetch or self._fetch
+        self.state = S_DISCONNECTED
+        self.detail = "HTTP source not polled yet"
+        self.opens = self.rx_lines = self.rx_bytes = self.tx_lines = self.overflows = 0
+        self.connected = False
+        self.fails = 0
+        self._stop = threading.Event()
+        self._thread: Optional[threading.Thread] = None
+
+    @staticmethod
+    def _fetch(url: str, timeout: float) -> bytes:
+        request = urllib.request.Request(url, headers={"Cache-Control": "no-store"})
+        with urllib.request.urlopen(request, timeout=timeout) as reply:  # noqa: S310 - fixed http AP URL
+            if reply.status != 200:
+                raise OSError(f"HTTP {reply.status}")
+            return reply.read(65536)
+
+    def start(self) -> None:
+        self._thread = threading.Thread(target=self._run, name="http-source", daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=3)
+
+    def poll_once(self) -> bool:
+        try:
+            body = self.fetch(self.path + "/api/motion/status", self.timeout_s)
+            obj = json.loads(body.decode("utf-8"))
+            if not isinstance(obj, dict) or not isinstance(obj.get("now_ms"), (int, float)):
+                raise ValueError("status without numeric now_ms")
+        except (OSError, ValueError) as exc:
+            self.fails += 1
+            if self.connected and self.fails >= HTTP_SOURCE_FAILS_TO_CLOSE:
+                self.connected = False
+                self.state, self.detail = S_DISCONNECTED, f"HTTP source lost: {exc}"
+                self.on_close(time.monotonic(), self.state, self.detail)
+            elif not self.connected:
+                self.state, self.detail = S_DISCONNECTED, f"HTTP source unreachable: {exc}"
+            return False
+        self.fails = 0
+        if not self.connected:
+            self.connected = True
+            self.opens += 1
+            self.state, self.detail = S_CONNECTED, f"read-only HTTP {self.path} (no USB)"
+            self.log.write("EVT", "http source open", url=self.path)
+            self.on_open(time.monotonic())
+        self.rx_lines += 1
+        self.rx_bytes += len(body)
+        self.on_line("@TEL " + json.dumps(obj, separators=(",", ":")), time.monotonic())
+        return True
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            started = time.monotonic()
+            self.poll_once()
+            self._stop.wait(max(0.0, self.period_s - (time.monotonic() - started)))
+
+    def write_line(self, text: str, origin: str) -> None:
+        # Read-only source: subscription/flush lines have no meaning over HTTP.
+        if origin == "console" and text:
+            raise OSError(errno.EROFS, "HTTP source is read-only (use the Dashboard)")
+
+
+def robot_reachable(url: str, timeout: float = HTTP_SOURCE_TIMEOUT_S) -> bool:
+    try:
+        HttpStatusLink._fetch(url.rstrip("/") + "/api/motion/status", timeout)
+        return True
+    except (OSError, ValueError):
+        return False
 
 
 def parse_kv(text: str) -> dict[str, str]:
@@ -817,12 +914,15 @@ class Bridge:
     """Wires the serial link, the engine, the console fan-out and the session log."""
 
     def __init__(self, port: str, log: SessionLog, lock_dir: str, tel_hz: int = 10,
-                 fake_device: bool = False, legacy_poll: bool = True, engine_kwargs: Optional[dict] = None):
-        self.port = port
+                 fake_device: bool = False, legacy_poll: bool = True, engine_kwargs: Optional[dict] = None,
+                 source_url: Optional[str] = None):
+        self.port = source_url.rstrip("/") if source_url else port
+        self.http_source = bool(source_url)
         self.log = log
         self.engine = TelemetryEngine(tel_hz=tel_hz, fake_device=fake_device, legacy_poll=legacy_poll,
                                       log=log, **(engine_kwargs or {}))
-        self.link = SerialLink(port, lock_dir, log, self._on_open, self._on_line, self._on_close)
+        self.link: Any = (HttpStatusLink(self.port, log, self._on_open, self._on_line, self._on_close)
+                          if source_url else SerialLink(port, lock_dir, log, self._on_open, self._on_line, self._on_close))
         self.console: Optional["ConsoleClient"] = None
         self.console_lock = threading.Lock()
         self._stop = threading.Event()
@@ -886,6 +986,11 @@ class Bridge:
         self.write(text, "console")
 
     def request_stop(self, origin: str = "http") -> dict:
+        if self.http_source:
+            # The anonymous HTTP source cannot (and must not) command the robot.
+            return {"ok": False, "written": [], "replies": [], "error": "HTTP_SOURCE_READONLY",
+                    "serial_state": self.engine.serial_state, "host_utc": utc_now(),
+                    "note": "Read-only Wi-Fi source: STOP from the MATDOG Dashboard (header) or the physical stop."}
         written: list[str] = []
         error = ""
         mark = self.engine.rx_seq
@@ -1125,6 +1230,8 @@ class BridgeHandler(http.server.BaseHTTPRequestHandler):
         path = urllib.parse.urlsplit(self.path).path
         if path == "/api/motion/status":
             self._json(200, self.server.bridge.status_payload())
+        elif path == "/api/bridge/ping.gif":
+            self._send(200, PING_GIF, "image/gif", {"Cache-Control": "no-store"})
         elif path == "/api/bridge/health":
             self._json(200, self.server.bridge.health())
         elif path == "/api/bridge/events":
@@ -1523,6 +1630,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0],
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--port", default=DEFAULT_PORT, help="serial device path (default: by-id ESP32-S3 node)")
+    parser.add_argument("--source", choices=("auto", "serial", "http"), default="auto",
+                        help="auto (default): read-only Wi-Fi status from --robot-url when reachable, else USB serial; "
+                             "http: Wi-Fi only, USB never opened; serial: USB owner (legacy)")
+    parser.add_argument("--robot-url", default=DEFAULT_ROBOT_URL, help="Controller base URL for the HTTP source")
     parser.add_argument("--http", default=DEFAULT_HTTP, help="HTTP bind HOST:PORT (default 0.0.0.0:8765)")
     parser.add_argument("--console", default=DEFAULT_CONSOLE, help="loopback console HOST:PORT (default 127.0.0.1:8766)")
     parser.add_argument("--viewer-dist", default=DEFAULT_VIEWER_DIST, help="built viewer directory (vite build output)")
@@ -1556,8 +1667,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         port = fake.link_path
     log.write("EVT", "bridge start", argv=sys.argv, port=port, fake_device=bool(fake), pid=os.getpid(),
               http=args.http, console=args.console, viewer_dist=args.viewer_dist)
+    source_url: Optional[str] = None
+    if not fake and (args.source == "http" or (args.source == "auto" and robot_reachable(args.robot_url))):
+        source_url = args.robot_url
+    log.write("EVT", "bridge source", source="http" if source_url else "serial", url=source_url, requested=args.source)
     bridge = Bridge(port, log, lock_dir, tel_hz=args.tel_hz, fake_device=bool(fake),
-                    legacy_poll=not args.no_legacy_poll)
+                    legacy_poll=not args.no_legacy_poll, source_url=source_url)
     try:
         httpd = BridgeHTTPServer(http_address, bridge, args.viewer_dist)
         console = ConsoleServer(console_address, bridge)
@@ -1572,7 +1687,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     for thread in threads:
         thread.start()
     banner = "FAKE DEVICE - NOT HARDWARE - " if fake else ""
-    print(f"[{BRIDGE_NAME}] {banner}serial {port}")
+    print(f"[{BRIDGE_NAME}] {banner}" + (f"source HTTP read-only {source_url} (USB not opened)" if source_url else f"serial {port}"))
     print(f"[{BRIDGE_NAME}] log {log.path}")
     print(f"[{BRIDGE_NAME}] viewer {args.viewer_dist}{'' if os.path.isdir(args.viewer_dist) else '  (MISSING: run npm run build)'}")
     port_number = httpd.server_address[1]

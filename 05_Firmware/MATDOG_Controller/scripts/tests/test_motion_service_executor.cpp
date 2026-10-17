@@ -32,9 +32,14 @@ class Backend : public ActuatorBackend {
   std::vector<Write> writes;
   BackendWriteOutcome outcome = BackendWriteOutcome::VERIFIED_APPLIED;
   int torque_calls = 0;
-  BackendWriteOutcome enableTorque(uint8_t) override { ++torque_calls; return outcome; }
+  // Injected single-joint faults: the next fail_next goal/torque writes return
+  // fail_outcome and change nothing (models a lost reply / refused write).
+  int fail_next = 0, attempts = 0; BackendWriteOutcome fail_outcome = BackendWriteOutcome::UNCERTAIN;
+  bool injected() { ++attempts; if (fail_next > 0) { --fail_next; return true; } return false; }
+  BackendWriteOutcome enableTorque(uint8_t) override { if (injected()) return fail_outcome; ++torque_calls; return outcome; }
   BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t) override { ++torque_calls; return outcome; }
   BackendWriteOutcome writeGoalPosition(uint8_t bus, uint16_t tick, actuator::MotionProfile) override {
+    if (injected()) return fail_outcome;
     writes.push_back({bus, tick}); return outcome;
   }
   // Issue #52 frame: one SYNC_WRITE double. TX_OK = every byte left (no ACK

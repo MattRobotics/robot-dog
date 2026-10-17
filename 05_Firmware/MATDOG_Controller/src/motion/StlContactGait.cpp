@@ -2,11 +2,15 @@
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
+// Loop-stack budget (2026-10-17): the sample and frame live in static storage;
+// adapted() is only called from this file, on the single Controller loop, and
+// never recursively (its callers pass their own frame as `previous`).
 LocomotionFrame adapted(const GaitParameters& p,const CartesianSample& input,const LocomotionFrame* previous){
- auto cart=input;double offsets[4]{};
+ static CartesianSample cart;static LocomotionFrame f;
+ cart=input;double offsets[4]{};
  for(unsigned iteration=0;iteration<(input.stlSmoothing?12u:5u);++iteration){
   for(unsigned i=0;i<4;++i)cart.feet[i].z=input.feet[i].z+offsets[i];
-  auto f=solveGait(p,cart,previous);if(!f.target.valid)return f;
+  f=solveGait(p,cart,previous);if(!f.target.valid)return f;
   bool converged=true;
   for(unsigned i=0;i<4;++i){const auto leg=static_cast<LegId>(i);
    const double hard=canonicalFootPlaneMinimum(leg,f.target.legs[i],cart.body);
@@ -34,11 +38,15 @@ LocomotionFrame stlContactPosition(const GaitParameters& p,const CartesianSample
 LocomotionFrame solveStlContactGait(const GaitParameters& p,const CartesianSample& c,const LocomotionFrame* previous,double h){
  if(!std::isfinite(h)||h<=0||h>.002)return {};
  if(!std::isfinite(c.stlSmoothing)||c.stlSmoothing<0||c.stlSmoothing>1)return {};
- auto f=adapted(p,c,previous);if(!f.target.valid)return f;
+ static LocomotionFrame f;f=adapted(p,c,previous);if(!f.target.valid)return f;
  for(unsigned refinement=0;refinement<(c.stlSmoothing?5u:1u);++refinement,h*=.5){
  bool converged=true;
- const auto left=adapted(p,stencil(c,-h),&f),right=adapted(p,stencil(c,h),&f);
- const auto halfLeft=adapted(p,stencil(c,-h/2),&f),halfRight=adapted(p,stencil(c,h/2),&f);
+ // Static: four multi-KB frames would otherwise sit on the 16 KiB Controller
+ // loop stack (WALK chain ~17.6 KiB of known frames, 2026-10-16 audit). The
+ // solver runs only on the single Controller loop and is not re-entrant.
+ static LocomotionFrame left,right,halfLeft,halfRight;static CartesianSample shiftedSample;
+ shiftedSample=stencil(c,-h);left=adapted(p,shiftedSample,&f);shiftedSample=stencil(c,h);right=adapted(p,shiftedSample,&f);
+ shiftedSample=stencil(c,-h/2);halfLeft=adapted(p,shiftedSample,&f);shiftedSample=stencil(c,h/2);halfRight=adapted(p,shiftedSample,&f);
  if(!left.target.valid||!right.target.valid||!halfLeft.target.valid||!halfRight.target.valid)return {};
  for(unsigned i=0;i<4;++i){const auto l=left.target.legs[i],q=f.target.legs[i],r=right.target.legs[i];
   const auto hl=halfLeft.target.legs[i],hr=halfRight.target.legs[i];

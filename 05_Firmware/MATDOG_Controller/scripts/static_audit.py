@@ -6443,7 +6443,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     # portal_.authorize 4: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof)
     # + the operator heartbeat (2026-10-15): only a poll proving session AND CSRF (the Dashboard,
     # which holds STOP) keeps the deadman alive; the read-only Twin and anonymous polls never do.
-    if "if(req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))service_->operatorHeartbeat(now_ms);" not in compact_transport:
+    # 2026-10-17: the same proof is computed once and also reported to the
+    # Dashboard ("heartbeat":true|false) so a lapsed session is visible.
+    if "constboolbeat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);if(beat)service_->operatorHeartbeat(now_ms);" not in compact_transport:
         fail("Operator heartbeat must require the AP admin session and its CSRF token")
     # 5th portal_.authorize: the Issue #52 STOP lane (same session + CSRF proof as a Motion
     # command, after the admin lease/generation/radio admission, AP socket only).
@@ -6562,11 +6564,14 @@ def check_motion_convergence_gate(sketch_dir):
 
 def check_stand_release_scope(files):
     by_name={p.name:c for p,c in files if "scripts" not in p.parts}
-    if 'constexpr bool kStandOnlyCandidate = true;' not in by_name.get('BuildConfig.h',''):
-        fail('Release scope must remain STAND-only')
-    commissioning=by_name.get('Commissioning.cpp','')
-    for token in ('operational&&!build::kStandOnlyCandidate', 'if(build::kStandOnlyCandidate){reason="STAND_ONLY_CANDIDATE";return reply();}'):
-        if token not in commissioning:fail('STAND-only WALK admission fence missing')
+    # ADR-006 (2026-10-17): availability is decided by runtime checks, never
+    # by a compile-time validation fence; qualification is reported, not gated.
+    if any('kStandOnlyCandidate' in c for p,c in files if "scripts" not in p.parts):
+        fail('ADR-006: compile-time STAND-only fence reintroduced')
+    if 'if(operational){unsigned joint=12;' not in by_name.get('Commissioning.cpp',''):
+        fail('ADR-006: operational WALK binding must depend on live limits only')
+    if '\\"hardware_qualified\\":{' not in by_name.get('MotionService.cpp',''):
+        fail('ADR-006: capabilities must report hardware qualification separately')
     arm=by_name.get('Controller.cpp','').split('const char* Controller::armOperationalSession(')[-1].split('bool Controller::RestoreHook')[0]
     if 'Serial.printf' in arm or 'writeAdmissionTrace(Serial,trace,trace_bytes)' not in arm:
         fail('Admission diagnostics must use bounded nonallocating writes')
@@ -6574,7 +6579,7 @@ def check_stand_release_scope(files):
     # only the real quoted CSP lines here; do not weaken other audit rules.
     policy_path=next((p for p,c in files if p.name=='TwinHostPolicy.h'),None)
     policy=''.join(re.findall(r'^\s*"([^"]*)"',policy_path.read_text(),re.MULTILINE)) if policy_path else ''
-    expected="connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; "
+    expected="connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; img-src 'self' http://192.168.4.2:8765 http://192.168.1.149:8765; "
     if expected not in policy or '*' in policy:fail('Twin CSP allowlist drift')
 
 

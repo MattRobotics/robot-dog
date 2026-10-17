@@ -44,6 +44,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   void bindSession(MotionSession* session){session_=session;}
   void bindArmer(SessionArmer* armer){armer_=armer;}
   bool arming() const override {return pending_stand_;}
+  const char* armingFailure() const override {return arming_failure_;}
   const char* lastEntryReason() const {return entry_reason_;}
   bool walking() const {return walking_;}
   double walkCycles() const {return walking_?walk_.cycles():0;}
@@ -88,7 +89,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   SessionArmer* armer_=nullptr;
   bool pending_stand_=false;motion::MotionCommand pending_command_{};uint32_t pending_since_ms_=0;
   motion::PlanarVelocityCommand walk_command_{};
-  const char* entry_reason_="";
+  const char* entry_reason_="";const char* arming_failure_=nullptr;
   MotionExecutor* executor_=nullptr;
   MotionSession* session_=nullptr;
   actuator::SafeActuatorPolicy* policy_=nullptr;

@@ -57,6 +57,19 @@ class MotionSession {
  uint32_t micro_sequence_=0,micro_issued_at_ms_=0;
  double primed_rad_[12]{},rest_rad_[12]{};uint8_t next_=0;uint32_t epoch_=0,permit_generation_=0,started_at_ms_=0;
  uint16_t clamp_mask_=0;uint8_t clamp_ticks_[12]{};
+ // PRIME/ENERGIZE write diagnostics (2026-10-17): the policy decision or the
+ // backend outcome and the joint, instead of one merged reason.
+ uint8_t write_attempts_=0;int8_t failed_joint_=-1;const char* failure_detail_="";const char* last_revoke_="";
+ public:
+ // A goal write with torque OFF and a torque-enable are idempotent and verified
+ // by readback: a missed reply on the half-duplex bus is retried on the next
+ // tick (same joint, same target, re-planned through the policy) before the
+ // session is revoked. A policy refusal is never retried.
+ static constexpr uint8_t kWriteAttempts=3;
+ int failedJoint() const {return failed_joint_;}
+ const char* failureDetail() const {return failure_detail_;}
+ // The cause that ended the last session (kept after SAFE_OFF_VERIFIED).
+ const char* lastRevoke() const {return last_revoke_;}
  public:
  // Joints primed at a clamped inside tick, and by how many ticks (diagnostics).
  uint16_t primeClampMask() const {return clamp_mask_;}

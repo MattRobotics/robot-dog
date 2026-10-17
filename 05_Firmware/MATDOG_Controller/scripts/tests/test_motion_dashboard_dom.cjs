@@ -29,6 +29,8 @@ async function boot(enabled = false, options = {}) {
       w.setTimeout = (fn, ms) => { timers.push({ fn, ms, active: true }); return timers.length; }; w.clearTimeout = id => { if (timers[id - 1]) timers[id - 1].active = false; };
       w.setInterval = (fn, ms) => { intervals.push({ fn, ms }); return intervals.length; };
       w.addEventListener('error', e => errors.push(e.message));
+      // Twin host probe double: an <img> to a reachable bridge origin loads.
+      if (options.twin !== undefined) w.Image = class { set src(v) { this._s = v; if (!v) return; Promise.resolve().then(() => (v.startsWith(options.twin + '/api/bridge/ping.gif') ? this.onload : this.onerror)?.()); } get src() { return this._s; } };
       w.fetch = async (url, init = {}) => {
         calls.push({ url, method: init.method || 'GET', csrf: (init.headers || {})['X-Csrf-Token'] });
         const read = !init.method || init.method === 'GET';
@@ -57,6 +59,8 @@ async function boot(enabled = false, options = {}) {
         }
         if (url === '/api/motion/status') return reply(JSON.stringify(device.status));
         if (url === '/api/motion/capabilities') return reply(JSON.stringify(device.caps));
+        if (url === '/wifi/session') { device.resumes = (device.resumes || 0) + 1; return device.sessionOk ? reply('e'.repeat(64)) : reply('AUTH_FAILED', 403); }
+        if (url === '/api/motion/command' && device.authFail > 0) { device.authFail--; return reply('{"version":1,"ok":false,"error":"AUTH_FAILED"}', 403); }
         if (url === '/api/motion/command') {
           const command = JSON.parse(init.body);
           if (device.holdCommand) await device.holdCommand;
@@ -248,19 +252,19 @@ async function boot(enabled = false, options = {}) {
   assert(p.q('#motion-state').textContent.includes('timeout 2000 ms'), 'out-of-bounds timeout rejected');
   p.close();
 
-  p = await boot();
-  const input = p.q('#motion-twin-url'), link = p.q('#motion-twin');
-  assert.strictEqual(link.getAttribute('aria-disabled'), 'true');
-  for (const value of ['http://localhost:8765/', 'http://localhost.:8765/', 'http://127.1:8765/', 'http://[::1]:8765/', 'http://[::ffff:127.0.0.1]:8765/', 'http://0.0.0.0:8765/', 'javascript:alert(1)', 'http://192.168.1.40:8765/', 'http://192.168.1.149:9999/', 'http://user:secret@192.168.1.40:8765/']) {
-    input.value = value; input.dispatchEvent(new p.dom.window.Event('change'));
-    assert.strictEqual(link.getAttribute('aria-disabled'), 'true', value);
-    assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), null);
-  }
-  input.value = 'http://192.168.1.149:8765/'; input.dispatchEvent(new p.dom.window.Event('change'));
-  assert.strictEqual(link.href, 'http://192.168.1.149:8765/');
-  assert.strictEqual(link.getAttribute('aria-disabled'), 'false');
-  assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), link.href);
-  assert(!link.textContent.includes('LIVE'), 'configured link alone is not evidence of a hardware LIVE feed');
+  // Twin host discovered automatically: no IP entry, no stored URL.
+  p = await boot(false, { twin: 'http://192.168.1.149:8765' }); await settle();
+  assert(!p.q('#motion-twin-url'), 'no Twin address field in the ordinary UI');
+  { const link = p.q('#motion-twin'), frame = p.q('#dashboard-twin-frame');
+    assert.strictEqual(link.href, 'http://192.168.1.149:8765/'); assert.strictEqual(link.getAttribute('aria-disabled'), 'false');
+    assert(!frame.hidden && frame.getAttribute('src') === 'http://192.168.1.149:8765/', 'first reachable configured host framed');
+    assert(p.q('#dashboard-twin-chip').textContent.includes('192.168.1.149:8765'));
+    assert(!link.textContent.includes('LIVE'), 'a reachable host alone is not evidence of a hardware LIVE feed');
+    assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), null); }
+  p.close();
+  p = await boot(false, { twin: 'http://192.168.9.9:8765' }); await settle();
+  assert.strictEqual(p.q('#motion-twin').getAttribute('aria-disabled'), 'true'); assert(p.q('#dashboard-twin-frame').hidden);
+  assert(p.q('#dashboard-twin-chip').textContent.includes('NON TROVATO'), 'missing host is explicit');
   p.close();
 
   p=await boot(true);
@@ -385,6 +389,55 @@ async function boot(enabled = false, options = {}) {
   p.device.status.operational.walk = 'WALK_RANGE_OUTSIDE_LIMITS'; p.device.status.stand_state = 'STAND'; p.device.status.now_ms += 100; await p.motionPoll();
   assert(p.q('#motion-walk-start').disabled, 'unbound walk keeps WALK START disabled');
   p.close();
+
+  // --- 17 Oct: operator view, lifecycle and session (ADR-006) ----------------
+  p = await boot(true);
+  p.device.status.operational = { system_health: 'READY', calibration: 'RESTORED', joint_feedback: 'AVAILABLE', motion_authority: 'GRANTED', phase: 'READY', reason: 'OK', mode: 'RUN', entry_reason: '', operator_present: true, walk: 'WALK_BOUND' };
+  p.device.status.heartbeat = true; p.device.status.now_ms += 100; await p.motionPoll();
+  assert(p.q('#dashboard #motion-quick'), 'STAND/WALK/STOP on the first Dashboard tab');
+  assert(!p.q('#motion-quick input[type=checkbox]'), 'no manual presence checkbox');
+  assert(!p.q('#motion-q-stand').disabled && p.q('#motion-link').textContent === 'PRONTO');
+  p.q('#motion-q-stand').click(); await settle();
+  assert.strictEqual(p.device.commands.at(-1).type, 'POSTURE.STAND', 'quick STAND uses the reviewed command path');
+  // Battery: DALY value and the SOC estimate are both labelled.
+  p.dom.window.eval("st={bms_valid:'YES',bms_fresh:'YES',bms_soc_percent:'80.0',bms_pack_v:'12.1',bms_cell_min_mv:'4001',bms_current_a:'-0.4',bms_remaining_ah:'7.3',bms_remaining_estimate_ah:'7.20',bms_capacity_config_ah:'9.0'}");
+  await p.pulse();
+  { const t = p.q('#motion-battery').textContent;
+    assert(t.includes('SOC DALY80.0 %') && t.includes('12.1 V') && t.includes('4001 mV') && t.includes('-0.4 A'));
+    assert(t.includes('7.3 Ah · valore BMS') && t.includes('7.20 Ah · STIMA') && t.includes('9.0 Ah')); }
+  // Hidden page: polling keeps running (communication heartbeat), WALK gets a controlled stop.
+  p.device.status.operational.walk = 'WALK'; p.device.status.now_ms += 100; await p.motionPoll();
+  Object.defineProperty(p.dom.window.document, 'hidden', { configurable: true, get: () => true });
+  p.dom.window.document.dispatchEvent(new p.dom.window.Event('visibilitychange')); await settle();
+  { const c = p.device.commands.at(-1); assert(c.type === 'BASE_VELOCITY' && c.params.vx === 0, 'hidden during WALK = coordinated WALK STOP, not SAFE_OFF'); }
+  assert(p.timers.some(t => t.active && t.fn.name === 'refreshMotion'), 'status polling is not cancelled when hidden');
+  const polls0 = p.calls.filter(c => c.url === '/api/motion/status').length;
+  Object.defineProperty(p.dom.window.document, 'hidden', { configurable: true, get: () => false });
+  p.dom.window.dispatchEvent(new p.dom.window.Event('focus')); await settle();
+  assert(p.calls.filter(c => c.url === '/api/motion/status').length > polls0, 'focus resumes polling immediately');
+  // Lapsed admin session: shown as AUTENTICAZIONE and renewed without the token.
+  p.dom.window.eval("csrf='d'.repeat(64);store.set('md_remember','1')"); p.device.sessionOk = true;
+  p.device.status.heartbeat = false; p.device.status.now_ms += 100; await p.motionPoll();
+  assert(p.device.resumes >= 1, 'session resumed automatically');
+  assert.strictEqual(p.dom.window.eval('csrf'), 'e'.repeat(64));
+  p.device.status.heartbeat = false; p.device.status.now_ms += 100;
+  p.device.sessionOk = false; await p.pulse(5000); await p.motionPoll();
+  assert.strictEqual(p.q('#motion-link').textContent, 'AUTENTICAZIONE', 'auth loss is distinct from STALE/network');
+  p.device.sessionOk = true; p.device.status.heartbeat = true; p.device.status.now_ms += 100; await p.motionPoll();
+  // A command refused with AUTH_FAILED was not executed: renewed once and resent unchanged.
+  p.device.authFail = 1; const sentBefore = p.device.commands.length;
+  p.device.status.operational.walk = 'WALK_BOUND'; p.device.status.now_ms += 100; await p.motionPoll();
+  p.q('#motion-q-stand').click(); await settle(); await settle();
+  { const sent = p.device.commands.slice(sentBefore); assert.strictEqual(sent.length, 2, 'one resend after renewal');
+    assert.strictEqual(sent[0].id, sent[1].id, 'same id/sequence: no new command invented'); }
+  // Controller abort cause is shown as such (not as input loss).
+  p.device.status.active_command = { version: 1, id: 'web-x', sequence: 9, outcome: 'ABORTED', reason: 'PRIME_BACKEND_NOT_APPLIED' };
+  p.device.status.now_ms += 100; await p.motionPoll();
+  assert.strictEqual(p.q('#motion-link').textContent, 'CONTROLLER'); assert(p.q('#motion-cause').textContent.includes('PRIME_BACKEND_NOT_APPLIED'));
+  // Network loss vs Controller refusal.
+  p.device.down = true; await p.motionPoll(); await p.fireTimer(250); await p.pulse();
+  assert.strictEqual(p.q('#motion-link').textContent, 'RETE');
+  p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
-  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay, LAN Twin URL, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY; WALK START/STOP; FAST experimental opt-in; STOP not queued behind a pending command)');
+  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay (AUTH_FAILED resend only), automatic Twin host, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY; WALK START/STOP; FAST experimental opt-in; STOP not queued behind a pending command; quick STAND/WALK/STOP + battery Ah; background polling; session renewal; distinct causes)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

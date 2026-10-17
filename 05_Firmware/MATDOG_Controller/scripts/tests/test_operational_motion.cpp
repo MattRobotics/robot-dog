@@ -661,7 +661,89 @@ void postValidationAdmissionClock(){
  }
 }
 
+
+// Regression 2026-10-17 (hardware: STAND ACCEPTED, no motion, planner
+// PRIME_BACKEND_OR_POLICY, clamp mask 260, executor INPUT_LOST_OR_EXPIRED).
+// An admitted STAND must reach the backend: 12 PRIME goal writes inside the
+// limits (LF/LH LOWER clamped inward = 0x104), 12 verified torque enables, ARM,
+// coordinated targets, executor progress. A lost reply is retried; a refused
+// write aborts the command with ITS cause, never relabelled as input loss.
+namespace stand_backend {
+void foldOnlyLfLh(Operational& op){
+  auto& b=op.b;
+  // RF and RH LOWER rest inside their limits on this pose: only 2 and 8 clamp.
+  for(unsigned i:{5u,11u}){const auto* l=b.r.policy.limits().find(slotIdentity(i),b.r.geometry.provenanceTag());
+    const uint16_t rest=tickOf(b.r,i,b.r.feedback.actual_rad[i]);const uint16_t inside=rest<l->min_tick?l->min_tick+3:rest>l->max_tick?l->max_tick-3:rest;
+    b.r.feedback.actual_rad[i]=qOf(b.r,i,inside);}
+}
+MotionReadiness gated(Operational& op){auto r=op.readiness();
+  // As Controller: SAFE_OFF_REQUIRED drops the operational permit.
+  if(op.b.session.state()==MotionSessionState::SAFE_OFF_REQUIRED){r.operational_permit=false;}
+  return r;}
+void tick(Operational& op){auto& b=op.b;b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);
+  if(b.session.state()==MotionSessionState::ARMING){for(auto& on:b.r.feedback.torque_on)on=true;
+    for(unsigned i=0;i<12;++i)b.r.feedback.actual_rad[i]=b.session.primedRadians()[i];}
+  motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];
+  observe(o,q,b.now);b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,b.now);b.service.refresh(gated(op),b.now);}
+void reachesBackend(int lost_replies){
+  Operational op;auto& b=op.b;foldOnlyLfLh(op);
+  b.r.backend.fail_next=lost_replies;b.r.backend.fail_outcome=BackendWriteOutcome::UNCERTAIN;
+  const auto ack=op.stand();CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);REASON(ack.reason,"OK");
+  CHECK(b.session.primeClampMask()==260);                                   // 0x104, as on hardware
+  for(unsigned k=0;k<60&&b.coordinator.arming();++k)tick(op);
+  // The backend saw the whole torque sequence, not just an HTTP ACCEPTED.
+  CHECK(b.r.backend.attempts==24+lost_replies);
+  CHECK(b.r.backend.torque_calls==12);
+  CHECK(b.session.state()==MotionSessionState::ARMED&&b.r.executor.active());
+  REASON(b.coordinator.lastEntryReason(),"");CHECK(b.coordinator.armingFailure()==nullptr);
+  size_t prime=0;for(unsigned i=0;i<12;++i){const auto& w=b.r.backend.writes[prime++];
+    const auto* l=b.r.policy.limits().find(slotIdentity(i),b.r.geometry.provenanceTag());CHECK(l&&l->contains(w.tick));
+    CHECK(w.tick==tickOf(b.r,i,b.session.primedRadians()[i]));}
+  // Planner targets reach the executor and it advances.
+  motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];
+  unsigned frames=0;const unsigned frames_before=b.r.backend.frames;
+  for(unsigned k=0;k<4000&&frames<25;++k){
+    b.now+=20;b.r.facts.permit_expires_at_ms=b.evidence.expires_at_ms=b.now+3000;
+    observe(o,q,b.now);b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,b.now);b.service.refresh(gated(op),b.now);
+    auto frame=b.coordinator.frame();
+    if(frame.target.valid&&frame.target.sequence>b.r.executor.status().completed_sequence){
+      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=b.now/1000.;a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
+      a.geometryIdentityVerified=a.sweptCollisionClear=a.supportCompatible=a.continuousBoundsConfirmed=a.fixtureTrialEnvelopeReviewed=true;
+      b.coordinator.assess(a,b.now);b.coordinator.update(b.r.facts,b.r.feedback,b.now);
+      for(unsigned i=0;i<12;++i)b.r.executor.update(b.r.facts,b.r.feedback,++b.now);
+      for(unsigned i=0;i<12;++i){q[i]=b.r.executor.targetRadians()[i];b.r.feedback.actual_rad[i]=q[i];b.r.feedback.sampled_at_ms[i]=b.now+1;}
+      ++b.now;b.r.executor.update(b.r.facts,b.r.feedback,b.now);++frames;}
+    if(b.r.executor.status().safe_off_required)break;
+  }
+  CHECK(frames>=25&&b.r.executor.status().completed_sequence>=25&&b.r.backend.frames>frames_before);
+  CHECK(!b.r.executor.status().safe_off_required);
+  CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ACCEPTED);   // still rising, not aborted
+  std::printf("STAND_BACKEND lost_replies=%d prime+energize_attempts=%d torque=%d frames=%u completed=%lu\n",lost_replies,b.r.backend.attempts,
+              b.r.backend.torque_calls,frames,(unsigned long)b.r.executor.status().completed_sequence);
+}
+void refusedWriteKeepsItsCause(BackendWriteOutcome outcome,const char* expected,int fail_after){
+  Operational op;auto& b=op.b;foldOnlyLfLh(op);
+  CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
+  b.r.backend.fail_outcome=outcome;
+  for(unsigned k=0;k<60&&b.coordinator.arming();++k){if(b.r.backend.attempts==fail_after)b.r.backend.fail_next=MotionSession::kWriteAttempts;tick(op);}
+  CHECK(!b.coordinator.arming()&&b.session.state()==MotionSessionState::SAFE_OFF_REQUIRED);
+  REASON(b.session.reason(),expected);CHECK(b.session.failedJoint()==(fail_after%12));
+  REASON(b.coordinator.armingFailure(),expected);REASON(b.coordinator.lastEntryReason(),expected);
+  tick(op);
+  CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ABORTED);REASON(b.service.activeAck().reason,expected);
+  CHECK(std::strcmp(b.r.executor.status().reason,"INPUT_LOST_OR_EXPIRED")!=0);REASON(b.r.executor.status().reason,expected);
+  CHECK(b.r.backend.attempts==fail_after+(int)MotionSession::kWriteAttempts);  // bounded retries, then nothing
+}
+void run(){
+  reachesBackend(0);reachesBackend(1);reachesBackend(2);
+  refusedWriteKeepsItsCause(BackendWriteOutcome::VERIFIED_NOT_APPLIED,"PRIME_BACKEND_NOT_APPLIED",0);
+  refusedWriteKeepsItsCause(BackendWriteOutcome::UNCERTAIN,"PRIME_BACKEND_NO_RESPONSE",2);
+  refusedWriteKeepsItsCause(BackendWriteOutcome::VERIFIED_NOT_APPLIED,"ENERGIZE_BACKEND_NOT_APPLIED",12+8);
+}
+}
 int main(){
+  stand_backend::run();
+  if(std::getenv("MATDOG_STAND_BACKEND_ONLY")){std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND backend)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
   postValidationAdmissionClock();
   clockAndScheduler();frameTransactionContract();legacyHeartbeatContract();
   const bool stand_only=std::getenv("MATDOG_STAND_ONLY")!=nullptr;

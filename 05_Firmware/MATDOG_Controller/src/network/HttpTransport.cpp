@@ -553,10 +553,15 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     // the admin session AND its CSRF token: only the Dashboard page, which
     // holds STOP, has both. The read-only Twin, anonymous and LAN read-only
     // polls never keep a session alive (2026-10-15).
-    if(req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))
-      service_->operatorHeartbeat(now_ms);
+  {
+    const bool beat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);
+    if(beat)service_->operatorHeartbeat(now_ms);
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
+    // Tells the Dashboard whether THIS poll renewed the operator heartbeat, so
+    // a lapsed admin session is shown (and resumed) instead of a silent deadman.
+    if(resp.ok){const size_t n=strlen(resp.text);if(n&&n+20<sizeof(resp.text))strcpy(resp.text+n-1,beat?",\"heartbeat\":true}":",\"heartbeat\":false}");else resp.ok=false;}
+  }
     if(resp.ok)appendTransportStats(resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"MOTION_STATUS_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(resp.text):0;break;
@@ -832,6 +837,16 @@ void HttpTransport::statusExtension(
         bms.pack_current_a, bms.state_name, bms.charge_mos_on ? "ON" : "OFF",
         bms.discharge_mos_on ? "ON" : "OFF", bms.alarms[0], bms.alarms[1],
         bms.alarms[2], bms.alarms[3]);
+    // Capacity (Dashboard 2026-10-17): the DALY 0xD2 remaining-capacity
+    // register as reported (a BMS coulomb count, not validated on MATDOG), the
+    // configured nominal pack, and SOC x nominal labelled as an ESTIMATE.
+    // Display only: nothing here feeds a protection, permit or LED threshold.
+    add("bms_remaining_ah=%.1f\nbms_capacity_config_ah=%.1f\n"
+        "bms_remaining_estimate_ah=%.2f\n",
+        bms.remaining_ah, power::kPackNominalCapacityAh,
+        bms.soc_percent >= 0 && bms.soc_percent <= 100
+            ? bms.soc_percent * power::kPackNominalCapacityAh / 100.0f
+            : 0.0f);
     add("bms_cells=%u\nbms_cell_min_mv=%u\nbms_cell_max_mv=%u\n"
         "bms_cell_delta_mv=%u\n",
         (unsigned)bms.cell_count, (unsigned)bms.cell_min_mv,

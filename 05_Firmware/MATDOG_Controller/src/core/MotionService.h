@@ -22,6 +22,9 @@ class SemanticMotionPlanner {
   // True while an accepted command waits for the session to arm (torque
   // sequence). The service must not read the idle executor as an abort.
   virtual bool arming() const { return false; }
+  // Why the last accepted arming ended without an armed session (nullptr =
+  // none). The command is then aborted with THIS reason, not a later gate.
+  virtual const char* armingFailure() const { return nullptr; }
 };
 struct MotionTelemetry {
  bool joints_valid=false, quaternion_valid=false, height_valid=false,raw_valid=false;
@@ -34,6 +37,7 @@ struct MotionTelemetry {
  const char* source="UNKNOWN";
  const char* session_profile_sha256="";
  const char* session_state="OFF";const char* session_reason="LOCAL_TRIAL_EVIDENCE_REQUIRED";
+ const char* session_last_revoke="";const char* session_failure="";int session_failed_joint=-1;
  // Runtime test policy view (read-only). Distinct reasons, never one badge.
  const char* runtime_mode="DIAGNOSTIC";const char* limits_scope="NONE";const char* restore="NOT_RUN";
  const char* pose_class="NOT_EVALUATED";const char* pose_reason="";int pose_joint=-1;

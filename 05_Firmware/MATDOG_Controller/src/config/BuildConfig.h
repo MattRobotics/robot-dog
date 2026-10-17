@@ -48,7 +48,10 @@
 #endif
 namespace matdog {
 namespace build {
-constexpr bool kStandOnlyCandidate = true; // release scope: boot/diagnostics/RESTORE/STAND
+// No compile-time feature fence (ADR-006, 2026-10-17): STAND, WALK STANDARD
+// and WALK FAST are exposed whenever the Controller's runtime checks admit them
+// (live limits, certified boxes, feedback, power, presence). Hardware
+// qualification is tracked outside the firmware and reported as such.
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 

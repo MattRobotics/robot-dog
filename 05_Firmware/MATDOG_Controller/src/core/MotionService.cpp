@@ -51,6 +51,10 @@ void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
  else if(arming_seen_){arming_seen_=false;if(active_command_&&executor_&&executor_->active())active_arm_generation_=executor_->status().arm_generation;}
  if(active_command_&&executor_&&active_arm_generation_!=executor_->status().arm_generation)
   finishActive(motion::CommandOutcome::ABORTED,"SESSION_CHANGED");
+ // A failed torque sequence (PRIME/ENERGIZE/ARM) ends the accepted command
+ // with its own cause, before the permit drop it causes is read as a gate.
+ if(active_command_&&planner_&&!planner_->arming()&&planner_->armingFailure())
+  finishActive(motion::CommandOutcome::ABORTED,planner_->armingFailure());
  const char* gate=refusal();
  if((gate&&((executor_&&executor_->active()&&!r.local_fixture_session)||active_command_))||
     (teleop_deadline_ms_&&static_cast<int32_t>(now-teleop_deadline_ms_)>=0))disconnected(now);
@@ -74,7 +78,9 @@ void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
 void MotionService::disconnected(uint32_t now) {
  const char* gate=refusal();
  if(planner_)planner_->stop(now);
- if(executor_&&(gate||!planner_||!planner_->coordinatedStopping()))executor_->stop("INPUT_LOST_OR_EXPIRED");
+ // Only a live executor is stopped here: an idle one keeps the reason of the
+ // fault that already stopped it (it is never relabelled as input loss).
+ if(executor_&&executor_->active()&&(gate||!planner_||!planner_->coordinatedStopping()))executor_->stop("INPUT_LOST_OR_EXPIRED");
  // STOP must retain its acknowledgement until SAFE_OFF or the all-foot stop
  // is independently verified. Other accepted work is explicitly aborted.
  if(active_intent_!=motion::Intent::STOP)finishActive(motion::CommandOutcome::ABORTED,gate?gate:"INPUT_LOST_OR_EXPIRED");
@@ -143,7 +149,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  if(!out||!cap)return false;
  JsonWriter w{out,cap};const auto* refusal_reason=refusal();
- w.add("{\"version\":1,\"walk\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"strides_m\":[%.17g,%.17g,%.17g],\"fast\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"stride_m\":%.17g,\"experimental\":true}},\"first_stride_only\":%s,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",motion::operational_walk::kPeriodS,motion::operational_walk::kLiftM,motion::operational_walk::kStrideM[0],motion::operational_walk::kStrideM[1],motion::operational_walk::kStrideM[2],motion::operational_walk::kFastPeriodS,motion::operational_walk::kFastLiftM,motion::operational_walk::kFastStrideM[0],readiness_.first_stride_only?"true":"false",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
+ w.add("{\"version\":1,\"walk\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"strides_m\":[%.17g,%.17g,%.17g],\"fast\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"stride_m\":%.17g,\"experimental\":true}},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"fast\":false},\"first_stride_only\":%s,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",motion::operational_walk::kPeriodS,motion::operational_walk::kLiftM,motion::operational_walk::kStrideM[0],motion::operational_walk::kStrideM[1],motion::operational_walk::kStrideM[2],motion::operational_walk::kFastPeriodS,motion::operational_walk::kFastLiftM,motion::operational_walk::kFastStrideM[0],readiness_.first_stride_only?"true":"false",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
  for(size_t i=0;i<motion::kMotionActionCount;i++){const auto& a=motion::actionCatalog()[i];w.add("%s{\"id\":\"%s\",\"category\":\"%s\",\"label\":\"%s\",\"parameters\":\"%s\",\"prerequisites\":\"%s\",\"capability\":\"%s\",\"implemented\":%s,\"implementation\":\"%s\",\"available\":%s,\"reason\":\"%s\"}",i?",":"",a.id,a.category,a.label,a.parameters,(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)?"none":a.prerequisites,a.capability,a.implemented?"true":"false",a.implemented?"software_tested":"planned",available(a)?"true":"false",available(a)?"OK":a.implemented?(refusal_reason?refusal_reason:(readiness_.local_operator_owns_session||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"LOCAL_OPERATOR_CONTROLS_SESSION":a.intent==motion::Intent::BASE_VELOCITY&&!readiness_.walk_qualified?"LOCAL_WALK_ADMISSION_REQUIRED":"UNAVAILABLE"):"ACTION_NOT_VALIDATED");}
  w.add("]}");return w.ok;
 }
@@ -179,7 +185,8 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
  w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",
  readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");
- w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\"}",telemetry_.session_state,telemetry_.session_reason);
+ w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\",\"last_revoke\":\"%s\",\"failure\":\"%s\",\"failed_joint\":%d}",telemetry_.session_state,telemetry_.session_reason,
+  telemetry_.session_last_revoke,telemetry_.session_failure,telemetry_.session_failed_joint);
  w.add(",\"validation\":{\"capable\":%s,\"scope\":\"%s\",\"segment\":%u,\"profile_sha256\":\"%s\",\"foot_load_proven\":%s}",telemetry_.validation_capable?"true":"false",telemetry_.fixture_scope?"SUSPENDED_FIXTURE":telemetry_.load_scope?"EXTERNAL_LOAD_REVIEW":"UNQUALIFIED",telemetry_.supervised_segment,telemetry_.session_profile_sha256,telemetry_.foot_load_proven?"true":"false");
  w.add(",\"commissioning\":{\"mode\":\"%s\",\"limits\":\"%s\",\"approved_joints\":%u,\"commissioning_joints\":%u,\"restore\":\"%s\",\"pose\":\"%s\",\"pose_reason\":\"%s\",\"pose_joint\":%d,\"pose_max_dev_rad\":",
   telemetry_.runtime_mode,telemetry_.limits_scope,telemetry_.approved_joints,telemetry_.commissioning_joints,telemetry_.restore,telemetry_.pose_class,telemetry_.pose_reason,telemetry_.pose_joint);
