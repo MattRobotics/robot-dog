@@ -67,6 +67,7 @@ fixture=fixture.replace('  switch(req.kind){','''  if(revoke_before_service) ser
 admission=between(c,'  resp.sequence = req.sequence;\n','  switch (req.kind) {')
 fixture=fixture.replace('// PRODUCTION_SERVICE_ADMISSION',admission)
 fixture=fixture.replace('  if(revoke_before_service)', '  auto serviceRequest = [&]() {\n  if(revoke_before_service)').replace('   default: return false;', '   default: return;').replace('  *out=resp;return true;', '  }; serviceRequest(); *out=resp;return true;')
+fixture = '#include "network/TwinHostPolicy.h"\n' + fixture
 platform=r'''
 WifiStub WiFi;
 esp_err_t esp_wifi_get_mode(wifi_mode_t *m) { if(!WiFi.mode_read_ok)return -1; *m=static_cast<wifi_mode_t>(WiFi.mode_value); return ESP_OK; }

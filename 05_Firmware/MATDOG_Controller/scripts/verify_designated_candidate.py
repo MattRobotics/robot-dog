@@ -87,4 +87,4 @@ def verify_frozen_qualification(root,source):
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('designation',type=Path);p.add_argument('--field',choices=('source','directory','qualification'),required=True);a=p.parse_args();source,root=verify(a.designation)
  modern=json.loads(a.designation.read_text()).get('schema')==3
- print(('STATIC_AUDIT = PASS (V3 final-source inventories and exact campaign evidence)' if modern else verify_frozen_qualification(ROOT,source)) if a.field=='qualification' else source if a.field=='source' else root)
+ print(('STATIC_AUDIT_QUALIFICATION = PASS (V3 inventories; FULL or strictly resolved COMPOSED campaign, see designation)' if modern else verify_frozen_qualification(ROOT,source)) if a.field=='qualification' else source if a.field=='source' else root)

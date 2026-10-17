@@ -19,7 +19,8 @@ class Gate(unittest.TestCase):
         self.git('init', '-q'); self.git('config', 'user.email', 'offline@example.invalid')
         self.git('config', 'user.name', 'offline test')
         self.write(g.FW + '/src/test.cpp', 'int source;\n')
-        self.write(g.FW + '/scripts/test.py', '# qualified test\n'); self.commit()
+        self.write(g.FW + '/scripts/test.py', '# qualified test\n')
+        self.write(g.CSP_FIXTURE, "platform=r'''offline fixture'''\n"); self.commit()
         self.source = self.git('rev-parse', 'HEAD').strip()
         table = bm.matdog_layout.build_table_bytes() if hasattr(bm.matdog_layout, 'build_table_bytes') else None
         if table is None:
@@ -93,6 +94,31 @@ class Gate(unittest.TestCase):
     def test_supervised_flag_is_not_falsified(self):
         p=self.art/'matdog_build_manifest.txt'; p.write_text(p.read_text().replace('SUPERVISED_VALIDATION_CAPABLE=0','SUPERVISED_VALIDATION_CAPABLE=1'))
         self.d['artifacts'][p.name]=g.sha(p.read_bytes()); self.save(); self.refuses()
+    def composite(self):
+        p=self.root/g.CSP_FIXTURE;before=p.read_text();p.write_text(before.replace("platform=r'''",g.CSP_FIXTURE_INCLUDE+"platform=r'''",1));self.commit()
+        qualified=self.git('rev-parse','HEAD').strip();self.d['qualification_commit']=qualified
+        self.d['qualified_tools']=g.inventory(self.root,qualified,g.tooling)
+        for e in self.d['evidence'].values():e['qualification_commit']=qualified
+        e=self.d['evidence']['full_static_audit'];p=Path(e['path'])
+        p.write_text('QUALIFIED_SOURCE='+self.source+"\nSTATIC_AUDIT = FAIL (1 finding(s))\n - run_host_tests.sh: test_ap_only_transport.py error: ‘kDashboardContentSecurityPolicy’ was not declared in this scope\n")
+        e.update(sha256=g.sha(p.read_bytes()),result='FAIL',exit_code=1,mode='COMPOSED_CSP_FIXTURE')
+        p=self.base/'resolution.log';p.write_text('QUALIFIED_SOURCE='+self.source+'\n'+'\n'.join('COMMAND='+n for n in g.REMAINDER)+'\nHOST_REMAINDER = PASS\n')
+        e['resolution']=dict(path=str(p),sha256=g.sha(p.read_bytes()),source_commit=self.source,qualification_commit=qualified,result='PASS',exit_code=0)
+        self.save()
+    def test_exact_composed_resolution(self):
+        self.composite();g.verify(self.path,self.root)
+    def test_composite_cannot_hide_other_audit_failure(self):
+        self.composite();e=self.d['evidence']['full_static_audit'];p=Path(e['path']);p.write_text(p.read_text().replace('1 finding(s)','2 finding(s)'));e['sha256']=g.sha(p.read_bytes());self.save();self.refuses()
+    def test_composite_requires_all_remaining_tests(self):
+        self.composite();e=self.d['evidence']['full_static_audit']['resolution'];p=Path(e['path']);p.write_text(p.read_text().replace('COMMAND=test_dev_identity_build.py','SKIPPED'));e['sha256']=g.sha(p.read_bytes());self.save();self.refuses()
+    def test_composite_resolution_log_tamper(self):
+        self.composite();Path(self.d['evidence']['full_static_audit']['resolution']['path']).write_text('forged');self.refuses()
+    def test_composite_fixture_must_be_only_the_include_fix(self):
+        self.composite();p=self.root/g.CSP_FIXTURE;p.write_text(p.read_text()+'# unreviewed weakening\n');self.commit()
+        q=self.git('rev-parse','HEAD').strip();self.d['qualification_commit']=q;self.d['qualified_tools']=g.inventory(self.root,q,g.tooling)
+        for e in self.d['evidence'].values():e['qualification_commit']=q
+        self.d['evidence']['full_static_audit']['resolution']['qualification_commit']=q
+        self.save();self.refuses()
     def test_missing_artifact(self):
         (self.art/'sdkconfig').unlink(); self.refuses()
 
