@@ -24,6 +24,7 @@ for path in (fw/'src').rglob('*'):
 assert 'armOperationalSession(now,true)' not in source and 'armOperationalSession' not in diag
 for token in ('servo_bus_','validation_present_','operational_facts_','START','CLEAR'):
     assert token not in diag,token
+assert 'kFastProfile' not in (fw/'src/core/Commissioning.cpp').read_text(),'WALK FAST must stay out of this image'
 assert source.index('if(!strcmp(t[0],"PRIME_DIAG"))') < source.index('if(!build::kSupervisedValidationCapable)')
 unit=r'''
 #include "diagnostics/PrimeDiagnostic.h"

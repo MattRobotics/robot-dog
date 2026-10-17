@@ -121,10 +121,8 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   if(operational){unsigned joint=12;
    if(motion::operational_walk::fitsLimits(r.feedback,r.execution.tracking_tolerance_rad,&joint)){
     r.walk=motion::operational_walk::specification();operational_walk_bound_=true;operational_walk_reason_="WALK_BOUND";
-    // The EXPERIMENTAL fast profile is offered (never selected by default) only
-    // when its own certified box +/- tube fits these live limits too.
-    if(motion::operational_walk::fitsLimits(motion::operational_walk::kFastProfile,r.feedback,r.execution.tracking_tolerance_rad))
-      r.walk.maxVxMps=std::fmax(r.walk.maxVxMps,motion::operational_walk::profileVelocity(motion::operational_walk::kFastProfile,0));
+    // WALK FAST is NOT part of this image: the speed cap stays at the STANDARD maximum, so a FAST
+    // request is refused by the Controller (VELOCITY_OUTSIDE_REVIEWED_SCOPE). Deferred, not removed.
    } else {r.walk=motion::WalkSpecification{};operational_walk_reason_="WALK_RANGE_OUTSIDE_LIMITS";}  // STAND stays available
   }
   static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;
