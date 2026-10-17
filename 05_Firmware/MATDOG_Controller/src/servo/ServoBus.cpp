@@ -161,6 +161,7 @@ SafeOffResult ServoBus::safeOff(int id) {
 }
 
 ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
+  if(prime_diagnostic_inhibit_)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
   ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
@@ -186,22 +187,33 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
   const bool search = profile == GoalMotionProfile::SEARCH_ENVELOPE;
 
   ScopedIOTimeout guard(st_, validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
-  st_.WritePosEx(
+  goal_capture_=diagnostics::GoalWriteCapture{};
+  goal_capture_.attempted=true;goal_capture_.id=static_cast<uint8_t>(id);goal_capture_.position=target_tick;
+  goal_capture_.speed=search?kSearchEnvelopeSpeed:validation_speed_?validation_speed_:kBoundedWriteSpeed;
+  goal_capture_.acc=search?kSearchEnvelopeAcceleration:validation_acceleration_?validation_acceleration_:kBoundedWriteAcceleration;
+  goal_capture_.started_ms=millis();
+  goal_capture_.ack=st_.WritePosEx(
       static_cast<uint8_t>(id),
       static_cast<s16>(target_tick),
       search ? kSearchEnvelopeSpeed : validation_speed_?validation_speed_:kBoundedWriteSpeed,
       search ? kSearchEnvelopeAcceleration : validation_acceleration_?validation_acceleration_:kBoundedWriteAcceleration);
+  goal_capture_.write_done_ms=millis();
 
   if(!search&&validation_speed_){
     // The explicit validation profile requires independent SRAM readback of
     // the complete holding command before MotionSession can enable torque.
     uint8_t control[10]{};
-    if(st_.Read(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE,control,sizeof(control))!=static_cast<int>(sizeof(control))){
+    if(st_.ReadCaptured(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE,control,sizeof(control),&goal_capture_.response)!=static_cast<int>(sizeof(control))){
+      goal_capture_.finished_ms=millis();
       last_detected_=core::DetectedState::NO_RESPONSE;
       return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
     }
     auto word=[&](unsigned address){const unsigned i=address-SMS_STS_TORQUE_ENABLE;return static_cast<uint16_t>(control[i]|(control[i+1]<<8));};
     last_detected_=core::DetectedState::ONLINE;
+    goal_capture_.position_read=word(SMS_STS_GOAL_POSITION_L);goal_capture_.speed_read=word(SMS_STS_GOAL_SPEED_L);
+    goal_capture_.acc_read=control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE];
+    goal_capture_.mismatch=(goal_capture_.position_read!=target_tick?1u:0u)|(goal_capture_.speed_read!=validation_speed_?2u:0u)|(goal_capture_.acc_read!=validation_acceleration_?4u:0u);
+    goal_capture_.finished_ms=millis();
     return word(SMS_STS_GOAL_POSITION_L)==target_tick&&word(SMS_STS_GOAL_SPEED_L)==validation_speed_&&control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE]==validation_acceleration_?
         ServoWriteVerifyResult::VERIFIED_APPLIED:ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   }
@@ -291,6 +303,7 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
 
 bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report) {
   FrameTx local{};FrameTx& r=report?*report:local;r=FrameTx{};
+  if(prime_diagnostic_inhibit_)return false;
   if(!validation_speed_||!validation_acceleration_)return false;   // no reviewed drive pair: nothing sent
   uint8_t packet[packet::kGoalFrameBytes];
   const size_t n=packet::buildGoalFrame(ids,ticks,12,validation_speed_,validation_acceleration_,packet,sizeof(packet));

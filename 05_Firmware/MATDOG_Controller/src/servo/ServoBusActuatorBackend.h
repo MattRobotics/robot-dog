@@ -22,6 +22,10 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
   void begin(ServoBus* bus) { bus_ = bus; }
   actuator::BackendWriteOutcome reduceValidationOutputWhileOff(uint8_t id,uint16_t ceiling){return bus_?translate(bus_->reduceValidationOutputWhileOff(id,ceiling)):actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;}
   bool bound() const { return bus_ != nullptr; }
+  bool lastGoalWriteCapture(diagnostics::GoalWriteCapture* out) const override {
+    if(!bus_||!out)return false;
+    *out=bus_->lastGoalWriteCapture();return out->attempted;
+  }
 
   actuator::BackendWriteOutcome enableTorque(uint8_t bus_id) override {
     if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;

@@ -27,7 +27,10 @@ class MotionSession {
  void begin(actuator::SafeActuatorPolicy*,actuator::ActuatorRuntime*,MotionExecutor*,
             core::ActuatorAuthorityArbiter*,const actuator::CalibrationGeometryProfile*,const actuator::GeometryProvenance*);
  bool request(const LocalTrialEvidence&,const MotionExecutionFacts&,const ExecutionEnvelope&,
-              const JointFeedback&,bool approved_image,uint32_t now_ms);
+              const JointFeedback&,bool approved_image,uint32_t now_ms,bool prime_diagnostic=false);
+ const diagnostics::PrimeRejectionLog& primeDiagnostics() const {return prime_diagnostics_;}
+ bool clearPrimeDiagnostics(){if(state_!=MotionSessionState::OFF||(executor_&&executor_->active()))return false;prime_diagnostics_.clear();return true;}
+ bool primeDiagnosticMode() const {return prime_diagnostic_mode_;}
  void update(const LocalTrialEvidence&,const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
  bool requestFixtureMicro(unsigned joint,double delta_rad,double duration_s,const FrameValidation& path,
                           const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
@@ -46,6 +49,9 @@ class MotionSession {
  const char* gate(const LocalTrialEvidence&,const MotionExecutionFacts&,const JointFeedback&,uint32_t) const;
  bool resolve(unsigned,double,actuator::ActuatorCommand&,uint8_t&) const;
  bool insideTick(unsigned joint,double q,uint16_t max_ticks,double& inside,uint8_t& ticks) const;
+ bool recordPrimeRejection(uint8_t bus,uint16_t target,uint32_t now,const char* reason,bool backend_called);
+ diagnostics::PrimeRejectionLog prime_diagnostics_{};
+ bool prime_diagnostic_mode_=false;
  actuator::SafeActuatorPolicy* policy_=nullptr;actuator::ActuatorRuntime* runtime_=nullptr;
  MotionExecutor* executor_=nullptr;core::ActuatorAuthorityArbiter* arbiter_=nullptr;
  const actuator::CalibrationGeometryProfile* geometry_=nullptr;const actuator::GeometryProvenance* provenance_=nullptr;

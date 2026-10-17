@@ -33,6 +33,42 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
  if(!strcmp(t[0],"JOINT")&&n==2){uint32_t j;if(!uintToken(t[1],j)||j>=12)return reply();const auto& r=operational_producer_.raw(j);const auto* servo=servo::legServoAt((j/3)*3+2-j%3);const auto fb=operational_producer_.snapshot(now,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   snprintf(out,size,"JOINT slot=%lu id=%u configured_unit=%s raw=%u torque=%d speed_raw=%d goal=%d goal_speed=%d goal_acc=%d output=%d temp=%d voltage_dv=%d status=%d stamp_ms=%lu age_ms=%lu transaction_ms=%lu mapped_valid=%u actual_rad=%.9f",(unsigned long)j,servo->bus_id,servo->physical_unit,r.position,r.torque,r.speed,r.goal_position,r.goal_speed,r.goal_acceleration,r.torque_limit,r.temperature,r.voltage,r.status,(unsigned long)r.sampled_at_ms,(unsigned long)(now-r.sampled_at_ms),(unsigned long)r.transaction_ms,fb.read_ok[j]?1u:0u,fb.actual_rad[j]);return true;}
  if(!strcmp(t[0],"SENSORS")&&n==1){const auto i=imu_.orientationSnapshot();const auto& b=daly_.sample();snprintf(out,size,"SENSORS uptime_ms=%lu imu_valid=%u imu_stamp_ms=%lu quaternion=%.9f,%.9f,%.9f,%.9f bms_valid=%u bms_stamp_ms=%lu soc=%.3f power=%s fault=%u boot_safe_off_pending=%u",(unsigned long)now,i.valid?1u:0u,(unsigned long)i.sampled_at_ms,i.wxyz[0],i.wxyz[1],i.wxyz[2],i.wxyz[3],b.valid?1u:0u,(unsigned long)b.sampled_at_ms,b.soc_percent,core::toString(power_state_.state()),system_state_.systemHealth()==SystemHealth::FAULT?1u:0u,boot_safe_off_pending_?1u:0u);return true;}
+ // USB-local diagnostics, before the legacy capability/card gates. READ and
+ // STATUS only copy RAM; START is explicit, finite, and uses all normal
+ // operational PRIME admission gates. No Dashboard/HTTP command is added.
+ if(!strcmp(t[0],"PRIME_DIAG")){
+  const auto& log=operational_session_.primeDiagnostics();
+  if(n==2&&!strcmp(t[1],"STATUS")){
+   snprintf(out,size,"PRIME_DIAG mode=%u used=%u records=%u capacity=%u overflow=%u session=%s reason=%s last_revoke=%s torque_inhibit=%u nonce=%lu",
+    prime_diagnostic_mode_?1u:0u,log.used?1u:0u,log.count(),diagnostics::PrimeRejectionLog::kCapacity,log.overflow?1u:0u,
+    operational_session_.stateName(),operational_session_.reason(),operational_session_.lastRevoke(),servo_bus_.primeDiagnosticInhibit()?1u:0u,(unsigned long)validation_nonce_);return true;
+  }
+  const bool idle=operational_session_.state()==execution::MotionSessionState::OFF&&!motion_executor_.active()&&!motion_service_.busy();
+  if(n==3&&!strcmp(t[1],"READ")){
+   if(!idle){reason="SAFE_OFF_REQUIRED_BEFORE_EXPORT";return reply();}
+   uint32_t index;if(!uintToken(t[2],index)){reason="RECORD_INDEX";return reply();}
+   const auto* record=log.at(index);if(!record){reason="RECORD_INDEX";return reply();}
+   if(!diagnostics::formatPrimeRejection(*record,index,out,size)){snprintf(out,size,"PRIME_DIAG=REFUSED REASON=EXPORT_CAPACITY");return false;}
+   return true;
+  }
+  if(n!=4||(!strcmp(t[1],"START")?strcmp(t[3],"CONFIRM_FIXTURE_PRESENT_POWER_CUT_TORQUE_OFF_NO_ENERGIZE"):
+              !strcmp(t[1],"CLEAR")?strcmp(t[3],"CONFIRM_CLEAR_RAM_EVIDENCE"):1))return reply();
+  uint32_t nonce;if(!uintToken(t[2],nonce)||nonce!=validation_nonce_){reason="NONCE";return reply();}
+  if(!idle||boot_safe_off_pending_){reason="SAFE_IDLE_REQUIRED";return reply();}
+  if(!strcmp(t[1],"CLEAR")){ok=operational_session_.clearPrimeDiagnostics();reason=ok?"RAM_EVIDENCE_CLEARED_TORQUE_INHIBIT_UNCHANGED":"SAFE_IDLE_REQUIRED";return reply();}
+  if(wifi_.configBusy()){reason="NETWORK_CONFIGURATION_TRANSACTION_ACTIVE";return reply();}
+  if(log.used||log.count()||log.overflow){reason="PRIME_DIAGNOSTIC_CLEAR_REQUIRED";return reply();}
+  if(!operational_producer_.rawFresh(now,reviewed_motion_.execution.feedback_max_age_ms)){reason="FRESH_FEEDBACK_REQUIRED";return reply();}
+  for(unsigned i=0;i<12;++i)if(operational_producer_.raw(i).torque!=0||operational_producer_.raw(i).speed!=0){reason="STATIONARY_TORQUE_OFF_REQUIRED_FOR_PRIME";return reply();}
+  prime_diagnostic_mode_=true;servo_bus_.inhibitTorqueForPrimeDiagnostics();
+  // This explicit USB confirmation supplies the same finite 3s presence
+  // window; no automatic heartbeat/retry or reusable movement permit.
+  validation_present_=true;validation_presence_ms_=now;
+  const char* refusal=armOperationalSession(now,true);
+  ok=refusal==nullptr;reason=ok?"PRIME_DIAGNOSTIC_STARTED_NO_ENERGIZE":refusal;
+  if(!ok){validation_present_=false;operational_facts_.operator_permit=false;}
+  return reply();
+ }
  if(wifi_.configBusy()){reason="NETWORK_CONFIGURATION_TRANSACTION_ACTIVE";return reply();}
  if(!build::kSupervisedValidationCapable){reason="VALIDATION_CAPABILITY_NOT_COMPILED";return reply();}
  if(runtime_mode_!=execution::RuntimeTestMode::GROUND_VALIDATION&&runtime_mode_!=execution::RuntimeTestMode::AUTONOMOUS){

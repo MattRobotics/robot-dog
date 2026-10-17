@@ -59,8 +59,10 @@ bool MotionSession::insideTick(unsigned i,double q,uint16_t max_ticks,double& in
  if(urad*1e-6<=q)return false;
  inside=urad*1e-6;ticks=static_cast<uint8_t>(distance);return true;
 }
-bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const ExecutionEnvelope& envelope,const JointFeedback& fb,bool image,uint32_t now){
+bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const ExecutionEnvelope& envelope,const JointFeedback& fb,bool image,uint32_t now,bool prime_diagnostic){
  if(state_!=MotionSessionState::OFF){reason_="SESSION_BUSY";return false;}
+ if(prime_diagnostic_mode_&&!prime_diagnostic){reason_="PRIME_DIAGNOSTIC_MODE_LATCHED";return false;}
+ if(prime_diagnostic&&(prime_diagnostics_.used||prime_diagnostics_.count()||prime_diagnostics_.overflow)){reason_="PRIME_DIAGNOSTIC_CLEAR_REQUIRED";return false;}
  if(!image){reason_="MOTION_AUTHORIZED_0";return false;}
  envelope_=envelope;
  if(!envelope.approved||!envelope.feedback_max_age_ms||envelope.feedback_max_age_ms>3000||
@@ -90,7 +92,18 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
  else if(arbiter_->request(core::ActuatorAuthority::MOTION,f.mode,&lease_)!=core::AuthorityResult::GRANTED){reason_="EXCLUSIVE_OWNER_REQUIRED";return false;}
  evidence_=e;epoch_=policy_->epoch();permit_generation_=f.permit_generation;next_=0;started_at_ms_=now;
  write_attempts_=0;failed_joint_=-1;failure_detail_="";last_revoke_="";
+ if(prime_diagnostic){prime_diagnostic_mode_=true;prime_diagnostics_.used=true;}
  state_=MotionSessionState::PRIMING;reason_="PRIMING_PRESENT";return true;
+}
+bool MotionSession::recordPrimeRejection(uint8_t bus,uint16_t target,uint32_t now,const char* reason,bool backend_called){
+ auto* record=prime_diagnostics_.append();if(!record)return false;
+ *record=diagnostics::PrimeRejection{};record->slot=next_;record->id=bus;record->attempt=write_attempts_+1;
+ record->target_position=target;record->session_ms=now;record->reason=reason;
+ if(backend_called&&runtime_&&runtime_->lastGoalWriteCapture(&record->goal)){
+  // Never attach a previous joint's cached transaction to a new rejection.
+  if(record->goal.id!=bus||record->goal.position!=target)record->goal=diagnostics::GoalWriteCapture{};
+ }
+ return true;
 }
 bool MotionSession::requestFixtureMicro(unsigned joint,double delta,double duration,const FrameValidation& path,
  const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now){
@@ -118,6 +131,7 @@ void MotionSession::confirmSafeOff(){
 }
 void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFacts& input,const JointFeedback& fb,uint32_t now){
  if(state_==MotionSessionState::OFF||state_==MotionSessionState::SAFE_OFF_REQUIRED)return;
+ if(prime_diagnostic_mode_&&state_!=MotionSessionState::PRIMING){revoke("PRIME_DIAGNOSTIC_STATE_GUARD");return;}
  if(const char* r=gate(e,input,fb,now)){revoke(r);return;}
  auto f=input;f.lease=lease_;
  if(state_==MotionSessionState::ARMED){
@@ -155,10 +169,12 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
  if(state_==MotionSessionState::PRIMING && fb.torque_on[next_]){revoke("TORQUE_CHANGED_DURING_PRIME");return;}
  if(state_==MotionSessionState::ENERGIZING)cmd.operation=actuator::ActuatorOperation::TORQUE_ENABLE;
  const bool energize=state_==MotionSessionState::ENERGIZING;
+ if(!energize&&prime_diagnostics_.full()){revoke("PRIME_DIAGNOSTIC_BUFFER_FULL");return;}
  actuator::ActuatorTransaction tx;
  const auto decision=policy_->plan(cmd,lease_,f.mode,&tx);
  if(decision!=actuator::WriteDecision::ACCEPT){
   failed_joint_=static_cast<int8_t>(next_);failure_detail_=actuator::toString(decision);
+  if(!energize)recordPrimeRejection(bus,cmd.target_tick,now,failure_detail_,false);
   revoke(energize?"ENERGIZE_POLICY_REJECTED":"PRIME_POLICY_REJECTED");return;}
  actuator::WriteDecision commit=actuator::WriteDecision::ACCEPT;
  const auto result=runtime_->execute(&tx,bus,&commit);
@@ -166,12 +182,16 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
   failed_joint_=static_cast<int8_t>(next_);
   failure_detail_=result==actuator::ExecuteResult::NOT_EXECUTED?actuator::toString(commit):actuator::toString(result);
   const bool backend=result==actuator::ExecuteResult::BACKEND_REJECTED||result==actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF;
+  if(!energize)recordPrimeRejection(bus,cmd.target_tick,now,failure_detail_,backend);
   if(backend&&++write_attempts_<kWriteAttempts){reason_=energize?"ENERGIZE_WRITE_RETRY":"PRIME_WRITE_RETRY";return;}
   revoke(result==actuator::ExecuteResult::NOT_EXECUTED?(energize?"ENERGIZE_COMMIT_REJECTED":"PRIME_COMMIT_REJECTED"):
          result==actuator::ExecuteResult::BACKEND_REJECTED?(energize?"ENERGIZE_BACKEND_NOT_APPLIED":"PRIME_BACKEND_NOT_APPLIED"):
          result==actuator::ExecuteResult::UNCERTAIN_REQUIRES_SAFE_OFF?(energize?"ENERGIZE_BACKEND_NO_RESPONSE":"PRIME_BACKEND_NO_RESPONSE"):
          (energize?"ENERGIZE_BACKEND_UNAVAILABLE":"PRIME_BACKEND_UNAVAILABLE"));return;}
  write_attempts_=0;
- if(++next_==12){next_=0;started_at_ms_=now;state_=state_==MotionSessionState::PRIMING?MotionSessionState::ENERGIZING:MotionSessionState::ARMING;}
+ if(++next_==12){
+  if(prime_diagnostic_mode_){revoke("PRIME_DIAGNOSTIC_COMPLETE_NO_ENERGIZE");return;}
+  next_=0;started_at_ms_=now;state_=state_==MotionSessionState::PRIMING?MotionSessionState::ENERGIZING:MotionSessionState::ARMING;
+ }
 }
 } }

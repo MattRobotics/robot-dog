@@ -85,7 +85,10 @@ class Controller {
   bool admitRuntimePolicy(bool operational,uint32_t issued_ms,uint32_t now_ms,const char** reason);
   bool operatorPresent(uint32_t now_ms) const;
   uint32_t presenceWindowMs() const { return runtime_mode_==execution::RuntimeTestMode::OPERATIONAL?kOperationalHeartbeatMs:1000; }
-  const char* armOperationalSession(uint32_t now_ms);
+  const char* armOperationalSession(uint32_t now_ms,bool prime_diagnostic=false);
+  // This branch is a diagnostic release: normal Motion admission is refused
+  // from boot; only the explicit USB PRIME-only trial can be admitted.
+  bool prime_diagnostic_mode_=true;
   static constexpr uint32_t kOperationalHeartbeatMs=3000;
   bool operational_walk_bound_=false;const char* operational_walk_reason_="WALK_NOT_BOUND";
   bool walk_drive_latched_=false;

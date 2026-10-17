@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "ActuatorWritePolicy.h"
+#include "../diagnostics/PrimeDiagnostic.h"
 
 // The runtime adapter from SafeActuatorPolicy toward a real transport —
 // SAFE_ACTUATOR_LAYER.md §7's TO_IMPLEMENT item (I4, V3 handoff §12).
@@ -93,6 +94,8 @@ const char* toString(BackendWriteOutcome outcome);
 class ActuatorBackend {
  public:
   virtual ~ActuatorBackend() = default;
+  // Observation only: copy the last original goal transaction from RAM.
+  virtual bool lastGoalWriteCapture(diagnostics::GoalWriteCapture*) const {return false;}
 
   // APPLY torque only — never removes it. Bus id, not physical-unit label:
   // identity resolution already happened before execute() was called.
@@ -162,6 +165,9 @@ enum class ExecuteResult : uint8_t {
 // exactly one backend call for the committed command.
 class ActuatorRuntime {
  public:
+  bool lastGoalWriteCapture(diagnostics::GoalWriteCapture* out) const {
+    return backend_&&out&&backend_->lastGoalWriteCapture(out);
+  }
   void begin(SafeActuatorPolicy* policy, ActuatorBackend* backend);
 
   // Calls policy->commit(transaction) exactly once, then — only if that

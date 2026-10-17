@@ -199,6 +199,12 @@ class ServoBus {
   static constexpr uint8_t kSearchEnvelopeAcceleration = 8;
   ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
                                            GoalMotionProfile profile);
+  const diagnostics::GoalWriteCapture& lastGoalWriteCapture() const {return goal_capture_;}
+  // One-way RAM latch for a supervised PRIME-only trial. SAFE_OFF stays
+  // available; no software unlatch. Controller relatches this at every boot
+  // of the diagnostic release, before peripheral/command processing.
+  void inhibitTorqueForPrimeDiagnostics(){prime_diagnostic_inhibit_=true;}
+  bool primeDiagnosticInhibit() const {return prime_diagnostic_inhibit_;}
 
   // The reviewed RAM TorqueLimit (LF V25 hardware oracle, matdog.rs
   // TORQUE_LIMIT = 500, "still only half of the ST3215 command range"). The
@@ -351,6 +357,8 @@ class ServoBus {
   // copyable/movable: exactly one guard per transaction, matching "no
   // overengineering" from the handoff.
   uint32_t validation_timeout_ms_=0;
+  bool prime_diagnostic_inhibit_=false;
+  diagnostics::GoalWriteCapture goal_capture_{};
   uint16_t validation_speed_=0;uint8_t validation_acceleration_=0;
   class ScopedIOTimeout {
    public:
