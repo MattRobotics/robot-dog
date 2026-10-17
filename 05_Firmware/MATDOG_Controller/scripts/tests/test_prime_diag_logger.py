@@ -146,6 +146,14 @@ class Tests(unittest.TestCase):
             return saved
     def test_complete_prime_without_failure(self):
         self.assertEqual(self.run_case(USB([]))['prime_result'],'COMPLETE_NO_ENERGIZE')
+    def test_status_polling_is_paced_with_immediate_replies(self):
+        class Immediate(USB):
+            def read(self, timeout):
+                if self.queue:
+                    chunk=self.queue.pop(0);self.chunks.append(chunk);return chunk
+                self.now+=timeout;return b''
+        usb=Immediate([]);self.run_case(usb)
+        self.assertGreaterEqual(usb.now,.2)
     def test_every_slot_field_and_attempt(self):
         for slot in range(12):
             for field in (41,42,46):

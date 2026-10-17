@@ -316,6 +316,15 @@ class Acquisition:
                 require(d.get('reason') == 'SAFE_OFF_VERIFIED', 'OFF_WITHOUT_SAFE_OFF_VERIFICATION')
                 return d
             require(d['session'] in ('PRIMING', 'SAFE_OFF_REQUIRED'), 'UNSAFE_SESSION')
+            # At most 10 status requests/s. Drain unsolicited USB bytes during
+            # this interval; never flood the cooperative Controller command loop.
+            until = min(deadline, self.clock() + 0.1)
+            try:
+                while self.clock() < until:
+                    self.next_line(until)
+            except Refusal as exc:
+                if str(exc) != 'RESPONSE_TIMEOUT_PARTIAL_RETAINED':
+                    raise
         raise Refusal('SAFE_OFF_TIMEOUT_NO_RESET')
 
     def export(self, d):
