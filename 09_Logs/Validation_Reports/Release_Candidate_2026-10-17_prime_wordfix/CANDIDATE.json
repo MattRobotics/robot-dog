@@ -2,7 +2,7 @@
   "schema": 3,
   "release_ready": "PASS",
   "purpose": "APP_ONLY_PRIME_DIAGNOSTIC_WORDFIX_41b5dc4",
-  "scope": "OFFLINE_GATE_WORKFLOW_BOOTSTRAP_ONLY_NO_HARDWARE",
+  "scope": "SUPERVISED_PRIME_ONLY_TORQUE_ON_INHIBITED_NO_ENERGIZE; hardware_qualified=false",
   "source_commit": "41b5dc40b1d2cf50a85cc0e20e0f1b651524e5f0",
   "qualification_commit": "f6992b8c66a4083075b3a62e80f6b02425cee6e5",
   "artifact_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_WORDFIX_20261017/build-powered/artifacts/ROBOT_POWERED-ota0",
@@ -603,8 +603,8 @@
       "exit_code": 0
     },
     "workflow": {
-      "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_WORDFIX_20261017/release/gate-regressions.log",
-      "sha256": "9f8a33c568c011fdd43f26a99529af5f435241ceac3374a854e8deb4a06b2ad4",
+      "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/PRIME_WORDFIX_20261017/release/frozen-workflow.log",
+      "sha256": "644fe6fa6b50c83b10e9bd3f726140e3d796da6699586f7fc32a89142dec1d51",
       "source_commit": "41b5dc40b1d2cf50a85cc0e20e0f1b651524e5f0",
       "qualification_commit": "f6992b8c66a4083075b3a62e80f6b02425cee6e5",
       "result": "PASS",
