@@ -712,6 +712,7 @@ python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 python3 "$SCRIPT_DIR/test_motion_http_transport.py"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
+python3 "$SCRIPT_DIR/test_prime_read_audit.py"
 python3 "$SCRIPT_DIR/test_ap_only_transport.py"
 python3 "$SCRIPT_DIR/test_ap_session_clock.py"
 

@@ -108,7 +108,7 @@ class NetworkAuditTest(unittest.TestCase):
           ('WifiManager.h','void setRunMode(bool run) { run_mode_.store(run); }','void setRunMode(bool run) { run_mode_.store(run); } OperatingModeManager *mode_ = nullptr;'),
           ('HttpTransport.cpp','service_->wifiStatus();','service_->wifiStatus(); service_->wifi().setRunMode(true);'),
           # 2026-10-15: a cookie-only poll (the read-only Twin) must never be the deadman heartbeat.
-          ('HttpTransport.cpp','portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf))\n      service_->operatorHeartbeat','portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie))\n      service_->operatorHeartbeat'),
+          ('HttpTransport.cpp','const bool beat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);','const bool beat=req.ap_socket&&!readonly&&portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie);'),
         ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))

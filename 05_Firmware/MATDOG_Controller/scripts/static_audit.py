@@ -1744,6 +1744,34 @@ def check_thermal_confirmation(files):
             "millis() - started < IOTimeOut", "drained < 64", "validServoReadPacket(packet, size, id, width)"),
         "ServoBus.h": ("ValidatedServoRead st_;",),
     }
+    # PRIME diagnostics preserve the parser verdict but return a detailed enum
+    # instead of bool. Recognise the exact reviewed parser, ignoring whitespace
+    # only: requiring its COMPLETE body rejects dropped guards, early success,
+    # or altered checksum semantics. Do not infer safety from enum names alone.
+    detailed = "servoReadValidity(" in by_name.get("ServoReadValidation.h", (None, ""))[1]
+    if detailed:
+        required["ServoReadValidation.h"] = ("""
+inline diagnostics::ReadValidity servoReadValidity(const uint8_t* frame, uint8_t size,
+                                 uint8_t id, uint8_t width) {
+  using diagnostics::ReadValidity;
+  if(frame==nullptr)return ReadValidity::INVALID_ARGUMENT;
+  if(size==0)return ReadValidity::NO_RESPONSE;
+  if(size!=width+6)return ReadValidity::SHORT_PACKET;
+  if(frame[0]!=255||frame[1]!=255)return ReadValidity::HEADER;
+  if(frame[2]!=id)return ReadValidity::ID;
+  if(frame[3]!=width+2)return ReadValidity::LENGTH;
+  if(frame[4]!=0)return ReadValidity::STATUS;
+  uint8_t sum = 0;
+  for (uint8_t i = 2; i < size; ++i) sum = static_cast<uint8_t>(sum + frame[i]);
+  return sum==255?ReadValidity::VALID:ReadValidity::CHECKSUM;
+}
+""", "return servoReadValidity(frame,size,id,width)==diagnostics::ReadValidity::VALID;")
+        required["ValidatedServoRead.h"] = (
+            "return ReadCaptured(id,address,data,width,nullptr);",
+            "millis() - started < IOTimeOut", "drained < 64",
+            "const auto validity=servoReadValidity(packet,size,id,width);",
+            "if (validity!=ReadValidity::VALID) return 0; "
+            "for (uint8_t i = 0; i < width; ++i) data[i] = packet[i + 5]; return width;")
     for name, tokens in required.items():
         if name not in by_name:
             fail(f"{name}: missing thermal/UART safety component")
@@ -1751,8 +1779,22 @@ def check_thermal_confirmation(files):
         path, code = by_name[name]
         body = re.sub(r"\s+", " ", code)
         for token in tokens:
-            if token not in body:
+            match = (re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
+                     if detailed and name in ("ServoReadValidation.h", "ValidatedServoRead.h")
+                     else token in body)
+            if not match:
                 fail(f"{path}: thermal/UART safety invariant missing: {token}")
+        if detailed and name == "ValidatedServoRead.h":
+            # The only successful READ return must be the validated width.
+            # Capture instrumentation may return failure, never early success.
+            compact = re.sub(r"\s+", "", code)
+            returns = re.findall(r"\breturn\s+([^;]+);", code)
+            allowed = {"0", "width", "ReadCaptured(id,address,data,width,nullptr)",
+                       "Read(id,address,&data,1)==1?data:-1",
+                       "Read(id,address,data,2)==2?data[0]|(data[1]<<8):-1"}
+            if (compact.count("returnwidth;") != 1 or
+                    any(re.sub(r"\s+", "", value) not in allowed for value in returns)):
+                fail(f"{path}: thermal/UART safety invariant missing: only validated width may succeed")
     # A refuted block-read value must never accumulate into a safety verdict:
     # no transient latch, counter threshold or sticky fault may come back.
     for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp"):
