@@ -201,7 +201,9 @@ class Acquisition:
                 re.fullmatch(r'@MOTION VALIDATION PRIME_DIAG READ \d+', command) or
                 re.fullmatch(r'@MOTION VALIDATION PRIME_DIAG START \d+ ' + START_TOKEN, command),
                 'COMMAND_NOT_ALLOWLISTED')
-        data = (command + '\n').encode('ascii')
+        # A leading empty line separates STOP from any earlier short TX. It
+        # cannot complete a truncated command by concatenating the STOP text.
+        data = ('\n' + command + '\n').encode('ascii')
         # INTENT is separate from TX; only successful write bytes are TX evidence.
         self.journal.event('TX_INTENT', command)
         n = self.usb.write(data)

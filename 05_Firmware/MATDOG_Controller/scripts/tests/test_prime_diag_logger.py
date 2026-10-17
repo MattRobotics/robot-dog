@@ -75,7 +75,7 @@ class USB:
             chunk=self.queue.pop(0);self.chunks.append(chunk);return chunk
         return b''
     def write(self, data):
-        c=data.decode().rstrip('\n');self.commands.append(c)
+        c=data.decode().strip('\n');self.commands.append(c)
         if self.fault=='short_write' and ' START ' in c:return 5
         if c in ('@MOTION TELEMETRY 0','@IMU STREAM OFF','@BMS STREAM OFF'):
             self.add({'@MOTION TELEMETRY 0':'TELEMETRY=OFF','@IMU STREAM OFF':'IMU_STREAM=OFF','@BMS STREAM OFF':'BMS_STREAM=OFF'}[c]+'\n')
@@ -210,6 +210,15 @@ class Tests(unittest.TestCase):
         with patch('select.select',return_value=([7],[],[])),patch('os.read',return_value=b''):
             usb=object.__new__(m.RawUSB);usb.fd=7
             with self.assertRaises(m.Refusal):usb.read(.1)
+    def test_stop_delimited_after_short_write(self):
+        class Wire(USB):
+            def __init__(self):super().__init__(fault='short_write');self.wire=b''
+            def write(self,data):
+                n=super().write(data);self.wire+=data[:n];return n
+        usb=Wire();self.run_case(usb,True)
+        commands=usb.wire.split(b'\n')
+        self.assertIn(m.STOP.encode(),commands)
+        self.assertEqual(commands.count(m.STOP.encode()),1)
     def test_invalid_physical_setup_never_opens_usb(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/'physical.json'
