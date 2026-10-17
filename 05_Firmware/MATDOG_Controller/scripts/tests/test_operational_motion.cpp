@@ -67,7 +67,8 @@ struct Operational {
   void refresh(){b.service.refresh(readiness(),b.now);}
   // As every Controller tick: the measured pose is published before a command is served.
   void publish(){motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];observe(o,q,b.now);b.coordinator.observe(o);}
-  motion::MotionAck stand(uint32_t seq=1){publish();auto c=command(motion::Intent::STAND,seq,motion::ClientOwner::DASHBOARD);c.target_height_m=.150;c.issued_at_ms=b.now;c.ttl_ms=1000;return b.service.command(c,b.now);}
+  motion::MotionAck standAt(double h,uint32_t seq=1){publish();auto c=command(motion::Intent::STAND,seq,motion::ClientOwner::DASHBOARD);c.target_height_m=h;c.issued_at_ms=b.now;c.ttl_ms=1000;return b.service.command(c,b.now);}
+  motion::MotionAck stand(uint32_t seq=1){return standAt(.150,seq);}
   // One Controller tick: session lifecycle, coordinator, service, with a servo that follows.
   void tickArming(){
     b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);
@@ -562,6 +563,59 @@ void walkGates(){
   CHECK(walkCommand(op,12,vx).outcome==motion::CommandOutcome::ACCEPTED);
   CHECK(walkCommand(op,13,motion::operational_walk::strideVelocity(2)).outcome==motion::CommandOutcome::REJECTED);REASON(b.service.lastAck().reason,"WALK_IN_PROGRESS");
 }
+
+// STAND height (2026-10-17). The certified prone entry always ends at 150 mm. A lower request is a
+// controlled descent from that VERIFIED stand through the existing fixed-contact component, under the
+// same checkSegment limits/rates, executor tracking and SafeActuator checks. The command is completed
+// only at the requested height. Height is a COMMAND here: the fixture observation carries a declared body pose.
+double slotOf(const motion::JointTargetFrame& f,unsigned i){return slot(f,i);}
+void variableStandHeight(){
+  { Operational op;const auto& p=op.b.runtime.feedback;
+    CHECK(motion::standHeightReachable(.150,p));
+    for(double h:{.140,.120,.100,.080,.060})CHECK(motion::standHeightReachable(h,p));
+    for(double h:{0.,-.01,.151,.04,.02})CHECK(!motion::standHeightReachable(h,p));
+    auto narrow=p;for(auto& leg:narrow.jointLimits)for(auto& j:leg){j.lower=-.01;j.upper=.01;}
+    CHECK(!motion::standHeightReachable(.100,narrow)); }
+  for(double h:{.140,.100,.060}){
+    Operational op(0,-92.070442,1,true);auto& b=op.b;Driver d(op);
+    CHECK(op.standAt(h).outcome==motion::CommandOutcome::ACCEPTED);
+    for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+    for(unsigned i=0;i<12;++i)d.q[i]=d.written[i]=b.r.feedback.actual_rad[i];
+    bool ok=true,intermediate=false;const auto c4=motion::pairedProneSample(250,1,true).target;
+    while(b.service.activeAck().outcome!=motion::CommandOutcome::COMPLETED&&b.now<50000000&&ok){
+      ok=d.tick(20,true);
+      // The 150 mm entry stand must never be reported as the requested stand.
+      if(b.service.activeAck().outcome==motion::CommandOutcome::COMPLETED){double dev=0;for(unsigned i=0;i<12;++i)dev=std::max(dev,std::abs(d.q[i]-slotOf(c4,i)));intermediate=dev<1e-6;} }
+    if(!ok)std::printf("HEIGHT_FAIL h=%.3f coord=%s frame_reason=%s executor=%s session=%s reason=%s\n",h,b.coordinator.state(),motion::feedbackReasonName(b.coordinator.frame().reason),b.r.executor.status().reason,b.session.stateName(),b.session.reason());
+    CHECK(ok);CHECK(!intermediate);REASON(b.service.activeAck().reason,"STAND_VERIFIED");REASON(b.coordinator.state(),"STAND");
+    motion::StandDefinition dd=motion::canonicalStandDefinition();dd.lowBodyHeightM=h;dd.standBodyHeightM=.150;
+    motion::LegJointAngles seeds[4];for(unsigned i=0;i<4;++i)seeds[i]=dd.standSeed[i];motion::StandSample s;
+    for(int k=20;k>=0;--k){s=motion::sampleStandPath(dd,k/20.0,seeds);for(unsigned i=0;i<4;++i)seeds[i]=s.target.legs[i];}
+    CHECK(s.status==motion::StandStatus::OK);double worst=0;for(unsigned i=0;i<12;++i)worst=std::max(worst,std::abs(d.q[i]-slotOf(s.target,i)));
+    CHECK(worst<2e-3);CHECK(std::abs(b.coordinator.stand().standHeightM()-h)<1e-9);
+    CHECK(writesInsideLimits(b)&&d.max_step<=b.params.max_step_rad+1e-9);
+    std::printf("STAND_HEIGHT [SIMULATO] requested_mm=%.0f final_pose_error_rad=%.2e frames=%u writes=%zu\n",h*1000,worst,d.frames,b.r.backend.writes.size());
+    // WALK is certified around the 150 mm stand only.
+    op.walk_ok=true;op.refresh();CHECK(walkCommand(op,10,motion::operational_walk::strideVelocity(1)).outcome==motion::CommandOutcome::REJECTED);
+    REASON(b.service.lastAck().reason,"WALK_REQUIRES_150MM_STAND");
+    // Back to 150 mm with a normal STAND command, then WALK is admitted again.
+    CHECK(op.standAt(.150,11).outcome==motion::CommandOutcome::ACCEPTED);
+    ok=true;while(b.service.activeAck().outcome!=motion::CommandOutcome::COMPLETED&&b.now<50000000&&ok)ok=d.tick(20,true);
+    CHECK(ok&&std::abs(b.coordinator.stand().standHeightM()-.150)<1e-9);
+    double back=0;for(unsigned i=0;i<12;++i)back=std::max(back,std::abs(d.q[i]-slotOf(c4,i)));CHECK(back<2e-3);
+    op.refresh();CHECK(walkCommand(op,12,motion::operational_walk::strideVelocity(1)).outcome==motion::CommandOutcome::ACCEPTED);
+    // STOP while standing at any height: SAFE_OFF, no further writes.
+    auto stop=command(motion::Intent::STOP,13,motion::ClientOwner::DASHBOARD);stop.issued_at_ms=b.now;b.service.command(stop,b.now);
+    CHECK(b.session.safeOffRequired()); }
+  // Changing height while standing at 150 mm (a second explicit command), and STOP in the middle of the descent.
+  { Operational op;auto& b=op.b;Driver d(op);CHECK(reachStand(op,d));
+    CHECK(op.standAt(.120,2).outcome==motion::CommandOutcome::ACCEPTED);
+    for(unsigned k=0;k<60;++k)CHECK(d.tick(20,true));
+    CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ACCEPTED);REASON(b.coordinator.state(),"RISE");
+    auto stop=command(motion::Intent::STOP,3,motion::ClientOwner::DASHBOARD);stop.issued_at_ms=b.now;b.service.command(stop,b.now);
+    CHECK(b.session.safeOffRequired()&&b.r.executor.status().safe_off_required);
+    const size_t writes=b.r.backend.writes.size();for(unsigned k=0;k<20;++k)b.r.executor.update(b.r.facts,b.r.feedback,++b.now);CHECK(b.r.backend.writes.size()==writes); }
+}
 void operationalRefusals(){
   // A start inside the keep-out: refused BEFORE arming (2026-10-15 pre-arm dry run):
   // no session, no prime, no torque, not a single write.
@@ -745,6 +799,7 @@ int main(){
   stand_backend::run();
   if(std::getenv("MATDOG_STAND_BACKEND_ONLY")){std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND backend)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
   postValidationAdmissionClock();
+  if(std::getenv("MATDOG_HEIGHT_ONLY")){variableStandHeight();std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (HEIGHT only)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
   clockAndScheduler();frameTransactionContract();legacyHeartbeatContract();
   const bool stand_only=std::getenv("MATDOG_STAND_ONLY")!=nullptr;
   if(!stand_only)denseWalkRanges();
@@ -758,7 +813,7 @@ int main(){
     standTiming(false,c,0); }
   if(stand_only){operationalRefusals();heartbeatCoupling();std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND only)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
   operationalRefusals();
-  walkGates();heartbeatCoupling();streamFaults();
+  walkGates();variableStandHeight();heartbeatCoupling();streamFaults();
   const double step=2*kPi/4096;
   { StreamModel ideal;ideal.name="A_IDEAL";ideal.ideal=true;
     for(unsigned p=0;p<3;++p){auto r=streamWalk(p,ideal,10);CHECK(r.ok&&r.cycles_done>=10);} }

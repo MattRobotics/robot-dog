@@ -161,7 +161,6 @@ SafeOffResult ServoBus::safeOff(int id) {
 }
 
 ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
-  if(prime_diagnostic_inhibit_)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
   ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
@@ -303,7 +302,6 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
 
 bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report) {
   FrameTx local{};FrameTx& r=report?*report:local;r=FrameTx{};
-  if(prime_diagnostic_inhibit_)return false;
   if(!validation_speed_||!validation_acceleration_)return false;   // no reviewed drive pair: nothing sent
   uint8_t packet[packet::kGoalFrameBytes];
   const size_t n=packet::buildGoalFrame(ids,ticks,12,validation_speed_,validation_acceleration_,packet,sizeof(packet));

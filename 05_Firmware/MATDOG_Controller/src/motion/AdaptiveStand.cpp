@@ -56,7 +56,7 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
        r.proneMaxDeviationRad<=0||r.proneMaxRmsRad<=0){reject(FeedbackReason::ROUTE_REQUIRED);return false;}
     entry_=*r.entry;entryActive_=true;
   }
-  timedActive_=false;timedPhase_=0;
+  timedActive_=false;timedPhase_=0;adjust_=false;
   if(route_.pairedProne&&route_.phaseTimed){
     // Only behind a staged entry (the route then starts exactly at knot 0).
     // 0.999: the law's peaks sit strictly inside the checkSegment limits (an
@@ -66,6 +66,16 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
     timedActive_=true;
   }
   request_.acquisition=nullptr;request_.entry=nullptr;state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
+}
+bool AdaptiveStand::requestHeightAdjust(double h,uint32_t firstSequence,double now){
+  if(state_!=AdaptiveStandState::STAND||policy_.mode!=FeedbackMode::FIXTURE_REVIEW||!previous_.target.valid||!previous_.cartesian.valid||
+     !std::isfinite(h)||h<=0||h>.150||firstSequence==0||!std::isfinite(now)||std::abs(previous_.cartesian.body.translationM.z-h)<1e-9)return false;
+  request_.targetHeightM=h;request_.firstSequence=firstSequence;request_.acquisition=nullptr;request_.entry=nullptr;
+  // Constant mean speed: the 8 s rise of a 50 mm change, proportionally longer for a larger one.
+  request_.riseDurationS=std::max(8.0,8.0*std::abs(previous_.cartesian.body.translationM.z-h)/.050);
+  route_.count=0;route_.pairedProne=false;timedActive_=false;entryActive_=false;adjust_=true;
+  pendingValid_=assessed_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
+  state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
 FeedbackFrame AdaptiveStand::reject(FeedbackReason r){state_=AdaptiveStandState::REJECTED;reason_=r;pendingValid_=false;physicalReady_=false;FeedbackFrame f;f.reason=r;return f;}
 void AdaptiveStand::stop(){state_=AdaptiveStandState::STOPPED;reason_=FeedbackReason::STOPPED;pendingValid_=false;physicalReady_=false;}
@@ -166,7 +176,9 @@ FeedbackFrame AdaptiveStand::generate(double now){
     c.feet[i]=mix(a,b,law.progress);c.velocity[i]=rate(a,b,law.velocity);c.acceleration[i]=rate(a,b,law.acceleration);
     c.phases[i].stance=(endpoint_.requiredFeet&(1<<i))!=0;}
   c.valid=true;GaitParameters p;p.heightM=request_.targetHeightM;
-  auto f=solveGait(p,c,&previous_);
+  // Height adjust: the retained entry pose is a tabulated solution, not a solveGait branch; the
+  // timed stand below is seeded with it and checkSegment bounds every step from it.
+  auto f=solveGait(p,c,adjust_?nullptr:&previous_);
   if(!f.target.valid)return reject(f.status==GaitStatus::BRANCH_CHANGE?FeedbackReason::BRANCH_CHANGE:FeedbackReason::IK_FAILURE);
   // Reuse the C4-C fixed-contact rise component at any positive observed height.
   // Yaw/translation are factored out; descending adjustments reverse its clock.
@@ -189,6 +201,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
   if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
   pending_=feedbackFrame(f,sequence_++);pending_.bellySupportRequired=endpoint_.bellySupportRequired;
   pending_.externalSupportRequired=endpoint_.externalSupportRequired;pending_.timeS=now;
+  if(adjust_){pendingSolution_=f;pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
   // The solve is retained only after matching operational feedback acknowledges it.
   pendingValid_=true;assessed_=false;pendingSince_=now;reason_=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;
 }
@@ -206,7 +219,7 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
     if(r==FeedbackReason::FEEDBACK_PENDING){pending_.reason=r;return pending_;}
     if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}
-    previous_=route_.pairedProne?pendingSolution_:observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
+    previous_=route_.pairedProne||adjust_?pendingSolution_:observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
     pendingValid_=false;physicalReady_=pending_.physicalReadiness;++segmentIndex_;
     if(segmentIndex_==segmentIntervals_){
       if(entryPending()){
@@ -229,7 +242,16 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
   if(state_==AdaptiveStandState::OBSERVE){state_=AdaptiveStandState::CLASSIFY;FeedbackFrame f;f.reason=FeedbackReason::OK;return f;}
   if(state_==AdaptiveStandState::CLASSIFY){
     if(!o.stationary)return reject(FeedbackReason::UNRECOVERABLE_POSE);
-    if(entryActive_){
+    if(adjust_){
+      // A held, verified fixture stand: the joints must still be the retained
+      // solution (the declared fixture body pose is not a height measurement).
+      if(!o.externalSupportConfirmed)return reject(FeedbackReason::SUPPORT_INVALID);
+      for(unsigned i=0;i<4;++i){const auto& a=o.actual.legs[i];const auto& t=previous_.target.legs[i];
+        if(std::abs(a.hip-t.hip)>policy_.maxTrackingErrorRad||std::abs(a.upper-t.upper)>policy_.maxTrackingErrorRad||
+           std::abs(a.lower-t.lower)>policy_.maxTrackingErrorRad)return reject(FeedbackReason::ROUTE_MISMATCH);}
+      poseClass_=ObservedPoseClass::SUPPORTED_STAND;
+      if(!beginRise())return reject(FeedbackReason::IK_FAILURE);
+    } else if(entryActive_){
       // Recognition is a broad multi-joint region around the route head, NOT
       // the certified route tube; the staged entry is what reaches the tube.
       const auto head=pairedProneSample(0,0,true);if(!head.target.valid)return reject(FeedbackReason::ROUTE_REQUIRED);
@@ -300,5 +322,19 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
   if(!entryPending()&&route_.pairedProne&&route_.supervisedSegments&&approvedSegment_!=pairedSegment_&&
      !(approvedThrough_!=UINT16_MAX&&pairedSegment_<=approvedThrough_)){FeedbackFrame f;f.reason=FeedbackReason::ASSESSMENT_REQUIRED;return f;}
   return generate(now);
+}
+bool standHeightReachable(double h,const FeedbackPolicy& p){
+  if(!std::isfinite(h)||h<=0||h>.150)return false;
+  if(std::abs(h-.150)<1e-12)return true;                 // the certified entry pose itself
+  StandDefinition d=canonicalStandDefinition();d.lowBodyHeightM=h;d.standBodyHeightM=.150;
+  LegJointAngles seeds[4];for(unsigned i=0;i<4;++i)seeds[i]=d.standSeed[i];
+  for(int k=20;k>=0;--k){                                // whole descent, stand -> h, chained seeds
+    const auto s=sampleStandPath(d,k/20.0,seeds);
+    if(s.status!=StandStatus::OK)return false;
+    for(unsigned i=0;i<4;++i){seeds[i]=s.target.legs[i];const auto& q=s.target.legs[i];
+      const double v[3]={q.hip,q.upper,q.lower};
+      for(unsigned j=0;j<3;++j)if(!(v[j]>=p.jointLimits[i][j].lower&&v[j]<=p.jointLimits[i][j].upper))return false;}
+  }
+  return true;
 }
 } }

@@ -66,6 +66,14 @@ class AdaptiveStand {
   const FixtureEntryPlan& entryPlan() const {return entry_;}
   const FixturePoseClassification& proneClassification() const {return prone_;}
   bool physicalReadiness() const {return physicalReady_;}
+  // Fixture STAND height change (commanded, not measured: the fixture observation
+  // carries a declared body pose). Only from a VERIFIED STAND, at fixed canonical
+  // contacts, through the same fixed-contact rise component and checkSegment
+  // limits/rates as every other frame. Returns false without side effects when
+  // it does not apply.
+  bool requestHeightAdjust(double targetHeightM,uint32_t firstSequence,double nowS);
+  // Body height of the retained verified STAND solution; negative otherwise.
+  double standHeightM() const {return state_==AdaptiveStandState::STAND&&previous_.cartesian.valid?previous_.cartesian.body.translationM.z:-1;}
  private:
   FeedbackFrame reject(FeedbackReason reason);
   bool beginSegment(const AcquisitionWaypoint& endpoint);
@@ -100,6 +108,12 @@ class AdaptiveStand {
   PhaseTimedRoute timed_{};
   uint8_t timedPhase_=0;
   bool timedActive_=false;
+  bool adjust_=false;
 };
+// Pure geometry gate: is a STAND at this body height inside the LIVE joint
+// limits for the canonical contacts, along the whole descent from 150 mm?
+// 150 mm is the certified entry pose. Heights are body height above the
+// support plane in metres (the existing request convention).
+bool standHeightReachable(double heightM,const FeedbackPolicy& policy);
 } }
 #endif

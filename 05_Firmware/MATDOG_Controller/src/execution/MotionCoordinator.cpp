@@ -13,7 +13,7 @@ void MotionCoordinator::synchronizeSession(){
  arm_generation_=executor_->status().arm_generation;
  submitted_sequence_=0;assessment_={};frame_=motion::FeedbackFrame{};walking_=false;
  static const motion::FeedbackWalk kIdleWalk{};
- stand_.stop();walk_=kIdleWalk;scheduler_.stop();walk_profile_=nullptr;
+ stand_.stop();walk_=kIdleWalk;scheduler_.stop();walk_profile_=nullptr;final_height_m_=.150;
 }
 bool MotionCoordinator::configure(const motion::FeedbackPolicy& p,const motion::WalkSpecification& w,const motion::AcquisitionRoute* a){
  if(executor_&&executor_->active())return false;
@@ -42,7 +42,16 @@ bool MotionCoordinator::assess(const motion::SegmentAssessment& a,uint32_t now){
 const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_t now){
    if(session_&&session_->scope()==TrialScope::FIXTURE_MICRO)return "AUTONOMOUS_STAND_SCOPE_REQUIRED";
    if(walking_)return "WALK_MUST_STOP_FIRST";
+   if(commissioning_.enabled&&commissioning_.measuredStart&&stand_.state()==motion::AdaptiveStandState::STAND){
+    // Already standing: change height from the verified solution (or acknowledge the same height).
+    if(!motion::standHeightReachable(c.target_height_m,feedback_policy_))return "HEIGHT_OUTSIDE_LIVE_LIMITS";
+    if(std::abs(stand_.standHeightM()-c.target_height_m)<1e-9){final_height_m_=c.target_height_m;return nullptr;}
+    final_height_m_=c.target_height_m;
+    return stand_.requestHeightAdjust(c.target_height_m,executor_->status().accepted_sequence+1,walkTime(now))?nullptr:"HEIGHT_ADJUST_REFUSED";
+   }
    motion::AdaptiveStandRequest r;r.targetHeightM=c.target_height_m;r.firstSequence=executor_->status().accepted_sequence+1;
+   final_height_m_=.150;
+   if(commissioning_.enabled&&commissioning_.measuredStart){final_height_m_=c.target_height_m;r.targetHeightM=.150;}
    if(acquisition_.count||acquisition_.pairedProne)r.acquisition=&acquisition_;
    if(commissioning_.enabled){
     if(!session_||session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "COMMISSIONING_SCOPE_REQUIRED";
@@ -89,6 +98,9 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
  if((!executor_||!executor_->active())&&executor_&&c.intent==motion::Intent::STAND&&commissioning_.enabled&&commissioning_.measuredStart&&armer_){
   // Operational STAND from READY: the explicit command starts the controlled
   // torque sequence; the planner starts only once the session is ARMED.
+  // The certified prone entry always ends at 150 mm; a lower height is a controlled
+  // descent after it. Refuse a height the LIVE limits cannot hold before any torque.
+  if(!motion::standHeightReachable(c.target_height_m,feedback_policy_))return "HEIGHT_OUTSIDE_LIVE_LIMITS";
   if(const char* why=preArmCheck())return why;
   if(const char* why=armer_->armForCommand(now))return why;
   pending_stand_=true;arming_failure_=nullptr;pending_command_=c;pending_since_ms_=now;return nullptr;
@@ -109,6 +121,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
     if(walking_&&!zero)return "WALK_IN_PROGRESS";            // change speed: WALK STOP, then START
     if(!walking_&&!zero){
      if(stand_.state()!=motion::AdaptiveStandState::STAND)return "STAND_VERIFIED_REQUIRED";
+     if(std::abs(stand_.standHeightM()-.150)>1e-9)return "WALK_REQUIRES_150MM_STAND";   // the certified WALK box is built at 150 mm
      const auto* profile=motion::operational_walk::profileForVelocity(v.vxMps);
      if(!profile||v.vyMps!=0||v.yawRateRadS!=0)return "WALK_SPEED_NOT_CERTIFIED";
      // The profile's certified box +/- the tube must sit inside the live limits.
@@ -199,6 +212,12 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  // Observations remain externally measured. Targets never overwrite actual
  // joints, base height or contact evidence in order to manufacture tracking.
  frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6));
+ // The certified entry just verified its 150 mm STAND and a lower height was requested:
+ // continue in the SAME update, so the command is never completed at the intermediate height.
+ if(!walking_&&stand_.state()==motion::AdaptiveStandState::STAND&&commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
+    executor_->status().state==ExecutorState::READY){
+  if(!stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,now_us/1e6)){executor_->stop("HEIGHT_ADJUST_REFUSED");return;}
+ }
  if(walking_&&walk_.state()==motion::FeedbackWalkState::STAND){walking_=false;executor_->restoreArmedRates();return;}
  if((walking_&&walk_.state()==motion::FeedbackWalkState::REJECTED)||(!walking_&&stand_.state()==motion::AdaptiveStandState::REJECTED)){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
  if(feedback_policy_.mode==motion::FeedbackMode::SIMULATION||!frame_.physicalReadiness)return;

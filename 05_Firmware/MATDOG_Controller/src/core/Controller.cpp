@@ -62,9 +62,6 @@ const char* resetReasonName(esp_reset_reason_t reason) {
 }  // namespace
 
 void Controller::begin() {
-  // Diagnostic release interlock, before any peripheral/command processing.
-  // No torque-ON escape through another service or a subsequent SAFE_OFF.
-  servo_bus_.inhibitTorqueForPrimeDiagnostics();
   // G3.1: USB CDC output must never block this loop. HWCDC keeps treating a
   // host as connected after it closes the port, and with its default 100 ms
   // TX timeout each print then waits up to ~2 s on a full ring (BNO085 fell
@@ -613,8 +610,7 @@ void Controller::HeartbeatHook::heartbeat(uint32_t now_ms) {
   owner->validation_present_=true;owner->validation_presence_ms_=now_ms;
 }
 
-const char* Controller::armOperationalSession(uint32_t now,bool prime_diagnostic) {
-  if(prime_diagnostic_mode_&&!prime_diagnostic)return "PRIME_DIAGNOSTIC_MODE_USB_ONLY";
+const char* Controller::armOperationalSession(uint32_t now) {
   // preArmCheck may do substantial geometry work. Re-evaluate the SAME
   // producer at admission time; never relax future/stale feedback checks.
   now=millis();
@@ -640,7 +636,7 @@ const char* Controller::armOperationalSession(uint32_t now,bool prime_diagnostic
   operational_facts_.lease=motion_authority_lease_;
   local_trial_evidence_=e;
   // Runtime-governed: no compile-time motion flag is consulted on this path.
-  const bool admitted=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now,prime_diagnostic);
+  const bool admitted=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now);
   // One trace per admission, after the decision, never before the gate. These
   // are the actual inputs, not a later USB telemetry snapshot.
   char trace[kAdmissionTraceBytes];
@@ -648,9 +644,7 @@ const char* Controller::armOperationalSession(uint32_t now,bool prime_diagnostic
     e.generation,motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason(),operational_feedback_);
   writeAdmissionTrace(Serial,trace,trace_bytes);
   if(!admitted){operational_facts_.operator_permit=false;return operational_session_.reason();}
-  const int n=snprintf(trace,sizeof(trace),prime_diagnostic?
-    "PRIME_DIAGNOSTIC=STARTED generation=%lu torque_on=INHIBITED stop_before=ENERGIZE\r\n":
-    "OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
+  const int n=snprintf(trace,sizeof(trace),"OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
   if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,static_cast<size_t>(n));
   return nullptr;
 }
@@ -1186,7 +1180,6 @@ void Controller::printBootBanner() {
   Serial.printf("reset_reason : %s\n", resetReasonName(esp_reset_reason()));
   Serial.println("startup_motion   : DISABLED");
   Serial.println("startup_torque   : DISABLED");
-  Serial.println("prime_diagnostic : USB_EXPLICIT_ONLY torque_on=INHIBITED stop_before=ENERGIZE");
   Serial.println("startup_servo_census : ENABLED_READ_ONLY_INCREMENTAL");
   Serial.println("daly_write       : KEY_LOGIC_DISCHARGE_ONLY (operator command; no MOS/power-cut write)");
   Serial.printf("operating_mode   : %s\n", toString(operating_mode_.mode()));
