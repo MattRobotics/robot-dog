@@ -80,3 +80,10 @@ class HardwareSerial {
     return n;
   }
 };
+// Same function-like macro as the real ESP32 core (cores/esp32/Arduino.h,
+// makeWord in WMath.cpp). Without it the host build silently accepted a
+// production identifier named word(...), which the device compiles to
+// makeWord(address): PRIME readback then reported register addresses 42/46.
+inline uint16_t makeWord(uint16_t w){return w;}
+inline uint16_t makeWord(uint8_t h,uint8_t l){return static_cast<uint16_t>((h<<8)|l);}
+#define word(...) makeWord(__VA_ARGS__)
