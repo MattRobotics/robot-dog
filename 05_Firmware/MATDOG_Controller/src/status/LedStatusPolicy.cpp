@@ -116,8 +116,7 @@ LedEffect ledEffectFor(LedPresentationState state, uint32_t now_ms, uint8_t max_
       return {255, 0, 0, triangleBrightness(now_ms, kBreathePeriodMs, kBreatheMinBrightness,
                                            max_brightness)};
     case LedPresentationState::BATTERY_CRITICAL:
-      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,
-                                           max_brightness / 2)};
+      return {255, 0, 0, static_cast<uint8_t>(now_ms%500<250?max_brightness:0)};
     case LedPresentationState::DEGRADED:
       return {255, 140, 0, static_cast<uint8_t>(max_brightness / 2)};
     case LedPresentationState::BATTERY_WARNING:
@@ -178,12 +177,26 @@ LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
     std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;
   if(voltage_valid){
     const auto cell=inputs.cell_min_mv;const auto pack=inputs.pack_voltage_v;
-    if(cell<=3350||pack<=10.05f)voltage_level_=2;
-    else if(voltage_level_==2&&(cell<3450||pack<10.35f)){}
-    else if(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))voltage_level_=1;
-    else voltage_level_=0;
-    if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}
-  }
+    const bool distinct=!voltage_seen_||static_cast<int32_t>(inputs.sampled_at_ms-voltage_stamp_)>0;
+    if(distinct){
+      voltage_seen_=true;voltage_stamp_=inputs.sampled_at_ms;
+      // Critical is immediate, including the real 3190 mV/9.7 V event.
+      if(cell<=3350||pack<=10.05f){voltage_level_=2;voltage_votes_=0;}
+      else {
+        uint8_t next=0;
+        if(voltage_level_==2&&(cell<3450||pack<10.35f))next=2;
+        else if(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))next=1;
+        // Two consecutive distinct fresh DALY samples for warning/recovery.
+        // Repainting one cached sample can never advance this counter.
+        if(next==voltage_level_)voltage_votes_=0;
+        else {if(next!=voltage_candidate_){voltage_candidate_=next;voltage_votes_=0;}
+          if(++voltage_votes_>=2){voltage_level_=next;voltage_votes_=0;}}
+      }
+    }
+  }else {voltage_votes_=0;voltage_seen_=false;}
+  // Stale/invalid data cannot clear a known low-voltage alarm. UI labels the
+  // current data unknown; charging only suppresses presentation on fresh facts.
+  if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}
   snapshot_.presentation=selectFromFacts(inputs,snapshot_);
   if (state() == LedPresentationState::READY || state() == LedPresentationState::CHARGING) {
     if (!snapshot_.soc_valid) {

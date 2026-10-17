@@ -2623,24 +2623,14 @@ def check_led_status_boundaries(files):
     # voltage producer requested by the operator. Pin the whole decision block,
     # including freshness, plausibility, thresholds, hysteresis and charge mask.
     # Other aliases/constructors/compound producers remain forbidden below.
-    voltage_advisory = (
-        'constboolvoltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;'
-        'if(voltage_valid){constautocell=inputs.cell_min_mv;'
-        'constautopack=inputs.pack_voltage_v;'
-        'if(cell<=3350||pack<=10.05f)voltage_level_=2;'
-        'elseif(voltage_level_==2&&(cell<3450||pack<10.35f)){}elseif(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))voltage_level_=1;'
-        'elsevoltage_level_=0;'
-        'if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;'
-        'snapshot_.battery_warning|=voltage_level_==1;'
-        '}}'
-    )
+    voltage_advisory = 'constboolvoltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;if(voltage_valid){constautocell=inputs.cell_min_mv;constautopack=inputs.pack_voltage_v;constbooldistinct=!voltage_seen_||static_cast<int32_t>(inputs.sampled_at_ms-voltage_stamp_)>0;if(distinct){voltage_seen_=true;voltage_stamp_=inputs.sampled_at_ms;if(cell<=3350||pack<=10.05f){voltage_level_=2;voltage_votes_=0;}else{uint8_tnext=0;if(voltage_level_==2&&(cell<3450||pack<10.35f))next=2;elseif(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))next=1;if(next==voltage_level_)voltage_votes_=0;else{if(next!=voltage_candidate_){voltage_candidate_=next;voltage_votes_=0;}if(++voltage_votes_>=2){voltage_level_=next;voltage_votes_=0;}}}}}else{voltage_votes_=0;voltage_seen_=false;}if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}'
     voltage_policy = by_name.get("LedStatusPolicy.cpp", (None, ""))[1]
     if re.sub(r"\s+", "", voltage_policy).count(voltage_advisory) != 1:
         fail("LedStatusPolicy.cpp: candidate cell/pack advisory must retain exact freshness, thresholds, hysteresis and charging gate")
     if re.sub(r"\s+", "", policy_h).count("uint8_tvoltage_level_=0;") != 1:
         fail("LedStatusPolicy.h: voltage advisory latch must initialize to zero")
     controller_voltage = by_name.get("Controller.cpp", (None, ""))[1]
-    for field in ("cell_min_mv", "pack_voltage_v"):
+    for field in ("sampled_at_ms", "cell_min_mv", "pack_voltage_v"):
         expected = f"led_inputs.{field} = battery.{field};"
         copies = re.findall(rf"led_inputs\.{field}\s*=\s*[^;]+;", controller_voltage)
         if len(copies) != 1 or re.sub(r"\s+", "", copies[0]) != re.sub(r"\s+", "", expected):
@@ -6570,6 +6560,24 @@ def check_motion_convergence_gate(sketch_dir):
         print(result.stdout.strip())
 
 
+def check_stand_release_scope(files):
+    by_name={p.name:c for p,c in files if "scripts" not in p.parts}
+    if 'constexpr bool kStandOnlyCandidate = true;' not in by_name.get('BuildConfig.h',''):
+        fail('Release scope must remain STAND-only')
+    commissioning=by_name.get('Commissioning.cpp','')
+    for token in ('operational&&!build::kStandOnlyCandidate', 'if(build::kStandOnlyCandidate){reason="STAND_ONLY_CANDIDATE";return reply();}'):
+        if token not in commissioning:fail('STAND-only WALK admission fence missing')
+    arm=by_name.get('Controller.cpp','').split('const char* Controller::armOperationalSession(')[-1].split('bool Controller::RestoreHook')[0]
+    if 'Serial.printf' in arm or 'writeAdmissionTrace(Serial,trace,trace_bytes)' not in arm:
+        fail('Admission diagnostics must use bounded nonallocating writes')
+    # The legacy comment stripper removes // even inside URL literals. Inspect
+    # only the real quoted CSP lines here; do not weaken other audit rules.
+    policy_path=next((p for p,c in files if p.name=='TwinHostPolicy.h'),None)
+    policy=''.join(re.findall(r'^\s*"([^"]*)"',policy_path.read_text(),re.MULTILINE)) if policy_path else ''
+    expected="connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; "
+    if expected not in policy or '*' in policy:fail('Twin CSP allowlist drift')
+
+
 def check_operational_session_boundaries(files):
     by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
     session=by_name.get("MotionSession.cpp",(None,""))[1]
@@ -6592,6 +6600,7 @@ def main():
         fail(f"no source files found under {SKETCH_DIR}")
 
     check_forbidden_literals(files)
+    check_stand_release_scope(files)
     check_operational_session_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)

@@ -118,7 +118,7 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
     if(!f.target.valid||v<limits[i][0]||v>limits[i][1]){unbindCommissioning("ROUTE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}}
   if(params.walk_enabled){unsigned joint=0;
    if(!motion::compiledFirstStrideFitsLimits(r.feedback,motion::compiledFirstStrideTubeRad(),&joint)){unbindCommissioning("WALK_TUBE_OUTSIDE_COMMISSIONING_LIMITS");reason=commissioning_reason_;return false;}}
-  if(operational){unsigned joint=12;
+  if(operational&&!build::kStandOnlyCandidate){unsigned joint=12;
    if(motion::operational_walk::fitsLimits(r.feedback,r.execution.tracking_tolerance_rad,&joint)){
     r.walk=motion::operational_walk::specification();operational_walk_bound_=true;operational_walk_reason_="WALK_BOUND";
     // The EXPERIMENTAL fast profile is offered (never selected by default) only
@@ -303,6 +303,7 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
   return reply();
  }
  if((!strcmp(t[0],"WALK_START")||!strcmp(t[0],"WALK"))&&n==3&&!strcmp(t[2],"CONFIRM_SUSPENDED_FIRST_STRIDE_CLEARANCE")){
+  if(build::kStandOnlyCandidate){reason="STAND_ONLY_CANDIDATE";return reply();}
   if(!commissioning_params_.walk_enabled){reason="WALK_NOT_ENABLED_IN_POLICY";return reply();}
   if(!present||operational_session_.state()!=execution::MotionSessionState::ARMED){reason="PRESENCE_OR_NOT_ARMED";return reply();}
   const bool start=!strcmp(t[0],"WALK_START");

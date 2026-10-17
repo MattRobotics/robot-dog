@@ -24,6 +24,10 @@ def portal_html() -> str:
     assert len(fragments) == 1 and motion
     return fragments[0] + motion[1] + "</html>"
 
+def dashboard_csp() -> str:
+    policy = (SRC / "network/TwinHostPolicy.h").read_text()
+    return "".join(re.findall(r'^\s*"([^"\n]*)"', policy, re.MULTILINE))
+
 def capabilities() -> dict:
     source = (SRC / "motion/MotionContract.cpp").read_text()
     matches = re.findall(r'A\("([^"]+)","([^"]+)","([^"]+)","([^"]+)","([^"]+)",(true|false),', source)
@@ -91,6 +95,10 @@ def main() -> None:
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            if content_type.startswith("text/html"):
+                self.send_header("Content-Security-Policy", dashboard_csp())
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("X-Content-Type-Options", "nosniff")
             self.end_headers()
             self.wfile.write(body)
         def json(self, body, status=200):

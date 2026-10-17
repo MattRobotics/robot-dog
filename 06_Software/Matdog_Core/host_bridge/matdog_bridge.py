@@ -53,6 +53,7 @@ import sys
 import tempfile
 import termios
 import threading
+from zoneinfo import ZoneInfo
 import time
 import urllib.parse
 from typing import Any, Callable, Optional
@@ -126,7 +127,10 @@ class SessionLog:
         self.records = 0
 
     def write(self, direction: str, line: str, **extra: Any) -> None:
-        record = {"utc": utc_now(), "mono": round(time.monotonic(), 6), "dir": direction, "line": line}
+        utc = utc_now()
+        local = _dt.datetime.fromisoformat(utc.replace("Z", "+00:00")).astimezone(ZoneInfo("Europe/Rome"))
+        record = {"utc": utc, "rome": local.isoformat(timespec="microseconds"), "zone": local.tzname(),
+                  "time_source": "host_wall_clock", "mono": round(time.monotonic(), 6), "dir": direction, "line": line}
         record.update(extra)
         text = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         with self._lock:

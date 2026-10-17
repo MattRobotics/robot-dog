@@ -167,6 +167,14 @@ const row = (page, list, label) => {
   eq(p.q('#socBar i').style.width, '25%', 'bar follows the update');
   p.device.status.bms_soc_percent = '10.0'; await p.poll();
   ok(p.q('#socBar').classList.contains('bad') && p.q('#bmsBadge').textContent === 'CRITICA', 'critical charge colour');
+  Object.assign(p.device.status,{bms_soc_percent:'33.2',bms_pack_v:'9.7',bms_cell_min_mv:'3190',led_battery_critical:'YES'});await p.poll();
+  eq(p.q('#soc').textContent,'33 %','BMS estimate retained, not rewritten as physical zero');
+  ok(p.q('#socBar').hidden,'critical: no SOC bar suggesting usable autonomy');
+  ok(p.q('#energyState').textContent.includes('energia operativa esaurita'),'qualitative unavailable energy');
+  p.device.status.bms_soc_percent='NaN';await p.poll();
+  eq(p.q('#bmsBadge').textContent,'CRITICA','voltage alarm remains critical with invalid SOC');
+  eq(p.q('#soc').textContent,'N/D','fresh invalid SOC is unknown, not false stale or zero');
+  p.device.status.led_battery_critical='NO';
   Object.assign(p.device.status, {bms_soc_percent: '38.0', bms_fresh: 'NO', bms_sample_age_ms: '9000', bms_comm: 'TIMEOUT'}); await p.poll();
   eq(p.q('#soc').textContent, 'STALE', 'stale sample is not shown as current');
   eq(p.q('#socBar i').style.width, '0px', 'stale: empty bar');

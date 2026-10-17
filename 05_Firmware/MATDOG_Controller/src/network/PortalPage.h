@@ -58,7 +58,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{
 <div id="staleNote">Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.</div>
 <div class="cards">
 <div class="card"><h3>Stato generale</h3><div class="kpis"><div><small>Sistema</small><b id="health">—</b></div><div><small>Alimentazione</small><b id="power">—</b></div><div><small>Authority</small><b id="authority">—</b></div></div><div class="mods" id="mods"></div><dl id="sysList"></dl><p class="note" id="safety"></p></div>
-<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><div class="big"><b id="soc">N/D</b><span id="packV"></span></div><div id="socBar" class="bar" role="meter" aria-label="Stato di carica" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
+<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><p id="energyState" class="note">Disponibilità energetica non verificata</p><small>SOC BMS stimato · non calibrato</small><div class="big"><b id="soc">N/D</b><span id="packV"></span></div><div id="socBar" class="bar" role="meter" aria-label="Stato di carica" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
 <div class="card"><h3>IMU BNO085<span id="imuBadge" class="chip">N/D</span></h3><dl id="imuList"></dl></div>
 <div class="card"><h3>Servo e attuatori<span id="servoBadge" class="chip">N/D</span></h3><dl id="servoList"></dl></div>
 <div class="card"><h3>Calibrazione<span id="calBadge" class="chip">N/D</span></h3><dl id="calList"></dl><p class="note">La calibrazione disponibile è un'evidenza salvata, non un'autorizzazione al movimento.</p></div>
@@ -84,6 +84,7 @@ let csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=
 let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const message=$('#message');
+function formatDiagnosticTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return 'N/D';try{const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'longOffset'}).formatToParts(d).map(x=>[x.type,x.value]));const off=p.timeZoneName.replace('GMT','')||'+00:00';return d.toISOString()+' · '+p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+off+' Europe/Rome '+(off==='+02:00'?'CEST':'CET')+' · fonte browser, non sincronizza il robot'}catch(e){return d.toISOString()+' · Europe/Rome non disponibile · fonte browser'}}
 function show(text,kind){message.textContent=text;message.className=kind||'';message.hidden=!text}
 message.onclick=()=>show('');
 function page(name){PAGES.forEach(p=>$('#'+p).hidden=p!==name);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===name))}
@@ -119,10 +120,12 @@ function renderStatus(){
  // Battery: a value is shown as current only when the controller calls it fresh.
  const valid=s.bms_valid==='YES',fresh=s.bms_fresh==='YES',soc=parseFloat(s.bms_soc_percent),bar=$('#socBar');
  const crit=s.led_battery_critical==='YES'||soc<=BAT_CRIT,low=s.led_battery_warning==='YES'||soc<=BAT_LOW;
- if(valid&&fresh&&isFinite(soc)){
-  $('#soc').textContent=soc.toFixed(0)+' %';$('#packV').textContent=s.bms_pack_v+' V · 3S';
-  bar.className='bar '+(crit?'bad':low?'warn':'ok');bar.firstChild.style.width=Math.max(0,Math.min(100,soc))+'%';bar.setAttribute('aria-valuenow',soc.toFixed(0));
-  chip('#bmsBadge',crit?'CRITICA':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',crit?'bad':low?'warn':'ok');
+ const unavailable=crit||s.led_charging_fault==='YES'||['FAULT','PROTECTED'].includes(s.bms_state)||(fresh&&s.bms_discharge_mos==='OFF'&&s.bms_state!=='CHARGING');
+ $('#energyState').textContent=!valid||!fresh?'Disponibilità energetica non verificata · dati assenti/stale'+(crit?' · ultimo allarme BATTERY_CRITICAL':''):unavailable?(crit?'BATTERY_CRITICAL':'PROTEZIONE BMS')+' · energia operativa esaurita · autonomia utilizzabile non stimata':low?'BATTERY_WARNING · energia operativa limitata · SOC non prova autonomia':'Energia operativa senza allarmi noti · autonomia utilizzabile non stimata';
+ if(valid&&fresh){
+  const socKnown=isFinite(soc);$('#soc').textContent=socKnown?soc.toFixed(0)+' %':'N/D';$('#packV').textContent=s.bms_pack_v+' V · 3S';
+  bar.className='bar '+(crit?'bad':low?'warn':'ok');bar.hidden=unavailable||!socKnown;bar.firstChild.style.width=bar.hidden?'0%':Math.max(0,Math.min(100,soc))+'%';if(bar.hidden)bar.removeAttribute('aria-valuenow');else bar.setAttribute('aria-valuenow',soc.toFixed(0));
+  chip('#bmsBadge',crit?'CRITICA':unavailable?'INDISPONIBILE':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',unavailable?'bad':low?'warn':'ok');
  }else{
   $('#soc').textContent=valid?'STALE':'N/D';$('#packV').textContent='';bar.className='bar';bar.firstChild.style.width='0';bar.removeAttribute('aria-valuenow');
   chip('#bmsBadge',valid?'DATO VECCHIO':s.bms_comm==='NEVER_POLLED'?'IN ATTESA':'OFFLINE',valid?'warn':'bad');
@@ -206,9 +209,9 @@ function link(){
  const age=lastOk?Date.now()-lastOk:0,dot=$('#linkDot'),text=$('#linkText');
  if(watch&&(fails||age>2*POLL_MS)){dot.className='dot warn';text.textContent='Prova del router in corso da '+dur(Date.now()-watch.t)+': AP chiuso (previsto). Se il telefono non si ricollega da solo, riconnettilo a «'+watch.ap+'».'}
  else if(!lastOk){dot.className='dot '+(fails>1?'bad':'');text.textContent=fails>1?'Dispositivo non raggiungibile. Collega il telefono al Wi-Fi MATDOG e apri http://192.168.4.1':'Connessione al dispositivo…'}
- else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+new Date(lastOk).toLocaleTimeString('it-IT')}
- else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+new Date(lastOk).toLocaleTimeString('it-IT')+' ('+dur(age)+' fa)'}
- else{dot.className='dot ok';text.textContent='Aggiornato alle '+new Date(lastOk).toLocaleTimeString('it-IT')+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
+ else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+formatDiagnosticTime(lastOk)}
+ else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa)'}
+ else{dot.className='dot ok';text.textContent='Aggiornato alle '+formatDiagnosticTime(lastOk)+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
  document.body.classList.toggle('stale',!!lastOk&&(fails>=2||age>STALE_MS));
  // A temporary session ends on the controller after SESSION_MS.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}

@@ -15,6 +15,7 @@
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
 #include "PortalPage.h"
+#include "TwinHostPolicy.h"
 #include "../core/MotionJson.h"
 #include "RestoreRequestJson.h"
 #include "TwinAssets.h"
@@ -1161,9 +1162,7 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
   httpd_resp_set_hdr(req, "X-Content-Type-Options", "nosniff");
   httpd_resp_set_hdr(
       req, "Content-Security-Policy",
-      "default-src 'self'; script-src 'unsafe-inline'; style-src "
-      "'unsafe-inline'; connect-src "
-      "'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+      kDashboardContentSecurityPolicy);
   return httpd_resp_send(req, kPortalPage, sizeof(kPortalPage) - 1);
 }
 esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {

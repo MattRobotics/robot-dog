@@ -44,6 +44,7 @@ struct LedStatusInputs {
   bool sample_valid = false;
   bool daly_comm_ok = false;
   uint32_t telemetry_age_ms = UINT32_MAX;
+  uint32_t sampled_at_ms = 0; // actual cached DALY sample identity, not LED refresh time
   float soc_percent = 0;
   uint16_t cell_min_mv = 0;
   float pack_voltage_v = 0;
@@ -115,6 +116,9 @@ class LedStatusPolicy {
  private:
   LedStatusSnapshot snapshot_;
   uint8_t voltage_level_ = 0; // advisory only; independent of DALY SOC
+  bool voltage_seen_ = false;
+  uint32_t voltage_stamp_ = 0;
+  uint8_t voltage_candidate_ = 0, voltage_votes_ = 0;
   uint8_t soc_level_ = 0; // presentation-only hysteresis: 0 normal, 1 warning, 2 critical
 };
 

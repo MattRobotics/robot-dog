@@ -251,13 +251,13 @@ async function boot(enabled = false, options = {}) {
   p = await boot();
   const input = p.q('#motion-twin-url'), link = p.q('#motion-twin');
   assert.strictEqual(link.getAttribute('aria-disabled'), 'true');
-  for (const value of ['http://localhost:8765/', 'http://localhost.:8765/', 'http://127.1:8765/', 'http://[::1]:8765/', 'http://[::ffff:127.0.0.1]:8765/', 'http://0.0.0.0:8765/', 'javascript:alert(1)', 'http://user:secret@192.168.1.40:8765/']) {
+  for (const value of ['http://localhost:8765/', 'http://localhost.:8765/', 'http://127.1:8765/', 'http://[::1]:8765/', 'http://[::ffff:127.0.0.1]:8765/', 'http://0.0.0.0:8765/', 'javascript:alert(1)', 'http://192.168.1.40:8765/', 'http://192.168.1.149:9999/', 'http://user:secret@192.168.1.40:8765/']) {
     input.value = value; input.dispatchEvent(new p.dom.window.Event('change'));
     assert.strictEqual(link.getAttribute('aria-disabled'), 'true', value);
     assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), null);
   }
-  input.value = 'http://192.168.1.40:8765/'; input.dispatchEvent(new p.dom.window.Event('change'));
-  assert.strictEqual(link.href, 'http://192.168.1.40:8765/');
+  input.value = 'http://192.168.1.149:8765/'; input.dispatchEvent(new p.dom.window.Event('change'));
+  assert.strictEqual(link.href, 'http://192.168.1.149:8765/');
   assert.strictEqual(link.getAttribute('aria-disabled'), 'false');
   assert.strictEqual(p.dom.window.localStorage.getItem('matdog.twin.url'), link.href);
   assert(!link.textContent.includes('LIVE'), 'configured link alone is not evidence of a hardware LIVE feed');

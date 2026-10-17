@@ -1,3 +1,4 @@
+#include "AdmissionDiagnostics.h"
 #include "Controller.h"
 #include <esp_random.h>
 
@@ -638,14 +639,13 @@ const char* Controller::armOperationalSession(uint32_t now) {
   const bool admitted=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now);
   // One trace per admission, after the decision, never before the gate. These
   // are the actual inputs, not a later USB telemetry snapshot.
-  Serial.printf("MOTION_ADMISSION now_ms=%lu epoch=%lu generation=%lu lease=%lu result=%s joints=",
-    (unsigned long)now,(unsigned long)actuator_policy_.epoch(),(unsigned long)e.generation,
-    (unsigned long)motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason());
-  for(unsigned i=0;i<12;++i)Serial.printf("%s%u:%lu:%ld:%u",i?",":"",i,
-    (unsigned long)operational_feedback_.sampled_at_ms[i],(long)static_cast<int32_t>(now-operational_feedback_.sampled_at_ms[i]),operational_feedback_.read_ok[i]?1:0);
-  Serial.println();
+  char trace[kAdmissionTraceBytes];
+  const size_t trace_bytes=formatAdmissionTrace(trace,sizeof(trace),now,actuator_policy_.epoch(),
+    e.generation,motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason(),operational_feedback_);
+  writeAdmissionTrace(Serial,trace,trace_bytes);
   if(!admitted){operational_facts_.operator_permit=false;return operational_session_.reason();}
-  Serial.printf("OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\n",(unsigned long)e.generation);
+  const int n=snprintf(trace,sizeof(trace),"OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
+  if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,static_cast<size_t>(n));
   return nullptr;
 }
 
@@ -1738,6 +1738,7 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.daly_comm_ok = daly_.lastCommResult() == power::DalyCommResult::OK;
     led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms;
     led_inputs.soc_percent = battery.soc_percent;
+    led_inputs.sampled_at_ms = battery.sampled_at_ms;
     led_inputs.cell_min_mv = battery.cell_min_mv;
     led_inputs.pack_voltage_v = battery.pack_voltage_v;
     led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0;

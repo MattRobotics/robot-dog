@@ -48,6 +48,7 @@
 #endif
 namespace matdog {
 namespace build {
+constexpr bool kStandOnlyCandidate = true; // release scope: boot/diagnostics/RESTORE/STAND
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 

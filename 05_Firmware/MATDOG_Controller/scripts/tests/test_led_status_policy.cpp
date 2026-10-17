@@ -157,14 +157,14 @@ void testReservedBatteryFacts() {
 }
 
 void testReservedBatteryEffects() {
-  g_case = "reserved battery states render uniform slow breathing";
+  g_case = "warning breathing and critical 2 Hz red flash";
   const uint8_t warning_envelope[] = {6, 13, 20, 13, 6};
-  const uint8_t critical_envelope[] = {6, 18, 30, 18, 6};
+  const uint8_t critical_envelope[] = {60, 0, 60, 0, 60};
   for (bool critical : {false, true}) {
     const auto state = critical ? LedPresentationState::BATTERY_CRITICAL
                                 : LedPresentationState::BATTERY_WARNING;
     const uint8_t green = critical ? 0 : 140;
-    const uint8_t peak = critical ? 30 : 20;
+    const uint8_t peak = critical ? 60 : 20;
     auto in = ready(55);
     in.battery_warning = !critical;
     in.battery_critical = critical;
@@ -178,13 +178,13 @@ void testReservedBatteryEffects() {
     uint8_t low = 255, high = 0;
     for (uint32_t t = 0; t <= 6000; t += 25) {
       const auto e = ledEffectFor(state, t, 60);
-      CHECK(e.brightness >= 6 && e.brightness <= peak);
+      CHECK(e.brightness >= (critical ? 0 : 6) && e.brightness <= peak);
       checkUniform(policy.update(in, t, 60), 255, green, 0, e.brightness);
       CHECK_EQ(e.brightness, ledEffectFor(state, t + 3000, 60).brightness);
       if (e.brightness < low) low = e.brightness;
       if (e.brightness > high) high = e.brightness;
     }
-    CHECK_EQ(low, 6);
+    CHECK_EQ(low, critical ? 0 : 6);
     CHECK_EQ(high, peak);
   }
   g_case = "reserved battery brightness ceilings include degenerate ranges";
@@ -193,13 +193,13 @@ void testReservedBatteryEffects() {
       const auto state = critical ? LedPresentationState::BATTERY_CRITICAL
                                   : LedPresentationState::BATTERY_WARNING;
       const uint8_t green = critical ? 0 : 140;
-      const uint8_t peak = max / (critical ? 2 : 3);
-      const uint8_t minimum = peak < 6 ? peak : 6;
+      const uint8_t peak = critical ? max : max / 3;
+      const uint8_t minimum = critical ? 0 : peak < 6 ? peak : 6;
       auto in = ready();
       in.battery_warning = !critical;
       in.battery_critical = critical;
       LedStatusPolicy policy;
-      checkUniform(policy.update(in, 0, max), 255, green, 0, minimum);
+      checkUniform(policy.update(in, 0, max), 255, green, 0, critical ? peak : minimum);
       checkUniform(policy.update(in, 1500, max), 255, green, 0, peak);
       for (uint32_t t : {0u, 750u, 1000u, 1500u, 2250u, 3000u, UINT32_MAX}) {
         const auto e = ledEffectFor(state, t, max);
@@ -211,7 +211,7 @@ void testReservedBatteryEffects() {
   g_case = "battery envelopes remain distinct from legacy alarm displays";
   checkEffect(ledEffectFor(LedPresentationState::FAULT, 1000, 60), 255, 0, 0, 60);
   checkEffect(ledEffectFor(LedPresentationState::CHARGING_FAULT, 1000, 60), 255, 0, 0, 60);
-  checkEffect(ledEffectFor(LedPresentationState::BATTERY_CRITICAL, 1000, 60), 255, 0, 0, 22);
+  checkEffect(ledEffectFor(LedPresentationState::BATTERY_CRITICAL, 1000, 60), 255, 0, 0, 60);
   checkEffect(ledEffectFor(LedPresentationState::DEGRADED, 1500, 60), 255, 140, 0, 30);
   checkEffect(ledEffectFor(LedPresentationState::BATTERY_WARNING, 1500, 60), 255, 140, 0, 20);
 }
@@ -594,24 +594,30 @@ void testNamesAndInitialState() {
 }  // namespace
 
 void testCellAndPackWarnings(){
- for(const auto cell:{3350,3351,3500,3501}){
-  LedStatusPolicy boundary;LedStatusInputs in;in.system_health=SystemHealth::READY;
-  in.sample_valid=in.daly_comm_ok=true;in.telemetry_age_ms=0;in.soc_percent=80;in.pack_voltage_v=11.1f;in.cell_min_mv=cell;
-  boundary.update(in,0,30);CHECK(boundary.snapshot().battery_critical==(cell<=3350));CHECK(boundary.snapshot().battery_warning==(cell>3350&&cell<=3500));
- }
-
- LedStatusPolicy p;LedStatusInputs in;in.system_health=matdog::core::SystemHealth::READY;
- in.sample_valid=in.daly_comm_ok=true;in.telemetry_age_ms=0;in.soc_percent=80;
- in.cell_min_mv=3700;in.pack_voltage_v=11.1f;p.update(in,1,30);CHECK(!p.snapshot().battery_warning&&!p.snapshot().battery_critical);
- in.cell_min_mv=3500;p.update(in,2,30);CHECK(p.snapshot().battery_warning);
- in.cell_min_mv=3190;in.pack_voltage_v=9.7f;in.soc_percent=33.2f;p.update(in,3,30);CHECK(p.snapshot().battery_critical);
- in.cell_min_mv=3400;in.pack_voltage_v=10.4f;p.update(in,4,30);CHECK(p.snapshot().battery_critical);
- in.cell_min_mv=3450;p.update(in,5,30);CHECK(!p.snapshot().battery_critical&&p.snapshot().battery_warning);
- in.cell_min_mv=3600;in.pack_voltage_v=10.8f;p.update(in,6,30);CHECK(!p.snapshot().battery_warning);
- in.pack_voltage_v=10.05f;p.update(in,7,30);CHECK(p.snapshot().battery_critical);
- in.telemetry_age_ms=10000;p.update(in,8,30);CHECK(!p.snapshot().battery_critical);
- in.telemetry_age_ms=0;in.battery_charging=true;p.update(in,9,30);CHECK(!p.snapshot().battery_critical);
- in.battery_charging=false;in.soc_percent=NAN;p.update(in,10,30);CHECK(p.snapshot().battery_critical);
+ LedStatusInputs in;in.system_health=SystemHealth::READY;in.sample_valid=in.daly_comm_ok=true;
+ in.telemetry_age_ms=0;in.soc_percent=80;in.pack_voltage_v=11.1f;in.cell_min_mv=3700;
+ LedStatusPolicy p;auto sample=[&](uint32_t stamp){in.sampled_at_ms=stamp;p.update(in,stamp,60);};
+ sample(1);CHECK(!p.snapshot().battery_warning&&!p.snapshot().battery_critical);
+ in.cell_min_mv=3500;sample(2);CHECK(!p.snapshot().battery_warning);
+ for(unsigned i=0;i<100;++i){sample(2);CHECK(!p.snapshot().battery_warning);}
+ sample(3);CHECK(p.snapshot().battery_warning);
+ in.cell_min_mv=3190;in.pack_voltage_v=9.7f;in.soc_percent=33.2f;sample(4);CHECK(p.snapshot().battery_critical);
+ CHECK_EQ(p.state(),LedPresentationState::BATTERY_CRITICAL);
+ for(unsigned t=0;t<1000;t+=50){const auto e=ledEffectFor(p.state(),t,60);CHECK_EQ(e.g,0);CHECK_EQ(e.b,0);CHECK_EQ(e.brightness,t%500<250?60:0);}
+ in.cell_min_mv=3400;in.pack_voltage_v=10.4f;sample(5);CHECK(p.snapshot().battery_critical);
+ in.cell_min_mv=3450;sample(6);CHECK(p.snapshot().battery_critical);sample(7);CHECK(!p.snapshot().battery_critical&&p.snapshot().battery_warning);
+ in.cell_min_mv=3600;in.pack_voltage_v=10.8f;sample(8);CHECK(p.snapshot().battery_warning);sample(9);CHECK(!p.snapshot().battery_warning);
+ in.pack_voltage_v=10.05f;sample(10);CHECK(p.snapshot().battery_critical);
+ in.telemetry_age_ms=5001;sample(11);CHECK(p.snapshot().battery_critical&&!p.snapshot().soc_valid);
+ in.telemetry_age_ms=0;in.battery_charging=true;sample(12);CHECK(!p.snapshot().battery_critical);CHECK_EQ(p.state(),LedPresentationState::CHARGING);
+ in.battery_alarm=true;sample(13);CHECK_EQ(p.state(),LedPresentationState::CHARGING_FAULT);
+ in.battery_alarm=false;in.battery_charging=false;in.soc_percent=NAN;sample(14);CHECK(p.snapshot().battery_critical);
+ // A one-sample warning dip, stale interval and backward stamps cannot vote twice.
+ LedStatusPolicy q;in.soc_percent=80;in.cell_min_mv=3700;in.pack_voltage_v=11.1f;in.sampled_at_ms=UINT32_MAX-3;q.update(in,0,60);
+ in.cell_min_mv=3500;in.sampled_at_ms=UINT32_MAX-2;q.update(in,0,60);CHECK(!q.snapshot().battery_warning);
+ in.telemetry_age_ms=5001;q.update(in,0,60);in.telemetry_age_ms=0;in.sampled_at_ms=1;q.update(in,0,60);CHECK(!q.snapshot().battery_warning);
+ in.sampled_at_ms=0;q.update(in,0,60);CHECK(!q.snapshot().battery_warning);
+ in.sampled_at_ms=2;q.update(in,0,60);CHECK(q.snapshot().battery_warning);
 }
 
 int main() {
