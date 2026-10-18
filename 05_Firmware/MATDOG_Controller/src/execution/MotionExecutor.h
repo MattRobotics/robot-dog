@@ -23,7 +23,7 @@ struct ExecutionEnvelope {
   uint32_t feedback_max_age_ms=0, batch_timeout_ms=0, tracking_timeout_ms=0;
   bool approved=false;
   // Issue #52: segment frames (prime/entry/STAND) as ONE coordinated frame
-  // transaction instead of twelve single writes; tracking per frame unchanged.
+  // transaction instead of twelve single writes.
   bool frame_writes=false;
   // Existing finite-segment executor, operational timed frames only. A zero
   // arrival tolerance preserves the original completion contract.
@@ -58,6 +58,7 @@ struct ExecutorStatus {
   // by fresh samples, inside the tube, with zero measured speed.
   uint32_t validated_sequence=0, tx_sequence=0, observed_sequence=0, settled_sequence=0;
   uint32_t frames_tx=0, frames_refused=0;
+  uint32_t last_frame_interval_us=0, max_frame_interval_us=0;
   uint64_t last_tx_complete_us=0;
   double stream_error_rad[12]{}, stream_peak_error_rad=0;
   uint8_t worst_joint=0xff;
@@ -89,7 +90,9 @@ class MotionExecutor {
   bool selectRates(double max_velocity_rad_s,double max_acceleration_rad_s2);
   void restoreArmedRates(){ if(armed_envelope_.approved){envelope_.max_velocity_rad_s=armed_envelope_.max_velocity_rad_s;envelope_.max_acceleration_rad_s2=armed_envelope_.max_acceleration_rad_s2;} }
   double maxVelocityRadS() const { return envelope_.max_velocity_rad_s; }
-  void update(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
+  bool timedSegmentsActive() const {return active()&&envelope_.timed_segments&&!streaming();}
+  static constexpr uint32_t kTimedFeedbackMaxAgeMs=100, kTimedMaxFrameGapMs=100;
+  void update(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us=0);
   // ---- streaming (Issue #52) ----
   bool beginStream(const StreamConfig&,const JointFeedback&,uint64_t now_us);
   // Validates the WHOLE frame (12 identities, raw ticks, URDF/gen-1 limits,
@@ -124,6 +127,7 @@ class MotionExecutor {
   FrameValidation validation_{};
   double target_[12]{},previous_[12]{},velocity_[12]{},pending_velocity_[12]{};
   uint32_t deadline_ms_=0,tracking_since_ms_=0,policy_epoch_=0,permit_generation_=0;
+  uint64_t tracking_started_us_=0;
   core::AuthorityLease lease_{};
   uint32_t arm_generation_=0;
   // streaming state

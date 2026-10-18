@@ -1,6 +1,7 @@
 #include "MotionExecutor.h"
 #include "../servo/ServoPopulation.h"
 #include <cmath>
+#include <algorithm>
 #include <cstring>
 namespace matdog { namespace execution {
 const char* toString(ExecutorState s) { switch(s){case ExecutorState::OFF:return "OFF";case ExecutorState::READY:return "READY";case ExecutorState::WRITING:return "WRITING";case ExecutorState::TRACKING:return "TRACKING";case ExecutorState::SAFE_OFF_REQUIRED:return "SAFE_OFF_REQUIRED";case ExecutorState::STREAMING:return "STREAMING";case ExecutorState::HOLD:return "HOLD";default:return "FAULT";} }
@@ -21,9 +22,10 @@ const char* MotionExecutor::gate(const MotionExecutionFacts& f,uint32_t now) con
  return nullptr;
 }
 const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now) const {
+ const uint32_t age=timedSegmentsActive()?std::min(envelope_.feedback_max_age_ms,kTimedFeedbackMaxAgeMs):envelope_.feedback_max_age_ms;
  for(unsigned i=0;i<12;i++){
   if(static_cast<int32_t>(now-f.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
-  if(now-f.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return "STALE_FEEDBACK";
+  if(now-f.sampled_at_ms[i]>age)return "STALE_FEEDBACK";
   if(!f.read_ok[i]||!std::isfinite(f.actual_rad[i]))return "FEEDBACK_INVALID";
   if(!f.torque_on[i])return "TORQUE_LOST";
  }
@@ -79,13 +81,14 @@ bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameVal
  segment_duration_ms_=static_cast<uint32_t>(std::ceil(dt*1000));
  validation_=v;deadline_ms_=issued+ttl;status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;status_.next_joint=0;status_.state=ExecutorState::WRITING;status_.reason="EXECUTING";return true;
 }
-void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) {
+void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now,uint64_t now_us) {
  if(!active())return;
  if(const char* r=gate(f,now)){stop(r);return;}
  if(streaming())return;   // streaming: monitor() owns feedback/tracking (asynchronous, per joint)
  if(const char* why=feedbackFailure(fb,now)){stop(why);return;}
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}}
  if(status_.state==ExecutorState::READY){
+  if(envelope_.timed_segments&&!validation_.final&&status_.completed_sequence&&now-tracking_since_ms_>kTimedMaxFrameGapMs){stop("FRAME_CADENCE_GAP");return;}
   double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));
   status_.max_tracking_error_rad=error;
   if(error>envelope_.tracking_tolerance_rad)stop("HOLD_TRACKING_ERROR");
@@ -100,9 +103,12 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
    if(fb.actual_rad[j]<lo||fb.actual_rad[j]>hi){stop("TRACKING_DIVERGENCE");return;}
   }
   if(envelope_.frame_writes){
+   if(envelope_.timed_segments&&!validation_.final)for(unsigned j=0;j<12;++j)
+    if(std::fabs(fb.actual_rad[j]-target_[j])>envelope_.tracking_tolerance_rad){stop("TRACKING_LAG_LIMIT");return;}
    // The whole frame in ONE coordinated transaction (validated in submit()).
    const char* why="";
-   if(!frameTx(target_,f,now*1000ull,&why)){stop(why);return;}
+   tracking_started_us_=now_us?now_us:now*1000ull;
+   if(!frameTx(target_,f,tracking_started_us_,&why)){stop(why);return;}
    status_.next_joint=12;status_.state=ExecutorState::TRACKING;tracking_since_ms_=now;return;
   }
   const unsigned i=status_.next_joint;actuator::ActuatorCommand cmd;uint8_t bus;
@@ -114,13 +120,15 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
   return;
  }
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
+ if(envelope_.timed_segments&&!validation_.final&&error>envelope_.tracking_tolerance_rad){stop("TRACKING_LAG_LIMIT");return;}
  // Continuous measured following guard, including while waiting to settle.
  // The independent [previous,target] box is included in the swept proof.
  if(envelope_.timed_segments)for(unsigned i=0;i<12;++i){
   if(fb.actual_rad[i]<std::fmin(previous_[i],target_[i])-envelope_.tracking_tolerance_rad||
      fb.actual_rad[i]>std::fmax(previous_[i],target_[i])+envelope_.tracking_tolerance_rad){stop("TRACKING_DIVERGENCE");return;}
  }
- // Feedback must postdate all writes, including the last joint's write.
+ // Only checkpoints need a collective post-TX observation. Intermediate
+ // frames use the age-bounded actual vector and the continuous 20 mrad guard.
  bool fresh=true;for(unsigned i=0;i<12;i++){
   // Finite TX uses the 32-bit millis epoch; compare in that same wrapping
   // domain, not against the feedback producer's extended microsecond clock.
@@ -128,8 +136,9 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
   fresh=fresh&&static_cast<int32_t>(fb.sampled_at_ms[i]-written)>0;
  }
  const double arrival=envelope_.timed_segments&&validation_.final?envelope_.arrival_tolerance_rad:envelope_.tracking_tolerance_rad;
- const bool released=!envelope_.timed_segments||now-tracking_since_ms_>=segment_duration_ms_;
- if(error<=arrival&&fresh&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason=envelope_.timed_segments&&!validation_.final?"TIMED_TRACKED":"TRACKED";}
+ const bool released=!envelope_.timed_segments||(now_us?now_us>=tracking_started_us_&&now_us-tracking_started_us_>=segment_duration_ms_*1000ull:now-tracking_since_ms_>=segment_duration_ms_);
+ const bool observed=envelope_.timed_segments&&!validation_.final?true:fresh;
+ if(error<=arrival&&observed&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason=envelope_.timed_segments&&!validation_.final?"TIMED_TRACKED":"TRACKED";}
  else if(now-tracking_since_ms_>=envelope_.tracking_timeout_ms)stop(envelope_.timed_segments&&validation_.final?"ARRIVAL_TIMEOUT":"TRACKING_TIMEOUT");
 }
 // ---------------------------------------------------------------------------
@@ -158,6 +167,10 @@ bool MotionExecutor::frameTx(const double target[12],const MotionExecutionFacts&
  const auto r=runtime_->executeFrame(&tx,bus,nullptr,&report);
  if(r==actuator::FrameExecuteResult::TX_COMPLETE_UNCONFIRMED){
   const uint64_t at=now_us+(report.tx_complete_us-report.tx_started_us);
+  const uint64_t gap=status_.last_tx_complete_us&&at>=status_.last_tx_complete_us?at-status_.last_tx_complete_us:0;
+  status_.last_frame_interval_us=gap>UINT32_MAX?UINT32_MAX:static_cast<uint32_t>(gap);
+  status_.max_frame_interval_us=std::max(status_.max_frame_interval_us,status_.last_frame_interval_us);
+  ++status_.frames_tx;
   status_.last_tx_complete_us=at;return true;}
  // Zero bytes (refused) and uncertain transmissions both end the stream:
  // the reference cannot continue past a frame that was not delivered.
@@ -193,7 +206,7 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  Sent& h=history_[(history_head_+history_count_)%kHistory];
  if(history_count_==kHistory)history_head_=(history_head_+1)%kHistory;else ++history_count_;
  h.at_us=status_.last_tx_complete_us;h.sequence=frame.sequence;for(unsigned i=0;i<12;i++)h.q[i]=candidate[i];
- status_.tx_sequence=status_.accepted_sequence=frame.sequence;++status_.frames_tx;status_.submitted_at_ms=now;last_release_us_=release_us;
+ status_.tx_sequence=status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;last_release_us_=release_us;
  if(final){status_.state=ExecutorState::HOLD;hold_sequence_=frame.sequence;hold_since_us_=now_us;status_.reason="HOLD";}
  monitor(f,fb,now,now_us);
  return status_.state==ExecutorState::STREAMING||status_.state==ExecutorState::HOLD;

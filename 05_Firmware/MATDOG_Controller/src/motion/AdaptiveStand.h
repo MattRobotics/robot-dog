@@ -48,7 +48,7 @@ struct AdaptiveStandRequest {
 class AdaptiveStand {
  public:
   bool request(const AdaptiveStandRequest& request,const FeedbackPolicy& policy,double nowS);
-  FeedbackFrame update(const AdaptiveObservation& observation,double nowS);
+  FeedbackFrame update(const AdaptiveObservation& observation,double nowS,bool timedReference=false);
   bool assess(const SegmentAssessment& assessment,double nowS);
   void stop();
   AdaptiveStandState state() const {return state_;}
@@ -66,6 +66,7 @@ class AdaptiveStand {
   const FixtureEntryPlan& entryPlan() const {return entry_;}
   const FixturePoseClassification& proneClassification() const {return prone_;}
   bool physicalReadiness() const {return physicalReady_;}
+  const JointTargetFrame& referenceTarget() const {return previous_.target;}
   bool pendingFinal() const {return pendingValid_&&segmentIndex_+1==segmentIntervals_;}
   void noteSubmitted(uint32_t sequence){if(pendingValid_&&assessed_&&pending_.target.sequence==sequence)submitted_=true;}
   // Fixture STAND height change (commanded, not measured: the fixture observation

@@ -221,10 +221,18 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  }
  if(!configured_||!executor_||!policy_||!executor_->active())return;
  if(walking_&&active_spec_.timeDriven){streamWalk(facts,fb,now,now_us);return;}
+ const bool timed=!walking_&&executor_->timedSegmentsActive();
+ if(timed){
+  // Monitor first, before consuming a timed ACK or sending the next target.
+  executor_->update(facts,fb,now,now_us);if(!executor_->active())return;
+  if(executor_->status().state==ExecutorState::READY&&frame_.target.valid&&
+     frame_.target.sequence==executor_->status().completed_sequence&&scheduler_.running()&&
+     !scheduler_.poll(now_us).release)return;
+ }
  auto o=observation_;o.acknowledged=executor_->status().completed_sequence!=0;o.acknowledgedSequence=executor_->status().completed_sequence;
  // Observations remain externally measured. Targets never overwrite actual
  // joints, base height or contact evidence in order to manufacture tracking.
- frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6));
+ frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6),timed);
  // The certified entry just verified its 150 mm STAND and a lower height was requested:
  // continue in the SAME update, so the command is never completed at the intermediate height.
  if(!walking_&&stand_.state()==motion::AdaptiveStandState::STAND&&commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
@@ -239,6 +247,7 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  const uint32_t ttl=static_cast<uint32_t>(feedback_policy_.segmentTimeoutS*1000);
  v.final=walking_||stand_.pendingFinal();
  if(executor_->submit(frame_.target,v,now,ttl,feedback_policy_.samplePeriodS,facts,fb,now)){
+  if(timed&&!scheduler_.running())scheduler_.start(now_us+static_cast<uint64_t>(feedback_policy_.samplePeriodS*1e6),static_cast<uint32_t>(feedback_policy_.samplePeriodS*1e6));
   submitted_sequence_=frame_.target.sequence;if(!walking_)stand_.noteSubmitted(frame_.target.sequence);
  }
 }

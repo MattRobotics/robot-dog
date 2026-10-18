@@ -187,6 +187,7 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
   telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false",telemetry_.walk,telemetry_.walk_cycles,telemetry_.walk_drive?"true":"false");
  w.add(",\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
+ w.add(",\"motion_timing\":{\"frames_tx\":%lu,\"last_tx_complete_us\":%llu,\"last_interval_us\":%lu,\"max_interval_us\":%lu}",(unsigned long)(s?s->frames_tx:0),(unsigned long long)(s?s->last_tx_complete_us:0),(unsigned long)(s?s->last_frame_interval_us:0),(unsigned long)(s?s->max_frame_interval_us:0));
  w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",
  readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");
  w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\",\"last_revoke\":\"%s\",\"failure\":\"%s\",\"failed_joint\":%d}",telemetry_.session_state,telemetry_.session_reason,

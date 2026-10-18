@@ -49,7 +49,7 @@ void quantizedFrame(unsigned ticks,bool final,bool old=false){
  if(!old){
   // All samples are fresh by age but predate the last UART byte: no ACK.
   for(auto& at:r.feedback.sampled_at_ms){at=sent+1;}
-  r.executor.update(r.facts,r.feedback,sent+20);CHECK(r.executor.status().completed_sequence==0);
+  r.executor.update(r.facts,r.feedback,sent+20);CHECK(r.executor.status().completed_sequence==((!final&&ticks<=12)?61u:0u));
  }
  for(auto& at:r.feedback.sampled_at_ms)at=sent+20;
  r.executor.update(r.facts,r.feedback,sent+20);
@@ -65,7 +65,7 @@ void quantizedFrame(unsigned ticks,bool final,bool old=false){
   for(auto& at:r.feedback.sampled_at_ms){at=sent+4000;}r.executor.update(r.facts,r.feedback,sent+4000);
   REASON(r.executor.status().reason,"ARRIVAL_TIMEOUT");
  }
- if(!old&&!final&&ticks>=14){CHECK(r.executor.status().safe_off_required);REASON(r.executor.status().reason,"TRACKING_DIVERGENCE");}
+ if(!old&&!final&&ticks>=14){CHECK(r.executor.status().safe_off_required);REASON(r.executor.status().reason,"TRACKING_LAG_LIMIT");}
  std::printf("QUANTIZED_FRAME61 ticks=%u final=%d old=%d completed=%u reason=%s\n",ticks,final,old,r.executor.status().completed_sequence,r.executor.status().reason);
 }
 void assessmentLifetime(){

@@ -34,7 +34,16 @@ if(s.maxJointStepRad>0)policy_.maxJointStepRad=s.maxJointStepRad;
   auto r=checkObservation(o,p,now);if(r!=FeedbackReason::OK){reject(r);return false;}
   if((p.mode==FeedbackMode::FIXTURE_REVIEW?!o.externalSupportConfirmed:o.confirmedFeet!=15)||o.bellySupported||!o.stationary){reject(FeedbackReason::SUPPORT_INVALID);return false;}
   auto planning=o;
-  if(p.mode==FeedbackMode::FIXTURE_REVIEW){planning.body={};planning.body.translationM.z=.15;}
+  if(p.mode==FeedbackMode::FIXTURE_REVIEW){
+    // Fixture anchors belong to the verified nominal STAND, not to encoder
+    // quantization/backlash. Measured feedback remains o and the executor's
+    // following monitor; never turn this planning reference into a measurement.
+    const auto& held=stand.referenceTarget();
+    if(!held.valid){reject(FeedbackReason::INVALID_COMMAND);return false;}
+    for(unsigned i=0;i<4;++i){const auto& a=o.actual.legs[i];const auto& q=held.legs[i];
+      if(std::abs(a.hip-q.hip)>p.maxTrackingErrorRad||std::abs(a.upper-q.upper)>p.maxTrackingErrorRad||std::abs(a.lower-q.lower)>p.maxTrackingErrorRad){reject(FeedbackReason::TRACKING_ERROR);return false;}}
+    planning.actual=held;planning.body={};planning.body.translationM.z=.15;
+  }
   else if(s.compiledFirstStride)planning.body.translationM.z=.15;
   previous_=observedSolution(planning);if(!previous_.target.valid){reject(FeedbackReason::IK_FAILURE);return false;}
   origin_=planning.body;origin_.translationM.z=0;

@@ -208,7 +208,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
   // The solve is retained only after matching operational feedback acknowledges it.
   pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;reason_=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;
 }
-FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
+FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,bool timedReference){
   if(state_==AdaptiveStandState::IDLE||state_==AdaptiveStandState::REJECTED||state_==AdaptiveStandState::STOPPED){FeedbackFrame f;f.reason=reason_;return f;}
   if(now<lastNow_)return reject(FeedbackReason::STALE_OBSERVATION);
   lastNow_=now;
@@ -218,7 +218,11 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
     if(now-pendingSince_>policy_.segmentTimeoutS)return reject(FeedbackReason::SEGMENT_TIMEOUT);
     if(!assessed_){pending_.reason=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;}
     r=checkAssessment(assessment_,pending_.target.sequence,policy_,now,submitted_);if(r!=FeedbackReason::OK)return reject(r);
-    r=checkTracking(o,pending_,policy_);
+    // Only a certified fixture microstep may consume the executor's timed
+    // following ACK. Actual joints/support/age are still checked continuously;
+    // phase endpoints keep the full measured-arrival checkpoint.
+    const bool intermediate=timedReference&&submitted_&&!pendingFinal()&&policy_.mode==FeedbackMode::FIXTURE_REVIEW&&policy_.routeTubeReviewed&&(route_.pairedProne||adjust_);
+    r=intermediate?(o.acknowledged&&o.acknowledgedSequence==pending_.target.sequence?FeedbackReason::OK:FeedbackReason::FEEDBACK_PENDING):checkTracking(o,pending_,policy_);
     if(r==FeedbackReason::FEEDBACK_PENDING){pending_.reason=r;return pending_;}
     if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}

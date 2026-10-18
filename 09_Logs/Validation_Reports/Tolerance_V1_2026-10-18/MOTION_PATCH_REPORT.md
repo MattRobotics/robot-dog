@@ -1,5 +1,7 @@
 # MATDOG — remediation Motion V1
 
+**Addendum real-time:** `REALTIME_CLOSURE.md` descrive la correzione successiva al commit8343b179. I risultati e la semantica post-TX sotto appartengono alla prima revisione: il candidato successivo elimina l’attesa collettiva dei microstep, mantiene i checkpoint e limita a100 ms il feedback durante Motion temporizzato. Il vecchio binario resta archiviato.
+
 ## Esito e perimetro
 
 Candidato offline su `~/MATDOG/worktrees/robot-dog-tolerance-v1-20261018`, ramo `fix/tolerance-operational-v1-20261018`, derivato dalla build installata789e07c attraverso il HEAD documentale6d60e1f. Un solo profilo ROBOT_POWERED, STAND60–150 mm e WALK STANDARD. Nessuna scrittura sul dispositivo, flash, NVS, EEPROM, PID, TorqueLimit o mapping. Nessun merge/push/reset/clean; nessuna modifica ai worktree precedenti.

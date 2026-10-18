@@ -302,7 +302,7 @@ struct StreamDriver {
      if(frame.target.valid&&!frame.executable&&!b.coordinator.walking()){motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=now_us/1e6;a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
       a.geometryIdentityVerified=a.sweptCollisionClear=a.supportCompatible=a.continuousBoundsConfirmed=a.fixtureTrialEnvelopeReviewed=true;
       if(b.coordinator.assess(a,b.now))b.coordinator.update(b.r.facts,b.r.feedback,b.now,now_us);}}
-    op.refresh();b.r.executor.update(b.r.facts,b.r.feedback,b.now);
+    op.refresh();b.r.executor.update(b.r.facts,b.r.feedback,b.now,now_us);
     // Writes transmitted this tick (a 12-joint frame or single legacy writes)
     // reach their servos after the UART delay.
     if(seen_writes<b.r.backend.writes.size()){std::array<double,12> g;

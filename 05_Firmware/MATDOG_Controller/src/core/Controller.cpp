@@ -1314,14 +1314,15 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     // within a bounded budget, each stamped at its own completion; the slow
     // 40..49 control block (torque/goal/profile/limit) rotates one joint per
     // 100 ms. Otherwise (prime/entry/STAND): the reviewed combined read.
-    const bool fast=motion_executor_.streaming();
+    const bool fast=motion_executor_.streaming()||motion_executor_.timedSegmentsActive();
     const unsigned reads=fast?3:1;const uint32_t budget_started=millis();
     for(unsigned k=0;k<reads&&(k==0||millis()-budget_started<2);++k){
     const unsigned slot=operational_poll_next_;
     const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
     execution::RawJointObservation r=operational_producer_.raw(slot);
     const uint32_t read_started=millis();
-    const bool control_due=!fast||(slot==operational_control_next_&&millis()-operational_control_at_ms_>=100);
+    const uint32_t control_period=motion_executor_.streaming()?100:20;
+    const bool control_due=!fast||(slot==operational_control_next_&&millis()-operational_control_at_ms_>=control_period);
     if(control_due){
       servo::ServoBus::ControlFeedbackSnapshot t{};
       r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,transaction_ms);
@@ -1337,7 +1338,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
       r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;
       // Torque state from the slow block, valid only while recent (monitor, not per sample).
-      if(millis()-r.control_at_ms>1500)r.read_ok=false;
+      if(millis()-r.control_at_ms>(motion_executor_.streaming()?1500:reviewed_motion_.execution.feedback_max_age_ms))r.read_ok=false;
     }
     r.transaction_ms=millis()-read_started;
     // The encoder sample instant is the block's completion, before any confirmation read.
@@ -1524,10 +1525,11 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       a.dynamicStabilityQualified=reviewed_motion_.scope==execution::TrialScope::AUTONOMOUS_WALK&&local_trial_evidence_.loaded_dynamics_qualified;
       // These assertions consume the sealed, externally reviewed tube proof,
       // not an encoder/IMU inference. No profile is distributed pre-approved.
-      publishLocalMotionAssessment(a);
+      if(publishLocalMotionAssessment(a))
+        motion_coordinator_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
     }
   }
-  motion_executor_.update(operational_facts_,operational_feedback_,now_ms);
+  motion_executor_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
   ready.operational_permit=operational_facts_.operator_permit&&operational_session_.state()==execution::MotionSessionState::ARMED;
   // OPERATIONAL: READY with MOTION authority held and an authenticated operator
   // present IS the permit to accept a command; the command then arms its own
@@ -1545,8 +1547,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   telemetry.height_valid=ready.support_observable;
   if(telemetry.height_valid)telemetry.base_height_m=observation.body.translationM.z;
   for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
-  telemetry.source="HARDWARE_SERVO_FEEDBACK";telemetry.joints_valid=true;telemetry.raw_valid=operational_producer_.rawFresh(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
-  telemetry.feedback_max_age_ms=reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500;
+  telemetry.source="HARDWARE_SERVO_FEEDBACK";
+  telemetry.feedback_max_age_ms=motion_executor_.timedSegmentsActive()||motion_executor_.streaming()?execution::MotionExecutor::kTimedFeedbackMaxAgeMs:reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500;
+  telemetry.raw_valid=operational_producer_.rawFresh(now_ms,telemetry.feedback_max_age_ms);telemetry.joints_valid=telemetry.raw_valid;
   telemetry.sampled_at_ms=now_ms;
   for(unsigned i=0;i<12;++i){
     telemetry.joints_valid=telemetry.joints_valid&&operational_feedback_.read_ok[i];
