@@ -1,6 +1,7 @@
 #include "AdaptiveStand.h"
 #include "TimedStand.h"
 #include "PoseSupport.h"
+#include "StandHeightRegion.h"
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -40,7 +41,7 @@ bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
 }
 bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& p,double now){
   state_=AdaptiveStandState::IDLE;poseClass_=ObservedPoseClass::UNKNOWN;reason_=FeedbackReason::NOT_REQUESTED;
-  previous_={};segmentStart_={};pending_=FeedbackFrame{};assessment_={};pendingValid_=assessed_=physicalReady_=false;
+  previous_={};segmentStart_={};pending_=FeedbackFrame{};assessment_={};pendingValid_=assessed_=submitted_=physicalReady_=false;
   entry_progress_=0;approvedSegment_=entry_knot_=UINT16_MAX;for(auto& q:entry_offset_)q={};
   entry_=FixtureEntryPlan{};prone_=FixturePoseClassification{};entryActive_=false;entryStage_=0;entryApproved_=UINT8_MAX;approvedThrough_=UINT16_MAX;
   route_.count=0;route_.pairedProne=false;pairedSegment_=0;routeIndex_=0;segmentIndex_=segmentIntervals_=0;
@@ -71,10 +72,11 @@ bool AdaptiveStand::requestHeightAdjust(double h,uint32_t firstSequence,double n
   if(state_!=AdaptiveStandState::STAND||policy_.mode!=FeedbackMode::FIXTURE_REVIEW||!previous_.target.valid||!previous_.cartesian.valid||
      !std::isfinite(h)||h<=0||h>.150||firstSequence==0||!std::isfinite(now)||std::abs(previous_.cartesian.body.translationM.z-h)<1e-9)return false;
   request_.targetHeightM=h;request_.firstSequence=firstSequence;request_.acquisition=nullptr;request_.entry=nullptr;
-  // Constant mean speed: the 8 s rise of a 50 mm change, proportionally longer for a larger one.
-  request_.riseDurationS=std::max(8.0,8.0*std::abs(previous_.cartesian.body.translationM.z-h)/.050);
+  // V1's smaller frame box uses .19 rad/s. Twelve seconds per 50 mm keeps
+  // the existing fixed-contact quintic inside that rate envelope.
+  request_.riseDurationS=std::max(12.0,12.0*std::abs(previous_.cartesian.body.translationM.z-h)/.050);
   route_.count=0;route_.pairedProne=false;timedActive_=false;entryActive_=false;adjust_=true;
-  pendingValid_=assessed_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
+  pendingValid_=assessed_=submitted_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
   state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
 FeedbackFrame AdaptiveStand::reject(FeedbackReason r){state_=AdaptiveStandState::REJECTED;reason_=r;pendingValid_=false;physicalReady_=false;FeedbackFrame f;f.reason=r;return f;}
@@ -137,7 +139,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
     if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
     pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
     pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;
-    pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
+    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
   if(route_.pairedProne&&timedActive_){
     unsigned segment=0;
@@ -148,7 +150,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
     if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
     pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
     pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;
-    pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
+    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
   if(route_.pairedProne){
     auto f=pairedProneSample(pairedSegment_,static_cast<double>(segmentIndex_+1)/segmentIntervals_,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
@@ -165,7 +167,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
     pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
     pending_.bellySupportRequired=static_cast<unsigned>(pairedPronePhase(pairedSegment_))<3;
     if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
-    pendingValid_=true;assessed_=false;pendingSince_=now;return pending_;
+    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
   const double u=static_cast<double>(segmentIndex_+1)/segmentIntervals_;
   const auto law=quinticTimeLaw(u,endpoint_.durationS);if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
@@ -196,6 +198,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
     for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];
       if(!ascending){auto& v=f.velocityRadS[i];v={-v.hip,-v.upper,-v.lower};}}
   }
+  if(adjust_&&!heightTargetInRegion(f.target))return reject(FeedbackReason::OUTSIDE_CERTIFIED_REGION);
   auto r=checkSegment(f,previous_.target,policy_);
   if(r!=FeedbackReason::OK)return reject(r);
   if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
@@ -203,7 +206,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
   pending_.externalSupportRequired=endpoint_.externalSupportRequired;pending_.timeS=now;
   if(adjust_){pendingSolution_=f;pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
   // The solve is retained only after matching operational feedback acknowledges it.
-  pendingValid_=true;assessed_=false;pendingSince_=now;reason_=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;
+  pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;reason_=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;
 }
 FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
   if(state_==AdaptiveStandState::IDLE||state_==AdaptiveStandState::REJECTED||state_==AdaptiveStandState::STOPPED){FeedbackFrame f;f.reason=reason_;return f;}
@@ -214,7 +217,7 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now){
     r=checkHeldSupport(o,previous_,pending_);if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_>policy_.segmentTimeoutS)return reject(FeedbackReason::SEGMENT_TIMEOUT);
     if(!assessed_){pending_.reason=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;}
-    r=checkAssessment(assessment_,pending_.target.sequence,policy_,now);if(r!=FeedbackReason::OK)return reject(r);
+    r=checkAssessment(assessment_,pending_.target.sequence,policy_,now,submitted_);if(r!=FeedbackReason::OK)return reject(r);
     r=checkTracking(o,pending_,policy_);
     if(r==FeedbackReason::FEEDBACK_PENDING){pending_.reason=r;return pending_;}
     if(r!=FeedbackReason::OK)return reject(r);
@@ -330,7 +333,7 @@ bool standHeightReachable(double h,const FeedbackPolicy& p){
   LegJointAngles seeds[4];for(unsigned i=0;i<4;++i)seeds[i]=d.standSeed[i];
   for(int k=20;k>=0;--k){                                // whole descent, stand -> h, chained seeds
     const auto s=sampleStandPath(d,k/20.0,seeds);
-    if(s.status!=StandStatus::OK)return false;
+    if(s.status!=StandStatus::OK||!heightTargetInRegion(s.target))return false;
     for(unsigned i=0;i<4;++i){seeds[i]=s.target.legs[i];const auto& q=s.target.legs[i];
       const double v[3]={q.hip,q.upper,q.lower};
       for(unsigned j=0;j<3;++j)if(!(v[j]>=p.jointLimits[i][j].lower&&v[j]<=p.jointLimits[i][j].upper))return false;}

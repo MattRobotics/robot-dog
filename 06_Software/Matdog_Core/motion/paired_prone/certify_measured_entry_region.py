@@ -53,7 +53,7 @@ def route_head(front_floor_deg,rear_floor_deg):
 
 class Region:
     def __init__(self,scene,box):
-        self.s=scene;self.box=box;self.calls=0;self.bvh={}
+        self.s=scene;self.box=box;self.calls=0;self.bvh={};self.objects={}
         for n in scene.model.collision_link_names:
             tri=np.asarray(scene.mesh(n).triangles_local,dtype=float).reshape(-1,3)
             m=fcl.BVHModel();m.beginModel(len(tri),len(tri)//3)
@@ -79,8 +79,15 @@ class Region:
     def distance(self,link_a,link_b,q):
         self.calls+=1;objs=[]
         for n in (link_a,link_b):
-            t=self.s.collision_transform(n,q)
-            objs.append(fcl.CollisionObject(self.bvh[n],fcl.Transform(np.asarray(t.rotation,dtype=float),np.asarray(t.translation,dtype=float))))
+            # One immutable object per link's LAST pose: bounded cache, no
+            # reuse across different joint coordinates or geometry scenes.
+            key=tuple(q[j] for j in self.s.model.relevant_actuated_joints_for_link(n))
+            cached=self.objects.get(n)
+            if cached is None or cached[0]!=key:
+                t=self.s.collision_transform(n,q)
+                obj=fcl.CollisionObject(self.bvh[n],fcl.Transform(np.asarray(t.rotation,dtype=float),np.asarray(t.translation,dtype=float)))
+                cached=(key,obj);self.objects[n]=cached
+            objs.append(cached[1])
         if fcl.collide(objs[0],objs[1],fcl.CollisionRequest(),fcl.CollisionResult())>0:return -1.
         return float(fcl.distance(objs[0],objs[1],fcl.DistanceRequest(),fcl.DistanceResult()))
     def certify_pair(self,link_a,link_b,required_m,budget_s):

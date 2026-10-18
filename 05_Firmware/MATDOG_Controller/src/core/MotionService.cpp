@@ -55,6 +55,10 @@ void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
  // with its own cause, before the permit drop it causes is read as a gate.
  if(active_command_&&planner_&&!planner_->arming()&&planner_->armingFailure())
   finishActive(motion::CommandOutcome::ABORTED,planner_->armingFailure());
+ // Preserve a physical/executor stop before the consequent permit drop is
+ // interpreted as a new admission failure (OPERATOR_GO_REQUIRED).
+ if(active_command_&&active_intent_!=motion::Intent::STOP&&executor_&&executor_->status().safe_off_required)
+  finishActive(motion::CommandOutcome::ABORTED,executor_->status().reason);
  const char* gate=refusal();
  if((gate&&((executor_&&executor_->active()&&!r.local_fixture_session)||active_command_))||
     (teleop_deadline_ms_&&static_cast<int32_t>(now-teleop_deadline_ms_)>=0))disconnected(now);

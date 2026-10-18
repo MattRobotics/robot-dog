@@ -705,7 +705,11 @@ bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
   -o "$OUT/test_operational_readiness" "$SCRIPT_DIR/test_operational_readiness.cpp" "$SKETCH_DIR/src/core/OperationalReadiness.cpp"
 "$OUT/test_operational_readiness"
-python3 "$SCRIPT_DIR/run_operational_motion_tests.py"
+# V1 release regression: measured replay, quantized following/arrival,
+# operational STAND/height, STANDARD cycle/STOP, heartbeat and stale data.
+# The extended multi-million-check STANDARD/experimental FAST matrix remains
+# available explicitly via run_operational_motion_tests.py; not the V1 gate.
+python3 "$SCRIPT_DIR/run_tolerance_v1_tests.py"
 python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 # Production Motion/RESTORE/Twin HTTP handlers, security envelope and operator
 # heartbeat proof (2026-10-15: was only in the release list and had regressed).

@@ -128,18 +128,15 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;
   route.pairedProne=true;route.supervisedSegments=!operational;route.timeScale=r.stand_time_scale;
   if(operational){route.phaseTimed=true;route.phaseVelocityRadS=params.max_velocity_rad_s;route.phaseAccelerationRadS2=params.max_acceleration_rad_s2;
-    r.execution.frame_writes=true;}   // one SYNC frame per tracked STAND frame
+    r.execution.frame_writes=true;r.execution.timed_segments=true;
+    r.execution.arrival_tolerance_rad=motion::tolerance::kArrivalRad;}
   route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
   static execution::CommissioningStandConfig cc;static const execution::CommissioningStandConfig kEmptyConfig{};cc=kEmptyConfig;cc.enabled=true;cc.certificate=commissioning_entry_;cc.minStageDurationS=params.entry_min_stage_s;
   if(operational){
-   // Measured-start entry: no certificate tube. Keep-outs from CAD/FCL
-   // (GEOMETRY_ENTRY_REPORT 2026-10-14): LF LOWER first zero separation
-   // -92.070442 deg. All four legs: MATDOG_MEASURED_ENTRY_REGION_CERTIFICATE_V1
-   // (2026-10-15) proves 120 non-adjacent pairs and 12 adjacent revolutes clear
-   // for every start the recognizer admits (head +/-10 deg, 6 mrad tube, LOWER
-   // down to -93.04 deg); every LOWER command stays above the URDF -92.0 deg
-   // limit, below which the adjacent UPPER-LOWER pair was not certified.
-   // MotionCoordinator refuses a band/tube wider than the certified one.
+   // Measured-start entry, same two-stage planner and CAD keep-out. V1's
+   // compiled region proof covers every recognized start (+/-10 deg) and
+   // both stages with the wider CAD tube; actual raw/URDF limits still apply.
+   // Physical mounting/cover uncertainty remains a fixture qualification.
    cc.measuredStart=true;cc.pathMarginRad=.001;cc.keepoutCount=1;
    auto& k=cc.keepouts[0];k.id="LF_UPPER_LOWER_CONTACT";k.a=k.b=2;k.ca=1;k.cb=0;k.bound=-92.070442*3.14159265358979323846/180.0;
   }

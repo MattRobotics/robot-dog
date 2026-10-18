@@ -14,9 +14,11 @@
 // production IK against the REAL gen-1 limits and swept against the canonical
 // meshes (09_Logs/Validation_Reports/Preflight_Review_2026-10-15/). Joint rate
 // envelope = the largest peak of the presets + margin; the servo drive profile
-// is a register ceiling ~1.5x above it. Tracking tolerance is NOT changed.
+// is a register ceiling ~1.5x above it. V1 following/arrival budgets are
+// shared with STAND through OperationalTolerance.h.
 #include <cmath>
 #include "FeedbackWalk.h"
+#include "OperationalTolerance.h"
 
 namespace matdog { namespace motion { namespace operational_walk {
 
@@ -41,7 +43,7 @@ constexpr uint8_t kDriveAcceleration = 50;
 // the chord between two in-box targets stays in the convex certified box and
 // its rate is checked over the real interval); the measured
 // joint vector must be younger than 120 ms and each joint sample younger than
-// 100 ms; a joint further than the 6 mrad tube from every goal sent in the last
+// 100 ms; a joint further than the V1 following budget from every goal sent in the last
 // 150 ms (servo lag tau + feedback age) for 3 consecutive samples has failed
 // to follow. Settled = |speed| <= 1 register step (1.53 mrad/s) at the target.
 extern const double kTargetMinRad[12];
@@ -83,20 +85,19 @@ extern const WalkProfile kFastProfile;
 constexpr unsigned kProfileCount = 2;
 extern const WalkProfile* const kProfiles[kProfileCount];
 // ---- Operational STAND profile (Issue #52, 2026-10-15) ----------------------
-// The certified paired route GEOMETRY is unchanged; its time law is the
-// junction-limited look-ahead profile (motion/PhaseTimedRoute.h). Every frame
-// is still tracked before the next (6 mrad tube) - the route certificate's
-// assumption - so a frame step must not exceed the tube:
-//   v = 0.29 rad/s, dt = 20 ms  ->  5.8 mrad per frame  (< tube 6 mrad, max_step 6 mrad)
-//   envelope a = 2.0 rad/s^2 (commissioning cap), planner a = a/2 so that a
-//   polyline-corner jump (<= a_planner*dt) plus segment acceleration stays
-//   inside the executor's finite-difference check.
-// Drive pair (RAM, STAND frames): GoalSpeed 300 steps/s = 0.46 rad/s (x1.6 over v),
+// Geometry stays on the existing paired polyline. Intermediate finite frames
+// advance after their release time and fresh measured following; phase ends
+// require arrival. V1 reserves 4 mrad for the full joint box, including a
+// polyline corner: 20 mrad following + 4 mrad step + quantization + 15 mrad
+// model/installation qualification allowance < 40 mrad.
+// v=.19 rad/s at 20 ms produces <=3.8 mrad, inside the 4 mrad ceiling.
+// Acceleration envelope remains 2 rad/s^2; the planner uses half at corners.
+// Drive pair (RAM, STAND frames): GoalSpeed 300 steps/s = 0.46 rad/s (x2.4 over v),
 // ACC 20 = 3.07 rad/s^2 (x1.5 over the envelope). Entry stages derive their
 // durations from the same rates (minimum stage 1 s, the compiled floor).
 // Offline numbers; NOT measured on hardware.
 struct StandProfile { double velocityRadS, accelerationRadS2, samplePeriodS, maxStepRad, minEntryStageS; DriveProfile drive; };
-constexpr StandProfile kStandProfile{0.29, 2.0, 0.020, 0.006, 1.0, {300, 20}};
+constexpr StandProfile kStandProfile{0.19, 2.0, 0.020, tolerance::kMaxStepRad, 1.0, {300, 20}};
 static_assert(kStandProfile.velocityRadS * kStandProfile.samplePeriodS <= kStandProfile.maxStepRad, "STAND frame step must stay inside the tube");
 
 // Executor/planner ceilings must cover every profile (checked in MotionCoordinator.cpp).

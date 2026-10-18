@@ -8,8 +8,13 @@ void MotionSession::begin(actuator::SafeActuatorPolicy* p,actuator::ActuatorRunt
  const actuator::CalibrationGeometryProfile* g,const actuator::GeometryProvenance* v){policy_=p;runtime_=r;executor_=e;arbiter_=a;geometry_=g;provenance_=v;}
 const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) const {
  if(!policy_||!runtime_||!executor_||!arbiter_||!geometry_||!provenance_)return "NOT_BOUND";
- if(!e.generation||static_cast<int32_t>(now-e.expires_at_ms)>=0||!e.local_operator_present||!e.physical_power_cut_verified||
-    !e.installation_verified||!e.servo_output_ceiling_verified||!e.imu_fresh)return "LOCAL_TRIAL_EVIDENCE_REQUIRED";
+ if(!e.generation)return "LOCAL_TRIAL_GENERATION_REQUIRED";
+ if(static_cast<int32_t>(now-e.expires_at_ms)>=0)return "LOCAL_TRIAL_EXPIRED";
+ if(!e.local_operator_present)return "LOCAL_OPERATOR_ABSENT";
+ if(!e.physical_power_cut_verified)return "LOCAL_POWER_EVIDENCE_REQUIRED";
+ if(!e.installation_verified)return "INSTALLATION_LIVE_EVIDENCE_REQUIRED";
+ if(!e.servo_output_ceiling_verified)return "SERVO_OUTPUT_CEILING_REQUIRED";
+ if(!e.imu_fresh)return e.scope_loss?e.scope_loss:"LOCAL_HARDWARE_SCOPE_REQUIRED";
  if(e.scope==TrialScope::FIXTURE_MICRO||e.scope==TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==TrialScope::SUPERVISED_FIXTURE_WALK||e.scope==TrialScope::FIXTURE_COMMISSIONING){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
  else if(e.scope==TrialScope::AUTONOMOUS_STAND||e.scope==TrialScope::AUTONOMOUS_WALK){
    if(!e.support_load_observable)return "AUTONOMOUS_SUPPORT_LOAD_REQUIRED";
@@ -24,8 +29,11 @@ const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutio
     f.permit_generation!=permit_generation_||policy_->epoch()!=epoch_||arbiter_->generation()!=lease_.generation||
     arbiter_->current()!=core::ActuatorAuthority::MOTION))return "SESSION_CHANGED";
  if(!geometry_->provenanceMatches(*provenance_))return "GEOMETRY_MISMATCH";
- for(unsigned i=0;i<12;++i)if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i])||static_cast<int32_t>(now-fb.sampled_at_ms[i])<0||
-    now-fb.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return "STALE_FEEDBACK";
+ for(unsigned i=0;i<12;++i){
+  if(static_cast<int32_t>(now-fb.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
+  if(now-fb.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return "STALE_FEEDBACK";
+  if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i]))return "FEEDBACK_INVALID";
+ }
  return nullptr;
 }
 bool MotionSession::resolve(unsigned i,double q,actuator::ActuatorCommand& cmd,uint8_t& bus) const {
@@ -134,7 +142,7 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
  if(const char* r=gate(e,input,fb,now)){revoke(r);return;}
  auto f=input;f.lease=lease_;
  if(state_==MotionSessionState::ARMED){
-  if(!executor_->active()){revoke("EXECUTOR_LOST");return;}
+  if(!executor_->active()){revoke(executor_->status().reason);return;}
   if(!micro_active_)return;
   if(now-micro_issued_at_ms_>static_cast<uint32_t>(envelope_.tracking_timeout_ms+1000)){revoke("MICRO_TIMEOUT");return;}
   if(executor_->status().state!=ExecutorState::READY||executor_->status().completed_sequence!=micro_sequence_)return;

@@ -2,6 +2,7 @@
 #include "../motion/OperationalWalkProfile.h"
 #include "../motion/FirstStrideReference.h"
 #include "../motion/PairedProneRoute.h"
+#include "../motion/OperationalTolerance.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -38,6 +39,7 @@ bool validCommissioningParameters(const CommissioningParameters& p,const char** 
   if(!in(p.max_acceleration_rad_s2,0,C::kMaxAccelerationRadS2))return bad("MAX_ACCELERATION");
   if(!in(p.tracking_tolerance_rad,0,C::kMaxTrackingRad))return bad("TRACKING_TOLERANCE");
   if(!in(p.max_step_rad,0,C::kMaxStepRad))return bad("MAX_STEP");
+  if(p.tracking_tolerance_rad+p.max_step_rad+motion::tolerance::kQuantizationRad+motion::tolerance::kModelUncertaintyRad>=motion::tolerance::kGeometryTubeRad)return bad("GEOMETRY_TUBE_BUDGET");
   if(!std::isfinite(p.sample_period_s)||p.sample_period_s<C::kMinSamplePeriodS||p.sample_period_s>C::kMaxSamplePeriodS)return bad("SAMPLE_PERIOD");
   if(!std::isfinite(p.entry_min_stage_s)||p.entry_min_stage_s<C::kMinStageS||p.entry_min_stage_s>C::kMaxStageS)return bad("ENTRY_MIN_STAGE");
   if(!std::isfinite(p.route_time_scale)||p.route_time_scale<C::kMinRouteScale||p.route_time_scale>C::kMaxRouteScale)return bad("ROUTE_TIME_SCALE");
@@ -109,6 +111,7 @@ bool applyOperationalStandProfile(CommissioningParameters& p,const char** reason
   CommissioningParameters next=p;
   next.max_velocity_rad_s=s.velocityRadS;next.max_acceleration_rad_s2=s.accelerationRadS2;next.sample_period_s=s.samplePeriodS;
   next.max_step_rad=s.maxStepRad;next.entry_min_stage_s=s.minEntryStageS;
+  next.tracking_tolerance_rad=motion::tolerance::kTrackingRad;
   if(!validCommissioningParameters(next,reason))return false;
   p=next;return true;
 }

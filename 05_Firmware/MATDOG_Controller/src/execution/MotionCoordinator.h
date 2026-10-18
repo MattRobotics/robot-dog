@@ -6,6 +6,7 @@
 #include "MotionSession.h"
 #include "../core/MotionClock.h"
 #include "../motion/OperationalWalkProfile.h"
+#include "../motion/OperationalTolerance.h"
 namespace matdog { namespace execution {
 // Fixture commissioning STAND: broad PRONE recognition plus a staged entry
 // from the armed pose to the fixture route head, certified offline from the
@@ -24,9 +25,11 @@ struct CommissioningStandConfig {
   // Offline certificate MATDOG_MEASURED_ENTRY_REGION_CERTIFICATE_V1 (2026-10-15,
   // certify_measured_entry_region.py): the 120 non-adjacent pairs and the 12
   // adjacent revolutes of all four legs are clear for EVERY start within this
-  // band of the route head, both entry stages, with this tracking tube. A wider
+  // band of the route head, both entry stages, with the compiled CAD tube.
+  // See TOLERANCE_CONTRACT_V1: adjacent domains stay inside URDF; physical
+  // installation uncertainty is not validated by the encoder. A wider
   // runtime band or tube leaves the certified region: refused, never clamped.
-  static constexpr double kCertifiedBandRad=.17453292519943295, kCertifiedTubeRad=.006;
+  static constexpr double kCertifiedBandRad=.17453292519943295, kCertifiedTubeRad=motion::tolerance::kGeometryTubeRad;
 };
 // Arms the motion session on demand (prime at the measured pose -> energize
 // -> arm) for an explicit command. Implemented by the Controller.

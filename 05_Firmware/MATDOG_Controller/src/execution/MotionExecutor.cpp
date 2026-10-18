@@ -20,16 +20,22 @@ const char* MotionExecutor::gate(const MotionExecutionFacts& f,uint32_t now) con
  if(active()&&(permit_generation_!=f.permit_generation||lease_.generation!=f.lease.generation||policy_epoch_!=policy_->epoch()))return "SESSION_CHANGED";
  return nullptr;
 }
-bool MotionExecutor::feedbackValid(const JointFeedback& f,uint32_t now) const {
- for(unsigned i=0;i<12;i++)if(!f.read_ok[i]||!f.torque_on[i]||!std::isfinite(f.actual_rad[i])||static_cast<int32_t>(now-f.sampled_at_ms[i])<0||now-f.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return false;
- return true;
+const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now) const {
+ for(unsigned i=0;i<12;i++){
+  if(static_cast<int32_t>(now-f.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
+  if(now-f.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return "STALE_FEEDBACK";
+  if(!f.read_ok[i]||!std::isfinite(f.actual_rad[i]))return "FEEDBACK_INVALID";
+  if(!f.torque_on[i])return "TORQUE_LOST";
+ }
+ return nullptr;
 }
 bool MotionExecutor::reject(const char* reason) { status_.reason=reason; if(active())stop(reason);return false; }
 bool MotionExecutor::arm(const MotionExecutionFacts& f,const ExecutionEnvelope& e,const JointFeedback& fb,uint32_t now) {
  if(status_.state!=ExecutorState::OFF)return reject("EXECUTOR_BUSY");
  if(const char* reason=gate(f,now))return reject(reason);
  if(!e.approved||!std::isfinite(e.max_velocity_rad_s)||!std::isfinite(e.max_acceleration_rad_s2)||!std::isfinite(e.tracking_tolerance_rad)||e.max_velocity_rad_s<=0||e.max_acceleration_rad_s2<=0||e.tracking_tolerance_rad<=0||!e.feedback_max_age_ms||!e.batch_timeout_ms||!e.tracking_timeout_ms||e.feedback_max_age_ms>3000||e.batch_timeout_ms>3000||e.tracking_timeout_ms>30000)return reject("ENVELOPE_UNAPPROVED");
- envelope_=armed_envelope_=e;if(!feedbackValid(fb,now))return reject("FEEDBACK_OR_TORQUE");
+ if(e.timed_segments&&(!e.frame_writes||!std::isfinite(e.arrival_tolerance_rad)||e.arrival_tolerance_rad<=0||e.arrival_tolerance_rad>e.tracking_tolerance_rad))return reject("ENVELOPE_UNAPPROVED");
+ envelope_=armed_envelope_=e;if(const char* why=feedbackFailure(fb,now))return reject(why);
  // A separately supervised prime/torque procedure is required before arm.
  // Arm itself issues no torque or position writes.
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&cmd,&bus))return reject("START_OUTSIDE_LIMITS");previous_[i]=target_[i]=fb.actual_rad[i];velocity_[i]=0;}
@@ -56,7 +62,7 @@ bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameVal
  if(!ttl||ttl>30000||static_cast<int32_t>(now-issued)<0||now-issued>=ttl)return reject("FRAME_EXPIRED");
  if(!std::isfinite(dt)||dt<=0||dt>30)return reject("SEGMENT_DURATION");
  if(v.sequence!=frame.sequence||v.policy_epoch!=policy_->epoch()||v.geometry!=policy_->currentGeometryTag()||!v.collision_clear||!v.support_valid||!v.path_continuous||!v.configuration_valid)return reject("SEGMENT_UNVALIDATED");
- if(!feedbackValid(fb,now))return reject("STALE_FEEDBACK");
+ if(const char* why=feedbackFailure(fb,now))return reject(why);
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus))return reject("ACTUAL_OUTSIDE_LIMITS");}
  double candidate[12];
  for(unsigned leg=0;leg<4;leg++){candidate[leg*3]=frame.legs[leg].hip;candidate[leg*3+1]=frame.legs[leg].upper;candidate[leg*3+2]=frame.legs[leg].lower;}
@@ -70,13 +76,14 @@ bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameVal
   pending_velocity_[i]=vel;
  }
  for(unsigned i=0;i<12;i++)target_[i]=candidate[i];
+ segment_duration_ms_=static_cast<uint32_t>(std::ceil(dt*1000));
  validation_=v;deadline_ms_=issued+ttl;status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;status_.next_joint=0;status_.state=ExecutorState::WRITING;status_.reason="EXECUTING";return true;
 }
 void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) {
  if(!active())return;
  if(const char* r=gate(f,now)){stop(r);return;}
  if(streaming())return;   // streaming: monitor() owns feedback/tracking (asynchronous, per joint)
- if(!feedbackValid(fb,now)){stop("STALE_FEEDBACK");return;}
+ if(const char* why=feedbackFailure(fb,now)){stop(why);return;}
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}}
  if(status_.state==ExecutorState::READY){
   double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));
@@ -107,10 +114,23 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
   return;
  }
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
+ // Continuous measured following guard, including while waiting to settle.
+ // The independent [previous,target] box is included in the swept proof.
+ if(envelope_.timed_segments)for(unsigned i=0;i<12;++i){
+  if(fb.actual_rad[i]<std::fmin(previous_[i],target_[i])-envelope_.tracking_tolerance_rad||
+     fb.actual_rad[i]>std::fmax(previous_[i],target_[i])+envelope_.tracking_tolerance_rad){stop("TRACKING_DIVERGENCE");return;}
+ }
  // Feedback must postdate all writes, including the last joint's write.
- bool fresh=true;for(unsigned i=0;i<12;i++)fresh=fresh&&static_cast<int32_t>(fb.sampled_at_ms[i]-tracking_since_ms_)>0;
- if(error<=envelope_.tracking_tolerance_rad&&fresh){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason="TRACKED";}
- else if(now-tracking_since_ms_>=envelope_.tracking_timeout_ms)stop("TRACKING_TIMEOUT");
+ bool fresh=true;for(unsigned i=0;i<12;i++){
+  // Finite TX uses the 32-bit millis epoch; compare in that same wrapping
+  // domain, not against the feedback producer's extended microsecond clock.
+  const uint32_t written=envelope_.frame_writes?static_cast<uint32_t>(status_.last_tx_complete_us/1000):tracking_since_ms_;
+  fresh=fresh&&static_cast<int32_t>(fb.sampled_at_ms[i]-written)>0;
+ }
+ const double arrival=envelope_.timed_segments&&validation_.final?envelope_.arrival_tolerance_rad:envelope_.tracking_tolerance_rad;
+ const bool released=!envelope_.timed_segments||now-tracking_since_ms_>=segment_duration_ms_;
+ if(error<=arrival&&fresh&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason=envelope_.timed_segments&&!validation_.final?"TIMED_TRACKED":"TRACKED";}
+ else if(now-tracking_since_ms_>=envelope_.tracking_timeout_ms)stop(envelope_.timed_segments&&validation_.final?"ARRIVAL_TIMEOUT":"TRACKING_TIMEOUT");
 }
 // ---------------------------------------------------------------------------
 // Streaming (Issue #52, 2026-10-15)
@@ -194,9 +214,12 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
  if(const char* r=gate(f,now)){stop(r);return;}
  if(status_.state==ExecutorState::STREAMING&&now_us>last_release_us_&&now_us-last_release_us_>stream_.max_frame_gap_us){stop("STREAM_STARVED");return;}
  uint64_t oldest=UINT64_MAX;bool settled=true;
+ const double settle_tolerance=envelope_.arrival_tolerance_rad>0?std::fmin(envelope_.arrival_tolerance_rad,stream_.tube_rad):stream_.tube_rad;
  for(unsigned i=0;i<12;i++){
-  if(!fb.read_ok[i]||!fb.torque_on[i]||!std::isfinite(fb.actual_rad[i])||!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us||
-     now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){stop("STREAM_FEEDBACK_STALE");return;}
+  if(!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us){stop("FEEDBACK_CLOCK_INVALID");return;}
+  if(now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){stop("STREAM_FEEDBACK_STALE");return;}
+  if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i])){stop("FEEDBACK_INVALID");return;}
+  if(!fb.torque_on[i]){stop("TORQUE_LOST");return;}
   actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}
   // Geometry: the measured joint must stay in the certified box (+/- tube).
   if(fb.actual_rad[i]<stream_.region_min_rad[i]-stream_.tube_rad||fb.actual_rad[i]>stream_.region_max_rad[i]+stream_.tube_rad){stop("OUTSIDE_CERTIFIED_REGION");return;}
@@ -209,7 +232,7 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
    checked_us_[i]=t;
   }
   if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];
-  settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=stream_.tube_rad&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
+  settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
  }
  for(unsigned k=history_count_;k-->0;){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<oldest){if(h.sequence>status_.observed_sequence)status_.observed_sequence=h.sequence;break;}}
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;

@@ -5,8 +5,8 @@
 #include "../motion/StandTrajectory.h"
 namespace matdog { namespace execution {
 // STREAMING/HOLD (Issue #52): time-driven frames, one coordinated bus transaction
-// per frame, asynchronous per-joint tracking. WRITING/TRACKING stay the finite
-// segment mode of prime/entry/STAND.
+// per frame, asynchronous per-joint tracking. WRITING/TRACKING also serve
+// finite ENTRY/STAND segments, with separate timed following and arrival.
 enum class ExecutorState : uint8_t { OFF, READY, WRITING, TRACKING, SAFE_OFF_REQUIRED, FAULT, STREAMING, HOLD };
 struct MotionExecutionFacts {
   core::AuthorityLease lease{};
@@ -25,6 +25,10 @@ struct ExecutionEnvelope {
   // Issue #52: segment frames (prime/entry/STAND) as ONE coordinated frame
   // transaction instead of twelve single writes; tracking per frame unchanged.
   bool frame_writes=false;
+  // Existing finite-segment executor, operational timed frames only. A zero
+  // arrival tolerance preserves the original completion contract.
+  double arrival_tolerance_rad=0;
+  bool timed_segments=false;
 };
 struct JointFeedback {
   bool read_ok[12]{}, torque_on[12]{};
@@ -39,6 +43,7 @@ struct FrameValidation {
   uint32_t sequence=0, policy_epoch=0;
   actuator::GeometryProvenanceTag geometry=actuator::kNoGeometryProvenance;
   bool collision_clear=false, support_valid=false, path_continuous=false, configuration_valid=false;
+  bool final=true; // phase/entry endpoint: require arrival, not just following
 };
 struct ExecutorStatus {
   ExecutorState state=ExecutorState::OFF;
@@ -103,8 +108,9 @@ class MotionExecutor {
   bool active() const { return status_.state==ExecutorState::READY||status_.state==ExecutorState::WRITING||status_.state==ExecutorState::TRACKING||streaming(); }
   const double* targetRadians() const { return target_; }
  private:
+  uint32_t segment_duration_ms_=0;
   const char* gate(const MotionExecutionFacts&,uint32_t) const;
-  bool feedbackValid(const JointFeedback&,uint32_t) const;
+  const char* feedbackFailure(const JointFeedback&,uint32_t) const;
   bool resolve(uint8_t index,double radians,actuator::ActuatorCommand*,uint8_t*) const;
   bool reject(const char* reason);
   actuator::SafeActuatorPolicy* policy_=nullptr;

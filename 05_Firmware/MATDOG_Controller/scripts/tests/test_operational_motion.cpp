@@ -38,7 +38,8 @@ struct Operational {
     // coordinated frame writes. legacy=true keeps the baseline for A/B.
     if(!legacy){const char* why="";CHECK(execution::applyOperationalStandProfile(b.params,&why));
       CHECK(execution::buildCommissioningRuntime(b.params,b.limits,1,b.r.policy.epoch(),&b.runtime));
-      b.runtime.execution.frame_writes=true;b.r.envelope=b.runtime.execution;}
+      b.runtime.execution.frame_writes=true;b.runtime.execution.timed_segments=true;
+      b.runtime.execution.arrival_tolerance_rad=motion::tolerance::kArrivalRad;b.r.envelope=b.runtime.execution;}
     if(walk){  // operational admission binds the continuous fixture WALK profile
       b.runtime.walk=motion::operational_walk::specification();
       CHECK(motion::operational_walk::fitsLimits(b.runtime.feedback,b.runtime.execution.tracking_tolerance_rad));
@@ -95,7 +96,7 @@ void operationalStandEndToEnd(double fold_offset_deg){
   CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ACCEPTED); // not aborted by the arm generation change
   REASON(b.coordinator.lastEntryReason(),"");
   CHECK(b.coordinator.entryPlan().status==motion::EntryStatus::OK);
-  motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];
+  motion::AdaptiveObservation o;double q[12],written[12];for(unsigned i=0;i<12;++i)q[i]=written[i]=b.r.feedback.actual_rad[i];
   unsigned frames=0,approval_waits=0;double max_step=0;uint32_t& now=b.now;
   while(std::strcmp(b.coordinator.state(),"STAND")&&now<50000000){
     now+=20;b.r.facts.permit_expires_at_ms=b.evidence.expires_at_ms=now+3000;  // Controller renews while the operator heartbeat is fresh
@@ -108,7 +109,7 @@ void operationalStandEndToEnd(double fold_offset_deg){
       CHECK(b.coordinator.assess(a,now));b.coordinator.update(b.r.facts,b.r.feedback,now);
       for(unsigned i=0;i<12;++i)b.r.executor.update(b.r.facts,b.r.feedback,++now);
       if(b.r.executor.status().state==ExecutorState::SAFE_OFF_REQUIRED||b.r.executor.status().state==ExecutorState::FAULT){std::printf("executor: %s\n",b.r.executor.status().reason);break;}
-      for(unsigned i=0;i<12;++i){const double t=b.r.executor.targetRadians()[i];max_step=std::max(max_step,std::abs(t-q[i]));q[i]=t;b.r.feedback.actual_rad[i]=t;b.r.feedback.sampled_at_ms[i]=now+1;}
+      for(unsigned i=0;i<12;++i){const double t=b.r.executor.targetRadians()[i];max_step=std::max(max_step,std::abs(t-written[i]));written[i]=t;q[i]=qOf(b.r,i,tickOf(b.r,i,t));b.r.feedback.actual_rad[i]=q[i];b.r.feedback.sampled_at_ms[i]=now+1;}
       ++now;b.r.executor.update(b.r.facts,b.r.feedback,now);++frames;
     }
     if(!std::strcmp(b.coordinator.state(),"REJECTED")){std::printf("operational stand rejected: %s\n",motion::feedbackReasonName(b.coordinator.frame().reason));break;}
@@ -116,7 +117,7 @@ void operationalStandEndToEnd(double fold_offset_deg){
   CHECK(!std::strcmp(b.coordinator.state(),"STAND"));
   CHECK(approval_waits==0);                                             // no per-stage/segment operator approvals
   CHECK(frames>200&&max_step<=b.params.max_step_rad+1e-9);
-  const auto c4=motion::pairedProneSample(250,1,true).target;for(unsigned i=0;i<12;++i)CHECK(std::abs(q[i]-slot(c4,i))<1e-9);
+  const auto c4=motion::pairedProneSample(250,1,true).target;for(unsigned i=0;i<12;++i)CHECK(std::abs(q[i]-slot(c4,i))<=motion::tolerance::kArrivalRad);
   op.refresh();CHECK(b.service.activeAck().outcome==motion::CommandOutcome::COMPLETED);REASON(b.service.activeAck().reason,"STAND_VERIFIED");
   // Every write stayed inside the unchanged hard limits.
   for(const auto& w:b.r.backend.writes){bool inside=false;
@@ -191,7 +192,7 @@ struct Driver {
       assessPending();record();
       for(unsigned i=0;i<12;++i)b.r.executor.update(b.r.facts,b.r.feedback,++now);
       if(failed())return false;
-      for(unsigned i=0;i<12;++i){const double t=b.r.executor.targetRadians()[i];max_step=std::max(max_step,std::abs(t-q[i]));q[i]=t;b.r.feedback.actual_rad[i]=t;b.r.feedback.sampled_at_ms[i]=now+1;}
+      for(unsigned i=0;i<12;++i){const double t=b.r.executor.targetRadians()[i];max_step=std::max(max_step,std::abs(t-written[i]));written[i]=t;q[i]=qOf(b.r,i,tickOf(b.r,i,t));b.r.feedback.actual_rad[i]=q[i];b.r.feedback.sampled_at_ms[i]=now+1;}
       ++now;b.r.executor.update(b.r.facts,b.r.feedback,now);++frames;
     }
     b.r.executor.update(b.r.facts,b.r.feedback,now);
@@ -207,9 +208,9 @@ struct Driver {
     std::array<double,12> now_q;for(unsigned i=0;i<12;++i)now_q[i]=q[i];history.push_back({b.now,now_q});
     while(history.size()>1&&history[1].first+servo.latency_ms<=b.now)history.pop_front();
     const auto& seen=history.front();
-    for(unsigned i=0;i<12;++i){b.r.feedback.actual_rad[i]=seen.second[i];b.r.feedback.sampled_at_ms[i]=seen.first;b.r.feedback.read_ok[i]=feedback_ok;b.r.feedback.torque_on[i]=true;}
+    for(unsigned i=0;i<12;++i){b.r.feedback.actual_rad[i]=qOf(b.r,i,tickOf(b.r,i,seen.second[i]));b.r.feedback.sampled_at_ms[i]=seen.first;b.r.feedback.read_ok[i]=feedback_ok;b.r.feedback.torque_on[i]=true;}
     renew(heartbeat);
-    motion::AdaptiveObservation o;double fq[12];for(unsigned i=0;i<12;++i)fq[i]=seen.second[i];observe(o,fq,b.now);b.coordinator.observe(o);
+    motion::AdaptiveObservation o;double fq[12];for(unsigned i=0;i<12;++i)fq[i]=b.r.feedback.actual_rad[i];observe(o,fq,b.now);b.coordinator.observe(o);
     b.coordinator.update(b.r.facts,b.r.feedback,b.now);op.refresh();assessPending();record();
     b.r.executor.update(b.r.facts,b.r.feedback,b.now);
     for(unsigned i=0;i<12;++i)st.trackmax=b.coordinator.walking()?std::max(st.trackmax,std::abs(q[i]-b.r.executor.targetRadians()[i])):st.trackmax;
@@ -236,7 +237,7 @@ struct StreamModel {
   const char* name="B";bool ideal=false;
   uint32_t loop_us=2000,read_us=420,tx_us=1100,jitter_us=0;unsigned reads_per_tick=2;
   double tau_s=.03,speed_rad_s=1000*2*kPi/4096,acc_rad_s2=50*100*2*kPi/4096;
-  uint32_t hb_period_ms=1000,stall_every_ms=0,stall_us=0;
+  uint32_t hb_period_ms=1000,stall_every_ms=0,stall_us=0;unsigned stop_short_ticks=0;
 };
 struct Dist {
   std::vector<double> v;void add(double x){v.push_back(x);}
@@ -261,7 +262,10 @@ struct StreamDriver {
       while(!inflight.empty()&&inflight.front().first<=now_us){for(unsigned i=0;i<12;++i)goal[i]=inflight.front().second[i];inflight.pop_front();}
       for(unsigned i=0;i<12;++i){if(stuck[i]){v[i]=0;continue;}
         if(m.ideal){q[i]=goal[i];v[i]=0;continue;}
-        double vd=(goal[i]-q[i])/m.tau_s;vd=std::max(-m.speed_rad_s,std::min(m.speed_rad_s,vd));
+        double residual=goal[i]-q[i];const double dead=m.stop_short_ticks*motion::tolerance::kTickRad;
+        if(m.stop_short_ticks&&std::abs(residual)<=dead){v[i]=0;continue;}
+        if(m.stop_short_ticks)residual-=std::copysign(dead,residual);
+        double vd=residual/m.tau_s;vd=std::max(-m.speed_rad_s,std::min(m.speed_rad_s,vd));
         const double dv=std::max(-m.acc_rad_s2*dt,std::min(m.acc_rad_s2*dt,vd-v[i]));v[i]+=dv;q[i]+=v[i]*dt;}}
   }
   void read(unsigned j){auto& r=op.b.r;sample_q[j]=qOf(r,j,tickOf(r,j,q[j]));sample_us[j]=now_us;
@@ -646,12 +650,12 @@ void operationalRefusals(){
     CHECK(cc.measuredStart&&cc.proneMaxDeviationRad<=CommissioningStandConfig::kCertifiedBandRad);
     cc.proneMaxDeviationRad=CommissioningStandConfig::kCertifiedBandRad*1.01;CHECK(!b.coordinator.configureCommissioning(cc));
     cc.proneMaxDeviationRad=CommissioningStandConfig::kCertifiedBandRad;CHECK(b.coordinator.configureCommissioning(cc)); }
-  { Bench wide(.008);CommissioningStandConfig cc;cc.enabled=true;cc.measuredStart=true;cc.minStageDurationS=4;
+  { Bench wide(.008);wide.runtime.feedback.maxTrackingErrorRad=.020;CommissioningStandConfig cc;cc.enabled=true;cc.measuredStart=true;cc.minStageDurationS=4;
     cc.proneMaxDeviationRad=wide.params.prone_max_deviation_rad;cc.proneMaxRmsRad=wide.params.prone_max_rms_rad;
     wide.coordinator.begin(&wide.r.executor,&wide.r.policy);motion::AcquisitionRoute route;route.pairedProne=true;route.geometryIdentityVerified=true;
     route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;route.timeScale=wide.runtime.stand_time_scale;
     CHECK(wide.coordinator.configure(wide.runtime.feedback,wide.runtime.walk,&route));
-    CHECK(!wide.coordinator.configureCommissioning(cc)); }                       // 8 mrad tube > certified 6 mrad
+    CHECK(!wide.coordinator.configureCommissioning(cc)); }                       // tracking20 + step6 + quantization + model15 exceeds the40 mrad proof
   // Feedback not published / moving: refused before arming.
   { Operational op;auto& b=op.b;auto c=command(motion::Intent::STAND,1,motion::ClientOwner::DASHBOARD);c.target_height_m=.150;c.issued_at_ms=b.now;c.ttl_ms=1000;
     const auto ack=b.service.command(c,b.now);CHECK(ack.outcome==motion::CommandOutcome::REJECTED);REASON(ack.reason,"PRE_ARM_FEEDBACK_REQUIRED");CHECK(op.armer.calls==0); }
@@ -703,7 +707,7 @@ void postValidationAdmissionClock(){
   CHECK(!producer.snapshot(b.now,b.r.envelope.feedback_max_age_ms).read_ok[newest]);
   CHECK(producer.snapshot(10006,b.r.envelope.feedback_max_age_ms).read_ok[newest]);
   CHECK(!producer.rawFresh(10407,b.r.envelope.feedback_max_age_ms));
-  auto rejected=op.stand();CHECK(rejected.outcome==motion::CommandOutcome::REJECTED);REASON(rejected.reason,"STALE_FEEDBACK");
+  auto rejected=op.stand();CHECK(rejected.outcome==motion::CommandOutcome::REJECTED);REASON(rejected.reason,"FEEDBACK_CLOCK_INVALID");
   CHECK(b.r.backend.writes.empty()&&b.session.state()==MotionSessionState::OFF);
   b.now=10006;auto accepted=op.stand(2);CHECK(accepted.outcome==motion::CommandOutcome::ACCEPTED);
   CHECK(b.session.state()==MotionSessionState::PRIMING&&b.r.backend.writes.empty());
@@ -754,9 +758,9 @@ void reachesBackend(int lost_replies){
     const auto* l=b.r.policy.limits().find(slotIdentity(i),b.r.geometry.provenanceTag());CHECK(l&&l->contains(w.tick));
     CHECK(w.tick==tickOf(b.r,i,b.session.primedRadians()[i]));}
   // Planner targets reach the executor and it advances.
-  motion::AdaptiveObservation o;double q[12];for(unsigned i=0;i<12;++i)q[i]=b.r.feedback.actual_rad[i];
+  motion::AdaptiveObservation o;double q[12],written[12];for(unsigned i=0;i<12;++i)q[i]=written[i]=b.r.feedback.actual_rad[i];
   unsigned frames=0;const unsigned frames_before=b.r.backend.frames;
-  for(unsigned k=0;k<4000&&frames<25;++k){
+  for(unsigned k=0;k<4000&&b.r.executor.status().completed_sequence<25;++k){
     b.now+=20;b.r.facts.permit_expires_at_ms=b.evidence.expires_at_ms=b.now+3000;
     observe(o,q,b.now);b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,b.now);b.service.refresh(gated(op),b.now);
     auto frame=b.coordinator.frame();
@@ -765,7 +769,7 @@ void reachesBackend(int lost_replies){
       a.geometryIdentityVerified=a.sweptCollisionClear=a.supportCompatible=a.continuousBoundsConfirmed=a.fixtureTrialEnvelopeReviewed=true;
       b.coordinator.assess(a,b.now);b.coordinator.update(b.r.facts,b.r.feedback,b.now);
       for(unsigned i=0;i<12;++i)b.r.executor.update(b.r.facts,b.r.feedback,++b.now);
-      for(unsigned i=0;i<12;++i){q[i]=b.r.executor.targetRadians()[i];b.r.feedback.actual_rad[i]=q[i];b.r.feedback.sampled_at_ms[i]=b.now+1;}
+      for(unsigned i=0;i<12;++i){q[i]=qOf(b.r,i,tickOf(b.r,i,b.r.executor.targetRadians()[i]));b.r.feedback.actual_rad[i]=q[i];b.r.feedback.sampled_at_ms[i]=b.now+1;}
       ++b.now;b.r.executor.update(b.r.facts,b.r.feedback,b.now);++frames;}
     if(b.r.executor.status().safe_off_required)break;
   }
@@ -795,6 +799,7 @@ void run(){
   refusedWriteKeepsItsCause(BackendWriteOutcome::VERIFIED_NOT_APPLIED,"ENERGIZE_BACKEND_NOT_APPLIED",12+8);
 }
 }
+#ifndef MATDOG_OPERATIONAL_NO_MAIN
 int main(){
   stand_backend::run();
   if(std::getenv("MATDOG_STAND_BACKEND_ONLY")){std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND backend)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
@@ -833,3 +838,5 @@ int main(){
       std::printf("FAST_STOP_AT cycles=%.2f -> %s stop_s=%.2f\n",at,r.ok?"STAND":"FAIL",r.stop_s);} }
   std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;
 }
+
+#endif // MATDOG_OPERATIONAL_NO_MAIN

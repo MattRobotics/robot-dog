@@ -10,6 +10,7 @@ struct LocalTrialEvidence {
  bool local_operator_present=false,physical_power_cut_verified=false;
  bool fixture_support_verified=false,installation_verified=false;
  bool servo_output_ceiling_verified=false,imu_fresh=false;
+ const char* scope_loss=nullptr; // diagnosis of the existing aggregate hardware scope
  bool support_load_observable=false,loaded_dynamics_qualified=false;
  double max_fixture_excursion_rad=0; // reviewed local micro-test limit; no default
  // FIXTURE_COMMISSIONING only: a joint resting up to this many ticks OUTSIDE

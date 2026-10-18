@@ -12,7 +12,7 @@ const char* feedbackReasonName(FeedbackReason r){
   "ROUTE_MISMATCH","IK_FAILURE","BRANCH_CHANGE","JOINT_LIMIT","CONTINUITY","VELOCITY_LIMIT",
   "ACCELERATION_LIMIT","ASSESSMENT_REQUIRED","ASSESSMENT_STALE","COLLISION","SUPPORT_INVALID",
   "CONTINUOUS_BOUNDS_MISSING","FEEDBACK_PENDING","TRACKING_ERROR","SEGMENT_TIMEOUT","INHIBITED",
-  "FAULT","VERIFY_PENDING","COMMAND_EXPIRED","SEQUENCE_REPLAY","STOPPED","FOOTPRINT_MISMATCH"};
+  "FAULT","VERIFY_PENDING","COMMAND_EXPIRED","SEQUENCE_REPLAY","STOPPED","FOOTPRINT_MISMATCH","OUTSIDE_CERTIFIED_REGION"};
   const unsigned i=static_cast<unsigned>(r);return i<sizeof(names)/sizeof(names[0])?names[i]:"UNKNOWN";
 }
 bool validFeedbackPolicy(const FeedbackPolicy& p){
@@ -54,8 +54,11 @@ FeedbackReason checkSegment(const LocomotionFrame& f,const JointTargetFrame& pre
       if(!std::isfinite(a[j])||std::abs(a[j])>al[j])return FeedbackReason::ACCELERATION_LIMIT;}}
   return FeedbackReason::OK;
 }
-FeedbackReason checkAssessment(const SegmentAssessment& a,uint32_t sequence,const FeedbackPolicy& p,double now){
-  if(!std::isfinite(now)||a.sequence!=sequence||!std::isfinite(a.stampS)||a.stampS>now||now-a.stampS>p.assessmentMaxAgeS)return FeedbackReason::ASSESSMENT_STALE;
+FeedbackReason checkAssessment(const SegmentAssessment& a,uint32_t sequence,const FeedbackPolicy& p,double now,bool submitted){
+  // Static CAD evidence is age-checked at admission. Once that exact frame is
+  // accepted, its lifetime is bounded by the executor; live evidence still ages.
+  const bool staticInFlight=submitted&&a.source==EvidenceSource::OFFLINE_CERTIFIED&&p.routeTubeReviewed;
+  if(!std::isfinite(now)||a.sequence!=sequence||!std::isfinite(a.stampS)||a.stampS>now||(!staticInFlight&&now-a.stampS>p.assessmentMaxAgeS))return FeedbackReason::ASSESSMENT_STALE;
   if((!evidence(a.source,p.mode)&&!(p.mode!=FeedbackMode::SIMULATION&&p.routeTubeReviewed&&a.source==EvidenceSource::OFFLINE_CERTIFIED))||!a.geometryIdentityVerified)return FeedbackReason::ASSESSMENT_REQUIRED;
   if(!a.sweptCollisionClear)return FeedbackReason::COLLISION;
   if(!a.supportCompatible)return FeedbackReason::SUPPORT_INVALID;

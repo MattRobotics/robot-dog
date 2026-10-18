@@ -1,6 +1,7 @@
 #ifndef MATDOG_EXECUTION_COMMISSIONING_POLICY_H
 #define MATDOG_EXECUTION_COMMISSIONING_POLICY_H
 #include "ReviewedMotionRuntime.h"
+#include "../motion/OperationalTolerance.h"
 #include <stdint.h>
 #include <stddef.h>
 namespace matdog { namespace execution {
@@ -43,7 +44,7 @@ struct CommissioningParameters {
 // Compiled caps. A runtime value outside its cap is refused, never clamped.
 struct CommissioningCaps {
   static constexpr uint16_t kMaxPrimeClampTicks=16;  // ~1.4 deg, inward only
-  static constexpr double kMaxVelocityRadS=.35, kMaxAccelerationRadS2=2, kMaxTrackingRad=.010;
+  static constexpr double kMaxVelocityRadS=.35, kMaxAccelerationRadS2=2, kMaxTrackingRad=motion::tolerance::kTrackingRad;
   static constexpr double kMaxStepRad=.01, kMinSamplePeriodS=.02, kMaxSamplePeriodS=.1;
   static constexpr double kMinStageS=1, kMaxStageS=60, kMinRouteScale=1, kMaxRouteScale=100;
   static constexpr double kMaxProneDeviationRad=.2617993877991494; // 15 deg recognition ceiling

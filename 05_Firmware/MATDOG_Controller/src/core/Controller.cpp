@@ -1409,6 +1409,29 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     }
   }
   operational_facts_.prime_profiles_verified=profileActive()&&prime_profiles;
+  // Diagnosis only (no new condition): which part of the hardware scope was lost. First field attempt (17/10)
+  // was revoked 150 ms after ENERGIZE with one aggregate reason while two clamped LOWERs were moving 4 counts
+  // inward - the gate cannot tell a speed above the prime drive profile from a stale IMU or a failed read.
+  const char* scope_loss=nullptr;
+  if(!scoped){
+    if(!reviewed_motion_bound_)scope_loss="SCOPE_REVIEWED_MOTION_NOT_BOUND";
+    else if(!execution::runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope))scope_loss="SCOPE_RUNTIME_MODE";
+    else if(reviewed_motion_.calibration_generation!=calibration.restored_generation)scope_loss="SCOPE_CALIBRATION_GENERATION_CHANGED";
+    else if(reviewed_motion_.policy_epoch!=actuator_policy_.epoch())scope_loss="SCOPE_POLICY_EPOCH_CHANGED";
+    else if(radio.closing.load()||radio.radio_fault.load())scope_loss="SCOPE_RADIO_TRANSITION";
+    else if(!imu.valid)scope_loss="SCOPE_IMU_INVALID";
+    else if(!sampleFresh(now_ms,imu.sampled_at_ms,reviewed_motion_.max_imu_age_ms))scope_loss="SCOPE_IMU_STALE";
+    else for(unsigned i=0;i<12&&!scope_loss;++i){const auto& raw=operational_producer_.raw(i);
+      if(!raw.read_ok)scope_loss="SCOPE_SERVO_READ_FAILED";
+      else if(raw.temperature>reviewed_motion_.max_servo_temperature_c)scope_loss="SCOPE_SERVO_OVER_TEMPERATURE";
+      else if(raw.voltage<reviewed_motion_.min_servo_voltage_dv||raw.voltage>reviewed_motion_.max_servo_voltage_dv)scope_loss="SCOPE_SERVO_VOLTAGE_WINDOW";
+      else if(profileActive()){
+        if(!(raw.torque_limit>=0&&raw.torque_limit<=output_ceiling))scope_loss="SCOPE_SERVO_TORQUE_LIMIT";
+        else if(!(raw.speed>=0&&raw.speed<=drive_speed))scope_loss="SCOPE_SERVO_SPEED_ABOVE_DRIVE_PROFILE";
+        else if(operational_session_.state()==execution::MotionSessionState::ARMED&&!reviewedPair(raw.goal_speed,raw.goal_acceleration))scope_loss="SCOPE_SERVO_DRIVE_PAIR";
+      }
+    }
+  }
   ready.hardware_approved=scoped&&((local_trial_evidence_.scope==execution::TrialScope::FIXTURE_MICRO||reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW)?
     reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified);
   if(validation_walk_admitted_){
@@ -1462,6 +1485,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   operational_facts_.hardware_qualified=ready.hardware_approved;
   operational_facts_.sequential_bus_qualified=ready.hardware_approved;
   local_trial_evidence_.imu_fresh=scoped;
+  local_trial_evidence_.scope_loss=scope_loss;
   local_trial_evidence_.local_operator_present=operatorPresent(now_ms);
   local_trial_evidence_.support_load_observable=reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW&&ready.support_observable;
   if(reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW){

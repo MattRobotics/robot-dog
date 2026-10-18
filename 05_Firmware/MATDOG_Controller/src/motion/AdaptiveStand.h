@@ -66,6 +66,8 @@ class AdaptiveStand {
   const FixtureEntryPlan& entryPlan() const {return entry_;}
   const FixturePoseClassification& proneClassification() const {return prone_;}
   bool physicalReadiness() const {return physicalReady_;}
+  bool pendingFinal() const {return pendingValid_&&segmentIndex_+1==segmentIntervals_;}
+  void noteSubmitted(uint32_t sequence){if(pendingValid_&&assessed_&&pending_.target.sequence==sequence)submitted_=true;}
   // Fixture STAND height change (commanded, not measured: the fixture observation
   // carries a declared body pose). Only from a VERIFIED STAND, at fixed canonical
   // contacts, through the same fixed-contact rise component and checkSegment
@@ -97,7 +99,7 @@ class AdaptiveStand {
   LegJointAngles entry_offset_[4]{};
   uint16_t entry_knot_=UINT16_MAX;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
-  bool pendingValid_=false, assessed_=false, physicalReady_=false;
+  bool pendingValid_=false, assessed_=false, physicalReady_=false, submitted_=false;
   FixtureEntryPlan entry_{};
   FixturePoseClassification prone_{};
   bool entryActive_=false;

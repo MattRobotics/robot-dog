@@ -236,7 +236,8 @@ async function send(path,body){return window.mdNet(()=>sendNow(path,body))}
 async function sendNow(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
 // Reopens the session without the token: the live session cookie, or the
 // remembered-device cookie, is sent by the browser only to /wifi/session.
-async function resume(){resumeAt=Date.now();try{csrf='';csrf=await send(location.protocol==='https:'?'/api/motion/session':'/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}}
+let resumePending=null;
+function resume(){if(resumePending)return resumePending;resumePending=(async()=>{resumeAt=Date.now();try{csrf=await send(location.protocol==='https:'?'/api/motion/session':'/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}finally{resumePending=null}})();return resumePending}
 async function adminPost(path,body){
  if(!csrf&&!(await resume())){needLogin();throw Error('Serve l\'accesso amministratore per modificare la configurazione.')}
  try{return await send(path,body)}catch(e){if(e.message!=='AUTH_FAILED')throw e;if(await resume())return send(path,body);needLogin();throw Error('Sessione scaduta: accedi di nuovo.')}

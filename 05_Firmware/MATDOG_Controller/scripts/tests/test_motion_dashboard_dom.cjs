@@ -399,6 +399,15 @@ async function boot(enabled = false, options = {}) {
   assert(!p.q('#motion-q-stand').disabled && p.q('#motion-link').textContent === 'PRONTO');
   p.q('#motion-q-stand').click(); await settle();
   assert.strictEqual(p.device.commands.at(-1).type, 'POSTURE.STAND', 'quick STAND uses the reviewed command path');
+  { const n=p.device.commands.length;
+    assert(p.q('#motion-q-stand').disabled && p.q('#motion-stand').disabled, 'both STAND buttons disabled until terminal acknowledgement');
+    p.q('#motion-q-stand').click(); p.q('#motion-stand').click(); await settle();
+    assert.strictEqual(p.device.commands.length,n,'accepted STAND cannot be submitted again between status polls');
+    const cmd=p.device.commands.at(-1);
+    p.device.status.active_command={id:cmd.id,sequence:cmd.sequence,outcome:'COMPLETED',reason:'STAND_VERIFIED'};
+    p.device.status.now_ms+=100;await p.motionPoll();
+    assert(!p.q('#motion-q-stand').disabled,'a terminal command re-enables height changes'); }
+
   // Battery: DALY value and the SOC estimate are both labelled.
   p.dom.window.eval("st={bms_valid:'YES',bms_fresh:'YES',bms_soc_percent:'80.0',bms_pack_v:'12.1',bms_cell_min_mv:'4001',bms_current_a:'-0.4',bms_remaining_ah:'7.3',bms_remaining_estimate_ah:'7.20',bms_capacity_config_ah:'9.0'}");
   await p.pulse();
@@ -420,6 +429,10 @@ async function boot(enabled = false, options = {}) {
   p.device.status.heartbeat = false; p.device.status.now_ms += 100; await p.motionPoll();
   assert(p.device.resumes >= 1, 'session resumed automatically');
   assert.strictEqual(p.dom.window.eval('csrf'), 'e'.repeat(64));
+  { const n=p.device.resumes;
+    await p.dom.window.eval('Promise.all([resume(),resume()])');
+    assert.strictEqual(p.device.resumes,n+1,'concurrent admin renewal uses one session request'); }
+
   p.device.status.heartbeat = false; p.device.status.now_ms += 100;
   p.device.sessionOk = false; await p.pulse(5000); await p.motionPoll();
   assert.strictEqual(p.q('#motion-link').textContent, 'AUTENTICAZIONE', 'auth loss is distinct from STALE/network');

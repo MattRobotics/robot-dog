@@ -12,7 +12,7 @@ enum class FeedbackReason : uint8_t {
   CONTINUITY, VELOCITY_LIMIT, ACCELERATION_LIMIT, ASSESSMENT_REQUIRED,
   ASSESSMENT_STALE, COLLISION, SUPPORT_INVALID, CONTINUOUS_BOUNDS_MISSING,
   FEEDBACK_PENDING, TRACKING_ERROR, SEGMENT_TIMEOUT, INHIBITED, FAULT,
-  VERIFY_PENDING, COMMAND_EXPIRED, SEQUENCE_REPLAY, STOPPED, FOOTPRINT_MISMATCH
+  VERIFY_PENDING, COMMAND_EXPIRED, SEQUENCE_REPLAY, STOPPED, FOOTPRINT_MISMATCH, OUTSIDE_CERTIFIED_REGION
 };
 const char* feedbackReasonName(FeedbackReason reason);
 struct FeedbackPolicy {
@@ -75,7 +75,7 @@ FeedbackReason checkObservation(const AdaptiveObservation& observation,
 FeedbackReason checkSegment(const LocomotionFrame& candidate, const JointTargetFrame& previous,
                             const FeedbackPolicy& policy);
 FeedbackReason checkAssessment(const SegmentAssessment& assessment, uint32_t sequence,
-                               const FeedbackPolicy& policy, double nowS);
+                               const FeedbackPolicy& policy, double nowS, bool submitted=false);
 FeedbackReason checkTracking(const AdaptiveObservation& observation, const FeedbackFrame& frame,
                              const FeedbackPolicy& policy);
 // Before ACK, require support already held by both frames; a future touchdown

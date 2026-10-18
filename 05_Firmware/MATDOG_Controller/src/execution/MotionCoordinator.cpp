@@ -28,10 +28,15 @@ bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c
  if(!configured_||feedback_policy_.mode!=motion::FeedbackMode::FIXTURE_REVIEW||!feedback_policy_.fixtureLimitVariant||!acquisition_.pairedProne||
     (!c.measuredStart&&!c.certificate.present)||c.keepoutCount>CommissioningStandConfig::kMaxKeepouts||
     (c.measuredStart&&(!(c.proneMaxDeviationRad<=CommissioningStandConfig::kCertifiedBandRad+1e-12)||
-                       !(feedback_policy_.maxTrackingErrorRad<=CommissioningStandConfig::kCertifiedTubeRad+1e-12)))||
+                       !(feedback_policy_.maxTrackingErrorRad+feedback_policy_.maxJointStepRad+motion::tolerance::kQuantizationRad+motion::tolerance::kModelUncertaintyRad<CommissioningStandConfig::kCertifiedTubeRad)))||
     !std::isfinite(c.pathMarginRad)||c.pathMarginRad<=0||!std::isfinite(c.minStageDurationS)||c.minStageDurationS<=0||
     !std::isfinite(c.proneMaxDeviationRad)||!std::isfinite(c.proneMaxRmsRad)||c.proneMaxRmsRad<=0||c.proneMaxRmsRad>c.proneMaxDeviationRad)return false;
- commissioning_=c;entry_plan_=motion::FixtureEntryPlan{};return true;
+ // The entry proof's folded boundary includes the live LOWER hard limit
+ // plus an explicit local model allowance. Never apply it to wider limits.
+ if(c.measuredStart)for(unsigned leg=0;leg<4;++leg)
+  if(feedback_policy_.jointLimits[leg][2].lower<motion::tolerance::kEntryLowerMeasuredMinRad[leg])return false;
+ commissioning_=c;
+ entry_plan_=motion::FixtureEntryPlan{};return true;
 }
 void MotionCoordinator::observe(const motion::AdaptiveObservation& o){observation_=o;}
 bool MotionCoordinator::assess(const motion::SegmentAssessment& a,uint32_t now){
@@ -60,8 +65,16 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
     for(unsigned i=0;i<12;++i){auto& q=start.legs[i/3];(i%3==0?q.hip:i%3==1?q.upper:q.lower)=executor_->targetRadians()[i];}
     const auto head=motion::pairedProneSample(0,0,true);if(!head.target.valid)return "ROUTE_HEAD_INVALID";
     if(commissioning_.measuredStart){
-     motion::MeasuredEntryConfig m;m.keepouts=commissioning_.keepouts;m.keepoutCount=commissioning_.keepoutCount;m.pathMarginRad=commissioning_.pathMarginRad;
-     entry_plan_=motion::planMeasuredEntry(start,head.target,feedback_policy_,m,commissioning_.minStageDurationS);
+     // Reuse the pre-arm path only for the same held start (two rounded
+     // micro-radian conversions). Avoid repeating geometry work under torque.
+     bool same=entry_plan_.status==motion::EntryStatus::OK&&entry_plan_.start.valid;
+     for(unsigned i=0;i<12&&same;++i){const auto& a=entry_plan_.start.legs[i/3];const auto& b=start.legs[i/3];
+      const double x=i%3==0?a.hip:i%3==1?a.upper:a.lower,y=i%3==0?b.hip:i%3==1?b.upper:b.lower;
+      same=std::abs(x-y)<=2e-6;}
+     if(!same){
+      motion::MeasuredEntryConfig m;m.keepouts=commissioning_.keepouts;m.keepoutCount=commissioning_.keepoutCount;m.pathMarginRad=commissioning_.pathMarginRad;
+      entry_plan_=motion::planMeasuredEntry(start,head.target,feedback_policy_,m,commissioning_.minStageDurationS);
+     }
     } else entry_plan_=motion::planFixtureEntry(start,head.target,feedback_policy_,commissioning_.certificate,commissioning_.minStageDurationS);
     if(entry_plan_.status!=motion::EntryStatus::OK){entry_reason_=motion::entryStatusName(entry_plan_.status);return entry_reason_;}
     r.entry=&entry_plan_;r.proneMaxDeviationRad=commissioning_.proneMaxDeviationRad;r.proneMaxRmsRad=commissioning_.proneMaxRmsRad;
@@ -224,6 +237,9 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  if(!frame_.target.valid||!frame_.executable||frame_.target.sequence==submitted_sequence_)return;
  FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();v.collision_clear=assessment_.sweptCollisionClear;v.support_valid=assessment_.supportCompatible;v.path_continuous=assessment_.continuousBoundsConfirmed;v.configuration_valid=assessment_.geometryIdentityVerified;
  const uint32_t ttl=static_cast<uint32_t>(feedback_policy_.segmentTimeoutS*1000);
- if(executor_->submit(frame_.target,v,now,ttl,feedback_policy_.samplePeriodS,facts,fb,now))submitted_sequence_=frame_.target.sequence;
+ v.final=walking_||stand_.pendingFinal();
+ if(executor_->submit(frame_.target,v,now,ttl,feedback_policy_.samplePeriodS,facts,fb,now)){
+  submitted_sequence_=frame_.target.sequence;if(!walking_)stand_.noteSubmitted(frame_.target.sequence);
+ }
 }
 } }
