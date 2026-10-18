@@ -269,7 +269,7 @@ async function boot(enabled = false, options = {}) {
 
   p=await boot(true);
   p.device.status.readiness.permit=false;p.device.status.now_ms+=100;await p.motionPoll();
-  assert(p.q('#motion-stand').disabled,'current permit=false wins over available=true capability');
+  assert(!p.q('#motion-stand').disabled,'procedural permit does not override live availability');
   assert(p.device.caps.actions.find(a=>a.id==='posture.stand').available,'fixture retains cached available=true');
   p.close();
 
@@ -334,7 +334,7 @@ async function boot(enabled = false, options = {}) {
   await p.motionPoll();
   const opText = p.q('#motion-state').textContent;
   assert(opText.includes('SistemaREADY') && opText.includes('CalibrazioneRESTORED') && opText.includes('Feedback giuntiAVAILABLE') && opText.includes('Motion AuthorityGRANTED'));
-  assert(opText.includes('Operatore (heartbeat)presente'));
+  assert(opText.includes('Collegamento teleoperazioneattivo'));
   assert(!p.q('#motion-stand').disabled, 'READY + Controller-available STAND: no extra consent step in the UI');
   assert(p.q('[data-action="posture.lie_down"]').disabled, 'unimplemented action stays disabled');
   assert(p.q('[data-action="posture.lie_down"]').closest('.motion-action').textContent.includes('planned'), 'unimplemented action is labelled as such');
@@ -350,7 +350,7 @@ async function boot(enabled = false, options = {}) {
   await p.motionPoll();
   const read = p.calls.filter(c => c.url === '/api/motion/status').at(-1);
   assert.strictEqual(read.csrf, 'd'.repeat(64), 'status poll presents the CSRF heartbeat proof');
-  assert(p.q('#motion-stand').closest('.card').textContent.includes('Solo con MATDOG sospeso sulla fixture'), 'fixture-only SAFE_OFF warning is visible');
+  assert(p.q('#motion-stand').closest('.card').textContent.includes('Non è un arresto di emergenza hardware certificato'), 'software STOP distinction remains visible');
   p.close();
   // --- Continuous WALK (2026-10-15, Issue #52): START only from verified STAND, STOP never queued ---
   p = await boot(true);
@@ -358,7 +358,7 @@ async function boot(enabled = false, options = {}) {
   p.device.status.now_ms += 100;
   p.device.status.operational = { system_health: 'READY', calibration: 'RESTORED', joint_feedback: 'AVAILABLE', motion_authority: 'GRANTED', phase: 'READY', reason: 'OK', mode: 'RUN', entry_reason: '', operator_present: true, walk: 'WALK_BOUND' };
   await p.motionPoll();
-  assert(p.q('#motion-walk-start').disabled, 'no WALK before a verified STAND');
+  assert(!p.q('#motion-walk-start').disabled, 'WALK owns its automatic STAND transition');
   p.device.status.stand_state = 'STAND'; p.device.status.reason = 'STAND_VERIFIED'; p.device.status.now_ms += 100;
   await p.motionPoll();
   assert(!p.q('#motion-walk-start').disabled, 'verified STAND + bound walk: WALK START available');
@@ -452,5 +452,5 @@ async function boot(enabled = false, options = {}) {
   assert.strictEqual(p.q('#motion-link').textContent, 'RETE');
   p.close();
   assert(!/getWriter|\.writable|\/servo\/|grantAuthority|TORQUE_ON|writeRegister/.test(motion));
-  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay (AUTH_FAILED resend only), automatic Twin host, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; FIXTURE_ONLY; WALK START/STOP; FAST experimental opt-in; STOP not queued behind a pending command; quick STAND/WALK/STOP + battery Ah; background polling; session renewal; distinct causes)');
+  console.log('MOTION_DASHBOARD_DOM = PASS (48 actions, 6 preserved tabs, semantic schema, disabled gates, TTL, release, focus loss, in-flight STOP, split diagnoses, measured RTT, bounded read retry, no POST replay (AUTH_FAILED resend only), automatic Twin host, HTTP status-before-JSON, single-flight reads, STOP lane, RESTORE gate, operational READY; no fixture permit; WALK START/STOP; FAST experimental opt-in; STOP not queued behind a pending command; quick STAND/WALK/STOP + battery Ah; background polling; session renewal; distinct causes)');
 })().catch(error => { console.error(error); process.exitCode = 1; });

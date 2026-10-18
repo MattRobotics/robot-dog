@@ -144,8 +144,8 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   if(!motion_coordinator_.configure(r.feedback,r.walk,&route)||!motion_coordinator_.configureCommissioning(cc)){unbindCommissioning("PLANNER_CONFIGURATION_REJECTED");reason=commissioning_reason_;return false;}
   reviewed_motion_=r;reviewed_motion_bound_=true;commissioning_bound_=true;
   servo_bus_.setValidationTimeout(commissioning_params_.transaction_timeout_ms);servo_bus_.setValidationDrive(commissioning_params_.drive_speed,commissioning_params_.drive_acceleration);
-  // Fixture support is the operator's declaration (this token + the deadman),
-  // never a load measurement. The body pose is the route's virtual reference.
+  // Body height and support are route model references, NOT sensor measurements.
+  // Operational commands do not require an operator support declaration.
   motion::AdaptiveObservation o;o.body=motion::pairedProneSample(0,0,true).cartesian.body;o.supportStampS=issued/1000.0;
   o.heightSource=o.supportSource=motion::EvidenceSource::EXTERNAL_MEASURED;o.externalSupportConfirmed=o.flatPlaneConfirmed=o.stationary=true;
   local_motion_observation_=o;local_trial_evidence_={};

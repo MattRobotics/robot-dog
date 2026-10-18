@@ -93,6 +93,7 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   // Operational STAND height: the certified entry always ends at 150 mm; a lower request is
   // reached afterwards by AdaptiveStand::requestHeightAdjust.
   double final_height_m_=.150;
+  bool pending_walk_=false;motion::MotionCommand pending_walk_command_{};
   bool pending_stand_=false;motion::MotionCommand pending_command_{};uint32_t pending_since_ms_=0;
   motion::PlanarVelocityCommand walk_command_{};
   const char* entry_reason_="";const char* arming_failure_=nullptr;

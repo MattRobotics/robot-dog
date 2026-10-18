@@ -543,7 +543,7 @@ void Controller::updateOperationalReadiness(uint32_t now_ms) {
   f.restore_refused_permanent=restore_refused_permanent_;f.restore_refused_transient=restore_refused_transient_;
   f.restore_reason=restore_refusal_reason_;
   f.raw_fresh=operational_producer_.rawFresh(now_ms,1000);
-  {const auto fb=operational_producer_.snapshot(now_ms,1000);bool all=true;for(unsigned i=0;i<12;++i)all=all&&fb.read_ok[i];f.mapped_fresh=all;}
+  {const auto fb=operational_producer_.snapshot(now_ms,1000);bool all=true;for(unsigned i=0;i<12;++i)all=all&&(fb.read_ok[i]||(operational_session_.state()!=execution::MotionSessionState::OFF&&fb.recovering[i]));f.mapped_fresh=all;if(fb.pending()&&all)f.raw_fresh=true;}
   f.operational_bound=runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_;
   f.admit_failed=admit_failed_;f.admit_reason=admit_reason_;
   // now_ms is the loop START; a BMS/IMU sample completed later in this same
@@ -617,21 +617,13 @@ const char* Controller::armOperationalSession(uint32_t now) {
   operational_feedback_=operational_producer_.snapshot(now,reviewed_motion_.execution.feedback_max_age_ms);
   if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL||!commissioning_bound_)return "OPERATIONAL_MODE_REQUIRED";
   if(authority_.current()!=ActuatorAuthority::MOTION||!motion_authority_lease_.valid())return "MOTION_AUTHORITY_REQUIRED";
-  if(!operatorPresent(now))return "OPERATOR_HEARTBEAT_REQUIRED";
   if(operational_session_.state()!=execution::MotionSessionState::OFF)return "SESSION_BUSY";
   for(unsigned i=0;i<12;++i)if(operational_producer_.raw(i).speed!=0||operational_producer_.raw(i).torque!=0)return "STATIONARY_TORQUE_OFF_REQUIRED_FOR_PRIME";
-  // Evidence from Controller facts, not operator tokens (directive 2026-10-14):
-  // installation = gen-1 RESTORE accepted against live raw spans; output
-  // ceiling = 12/12 persistent profile MATCH; power = BMS + power state;
-  // support = the authenticated operator is present (fixture route).
+  // Legacy diagnostic container carries only the route variant and live
+  // hardware observation here. No fixture/operator/test attestation is minted.
   execution::LocalTrialEvidence e;e.scope=execution::TrialScope::FIXTURE_COMMISSIONING;e.generation=++validation_sequence_;
-  e.expires_at_ms=now+presenceWindowMs();
-  e.local_operator_present=true;e.installation_verified=installation_live_verified_;
-  e.servo_output_ceiling_verified=servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE&&servo_preflight_.result().allPass();
-  e.physical_power_cut_verified=operational_facts_.bms_ok&&operational_facts_.power_ok;
-  e.fixture_support_verified=true;e.imu_fresh=operational_facts_.hardware_qualified;
+  e.imu_fresh=operational_facts_.hardware_qualified;
   e.prime_clamp_max_ticks=commissioning_params_.prime_clamp_ticks;
-  if(!e.installation_verified)return "INSTALLATION_LIVE_EVIDENCE_REQUIRED";
   operational_facts_.operator_permit=true;operational_facts_.permit_generation=e.generation;operational_facts_.permit_expires_at_ms=e.expires_at_ms;
   operational_facts_.lease=motion_authority_lease_;
   local_trial_evidence_=e;
@@ -644,7 +636,7 @@ const char* Controller::armOperationalSession(uint32_t now) {
     e.generation,motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason(),operational_feedback_);
   writeAdmissionTrace(Serial,trace,trace_bytes);
   if(!admitted){operational_facts_.operator_permit=false;return operational_session_.reason();}
-  const int n=snprintf(trace,sizeof(trace),"OPERATIONAL_SESSION=ARMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
+  const int n=snprintf(trace,sizeof(trace),"OPERATIONAL_SESSION=PRIMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
   if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,static_cast<size_t>(n));
   return nullptr;
 }
@@ -1272,24 +1264,16 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     if(boot_safe_off_mask_==((1u<<servo::kCanonicalServoCount)-1))boot_safe_off_pending_=false;
     return;
   }
-  if(validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs()){
+  if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL&&validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs()){
     validation_present_=false;validation_walk_admitted_=false;local_trial_evidence_.local_operator_present=false;
     operational_facts_.operator_permit=false;
     if(operational_session_.state()!=execution::MotionSessionState::OFF)
       operational_session_.revoke("LOCAL_PRESENCE_DEADMAN_EXPIRED");
   }
-  // OPERATIONAL: while the authenticated operator keeps polling, the declared
-  // fixture-support observation stays current and the finite permit of a
-  // live session is renewed. A lapse expires both (deadman -> SAFE_OFF).
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&operatorPresent(now_ms)){
-    // The heartbeat is presence/support only (Issue #52): it never stamps the
-    // encoder observation, which carries its own per-joint sample instants.
-    local_motion_observation_.supportStampS=validation_presence_ms_/1000.0;
-    if(operational_session_.state()!=execution::MotionSessionState::OFF&&operational_facts_.operator_permit){
-      operational_facts_.permit_expires_at_ms=local_trial_evidence_.expires_at_ms=validation_presence_ms_+presenceWindowMs();
-      local_trial_evidence_.local_operator_present=true;
-    }
-  }
+  // Only continuous teleoperation depends on live transport. STAND is a finite
+  // controller command; AP polling is not proof of presence or support.
+  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&motion_service_.busy()&&operatorPresent(now_ms))
+    motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));
   const auto& radio=wifi_.adminAccess();const uint32_t generation=radio.generation();
   if((validation_radio_generation_&&validation_radio_generation_!=generation)||radio.closing.load()||radio.radio_fault.load()){
     if(operational_session_.state()!=execution::MotionSessionState::OFF)operational_session_.revoke("RADIO_TRANSITION_REVOKED_LOCAL_SESSION");
@@ -1314,7 +1298,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     // within a bounded budget, each stamped at its own completion; the slow
     // 40..49 control block (torque/goal/profile/limit) rotates one joint per
     // 100 ms. Otherwise (prime/entry/STAND): the reviewed combined read.
-    const bool fast=motion_executor_.streaming()||motion_executor_.timedSegmentsActive();
+    const bool fast=motion_executor_.streaming()||motion_executor_.timedSegmentsActive()||operational_session_.state()==execution::MotionSessionState::ARMING;
     const unsigned reads=fast?3:1;const uint32_t budget_started=millis();
     for(unsigned k=0;k<reads&&(k==0||millis()-budget_started<2);++k){
     const unsigned slot=operational_poll_next_;
@@ -1352,7 +1336,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     if(r.read_ok&&joint&&r.temperature>70){int direct=-1;
       r.temperature=servo_bus_.readPresentTemperatureDirect(joint->bus_id,&direct)?direct:r.temperature;}
     operational_producer_.ingest(slot,r,geometry_profile_,actuator::geometry_data::kProvenance,actuator_policy_.transforms());
-    operational_poll_next_=static_cast<uint8_t>((slot+1)%12);operational_poll_at_ms_=r.sampled_at_ms;
+    operational_poll_next_=(!r.read_ok||r.position>=4096)?slot:static_cast<uint8_t>((slot+1)%12);operational_poll_at_ms_=r.sampled_at_ms;
     }
   }
   now_ms=millis(); // freshness uses completion time, never the pre-read clock
@@ -1400,6 +1384,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     return false;};
   const int output_ceiling=validation_profile_.sealed()?validation_profile_.output_ceiling:1000;
   for(unsigned i=0;i<12;++i){const auto& raw=operational_producer_.raw(i);
+    if(operational_feedback_.recovering[i]){prime_profiles=false;continue;}
     scoped=scoped&&raw.read_ok&&raw.temperature<=reviewed_motion_.max_servo_temperature_c&&
       raw.voltage>=reviewed_motion_.min_servo_voltage_dv&&raw.voltage<=reviewed_motion_.max_servo_voltage_dv;
     if(profileActive()){
@@ -1433,22 +1418,18 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       }
     }
   }
-  ready.hardware_approved=scoped&&((local_trial_evidence_.scope==execution::TrialScope::FIXTURE_MICRO||reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW)?
-    reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified);
+  ready.hardware_approved=scoped;
+  ready.hardware_reason=scope_loss?scope_loss:"HARDWARE_UNAVAILABLE";
   if(validation_walk_admitted_){
     const char* state=motion_coordinator_.state();
     if(!strcmp(state,"WALK_STARTING")||!strcmp(state,"WALK")||!strcmp(state,"STOPPING"))validation_walk_started_=true;
     else if(validation_walk_started_){validation_walk_admitted_=false;validation_walk_started_=false;}
   }
   ready.walk_qualified=reviewed_motion_bound_&&validation_walk_admitted_;
-  // OPERATIONAL first stride (2026-10-15): available only from a verified STAND
-  // of this armed session (or while that stride runs), with the authenticated
-  // operator present. STAND success never starts a stride by itself.
+  // WALK availability depends on its executable profile and live limits.
+  // The Coordinator owns the automatic transition through STAND.
   if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_){
-    const bool standing=!strcmp(motion_coordinator_.state(),"STAND")&&!motion_coordinator_.walking()&&
-                        motion_executor_.status().state==execution::ExecutorState::READY;
-    ready.walk_qualified=operational_walk_bound_&&reviewed_motion_bound_&&operatorPresent(now_ms)&&
-                         operational_session_.state()==execution::MotionSessionState::ARMED&&(standing||motion_coordinator_.walking());
+    ready.walk_qualified=operational_walk_bound_&&reviewed_motion_bound_;
   }
   ready.first_stride_only=reviewed_motion_bound_&&reviewed_motion_.walk.firstStrideOnly;
   ready.max_vx=reviewed_motion_.walk.maxVxMps;ready.max_vy=reviewed_motion_.walk.maxVyMps;ready.max_yaw_rate=reviewed_motion_.walk.maxYawRateRadS;
@@ -1457,16 +1438,15 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   for(unsigned i=0;i<12;++i)observation.actual.valid=observation.actual.valid&&operational_feedback_.read_ok[i];
   for(unsigned i=0;i<4;++i)observation.actual.legs[i]={operational_feedback_.actual_rad[i*3],operational_feedback_.actual_rad[i*3+1],operational_feedback_.actual_rad[i*3+2]};
   for(unsigned i=0;i<12;++i)observation.stationary=observation.stationary&&operational_producer_.raw(i).speed==0;
-  // Encoder vector stamp = its OLDEST per-joint sample (real read completion,
-  // monotonic clock); support = the declaration while the operator is present.
+  // Encoder timestamp remains the oldest real sample. The operational route
+  // uses model support assumptions, never a presence heartbeat as measurement.
   {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(operational_feedback_.sampled_at_us[i]<oldest)oldest=operational_feedback_.sampled_at_us[i];
    observation.stampS=observation.actual.valid&&oldest!=UINT64_MAX?oldest/1e6:0;
-   observation.externalSupportConfirmed=local_motion_observation_.externalSupportConfirmed&&(commissioning_bound_?operatorPresent(now_ms):true);}
-  // Commissioning: fixture support is the operator's declaration kept alive
-  // by the 1 s deadman, independent of where the joints are; the planner
-  // still checks every observation against the hard limits itself.
+   observation.externalSupportConfirmed=local_motion_observation_.externalSupportConfirmed&&(commissioning_bound_&&runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL?operatorPresent(now_ms):true);}
+  // Diagnostic fixture declarations remain local to diagnostics. Operational
+  // geometry uses its configured support model and live joint limits.
   ready.support_observable=commissioning_bound_?
-    (operatorPresent(now_ms)&&local_motion_observation_.externalSupportConfirmed):
+    ((runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||operatorPresent(now_ms))&&local_motion_observation_.externalSupportConfirmed):
     reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
     motion::checkObservation(observation,reviewed_motion_.feedback,motion_clock_.now()/1e6)==motion::FeedbackReason::OK;
   ready.local_fixture_session=operational_session_.state()==execution::MotionSessionState::ARMED&&
@@ -1499,6 +1479,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // Validate measured support/pose before the next actuator step. A revoked
   // fixture or lost held contact must stop WRITING without waiting for its ACK.
   const auto session_before=operational_session_.state();
+  const bool executor_stopped_before=motion_executor_.status().safe_off_required;
   operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
   if(session_before!=operational_session_.state()&&operational_session_.state()==execution::MotionSessionState::SAFE_OFF_REQUIRED&&
      (session_before==execution::MotionSessionState::PRIMING||session_before==execution::MotionSessionState::ENERGIZING||session_before==execution::MotionSessionState::ARMING)){
@@ -1507,13 +1488,18 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
                          operational_session_.failedJoint(),operational_session_.failureDetail());
     if(n>0&&static_cast<size_t>(n)<sizeof(line))writeAdmissionTrace(Serial,line,static_cast<size_t>(n));
   }
+  if(session_before!=operational_session_.state()){
+    char trace[160];const int n=snprintf(trace,sizeof(trace),"MOTION_PHASE now_ms=%lu state=%s reason=%s\r\n",
+      (unsigned long)millis(),operational_session_.stateName(),operational_session_.reason());
+    if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
+  }
   if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
   // The stride's internal TTL lives only as long as the operator heartbeat.
   // During the coordinated stop too: losing the heartbeat at any phase = SAFE_OFF.
   if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&motion_coordinator_.walking()&&operatorPresent(now_ms)){
     motion_coordinator_.renewWalk(now_ms);motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));}
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));
-  if(profileActive()&&validation_present_&&
+  if(profileActive()&&(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||validation_present_)&&
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
     const auto& frame=motion_coordinator_.frame();
     if(frame.target.valid&&!frame.executable){
@@ -1530,12 +1516,17 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     }
   }
   motion_executor_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
+  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
+    char trace[192];const int n=snprintf(trace,sizeof(trace),"MOTION_FIRST_STOP now_ms=%lu session=%s reason=%s tx_sequence=%lu\r\n",
+      (unsigned long)millis(),operational_session_.stateName(),motion_executor_.status().reason,
+      (unsigned long)motion_executor_.status().tx_sequence);
+    if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
+  }
   ready.operational_permit=operational_facts_.operator_permit&&operational_session_.state()==execution::MotionSessionState::ARMED;
-  // OPERATIONAL: READY with MOTION authority held and an authenticated operator
-  // present IS the permit to accept a command; the command then arms its own
-  // session (prime/energize/arm) under the same gates.
+  // Compatibility telemetry only: operational availability is determined by
+  // live hardware/authority; no operator permit is consumed by MotionService.
   if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&
-     authority_.current()==ActuatorAuthority::MOTION&&operatorPresent(now_ms)&&
+     authority_.current()==ActuatorAuthority::MOTION&&
      operational_session_.state()!=execution::MotionSessionState::SAFE_OFF_REQUIRED)ready.operational_permit=true;
   // Terminal service results must use this tick's validated planner/executor.
   motion_service_.refresh(ready,now_ms);
@@ -1548,6 +1539,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   if(telemetry.height_valid)telemetry.base_height_m=observation.body.translationM.z;
   for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
   telemetry.source="HARDWARE_SERVO_FEEDBACK";
+  telemetry.feedback_recovering=operational_feedback_.pending();
   telemetry.feedback_max_age_ms=motion_executor_.timedSegmentsActive()||motion_executor_.streaming()?execution::MotionExecutor::kTimedFeedbackMaxAgeMs:reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500;
   telemetry.raw_valid=operational_producer_.rawFresh(now_ms,telemetry.feedback_max_age_ms);telemetry.joints_valid=telemetry.raw_valid;
   telemetry.sampled_at_ms=now_ms;
@@ -1668,7 +1660,7 @@ void Controller::update(uint32_t now_ms) {
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
   servo_preflight_.update();
-  updateOperationalReadiness(now_ms);
+  updateOperationalReadiness(millis());
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();

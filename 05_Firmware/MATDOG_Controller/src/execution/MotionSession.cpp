@@ -8,31 +8,18 @@ void MotionSession::begin(actuator::SafeActuatorPolicy* p,actuator::ActuatorRunt
  const actuator::CalibrationGeometryProfile* g,const actuator::GeometryProvenance* v){policy_=p;runtime_=r;executor_=e;arbiter_=a;geometry_=g;provenance_=v;}
 const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) const {
  if(!policy_||!runtime_||!executor_||!arbiter_||!geometry_||!provenance_)return "NOT_BOUND";
- if(!e.generation)return "LOCAL_TRIAL_GENERATION_REQUIRED";
- if(static_cast<int32_t>(now-e.expires_at_ms)>=0)return "LOCAL_TRIAL_EXPIRED";
- if(!e.local_operator_present)return "LOCAL_OPERATOR_ABSENT";
- if(!e.physical_power_cut_verified)return "LOCAL_POWER_EVIDENCE_REQUIRED";
- if(!e.installation_verified)return "INSTALLATION_LIVE_EVIDENCE_REQUIRED";
- if(!e.servo_output_ceiling_verified)return "SERVO_OUTPUT_CEILING_REQUIRED";
- if(!e.imu_fresh)return e.scope_loss?e.scope_loss:"LOCAL_HARDWARE_SCOPE_REQUIRED";
- if(e.scope==TrialScope::FIXTURE_MICRO||e.scope==TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==TrialScope::SUPERVISED_FIXTURE_WALK||e.scope==TrialScope::FIXTURE_COMMISSIONING){if(!e.fixture_support_verified)return "FIXTURE_SUPPORT_REQUIRED";}
- else if(e.scope==TrialScope::AUTONOMOUS_STAND||e.scope==TrialScope::AUTONOMOUS_WALK){
-   if(!e.support_load_observable)return "AUTONOMOUS_SUPPORT_LOAD_REQUIRED";
-   if(e.scope==TrialScope::AUTONOMOUS_WALK&&!e.loaded_dynamics_qualified)return "WALK_DYNAMICS_REQUIRED";
- }
- else return "TRIAL_SCOPE_INVALID";
+ // Runtime conditions only: external qualification is not a motion permit.
+ if(!e.imu_fresh)return e.scope_loss?e.scope_loss:"IMU_UNAVAILABLE";
  if(!f.calibration_accepted||!f.envelopes_approved)return "RESTORE_OR_LIMITS_REQUIRED";
- if(!f.operator_permit||!f.permit_generation||static_cast<int32_t>(now-f.permit_expires_at_ms)>=0)return "PERMIT_REVOKED_OR_EXPIRED";
  if(f.mode!=core::OperatingMode::RUN||f.fault||!f.power_ok||!f.bms_ok||arbiter_->inhibited())return "MODE_POWER_FAULT";
- if(!f.hardware_qualified||!f.sequential_bus_qualified)return "SCOPED_HARDWARE_TIMING_REQUIRED";
- if(state_!=MotionSessionState::OFF && (e.generation!=evidence_.generation||e.scope!=evidence_.scope||
-    f.permit_generation!=permit_generation_||policy_->epoch()!=epoch_||arbiter_->generation()!=lease_.generation||
+ if(!f.hardware_qualified||!f.sequential_bus_qualified)return "LIVE_HARDWARE_UNAVAILABLE";
+ if(state_!=MotionSessionState::OFF && (policy_->epoch()!=epoch_||arbiter_->generation()!=lease_.generation||
     arbiter_->current()!=core::ActuatorAuthority::MOTION))return "SESSION_CHANGED";
  if(!geometry_->provenanceMatches(*provenance_))return "GEOMETRY_MISMATCH";
  for(unsigned i=0;i<12;++i){
   if(static_cast<int32_t>(now-fb.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
   if(now-fb.sampled_at_ms[i]>envelope_.feedback_max_age_ms)return "STALE_FEEDBACK";
-  if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i]))return "FEEDBACK_INVALID";
+  if((!fb.read_ok[i]&&!fb.recovering[i])||!std::isfinite(fb.actual_rad[i]))return "FEEDBACK_INVALID";
  }
  return nullptr;
 }
@@ -77,6 +64,7 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
     !std::isfinite(envelope.max_acceleration_rad_s2)||envelope.max_acceleration_rad_s2<=0||!std::isfinite(envelope.tracking_tolerance_rad)||
     envelope.tracking_tolerance_rad<=0){reason_="ENVELOPE_UNAPPROVED";return false;}
  if(const char* r=gate(e,f,fb,now)){reason_=r;return false;}
+ if(fb.pending()){reason_="FEEDBACK_RETRY_PENDING";return false;}
  uint16_t clamp_mask=0;uint8_t clamp_ticks[12]{};double primed[12]{};
  for(unsigned i=0;i<12;++i){actuator::ActuatorCommand cmd;uint8_t bus;
   primed[i]=fb.actual_rad[i];
@@ -140,6 +128,10 @@ void MotionSession::confirmSafeOff(){
 void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFacts& input,const JointFeedback& fb,uint32_t now){
  if(state_==MotionSessionState::OFF||state_==MotionSessionState::SAFE_OFF_REQUIRED)return;
  if(const char* r=gate(e,input,fb,now)){revoke(r);return;}
+ if(fb.pending()){
+  if(state_!=MotionSessionState::ARMED&&now-started_at_ms_>=envelope_.batch_timeout_ms)revoke("PRIME_ARM_TIMEOUT");
+  return;
+ }
  auto f=input;f.lease=lease_;
  if(state_==MotionSessionState::ARMED){
   if(!executor_->active()){revoke(executor_->status().reason);return;}
@@ -170,7 +162,7 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
   // Clamped joints must have settled at their inside target before arm.
   for(unsigned i=0;i<12;++i)if(std::abs(fb.actual_rad[i]-primed_rad_[i])>envelope_.tracking_tolerance_rad)return;
   if(!executor_->arm(f,envelope_,fb,now)){revoke(executor_->status().reason);return;}
-  state_=MotionSessionState::ARMED;reason_="ARMED_LOCAL_SCOPED_PERMIT";return;
+  state_=MotionSessionState::ARMED;reason_="ARMED";return;
  }
  actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(next_,primed_rad_[next_],cmd,bus)){revoke("PRIME_MAPPING_OR_LIMITS");return;}
  if(state_==MotionSessionState::PRIMING && fb.torque_on[next_]){revoke("TORQUE_CHANGED_DURING_PRIME");return;}

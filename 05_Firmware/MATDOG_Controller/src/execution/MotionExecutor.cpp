@@ -6,19 +6,18 @@
 namespace matdog { namespace execution {
 const char* toString(ExecutorState s) { switch(s){case ExecutorState::OFF:return "OFF";case ExecutorState::READY:return "READY";case ExecutorState::WRITING:return "WRITING";case ExecutorState::TRACKING:return "TRACKING";case ExecutorState::SAFE_OFF_REQUIRED:return "SAFE_OFF_REQUIRED";case ExecutorState::STREAMING:return "STREAMING";case ExecutorState::HOLD:return "HOLD";default:return "FAULT";} }
 void MotionExecutor::begin(actuator::SafeActuatorPolicy* p,actuator::ActuatorRuntime* r,const actuator::CalibrationGeometryProfile* g,const actuator::GeometryProvenance* v,const core::ActuatorAuthorityArbiter* a) { policy_=p;runtime_=r;geometry_=g;provenance_=v;arbiter_=a;status_=ExecutorStatus{}; }
-const char* MotionExecutor::gate(const MotionExecutionFacts& f,uint32_t now) const {
+const char* MotionExecutor::gate(const MotionExecutionFacts& f,uint32_t /*now*/) const {
  if(!policy_||!runtime_||!geometry_||!provenance_||!arbiter_)return "NOT_BOUND";
  if(f.fault)return "FAULT";
  if(arbiter_->inhibited())return "INHIBITED";
  if(!f.calibration_accepted)return "CALIBRATION_NOT_ACCEPTED";
  if(!f.envelopes_approved)return "LIMITS_NOT_APPROVED";
- if(!f.hardware_qualified||!f.sequential_bus_qualified)return "HARDWARE_NOT_QUALIFIED";
- if(!f.operator_permit||!f.permit_generation||static_cast<int32_t>(now-f.permit_expires_at_ms)>=0)return "PERMIT_REVOKED_OR_EXPIRED";
+ if(!f.hardware_qualified||!f.sequential_bus_qualified)return "LIVE_HARDWARE_UNAVAILABLE";
  if(!f.bms_ok||!f.power_ok)return "POWER_OR_BMS";
  if(f.mode!=core::OperatingMode::RUN)return "MODE";
  if(f.lease.owner!=core::ActuatorAuthority::MOTION||(arbiter_->current()!=f.lease.owner||arbiter_->generation()!=f.lease.generation))return "AUTHORITY_REVOKED";
  if(!geometry_->provenanceMatches(*provenance_)||policy_->currentGeometryTag()!=geometry_->provenanceTag())return "GEOMETRY_MISMATCH";
- if(active()&&(permit_generation_!=f.permit_generation||lease_.generation!=f.lease.generation||policy_epoch_!=policy_->epoch()))return "SESSION_CHANGED";
+ if(active()&&(lease_.generation!=f.lease.generation||policy_epoch_!=policy_->epoch()))return "SESSION_CHANGED";
  return nullptr;
 }
 const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now) const {
@@ -26,7 +25,7 @@ const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now)
  for(unsigned i=0;i<12;i++){
   if(static_cast<int32_t>(now-f.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
   if(now-f.sampled_at_ms[i]>age)return "STALE_FEEDBACK";
-  if(!f.read_ok[i]||!std::isfinite(f.actual_rad[i]))return "FEEDBACK_INVALID";
+  if((!f.read_ok[i]&&!f.recovering[i])||!std::isfinite(f.actual_rad[i]))return "FEEDBACK_INVALID";
   if(!f.torque_on[i])return "TORQUE_LOST";
  }
  return nullptr;
@@ -37,6 +36,7 @@ bool MotionExecutor::arm(const MotionExecutionFacts& f,const ExecutionEnvelope& 
  if(const char* reason=gate(f,now))return reject(reason);
  if(!e.approved||!std::isfinite(e.max_velocity_rad_s)||!std::isfinite(e.max_acceleration_rad_s2)||!std::isfinite(e.tracking_tolerance_rad)||e.max_velocity_rad_s<=0||e.max_acceleration_rad_s2<=0||e.tracking_tolerance_rad<=0||!e.feedback_max_age_ms||!e.batch_timeout_ms||!e.tracking_timeout_ms||e.feedback_max_age_ms>3000||e.batch_timeout_ms>3000||e.tracking_timeout_ms>30000)return reject("ENVELOPE_UNAPPROVED");
  if(e.timed_segments&&(!e.frame_writes||!std::isfinite(e.arrival_tolerance_rad)||e.arrival_tolerance_rad<=0||e.arrival_tolerance_rad>e.tracking_tolerance_rad))return reject("ENVELOPE_UNAPPROVED");
+ if(fb.pending())return reject("FEEDBACK_RETRY_PENDING");
  envelope_=armed_envelope_=e;if(const char* why=feedbackFailure(fb,now))return reject(why);
  // A separately supervised prime/torque procedure is required before arm.
  // Arm itself issues no torque or position writes.
@@ -59,6 +59,7 @@ bool MotionExecutor::resolve(uint8_t i,double q,actuator::ActuatorCommand* cmd,u
 }
 bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameValidation& v,uint32_t issued,uint32_t ttl,double dt,const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) {
  if(status_.state!=ExecutorState::READY)return reject("EXECUTOR_BUSY");
+ if(fb.pending())return false;
  if(const char* reason=gate(f,now))return reject(reason);
  if(!frame.valid||!frame.sequence||static_cast<int32_t>(frame.sequence-status_.accepted_sequence)<=0)return reject("FRAME_SEQUENCE");
  if(!ttl||ttl>30000||static_cast<int32_t>(now-issued)<0||now-issued>=ttl)return reject("FRAME_EXPIRED");
@@ -86,6 +87,10 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
  if(const char* r=gate(f,now)){stop(r);return;}
  if(streaming())return;   // streaming: monitor() owns feedback/tracking (asynchronous, per joint)
  if(const char* why=feedbackFailure(fb,now)){stop(why);return;}
+ if(fb.pending()){
+  if(status_.state!=ExecutorState::READY&&static_cast<int32_t>(now-deadline_ms_)>=0)stop("COMMAND_TIMEOUT");
+  return;
+ }
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}}
  if(status_.state==ExecutorState::READY){
   if(envelope_.timed_segments&&!validation_.final&&status_.completed_sequence&&now-tracking_since_ms_>kTimedMaxFrameGapMs){stop("FRAME_CADENCE_GAP");return;}
@@ -145,6 +150,7 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
 // Streaming (Issue #52, 2026-10-15)
 // ---------------------------------------------------------------------------
 bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,uint64_t now_us) {
+ if(fb.pending())return false;
  if(status_.state!=ExecutorState::READY)return false;
  if(!std::isfinite(c.tube_rad)||c.tube_rad<=0||c.tube_rad>envelope_.tracking_tolerance_rad+1e-12||!std::isfinite(c.max_lag_s)||c.max_lag_s<=0||c.max_lag_s>.5||
     !std::isfinite(c.settle_speed_rad_s)||c.settle_speed_rad_s<0||!c.feedback_max_age_us||c.feedback_max_age_us>500000||!c.hold_timeout_us||
@@ -179,6 +185,7 @@ bool MotionExecutor::frameTx(const double target[12],const MotionExecutionFacts&
 bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameValidation& v,uint64_t release_us,uint64_t deadline_us,bool final,
                             const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now,uint64_t now_us) {
  if(status_.state!=ExecutorState::STREAMING){++status_.frames_refused;return reject("STREAM_NOT_ACTIVE");}
+ if(fb.pending()){++status_.frames_refused;return false;}
  if(const char* reason=gate(f,now))return reject(reason);
  if(!frame.valid||!frame.sequence||static_cast<int32_t>(frame.sequence-status_.validated_sequence)<=0)return reject("FRAME_SEQUENCE");
  if(release_us<=last_release_us_||release_us>now_us||deadline_us<=now_us)return reject("FRAME_DEADLINE");
@@ -231,6 +238,7 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
  for(unsigned i=0;i<12;i++){
   if(!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us){stop("FEEDBACK_CLOCK_INVALID");return;}
   if(now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){stop("STREAM_FEEDBACK_STALE");return;}
+  if(fb.recovering[i]){settled=false;continue;}
   if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i])){stop("FEEDBACK_INVALID");return;}
   if(!fb.torque_on[i]){stop("TORQUE_LOST");return;}
   actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}
@@ -264,6 +272,6 @@ bool MotionExecutor::selectRates(double v,double a) {
     v>kWalkRateCeilingRadS||a>kWalkAccelerationCeilingRadS2)return false;
  envelope_.max_velocity_rad_s=v;envelope_.max_acceleration_rad_s2=a;return true;
 }
-void MotionExecutor::stop(const char* r) { if(active()||status_.safe_off_required){status_.state=ExecutorState::SAFE_OFF_REQUIRED;status_.safe_off_required=true;}status_.reason=r; }
+void MotionExecutor::stop(const char* r) { if(status_.safe_off_required)return; status_.state=ExecutorState::SAFE_OFF_REQUIRED;status_.safe_off_required=true;status_.reason=r; }
 void MotionExecutor::confirmSafeOff(bool off) { if(status_.safe_off_required&&off){status_.safe_off_required=false;status_.state=ExecutorState::OFF;} }
 } }

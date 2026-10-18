@@ -39,6 +39,14 @@ bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
   w.externalSupportRequired=false;
   w.requiredFeet=15;w.durationS=1;route.waypoints[route.count++]=w;return true;
 }
+bool AdaptiveStand::prepareTimedRoute(const AcquisitionRoute& r,const FeedbackPolicy& p){
+  if(!r.pairedProne||!r.phaseTimed)return true;
+  const double v=.999*r.phaseVelocityRadS,a=.999*r.phaseAccelerationRadS2/2;
+  if(timed_.valid&&timedVariant_==p.fixtureLimitVariant&&timed_.velocityRadS==v&&
+     timed_.accelerationRadS2==a&&timed_.frameS==p.samplePeriodS)return true;
+  timedVariant_=p.fixtureLimitVariant;
+  return buildPhaseTimedRoute(timedVariant_,v,a,p.samplePeriodS,&timed_);
+}
 bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& p,double now){
   state_=AdaptiveStandState::IDLE;poseClass_=ObservedPoseClass::UNKNOWN;reason_=FeedbackReason::NOT_REQUESTED;
   previous_={};segmentStart_={};pending_=FeedbackFrame{};assessment_={};pendingValid_=assessed_=submitted_=physicalReady_=false;
@@ -62,7 +70,7 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
     // Only behind a staged entry (the route then starts exactly at knot 0).
     // 0.999: the law's peaks sit strictly inside the checkSegment limits (an
     // exactly-equal analytic peak can exceed them by rounding).
-    if(!r.entry||!buildPhaseTimedRoute(p.fixtureLimitVariant,.999*route_.phaseVelocityRadS,.999*route_.phaseAccelerationRadS2/2,p.samplePeriodS,&timed_)||
+    if(!r.entry||!prepareTimedRoute(route_,p)||
        route_.phaseVelocityRadS>p.maxVelocityRadS[0].upper+1e-12){reject(FeedbackReason::INVALID_POLICY);return false;}
     timedActive_=true;
   }

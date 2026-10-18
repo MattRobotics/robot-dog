@@ -24,10 +24,25 @@ void OperationalFeedback::ingest(unsigned i,const RawJointObservation& sample,co
  {actuator::MicroRad q1=0;const uint16_t next=static_cast<uint16_t>(sample.position<4095?sample.position+1:sample.position-1);
   if(actuator::resolveRawToUrdfQ(geometry,provenance,*t,next,&q1)==actuator::TargetResolveStatus::OK){
    const double per_tick=(q1-q)/1e6*(sample.position<4095?1:-1);feedback_.speed_rad_s[i]=sample.speed_signed*per_tick;}}
+ last_valid_.read_ok[i]=true;last_valid_.sampled_at_ms[i]=feedback_.sampled_at_ms[i];
+ last_valid_.sampled_at_us[i]=feedback_.sampled_at_us[i];last_valid_.actual_rad[i]=feedback_.actual_rad[i];
+ last_valid_.torque_on[i]=feedback_.torque_on[i];last_valid_.speed_rad_s[i]=feedback_.speed_rad_s[i];
 }
 JointFeedback OperationalFeedback::snapshot(uint32_t now,uint32_t age) const {
  auto f=feedback_;
- for(unsigned i=0;i<12;++i)if(!age||static_cast<int32_t>(now-f.sampled_at_ms[i])<0||now-f.sampled_at_ms[i]>age)f.read_ok[i]=false;
+ for(unsigned i=0;i<12;++i){
+  // Failed transport / malformed position: retry within the ORIGINAL age
+  // limit, keeping the last valid timestamp and explicitly invalid feedback.
+  // Valid physical alarms are never hidden by this recovery window.
+  const auto& r=raw_[i];
+  if((!r.read_ok||(r.position>=4096&&r.status==0&&r.temperature>=0&&r.temperature<=70&&r.voltage>0&&r.torque>=0&&r.torque<=1))&&last_valid_.read_ok[i]&&age&&
+     static_cast<int32_t>(now-last_valid_.sampled_at_ms[i])>=0&&now-last_valid_.sampled_at_ms[i]<=age){
+   f.recovering[i]=true;f.read_ok[i]=false;
+   f.sampled_at_ms[i]=last_valid_.sampled_at_ms[i];f.sampled_at_us[i]=last_valid_.sampled_at_us[i];
+   f.actual_rad[i]=last_valid_.actual_rad[i];f.torque_on[i]=last_valid_.torque_on[i];
+  }
+  if(!age||static_cast<int32_t>(now-f.sampled_at_ms[i])<0||now-f.sampled_at_ms[i]>age)f.read_ok[i]=false;
+ }
  return f;
 }
 bool OperationalFeedback::rawFresh(uint32_t now,uint32_t age) const {

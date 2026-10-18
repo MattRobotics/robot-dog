@@ -24,6 +24,7 @@ class OperationalFeedback {
  const RawJointObservation& raw(unsigned slot) const {return raw_[slot<12?slot:0];}
  private:
  RawJointObservation raw_[12]{};
+ JointFeedback last_valid_{};
  JointFeedback feedback_{};
 };
 } }

@@ -257,7 +257,8 @@ target.write_text(json.dumps(config, indent=2) + "\n")
 PY
   CLI_OPTIONS=(--config-file "$CLI_CONFIG")
   LIBRARY_ROOT="${MATDOG_ARDUINO_LIBRARY_ROOT:-$HOME/Arduino/libraries}"
-  COMPILE_OPTIONS=(--clean --build-path "$COMPILE_DIR" --libraries "$LIBRARY_ROOT" "${COMPILE_EXTRA[@]}")
+  # Incremental compilation: never erase an existing build as a side effect.
+  COMPILE_OPTIONS=(--build-path "$COMPILE_DIR" --libraries "$LIBRARY_ROOT" "${COMPILE_EXTRA[@]}")
 fi
 APPLICATION_BINARY="$BUILD_DIR/MATDOG_Controller.ino.bin"
 PARTITION_ARTIFACT="$BUILD_DIR/MATDOG_Controller.ino.partitions.bin"

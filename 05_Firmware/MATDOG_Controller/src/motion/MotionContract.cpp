@@ -4,12 +4,12 @@
 namespace matdog { namespace motion {
 #define A(id,category,label,parameters,capability,implemented,intent) {id,category,label,parameters,"runtime_calibration;approved_limits;support_evidence;local_GO",capability,implemented,Intent::intent}
 static const MotionAction catalog[kMotionActionCount] = {
- A("posture.stand","Posture","Stand adattivo","target_height_m:0.06..0.15","stand",true,STAND),
+ A("posture.stand","Posture","Stand adattivo","target_height_m:0..0.15","stand",true,STAND),
  A("posture.lie_down","Posture","Lie down","target_height_m","lie_down",false,LIE_DOWN),
  A("posture.sit","Posture","Sit","none","sit",false,ACTION_EXECUTE),
  A("posture.crouch","Posture","Crouch","target_height_m","crouch",false,ACTION_EXECUTE),
- A("posture.height","Posture","Body height","target_height_m:0.06..0.15","stand",true,STAND),
- A("posture.confirm","Posture","Confirm stand","target_height_m:0.06..0.15","stand",true,STAND),
+ A("posture.height","Posture","Body height","target_height_m:0..0.15","stand",true,STAND),
+ A("posture.confirm","Posture","Confirm stand","target_height_m:0..0.15","stand",true,STAND),
  A("gait.walk","Gait","WALK","gait:WALK","walk",true,GAIT_SELECT),
  A("gait.trot","Gait","TROT","gait:TROT","trot",false,GAIT_SELECT),
  A("gait.pace","Gait","PACE","gait:PACE","pace",false,GAIT_SELECT),
@@ -49,7 +49,7 @@ static const MotionAction catalog[kMotionActionCount] = {
  A("recovery.observe","Recovery","Observe pose","none","observe",false,ACTION_EXECUTE),
  A("recovery.classify","Recovery","Classify pose","none","classify",false,ACTION_EXECUTE),
  A("recovery.acquire_support","Recovery","Acquire support","none","acquire_support",false,ACTION_EXECUTE),
- A("recovery.stand","Recovery","Recover to stand","target_height_m:0.06..0.15","stand",true,STAND),
+ A("recovery.stand","Recovery","Recover to stand","target_height_m:0..0.15","stand",true,STAND),
  A("motion.stop","Safety","STOP","none","stop",true,STOP),
  A("motion.status","Safety","Motion status","none","status",true,STATUS)
 };
@@ -72,6 +72,8 @@ bool validCommand(const MotionCommand& c,uint32_t now,const char** reason) {
  if(!c.sequence)return reject("SEQUENCE");
  if(c.owner==ClientOwner::UNKNOWN||static_cast<unsigned>(c.owner)>3)return reject("OWNER");
  if(c.intent==Intent::UNKNOWN||static_cast<unsigned>(c.intent)>9)return reject("INTENT");
+ // STOP de-escalates even with a stale dashboard clock or expired command TTL.
+ if(c.intent==Intent::STOP){if(reason)*reason="OK";return true;}
  // signed age rejects future times and remains correct across uptime wrap.
  const int32_t age=static_cast<int32_t>(now-c.issued_at_ms);
  if(age<0)return reject("FUTURE_TIMESTAMP");

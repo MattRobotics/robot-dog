@@ -6,8 +6,8 @@ fw=Path(__file__).resolve().parents[2]
 s=(fw/'src/core/Controller.cpp').read_text()
 start=s.index('bool Controller::operatorPresent(');end=s.index('\nconst char* Controller::armOperationalSession',start)
 methods=s[start:end]
-start=s.index('  if(validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs())')
-end=s.index('  // OPERATIONAL:',start)
+start=s.index('  if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL&&validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs())')
+end=s.index('  // Only continuous teleoperation',start)
 expiry=s[start:end]
 assert 'http_transport_.update(millis());' in s
 assert 'now=millis();\n  operational_feedback_=operational_producer_.snapshot(now,' in s
@@ -33,12 +33,14 @@ int main(){
  Controller c;Controller::HeartbeatHook hook{&c};hook.heartbeat(10000);
  assert(c.operatorPresent(10000)&&c.operatorPresent(13000)&&!c.operatorPresent(13001));
  assert(!c.operatorPresent(9999));c.operational_facts_.operator_permit=true;c.expire(13001);
- assert(!c.validation_present_&&!c.operational_facts_.operator_permit);
+ assert(c.validation_present_&&c.operational_facts_.operator_permit); // finite operational commands do not expire with presence
  assert(!strcmp(c.operational_session_.reason,"OLD_ADMISSION_RESULT")); // OFF history unchanged
  hook.heartbeat(14000);c.operational_session_.current=execution::MotionSessionState::ARMED;c.expire(17001);
+ assert(c.operational_session_.current==execution::MotionSessionState::ARMED);
+ c.runtime_mode_=execution::RuntimeTestMode::DIAGNOSTIC;c.expire(17001);
  assert(c.operational_session_.current==execution::MotionSessionState::SAFE_OFF_REQUIRED);
  assert(!strcmp(c.operational_session_.reason,"LOCAL_PRESENCE_DEADMAN_EXPIRED"));
- hook.heartbeat(UINT32_MAX-1000);assert(c.operatorPresent(1999)&&!c.operatorPresent(2000));
+ c.runtime_mode_=execution::RuntimeTestMode::OPERATIONAL;hook.heartbeat(UINT32_MAX-1000);assert(c.operatorPresent(1999)&&!c.operatorPresent(2000));
  c.validation_present_=false;assert(!c.operatorPresent(100)); // stored browser session alone proves no presence
  c.commissioning_bound_=false;hook.heartbeat(100);assert(!c.validation_present_);
 }
@@ -47,4 +49,4 @@ with tempfile.TemporaryDirectory(prefix='matdog-presence-') as d:
  p=Path(d);(p/'test.cpp').write_text(unit)
  subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror',str(p/'test.cpp'),'-o',str(p/'test')],check=True)
  subprocess.run([str(p/'test')],check=True)
-print('POST_VALIDATION_CLOCK PASS: 3s boundary, future, wrap, OFF history, active SAFE_OFF, auth != presence; production hooks and admission clock wiring')
+print('POST_VALIDATION_CLOCK PASS: 3s boundary, future, wrap, OFF history, operational no presence permit, diagnostic SAFE_OFF, auth != presence; production hooks and admission clock wiring')

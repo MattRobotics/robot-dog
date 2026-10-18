@@ -7,7 +7,7 @@ static_assert(matdog::motion::operational_walk::kMaxProfileVelocityRadS<=matdog:
               matdog::motion::operational_walk::kMaxProfileAccelerationRadS2<=matdog::execution::MotionExecutor::kWalkAccelerationCeilingRadS2,
               "every walk profile envelope must fit the executor ceilings");
 namespace matdog { namespace execution {
-void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;submitted_sequence_=0;arm_generation_=0;}
+void MotionCoordinator::begin(MotionExecutor* e,actuator::SafeActuatorPolicy* p){executor_=e;policy_=p;configured_=false;walking_=false;pending_stand_=pending_walk_=false;submitted_sequence_=0;arm_generation_=0;}
 void MotionCoordinator::synchronizeSession(){
  if(!executor_||arm_generation_==executor_->status().arm_generation)return;
  arm_generation_=executor_->status().arm_generation;
@@ -20,7 +20,10 @@ bool MotionCoordinator::configure(const motion::FeedbackPolicy& p,const motion::
  if(!motion::validFeedbackPolicy(p))return false;
  feedback_policy_=p;walk_specification_=w;
  static const motion::AcquisitionRoute kEmptyRoute{};   // no multi-KB temporary on the loop stack
- if(a)acquisition_=*a;else acquisition_=kEmptyRoute;configured_=true;return true;
+ if(a)acquisition_=*a;else acquisition_=kEmptyRoute;
+ // Build the static timing table before PRIME, never while holding torque.
+ if(!stand_.prepareTimedRoute(acquisition_,p))return false;
+ configured_=true;return true;
 }
 bool MotionCoordinator::configureCommissioning(const CommissioningStandConfig& c){
  if(executor_&&executor_->active())return false;
@@ -45,7 +48,6 @@ bool MotionCoordinator::assess(const motion::SegmentAssessment& a,uint32_t now){
  return ok;
 }
 const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_t now){
-   if(session_&&session_->scope()==TrialScope::FIXTURE_MICRO)return "AUTONOMOUS_STAND_SCOPE_REQUIRED";
    if(walking_)return "WALK_MUST_STOP_FIRST";
    if(commissioning_.enabled&&commissioning_.measuredStart&&stand_.state()==motion::AdaptiveStandState::STAND){
     // Already standing: change height from the verified solution (or acknowledge the same height).
@@ -59,7 +61,6 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
    if(commissioning_.enabled&&commissioning_.measuredStart){final_height_m_=c.target_height_m;r.targetHeightM=.150;}
    if(acquisition_.count||acquisition_.pairedProne)r.acquisition=&acquisition_;
    if(commissioning_.enabled){
-    if(!session_||session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "COMMISSIONING_SCOPE_REQUIRED";
     // The entry starts at the armed (held) pose, never at a nominal knot.
     motion::JointTargetFrame start;start.valid=true;
     for(unsigned i=0;i<12;++i){auto& q=start.legs[i/3];(i%3==0?q.hip:i%3==1?q.upper:q.lower)=executor_->targetRadians()[i];}
@@ -108,6 +109,20 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
  synchronizeSession();
  if(!configured_)return "PLANNER_ARTIFACT_REQUIRED";
  if(pending_stand_)return "ARMING_IN_PROGRESS";
+ // WALK owns its prerequisite transition; there is no dependency between UI buttons.
+ if(c.intent==motion::Intent::BASE_VELOCITY&&commissioning_.measuredStart&&!walking_){
+  const bool zero=c.vx==0&&c.vy==0&&c.yaw_rate==0;
+  if(zero){if(pending_walk_)stop(now);return nullptr;}
+  const auto* profile=motion::operational_walk::profileForVelocity(c.vx);
+  if(!profile||c.vy!=0||c.yaw_rate!=0)return "WALK_SPEED_OUTSIDE_PROFILE";
+  if(!motion::operational_walk::fitsLimits(*profile,feedback_policy_,feedback_policy_.maxTrackingErrorRad))return "WALK_PROFILE_OUTSIDE_LIMITS";
+  if(stand_.state()!=motion::AdaptiveStandState::STAND||std::abs(stand_.standHeightM()-.150)>1e-9){
+   auto prerequisite=c;prerequisite.intent=motion::Intent::STAND;prerequisite.target_height_m=.150;
+   if(const char* why=accept(prerequisite,now))return why;
+   pending_walk_command_=c;pending_walk_=true;return nullptr;
+  }
+ }
+
  if((!executor_||!executor_->active())&&executor_&&c.intent==motion::Intent::STAND&&commissioning_.enabled&&commissioning_.measuredStart&&armer_){
   // Operational STAND from READY: the explicit command starts the controlled
   // torque sequence; the planner starts only once the session is ARMED.
@@ -123,8 +138,6 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
   case motion::Intent::STAND:return startStand(c,now);
   case motion::Intent::GAIT_SELECT:return nullptr; // only WALK survived service validation
   case motion::Intent::BASE_VELOCITY:{
-   if(session_&&session_->scope()!=TrialScope::AUTONOMOUS_WALK&&session_->scope()!=TrialScope::SUPERVISED_FIXTURE_WALK&&
-      session_->scope()!=TrialScope::FIXTURE_COMMISSIONING)return "LOCAL_WALK_SCOPE_REQUIRED";
    motion::PlanarVelocityCommand v;v.vxMps=c.vx;v.vyMps=c.vy;v.yawRateRadS=c.yaw_rate;v.stampS=c.issued_at_ms/1000.0;v.ttlS=c.ttl_ms/1000.0;v.sequence=c.sequence;
    if(commissioning_.measuredStart){
     // Operational: the request was age-checked against its own TTL by the
@@ -156,7 +169,7 @@ const char* MotionCoordinator::accept(const motion::MotionCommand& c,uint32_t no
   default:return "ACTION_NOT_VALIDATED";
  }
 }
-void MotionCoordinator::stop(uint32_t){pending_stand_=false;if(session_&&(session_->scope()==TrialScope::SUPERVISED_FIXTURE_STAND||session_->scope()==TrialScope::SUPERVISED_FIXTURE_WALK||session_->scope()==TrialScope::FIXTURE_COMMISSIONING)){stand_.stop();session_->revoke("LOCAL_FIXTURE_STOP_SAFE_OFF");return;}if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
+void MotionCoordinator::stop(uint32_t){pending_walk_=false;pending_stand_=false;if(session_&&(session_->scope()==TrialScope::SUPERVISED_FIXTURE_STAND||session_->scope()==TrialScope::SUPERVISED_FIXTURE_WALK||session_->scope()==TrialScope::FIXTURE_COMMISSIONING)){stand_.stop();session_->revoke("LOCAL_FIXTURE_STOP_SAFE_OFF");return;}if(walking_)walk_.requestStop();else {stand_.stop();if(session_)session_->revoke("LOCAL_OPERATOR_STOP");}}
 bool MotionCoordinator::renewWalk(uint32_t now){
  if(!walking_||!commissioning_.measuredStart)return false;
  const auto st=walk_.state();if(st!=motion::FeedbackWalkState::STARTING&&st!=motion::FeedbackWalkState::WALK)return false;
@@ -205,14 +218,15 @@ void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const Joint
  if(executor_->stream(frame_.target,v,now_us,now_us+scheduler_.periodUs(),final,facts,fb,now,now_us))submitted_sequence_=frame_.target.sequence;
 }
 void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
+ if(executor_&&executor_->status().safe_off_required)pending_walk_=false;
  synchronizeSession();
  if(pending_stand_&&executor_){
   if(executor_->active()&&session_&&session_->state()==MotionSessionState::ARMED){
    pending_stand_=false;
-   if(const char* why=startStand(pending_command_,now)){entry_reason_=why;arming_failure_=why;if(session_)session_->revoke(why);return;}
+   if(const char* why=startStand(pending_command_,now)){pending_walk_=false;entry_reason_=why;arming_failure_=why;if(session_)session_->revoke(why);return;}
   } else if(!session_||session_->state()==MotionSessionState::OFF||session_->state()==MotionSessionState::SAFE_OFF_REQUIRED||
             static_cast<uint32_t>(now-pending_since_ms_)>15000){
-   pending_stand_=false;entry_reason_=session_&&session_->state()!=MotionSessionState::OFF?session_->reason():
+   pending_walk_=false;pending_stand_=false;entry_reason_=session_&&session_->state()!=MotionSessionState::OFF?session_->reason():
      session_&&*session_->lastRevoke()?session_->lastRevoke():"ARMING_FAILED";
    arming_failure_=static_cast<uint32_t>(now-pending_since_ms_)>15000&&session_&&session_->state()!=MotionSessionState::OFF&&
      session_->state()!=MotionSessionState::SAFE_OFF_REQUIRED?"ARMING_TIMEOUT":entry_reason_;
@@ -220,6 +234,17 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
   }
  }
  if(!configured_||!executor_||!policy_||!executor_->active())return;
+ if(fb.pending()){
+  if(executor_->streaming())executor_->monitor(facts,fb,now,now_us);
+  return; // hold the current target; never advance an uncertain trajectory
+ }
+
+ if(pending_walk_&&stand_.state()==motion::AdaptiveStandState::STAND&&executor_->status().state==ExecutorState::READY){
+  auto command=pending_walk_command_;pending_walk_=false;
+  command.issued_at_ms=now;
+  if(const char* why=accept(command,now)){entry_reason_=why;executor_->stop(why);return;}
+ }
+
  if(walking_&&active_spec_.timeDriven){streamWalk(facts,fb,now,now_us);return;}
  const bool timed=!walking_&&executor_->timedSegmentsActive();
  if(timed){

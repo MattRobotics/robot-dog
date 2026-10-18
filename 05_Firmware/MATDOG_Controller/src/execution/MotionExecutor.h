@@ -31,7 +31,8 @@ struct ExecutionEnvelope {
   bool timed_segments=false;
 };
 struct JointFeedback {
-  bool read_ok[12]{}, torque_on[12]{};
+  bool read_ok[12]{}, torque_on[12]{}, recovering[12]{};
+  bool pending() const {for(bool r:recovering)if(r)return true;return false;}
   uint32_t sampled_at_ms[12]{};
   double actual_rad[12]{};
   // Issue #52: real per-joint sample instant on the monotonic 64-bit clock

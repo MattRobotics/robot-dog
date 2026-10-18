@@ -84,12 +84,12 @@ void stopAndStale(){
   CHECK(r.arm());auto f=r.frame(61,0);auto v=r.validation(61);v.final=false;CHECK(r.executor.submit(f,v,100,1000,.020,r.facts,r.feedback,100));
   r.executor.update(r.facts,r.feedback,101);const auto writes=r.backend.writes.size();
   if(kind==0)r.executor.update(r.facts,r.feedback,201);
-  if(kind==1){r.fresh(102);r.facts.operator_permit=false;r.executor.update(r.facts,r.feedback,102);}
+  if(kind==1){r.fresh(102);r.facts.power_ok=false;r.executor.update(r.facts,r.feedback,102);}
   if(kind==2)r.executor.stop("OPERATOR_STOP");
   if(kind==3){r.feedback.torque_on[0]=false;r.executor.update(r.facts,r.feedback,102);}
   if(kind==4){r.feedback.read_ok[0]=false;r.executor.update(r.facts,r.feedback,102);}
   if(kind==5){r.feedback.sampled_at_ms[0]=103;r.executor.update(r.facts,r.feedback,102);}
-  CHECK(r.executor.status().safe_off_required);const char* reasons[]={"STALE_FEEDBACK","PERMIT_REVOKED_OR_EXPIRED","OPERATOR_STOP","TORQUE_LOST","FEEDBACK_INVALID","FEEDBACK_CLOCK_INVALID"};
+  CHECK(r.executor.status().safe_off_required);const char* reasons[]={"STALE_FEEDBACK","POWER_OR_BMS","OPERATOR_STOP","TORQUE_LOST","FEEDBACK_INVALID","FEEDBACK_CLOCK_INVALID"};
   REASON(r.executor.status().reason,reasons[kind]);
   r.executor.update(r.facts,r.feedback,202);CHECK(writes==r.backend.writes.size());
  }

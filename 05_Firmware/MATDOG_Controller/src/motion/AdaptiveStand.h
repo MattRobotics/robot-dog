@@ -47,6 +47,7 @@ struct AdaptiveStandRequest {
 };
 class AdaptiveStand {
  public:
+  bool prepareTimedRoute(const AcquisitionRoute&,const FeedbackPolicy&);
   bool request(const AdaptiveStandRequest& request,const FeedbackPolicy& policy,double nowS);
   FeedbackFrame update(const AdaptiveObservation& observation,double nowS,bool timedReference=false);
   bool assess(const SegmentAssessment& assessment,double nowS);
@@ -109,6 +110,7 @@ class AdaptiveStand {
   bool beginEntryStage();
   bool beginTimedPhase();
   PhaseTimedRoute timed_{};
+  bool timedVariant_=false;
   uint8_t timedPhase_=0;
   bool timedActive_=false;
   bool adjust_=false;

@@ -6,6 +6,7 @@ namespace matdog { namespace core {
 struct MotionReadiness {
  bool calibration_restored=false, calibration_accepted=false, limits_approved=false;
  bool walk_qualified=false,first_stride_only=false;double max_vx=0,max_vy=0,max_yaw_rate=0;
+ const char* hardware_reason="HARDWARE_UNAVAILABLE";
  bool hardware_approved=false, operational_permit=false, support_observable=false;
  bool local_fixture_session=false; // local session owns micro-test lifecycle
  bool local_operator_owns_session=false; // ownership persists between segments/strides
@@ -27,6 +28,7 @@ class SemanticMotionPlanner {
   virtual const char* armingFailure() const { return nullptr; }
 };
 struct MotionTelemetry {
+ bool feedback_recovering=false;
  bool joints_valid=false, quaternion_valid=false, height_valid=false,raw_valid=false;
  uint32_t joint_at_ms[12]{};
  uint32_t feedback_max_age_ms=500;

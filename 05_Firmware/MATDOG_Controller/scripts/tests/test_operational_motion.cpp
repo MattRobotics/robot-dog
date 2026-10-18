@@ -559,10 +559,10 @@ void clockAndScheduler(){
 void walkGates(){
   const double vx=motion::operational_walk::strideVelocity(1);
   { Operational op(0,-92.070442,1,true);CHECK(walkCommand(op,1,vx).outcome==motion::CommandOutcome::REJECTED);       // walk_qualified false
-    op.walk_ok=true;op.refresh();CHECK(walkCommand(op,2,vx).outcome==motion::CommandOutcome::REJECTED);REASON(op.b.service.lastAck().reason,"EXECUTOR_NOT_ARMED");
+    op.walk_ok=true;op.refresh();op.publish();CHECK(walkCommand(op,2,vx).outcome==motion::CommandOutcome::ACCEPTED);CHECK(op.b.coordinator.arming());
     CHECK(op.b.r.backend.writes.empty()&&!op.b.coordinator.walking()); }
   Operational op(0,-92.070442,1,true);auto& b=op.b;Driver d(op);CHECK(reachStand(op,d));op.walk_ok=true;op.refresh();
-  CHECK(walkCommand(op,10,vx*.9).outcome==motion::CommandOutcome::REJECTED);REASON(b.service.lastAck().reason,"WALK_SPEED_NOT_CERTIFIED");
+  CHECK(walkCommand(op,10,vx*.9).outcome==motion::CommandOutcome::REJECTED);REASON(b.service.lastAck().reason,"WALK_SPEED_OUTSIDE_PROFILE");
   { auto c=command(motion::Intent::BASE_VELOCITY,11,motion::ClientOwner::DASHBOARD);c.vx=vx;c.vy=.001;c.issued_at_ms=b.now;c.ttl_ms=350;CHECK(b.service.command(c,b.now).outcome==motion::CommandOutcome::REJECTED); }
   CHECK(walkCommand(op,12,vx).outcome==motion::CommandOutcome::ACCEPTED);
   CHECK(walkCommand(op,13,motion::operational_walk::strideVelocity(2)).outcome==motion::CommandOutcome::REJECTED);REASON(b.service.lastAck().reason,"WALK_IN_PROGRESS");
@@ -599,15 +599,16 @@ void variableStandHeight(){
     CHECK(worst<2e-3);CHECK(std::abs(b.coordinator.stand().standHeightM()-h)<1e-9);
     CHECK(writesInsideLimits(b)&&d.max_step<=b.params.max_step_rad+1e-9);
     std::printf("STAND_HEIGHT [SIMULATO] requested_mm=%.0f final_pose_error_rad=%.2e frames=%u writes=%zu\n",h*1000,worst,d.frames,b.r.backend.writes.size());
-    // WALK is certified around the 150 mm stand only.
-    op.walk_ok=true;op.refresh();CHECK(walkCommand(op,10,motion::operational_walk::strideVelocity(1)).outcome==motion::CommandOutcome::REJECTED);
-    REASON(b.service.lastAck().reason,"WALK_REQUIRES_150MM_STAND");
-    // Back to 150 mm with a normal STAND command, then WALK is admitted again.
-    CHECK(op.standAt(.150,11).outcome==motion::CommandOutcome::ACCEPTED);
-    ok=true;while(b.service.activeAck().outcome!=motion::CommandOutcome::COMPLETED&&b.now<50000000&&ok)ok=d.tick(20,true);
-    CHECK(ok&&std::abs(b.coordinator.stand().standHeightM()-.150)<1e-9);
-    double back=0;for(unsigned i=0;i<12;++i)back=std::max(back,std::abs(d.q[i]-slotOf(c4,i)));CHECK(back<2e-3);
-    op.refresh();CHECK(walkCommand(op,12,motion::operational_walk::strideVelocity(1)).outcome==motion::CommandOutcome::ACCEPTED);
+    // A WALK command raises the robot to its 150 mm gait pose automatically.
+    op.walk_ok=true;op.refresh();CHECK(walkCommand(op,10,motion::operational_walk::strideVelocity(1)).outcome==motion::CommandOutcome::ACCEPTED);
+    ok=true;
+    while(!b.coordinator.walking()&&b.now<50000000&&ok){
+      b.service.renewTeleop(b.now,3000);
+      for(auto& t:b.r.feedback.sampled_at_us)t=(b.now+20)*1000ull;
+      ok=d.tick(20,true);
+    }
+    CHECK(ok&&b.coordinator.walking()&&std::abs(b.coordinator.stand().standHeightM()-.150)<1e-9);
+    CHECK(b.service.activeAck().outcome==motion::CommandOutcome::ACCEPTED);
     // STOP while standing at any height: SAFE_OFF, no further writes.
     auto stop=command(motion::Intent::STOP,13,motion::ClientOwner::DASHBOARD);stop.issued_at_ms=b.now;b.service.command(stop,b.now);
     CHECK(b.session.safeOffRequired()); }
@@ -800,6 +801,8 @@ void run(){
 }
 }
 #ifndef MATDOG_OPERATIONAL_NO_MAIN
+
+#ifndef MATDOG_OPERATIONAL_NO_MAIN
 int main(){
   stand_backend::run();
   if(std::getenv("MATDOG_STAND_BACKEND_ONLY")){std::printf("OPERATIONAL_MOTION %s checks=%d failures=%d hardware=false (STAND backend)\n",failures?"FAIL":"PASS",checks,failures);return failures?1:0;}
@@ -840,3 +843,5 @@ int main(){
 }
 
 #endif // MATDOG_OPERATIONAL_NO_MAIN
+
+#endif
