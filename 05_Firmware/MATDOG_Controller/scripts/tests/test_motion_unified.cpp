@@ -1,0 +1,155 @@
+// Production-linked unified STAND/WALK, synthetic physics only. No transport.
+#define MATDOG_OPERATIONAL_NO_MAIN
+#include "test_operational_motion.cpp"
+#include <chrono>
+namespace {
+struct StreamRig {
+ Rig r;double lo[12],hi[12];
+ StreamRig(){
+  r.envelope.frame_writes=r.envelope.timed_segments=true;
+  r.envelope.max_velocity_rad_s=.19;r.envelope.max_acceleration_rad_s2=2;
+  r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;r.envelope.tracking_timeout_ms=4000;
+  for(unsigned i=0;i<12;++i){lo[i]=-.1;hi[i]=.1;r.feedback.sampled_at_us[i]=100000;}
+  CHECK(r.arm());StreamConfig c;c.tube_rad=.020;c.local_path_box=true;c.max_step_rad=.004;
+  c.settle_speed_rad_s=0;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
+  c.region_min_rad=lo;c.region_max_rad=hi;CHECK(r.executor.beginStream(c,r.feedback,100000));
+ }
+ void fresh(uint64_t t,double q){for(unsigned i=0;i<12;++i){r.feedback.sampled_at_ms[i]=t/1000;r.feedback.sampled_at_us[i]=t;r.feedback.actual_rad[i]=q;}}
+ bool send(unsigned seq,double q,uint64_t t,bool final=false){return r.executor.stream(r.frame(seq,q),r.validation(seq),t,t+20000,final,r.facts,r.feedback,t/1000,t);}
+ void monitor(uint64_t t){r.executor.monitor(r.facts,r.feedback,t/1000,t);}
+};
+void temporalContracts(){
+ // The old PRE_TX branch rejects this future target (.022 rad away).
+ // Only the held reference (0, .019 rad away) is relevant before this TX.
+ {StreamRig s;s.fresh(120000,-.019);CHECK(std::abs(-.019-.003)>.020);
+  CHECK(s.send(1,.003,120000));CHECK(s.r.backend.frames==1&&s.r.executor.status().completed_sequence==0);
+  CHECK(s.r.executor.status().stream_peak_error_rad<=.020);}
+ // A final target already matched by cached feedback is not ARRIVED.
+ {StreamRig s;CHECK(s.send(1,.003,120000,true));
+  s.fresh(120000,.003);s.monitor(122000);CHECK(s.r.executor.status().settled_sequence==0&&!s.r.executor.endStream());
+  s.fresh(122000,.003);s.r.feedback.sampled_at_us[11]=120000;s.monitor(123000);
+  CHECK(s.r.executor.status().settled_sequence==0);
+  s.r.feedback.sampled_at_us[11]=122001;s.r.feedback.recovering[11]=true;s.monitor(123000);
+  CHECK(s.r.executor.status().settled_sequence==0);
+  s.r.feedback.recovering[11]=false;s.r.feedback.speed_rad_s[3]=.01;s.monitor(123000);CHECK(s.r.executor.status().settled_sequence==0);
+  s.r.feedback.speed_rad_s[3]=0;s.monitor(123000);CHECK(s.r.executor.status().settled_sequence==1);
+  // New feedback leaving the tighter arrival band revokes settlement.
+  s.fresh(124000,-.014);s.monitor(124000);CHECK(s.r.executor.status().settled_sequence==0);
+  s.fresh(125000,.003);s.monitor(125000);CHECK(s.r.executor.endStream());CHECK(s.r.executor.status().completed_sequence==1);}
+ // Three NEW divergent samples stop tracking even inside the independent
+ // historical geometric box. Old snapshots cannot count as extra samples.
+ {StreamRig s;CHECK(s.send(1,.003,120000));CHECK(s.send(2,.006,140000));CHECK(s.send(3,.009,160000));
+  for(unsigned k=0;k<3;++k){s.r.feedback.sampled_at_us[0]=162000+k*1000;s.r.feedback.actual_rad[0]=-.014;
+   s.monitor(162000+k*1000);if(k<2){CHECK(!s.r.executor.status().safe_off_required);s.monitor(162000+k*1000);CHECK(!s.r.executor.status().safe_off_required);}}
+  REASON(s.r.executor.status().reason,"TRACKING_LAG_PERSISTENT");}
+ std::puts("TEMPORAL_CONTRACTS PASS: no future-target gate, post-TX all-12 arrival, quiet speed, new-sample persistence");
+}
+void safetyFaults(){
+ const char* reasons[]={"OPERATOR_STOP","OUTSIDE_PATH_BOX","STREAM_FEEDBACK_STALE","FEEDBACK_CLOCK_INVALID","TARGET_OR_MAPPING","SEGMENT_UNVALIDATED","FRAME_TX_UNCERTAIN","FRAME_REFUSED_ZERO_BYTES","POWER_OR_BMS","TORQUE_LOST","FEEDBACK_INVALID","STREAM_CLOCK_INVALID","PATH_STEP_LIMIT","HOLD_SETTLE_TIMEOUT","STREAM_FEEDBACK_STALE","STREAM_STARVED","ACTUAL_OUTSIDE_LIMITS","TARGET_OUTSIDE_CERTIFIED_REGION"};
+ for(unsigned kind=0;kind<18;++kind){StreamRig s;
+  if(kind==0)s.r.executor.stop("OPERATOR_STOP");
+  if(kind==1){s.fresh(120000,.021);s.monitor(120000);}
+  if(kind==2){s.r.feedback.sampled_at_us[2]=99999;s.monitor(200000);}
+  if(kind==3){s.r.feedback.sampled_at_us[2]=120001;s.monitor(120000);}
+  if(kind==4)s.send(1,.2,120000);
+  if(kind==5){auto v=s.r.validation(1);v.collision_clear=false;CHECK(!s.r.executor.stream(s.r.frame(1,.003),v,120000,140000,false,s.r.facts,s.r.feedback,120,120000));}
+  if(kind==6){s.r.backend.frame_mode=Backend::FrameMode::PARTIAL;s.send(1,.003,120000);}
+  if(kind==7){s.r.backend.frame_mode=Backend::FrameMode::REFUSE;s.send(1,.003,120000);}
+  if(kind==8){s.r.facts.power_ok=false;s.send(1,.003,120000);}
+  if(kind==9){s.r.feedback.torque_on[2]=false;s.send(1,.003,120000);}
+  if(kind==10){s.r.feedback.read_ok[2]=false;s.send(1,.003,120000);}
+  if(kind==11)s.monitor(99999);
+  if(kind==12)s.send(1,.0041,125000);
+  if(kind==13){CHECK(s.send(1,.003,120000,true));s.fresh(4120001,.003);s.r.feedback.speed_rad_s[0]=.01;s.monitor(4120001);}
+  if(kind==14){s.r.feedback.recovering[2]=true;s.r.feedback.sampled_at_us[2]=99999;s.monitor(200000);}
+  if(kind==15)s.monitor(200001);
+  if(kind==16){s.fresh(120000,.16);s.monitor(120000);}
+  if(kind==17)s.send(1,.101,120000);
+  CHECK(s.r.executor.status().safe_off_required);if(std::strcmp(s.r.executor.status().reason,reasons[kind]))std::printf("FAULT kind=%u actual=%s expected=%s\n",kind,s.r.executor.status().reason,reasons[kind]);REASON(s.r.executor.status().reason,reasons[kind]);
+  const auto frames=s.r.backend.frames;const auto writes=s.r.backend.writes.size();
+  s.send(2,.002,4130000);s.r.executor.update(s.r.facts,s.r.feedback,4130,4130000);
+  CHECK(s.r.backend.frames==frames&&s.r.backend.writes.size()==writes);
+  s.r.executor.confirmSafeOff(false);CHECK(s.r.executor.status().safe_off_required);
+  s.r.executor.confirmSafeOff(true);CHECK(s.r.executor.status().state==ExecutorState::OFF);
+ }
+ // STEP and real interval rate ceilings cannot be raised by a late release.
+ {StreamRig s;CHECK(s.send(1,.003,120000));s.fresh(126000,.003);CHECK(!s.send(2,.006,126000));REASON(s.r.executor.status().reason,"RATE_LIMIT");}
+ {StreamRig s;CHECK(s.send(1,.001,120000));s.fresh(170000,.001);CHECK(s.send(2,.001,170000));s.fresh(190000,.001);CHECK(!s.send(3,.004,190000));REASON(s.r.executor.status().reason,"ACCELERATION_LIMIT");}
+ // STOP delivered between any two reads in the existing fast batch.
+ for(unsigned stop_slot=0;stop_slot<3;++stop_slot){StreamRig s;unsigned reads=0;
+  for(unsigned k=0;execution::operationalPollReadAllowed(true,k,true);++k){
+   if(k==stop_slot){s.r.executor.stop("MID_BATCH_STOP");break;}++reads;}
+  CHECK(reads==stop_slot);CHECK(!s.send(1,.003,120000)&&s.r.backend.frames==0);
+ }
+ std::puts("SAFETY_FAULTS PASS: STOP, divergence, lost/recovering/future feedback, raw limit, collision, uncertain/refused TX, power, torque, clock, step/rate/acceleration, HOLD timeout, SAFE_OFF latch");
+}
+struct RunStats {Dist gaps,regular,age,sample_period,work;unsigned frames=0,checkpoints=0;double elapsed=0,tracking=0,step=0;};
+RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
+ Operational op(2.,-92.070442,1,walk);auto& b=op.b;
+ if(from_ready){op.publish();op.walk_ok=true;op.refresh();const auto ack=walkCommand(op,1,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1));std::printf("AUTO_STAND admission=%s\n",ack.reason);CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);}
+ else CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
+ for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+ CHECK(b.session.state()==MotionSessionState::ARMED&&op.armer.calls==1);
+ m.speed_rad_s=motion::operational_walk::kStandProfile.drive.goalSpeed*motion::tolerance::kTickRad;
+ m.acc_rad_s2=motion::operational_walk::kStandProfile.drive.acceleration*100*motion::tolerance::kTickRad;
+ StreamDriver d(op,m);const uint64_t start=d.now_us;uint64_t last_tx=0;unsigned previous=0;
+ uint64_t samples[12]{};double last_q[12];for(unsigned i=0;i<12;++i)last_q[i]=b.r.executor.targetRadians()[i];
+ RunStats st;bool ok=true,last_final=false,no_micro_arrival=true,one_frame=true,all_post=true;
+ while(ok&&std::strcmp(b.coordinator.state(),"STAND")&&!b.coordinator.walking()&&d.now_us-start<90000000){
+  if(from_ready&&d.present())b.service.renewTeleop(b.now,250); // Controller renews also during automatic STAND
+  const auto c0=std::chrono::steady_clock::now();ok=d.tick();const auto c1=std::chrono::steady_clock::now();
+  st.work.add(std::chrono::duration<double,std::micro>(c1-c0).count());
+  const auto& es=b.r.executor.status();st.tracking=std::max(st.tracking,es.stream_peak_error_rad);
+  for(unsigned i=0;i<12;++i){st.age.add((d.now_us-d.sample_us[i])/1000.);
+   if(samples[i]!=d.sample_us[i]){if(samples[i])st.sample_period.add((d.sample_us[i]-samples[i])/1000.);samples[i]=d.sample_us[i];}}
+  if(d.frames_seen!=previous){one_frame=one_frame&&d.frames_seen==previous+1;
+   if(last_tx){st.gaps.add((es.last_tx_complete_us-last_tx)/1000.);if(!last_final)st.regular.add((es.last_tx_complete_us-last_tx)/1000.);}
+   last_tx=es.last_tx_complete_us;previous=d.frames_seen;last_final=b.coordinator.stand().pendingFinal();
+   if(last_final)++st.checkpoints;
+   else no_micro_arrival=no_micro_arrival&&es.completed_sequence<es.tx_sequence;
+   for(unsigned i=0;i<12;++i){st.step=std::max(st.step,std::abs(b.r.executor.targetRadians()[i]-last_q[i]));last_q[i]=b.r.executor.targetRadians()[i];}}
+  if(es.settled_sequence)for(unsigned i=0;i<12;++i)all_post=all_post&&d.sample_us[i]>es.last_tx_complete_us;
+ }
+ st.frames=d.frames_seen;st.elapsed=(d.now_us-start)/1e6;
+ std::printf("STAND_REPLAY model=%s ok=%d elapsed_s=%.6f frames=%u checkpoints=%u gap_ms_p50=%.3f p99=%.3f max=%.3f regular_ms_p50=%.3f p99=%.3f max=%.3f feedback_age_ms_max=%.3f sample_period_ms_p50=%.3f max=%.3f tracking_peak_mrad=%.3f step_mrad=%.3f host_tick_work_us_p50=%.1f p99=%.1f max=%.1f reason=%s frame=%s hardware=false\n",
+  m.name,ok,st.elapsed,st.frames,st.checkpoints,st.gaps.pct(.5),st.gaps.pct(.99),st.gaps.max(),st.regular.pct(.5),st.regular.pct(.99),st.regular.max(),st.age.max(),st.sample_period.pct(.5),st.sample_period.max(),st.tracking*1000,st.step*1000,st.work.pct(.5),st.work.pct(.99),st.work.max(),b.r.executor.status().reason,motion::feedbackReasonName(b.coordinator.frame().reason));
+ CHECK(ok&&(!std::strcmp(b.coordinator.state(),"STAND")||b.coordinator.walking()));
+ CHECK(st.checkpoints==7&&no_micro_arrival&&one_frame&&all_post&&st.step<=.004+1e-12);
+ CHECK(b.r.backend.frames==st.frames&&writesInsideLimits(b));
+ if(!ok||(!b.coordinator.walking()&&std::strcmp(b.coordinator.state(),"STAND")))return st;
+ if(walk){
+  for(unsigned k=0;k<120&&ok;++k)ok=d.tick();
+  op.walk_ok=true;op.refresh();
+  if(!from_ready)CHECK(walkCommand(op,30,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1)).outcome==motion::CommandOutcome::ACCEPTED);
+  d.m.speed_rad_s=motion::operational_walk::kStandardDrive.goalSpeed*motion::tolerance::kTickRad;
+  d.m.acc_rad_s2=motion::operational_walk::kStandardDrive.acceleration*100*motion::tolerance::kTickRad;
+  const auto w0=d.now_us;while(ok&&b.coordinator.walkCycles()<1.1&&d.now_us-w0<16000000)ok=d.tick();
+  CHECK(ok&&b.coordinator.walkCycles()>=1.1);
+  CHECK(walkCommand(op,31,0).outcome==motion::CommandOutcome::ACCEPTED);
+  const auto z0=d.now_us;while(ok&&b.coordinator.walking()&&d.now_us-z0<30000000)ok=d.tick();
+  CHECK(ok&&!b.coordinator.walking()&&b.r.executor.status().state==ExecutorState::READY);
+  if(!from_ready){
+   CHECK(walkCommand(op,32,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1)).outcome==motion::CommandOutcome::ACCEPTED);
+   for(unsigned k=0;k<50&&ok;++k)ok=d.tick();
+   d.heartbeat=false;const auto deadman_start=d.now_us;
+   while(ok&&d.now_us-deadman_start<4000000)ok=d.tick();
+   CHECK(!ok&&b.r.executor.status().safe_off_required);
+   const auto stopped=b.r.backend.frames;for(unsigned k=0;k<5;++k)d.tick();CHECK(b.r.backend.frames==stopped);
+   std::printf("WALK_DEADMAN reason=%s zero_post_stop_frames=true hardware=false\n",b.r.executor.status().reason);
+  }
+  std::printf("WALK_STANDARD auto_stand=%d coordinated_stop_checked=true state=%s hardware=false\n",from_ready,b.coordinator.state());
+ }
+ auto stop=command(motion::Intent::STOP,90,motion::ClientOwner::DASHBOARD);stop.issued_at_ms=b.now;b.service.command(stop,b.now);
+ const auto n=b.r.backend.frames;for(unsigned k=0;k<5;++k)d.tick();CHECK(b.r.executor.status().safe_off_required&&b.session.safeOffRequired()&&b.r.backend.frames==n);
+ return st;
+}
+}
+int main(){
+ std::setvbuf(stdout,nullptr,_IONBF,0);
+ temporalContracts();safetyFaults();
+ StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
+ m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);
+ m.name="ASYNC_84MS";m.jitter_us=0;m.loop_us=21000;m.read_us=1000;standReplay(m);
+ m.name="LOADED_6MS";m.loop_us=6000;m.read_us=420;standReplay(m,true,true);
+ std::printf("UNIFIED_MOTION failures=%d hardware=false\n",failures);return failures?1:0;
+}

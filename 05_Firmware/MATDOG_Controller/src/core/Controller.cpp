@@ -1311,8 +1311,8 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
     execution::RawJointObservation r=operational_producer_.raw(slot);
     const uint32_t read_started=millis();
-    const uint32_t control_period=motion_executor_.streaming()?100:20;
-    const uint32_t control_max_age=motion_executor_.streaming()?1500:reviewed_motion_.execution.feedback_max_age_ms;
+    const uint32_t control_period=motion_coordinator_.streamingWalk()?100:20;
+    const uint32_t control_max_age=motion_coordinator_.streamingWalk()?1500:reviewed_motion_.execution.feedback_max_age_ms;
     const bool control_due=!r.read_ok||execution::controlReadDue(fast,slot,operational_control_next_,millis(),
       operational_control_at_ms_,control_period,r.control_at_ms,control_max_age);
     if(control_due){

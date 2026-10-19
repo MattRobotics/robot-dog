@@ -102,7 +102,7 @@ bool AdaptiveStand::beginSegment(const AcquisitionWaypoint& e){
     !std::isfinite(e.durationS)||e.durationS<=0||e.requiredFeet>15||
     (!e.bellySupportRequired&&!e.externalSupportRequired&&e.requiredFeet==0))return false;
   const double n=std::ceil(e.durationS/policy_.samplePeriodS);if(n<2||n>1000000)return false;
-  endpoint_=e;segmentStart_=previous_;segmentIndex_=0;segmentIntervals_=static_cast<uint32_t>(n);return true;
+  endpoint_=e;segmentStart_=previous_;segmentIndex_=0;segmentIntervals_=static_cast<uint32_t>(n);referenceAtS_=lastNow_;referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginRise(){
   AcquisitionWaypoint e;e.body=previous_.cartesian.body;e.body.translationM.z=request_.targetHeightM;
@@ -115,7 +115,7 @@ bool AdaptiveStand::beginEntryStage(){
   endpoint_.durationS=entry_.durationS[entryStage_];
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS-1e-9);
   if(!std::isfinite(n)||n<2||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginTimedPhase(){
   if(timedPhase_>=5)return false;
@@ -125,7 +125,7 @@ bool AdaptiveStand::beginTimedPhase(){
   endpoint_.durationS=timed_.durationS[timedPhase_];
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS-1e-9);
   if(!std::isfinite(n)||n<1||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginPairedSegment(){
   if(timedActive_)return beginTimedPhase();
@@ -137,11 +137,20 @@ bool AdaptiveStand::beginPairedSegment(){
   if(!std::isfinite(route_.timeScale)||route_.timeScale<1)return false;
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS);
   if(n<1||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
 }
 FeedbackFrame AdaptiveStand::generate(double now){
+  // Advance by elapsed monotonic time, bounded by the approved step/rate
+  // budget on a late release. Dropped time slows this SAME path; no catch-up
+  // burst or future jump is emitted. The executor checks actual TX intervals.
+  double vmax=0;
+  for(const auto& v:policy_.maxVelocityRadS)vmax=std::fmax(vmax,std::fmax(std::abs(v.hip),std::fmax(std::abs(v.upper),std::abs(v.lower))));
+  const double advance=std::fmin(std::fmax(0.,now-referenceAtS_),policy_.maxJointStepRad/vmax);
+  pendingTimeS_=timeDriven_?std::fmin(endpoint_.durationS,referenceTimeS_+advance):
+    endpoint_.durationS*(segmentIndex_+1)/segmentIntervals_;
+  const double u=pendingTimeS_/endpoint_.durationS;
   if(entryPending()){
-    auto f=fixtureEntrySample(entry_,entryStage_,static_cast<double>(segmentIndex_+1)/segmentIntervals_,previous_.cartesian.body);
+    auto f=fixtureEntrySample(entry_,entryStage_,u,previous_.cartesian.body);
     if(!f.target.valid)return reject(FeedbackReason::INVALID_COMMAND);
     auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
     if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
@@ -151,7 +160,7 @@ FeedbackFrame AdaptiveStand::generate(double now){
   }
   if(route_.pairedProne&&timedActive_){
     unsigned segment=0;
-    auto f=phaseTimedSample(timed_,timedPhase_,endpoint_.durationS*(segmentIndex_+1)/segmentIntervals_,policy_.fixtureLimitVariant,&segment);
+    auto f=phaseTimedSample(timed_,timedPhase_,pendingTimeS_,policy_.fixtureLimitVariant,&segment);
     if(!f.target.valid)return reject(FeedbackReason::IK_FAILURE);
     pairedSegment_=static_cast<uint16_t>(segment);
     auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
@@ -161,10 +170,10 @@ FeedbackFrame AdaptiveStand::generate(double now){
     pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
   if(route_.pairedProne){
-    auto f=pairedProneSample(pairedSegment_,static_cast<double>(segmentIndex_+1)/segmentIntervals_,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
+    auto f=pairedProneSample(pairedSegment_,u,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
     for(unsigned i=0;i<4;++i){auto& v=f.velocityRadS[i];v={v.hip/route_.timeScale,v.upper/route_.timeScale,v.lower/route_.timeScale};auto& a=f.accelerationRadS2[i];const double s=route_.timeScale*route_.timeScale;a={a.hip/s,a.upper/s,a.lower/s};}
     if(policy_.mode==FeedbackMode::FIXTURE_REVIEW&&pairedSegment_==entry_knot_){
-      const auto law=quinticTimeLaw(static_cast<double>(segmentIndex_+1)/segmentIntervals_,endpoint_.durationS);
+      const auto law=quinticTimeLaw(u,endpoint_.durationS);
       for(unsigned i=0;i<4;++i){const auto d=entry_offset_[i];auto& q=f.target.legs[i];auto& v=f.velocityRadS[i];auto& a=f.accelerationRadS2[i];
         q={q.hip+d.hip*(1-law.progress),q.upper+d.upper*(1-law.progress),q.lower+d.lower*(1-law.progress)};
         v={v.hip-d.hip*law.velocity,v.upper-d.upper*law.velocity,v.lower-d.lower*law.velocity};
@@ -177,7 +186,6 @@ FeedbackFrame AdaptiveStand::generate(double now){
     if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
     pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
-  const double u=static_cast<double>(segmentIndex_+1)/segmentIntervals_;
   const auto law=quinticTimeLaw(u,endpoint_.durationS);if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
   CartesianSample c;c.body=endpoint_.body;c.body.translationM=mix(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.progress);
   c.bodyVelocity=rate(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.velocity);
@@ -219,24 +227,29 @@ FeedbackFrame AdaptiveStand::generate(double now){
 FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,bool timedReference){
   if(state_==AdaptiveStandState::IDLE||state_==AdaptiveStandState::REJECTED||state_==AdaptiveStandState::STOPPED){FeedbackFrame f;f.reason=reason_;return f;}
   if(now<lastNow_)return reject(FeedbackReason::STALE_OBSERVATION);
-  lastNow_=now;
+  lastNow_=now;timeDriven_=timedReference;
   auto r=checkObservation(o,policy_,now);if(r!=FeedbackReason::OK)return reject(r);
   if(pendingValid_){
     r=checkHeldSupport(o,previous_,pending_);if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_>policy_.segmentTimeoutS)return reject(FeedbackReason::SEGMENT_TIMEOUT);
     if(!assessed_){pending_.reason=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;}
     r=checkAssessment(assessment_,pending_.target.sequence,policy_,now,submitted_);if(r!=FeedbackReason::OK)return reject(r);
-    // Only a certified fixture microstep may consume the executor's timed
-    // following ACK. Actual joints/support/age are still checked continuously;
-    // phase endpoints keep the full measured-arrival checkpoint.
-    const bool intermediate=timedReference&&submitted_&&!pendingFinal()&&policy_.mode==FeedbackMode::FIXTURE_REVIEW&&policy_.routeTubeReviewed&&(route_.pairedProne||adjust_);
-    r=intermediate?(o.acknowledged&&o.acknowledgedSequence==pending_.target.sequence?FeedbackReason::OK:FeedbackReason::FEEDBACK_PENDING):checkTracking(o,pending_,policy_);
+    if(timeDriven_&&!submitted_)return pending_;
+    // TX acceptance only for intermediate references. Structural endpoints
+    // consume the executor's measured, post-TX HOLD settlement.
+    // For the certified fixture stream, arrival/quiet/post-TX are already
+    // checked atomically by HOLD before completed_sequence is published.
+    // Re-running the finite segment's age gate would split that checkpoint.
+    const bool streamed=timeDriven_&&policy_.mode==FeedbackMode::FIXTURE_REVIEW&&policy_.routeTubeReviewed&&(route_.pairedProne||adjust_);
+    r=streamed?(o.acknowledged&&o.acknowledgedSequence==pending_.target.sequence?FeedbackReason::OK:FeedbackReason::FEEDBACK_PENDING):checkTracking(o,pending_,policy_);
     if(r==FeedbackReason::FEEDBACK_PENDING){pending_.reason=r;return pending_;}
     if(r!=FeedbackReason::OK)return reject(r);
-    if(now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}
+    if(!timeDriven_&&now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}
+    const bool endpoint=pendingFinal();
+    referenceTimeS_=pendingTimeS_;referenceAtS_=pendingSince_;
     previous_=route_.pairedProne||adjust_?pendingSolution_:observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
     pendingValid_=false;physicalReady_=pending_.physicalReadiness;++segmentIndex_;
-    if(segmentIndex_==segmentIntervals_){
+    if(endpoint){
       if(entryPending()){
         // The last entry sample IS the route head (fixture variant knot 0).
         if(++entryStage_<kFixtureEntryStages){if(!beginEntryStage())return reject(FeedbackReason::ROUTE_MISMATCH);}

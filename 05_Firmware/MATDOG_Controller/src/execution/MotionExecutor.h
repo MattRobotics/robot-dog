@@ -5,8 +5,8 @@
 #include "../motion/StandTrajectory.h"
 namespace matdog { namespace execution {
 // STREAMING/HOLD (Issue #52): time-driven frames, one coordinated bus transaction
-// per frame, asynchronous per-joint tracking. WRITING/TRACKING also serve
-// finite ENTRY/STAND segments, with separate timed following and arrival.
+// per frame, asynchronous per-joint tracking, shared by timed STAND and WALK.
+// WRITING/TRACKING retain finite commands and measured checkpoints.
 enum class ExecutorState : uint8_t { OFF, READY, WRITING, TRACKING, SAFE_OFF_REQUIRED, FAULT, STREAMING, HOLD };
 struct MotionExecutionFacts {
   core::AuthorityLease lease{};
@@ -25,8 +25,8 @@ struct ExecutionEnvelope {
   // Issue #52: segment frames (prime/entry/STAND) as ONE coordinated frame
   // transaction instead of twelve single writes.
   bool frame_writes=false;
-  // Existing finite-segment executor, operational timed frames only. A zero
-  // arrival tolerance preserves the original completion contract.
+  // Operational timed STAND selects streaming; finite submit accepts only
+  // measured endpoints with this arrival tolerance. Zero retains legacy arrival.
   double arrival_tolerance_rad=0;
   bool timed_segments=false;
 };
@@ -73,6 +73,10 @@ struct ExecutorStatus {
 // consecutive fresh samples is a physical failure to follow -> stop.
 struct StreamConfig {
   double tube_rad=0, max_lag_s=0, settle_speed_rad_s=0;
+  // STAND uses a single historical endpoint box for the measured vector,
+  // independent of timestamp-aligned per-joint tracking. No WALK lag allowance.
+  bool local_path_box=false;
+  double max_step_rad=0;
   uint32_t feedback_max_age_us=0, hold_timeout_us=0, max_frame_gap_us=0;
   uint8_t persist_samples=0;
   const double* region_min_rad=nullptr; const double* region_max_rad=nullptr;
@@ -92,6 +96,7 @@ class MotionExecutor {
   static constexpr double kWalkRateCeilingRadS=1.6, kWalkAccelerationCeilingRadS2=13.5;
   bool selectRates(double max_velocity_rad_s,double max_acceleration_rad_s2);
   void restoreArmedRates(){ if(armed_envelope_.approved){envelope_.max_velocity_rad_s=armed_envelope_.max_velocity_rad_s;envelope_.max_acceleration_rad_s2=armed_envelope_.max_acceleration_rad_s2;} }
+  uint32_t trackingTimeoutUs() const {return envelope_.tracking_timeout_ms*1000;}
   double maxVelocityRadS() const { return envelope_.max_velocity_rad_s; }
   bool timedSegmentsActive() const {return active()&&envelope_.timed_segments&&!streaming();}
   static constexpr uint32_t kTimedFeedbackMaxAgeMs=100, kTimedMaxFrameGapMs=100;
@@ -138,7 +143,7 @@ class MotionExecutor {
   double referenceRange(unsigned joint,uint64_t from_us,uint64_t to_us,double* lo,double* hi) const;
   StreamConfig stream_{};
   static constexpr unsigned kHistory=48;
-  struct Sent { uint64_t at_us=0; uint32_t sequence=0; double q[12]{}; };
+  struct Sent { uint64_t at_us=0; uint32_t sequence=0; bool held_seed=false; double q[12]{}; };
   Sent history_[kHistory]{};
   unsigned history_count_=0, history_head_=0;
   uint64_t last_release_us_=0, hold_since_us_=0, checked_us_[12]{};

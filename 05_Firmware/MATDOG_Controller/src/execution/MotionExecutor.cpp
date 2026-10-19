@@ -1,5 +1,6 @@
 #include "MotionExecutor.h"
 #include "../servo/ServoPopulation.h"
+#include "../motion/OperationalTolerance.h"
 #include <cmath>
 #include <algorithm>
 #include <cstring>
@@ -62,6 +63,7 @@ bool MotionExecutor::resolve(uint8_t i,double q,actuator::ActuatorCommand* cmd,u
 }
 bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameValidation& v,uint32_t issued,uint32_t ttl,double dt,const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) {
  if(status_.state!=ExecutorState::READY)return reject("EXECUTOR_BUSY");
+ if(envelope_.timed_segments&&!v.final)return reject("TIMED_STREAM_REQUIRED");
  if(fb.pending())return false;
  if(const char* reason=gate(f,now))return reject(reason);
  if(!frame.valid||!frame.sequence||static_cast<int32_t>(frame.sequence-status_.accepted_sequence)<=0)return reject("FRAME_SEQUENCE");
@@ -96,7 +98,6 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
  }
  for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}}
  if(status_.state==ExecutorState::READY){
-  if(envelope_.timed_segments&&!validation_.final&&status_.completed_sequence&&now-tracking_since_ms_>kTimedMaxFrameGapMs){stop("FRAME_CADENCE_GAP");return;}
   double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));
   status_.max_tracking_error_rad=error;
   if(error>envelope_.tracking_tolerance_rad)stop("HOLD_TRACKING_ERROR");
@@ -111,8 +112,6 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
    if(fb.actual_rad[j]<lo||fb.actual_rad[j]>hi){stop("TRACKING_DIVERGENCE");return;}
   }
   if(envelope_.frame_writes){
-   if(envelope_.timed_segments&&!validation_.final)for(unsigned j=0;j<12;++j)
-    if(std::fabs(fb.actual_rad[j]-target_[j])>envelope_.tracking_tolerance_rad){stop("TRACKING_LAG_LIMIT");return;}
    // The whole frame in ONE coordinated transaction (validated in submit()).
    const char* why="";
    tracking_started_us_=now_us?now_us:now*1000ull;
@@ -129,15 +128,14 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
   return;
  }
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
- if(envelope_.timed_segments&&!validation_.final&&error>envelope_.tracking_tolerance_rad){stop("TRACKING_LAG_LIMIT");return;}
  // Continuous measured following guard, including while waiting to settle.
  // The independent [previous,target] box is included in the swept proof.
  if(envelope_.timed_segments)for(unsigned i=0;i<12;++i){
   if(fb.actual_rad[i]<std::fmin(previous_[i],target_[i])-envelope_.tracking_tolerance_rad||
      fb.actual_rad[i]>std::fmax(previous_[i],target_[i])+envelope_.tracking_tolerance_rad){stop("TRACKING_DIVERGENCE");return;}
  }
- // Only checkpoints need a collective post-TX observation. Intermediate
- // frames use the age-bounded actual vector and the continuous 20 mrad guard.
+ // Finite commands are measured checkpoints. Timed intermediate references
+ // use stream()/monitor(), and cannot complete through this path.
  bool fresh=true;for(unsigned i=0;i<12;i++){
   // Finite TX uses the 32-bit millis epoch; compare in that same wrapping
   // domain, not against the feedback producer's extended microsecond clock.
@@ -146,8 +144,8 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
  }
  const double arrival=envelope_.timed_segments&&validation_.final?envelope_.arrival_tolerance_rad:envelope_.tracking_tolerance_rad;
  const bool released=!envelope_.timed_segments||(now_us?now_us>=tracking_started_us_&&now_us-tracking_started_us_>=segment_duration_ms_*1000ull:now-tracking_since_ms_>=segment_duration_ms_);
- const bool observed=envelope_.timed_segments&&!validation_.final?true:fresh;
- if(error<=arrival&&observed&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason=envelope_.timed_segments&&!validation_.final?"TIMED_TRACKED":"TRACKED";}
+ const bool observed=fresh;
+ if(error<=arrival&&observed&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason="TRACKED";}
  else if(now-tracking_since_ms_>=envelope_.tracking_timeout_ms)stop(envelope_.timed_segments&&validation_.final?"ARRIVAL_TIMEOUT":"TRACKING_TIMEOUT");
 }
 // ---------------------------------------------------------------------------
@@ -156,12 +154,16 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
 bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,uint64_t now_us) {
  if(fb.pending())return false;
  if(status_.state!=ExecutorState::READY)return false;
- if(!std::isfinite(c.tube_rad)||c.tube_rad<=0||c.tube_rad>envelope_.tracking_tolerance_rad+1e-12||!std::isfinite(c.max_lag_s)||c.max_lag_s<=0||c.max_lag_s>.5||
+ if(!std::isfinite(c.tube_rad)||c.tube_rad<=0||c.tube_rad>envelope_.tracking_tolerance_rad+1e-12||!std::isfinite(c.max_lag_s)||c.max_lag_s<0||(!c.local_path_box&&c.max_lag_s==0)||c.max_lag_s>.5||
     !std::isfinite(c.settle_speed_rad_s)||c.settle_speed_rad_s<0||!c.feedback_max_age_us||c.feedback_max_age_us>500000||!c.hold_timeout_us||
     !c.max_frame_gap_us||c.max_frame_gap_us>500000||!c.persist_samples||c.persist_samples>20||!c.region_min_rad||!c.region_max_rad)return false;
+ if(c.local_path_box&&(!std::isfinite(c.max_step_rad)||c.max_step_rad<=0||c.max_step_rad>motion::tolerance::kMaxStepRad||
+    c.tube_rad>motion::tolerance::kTrackingRad||c.max_lag_s!=0||
+    c.feedback_max_age_us>kTimedFeedbackMaxAgeMs*1000))return false;
  for(unsigned i=0;i<12;i++)if(!fb.read_ok[i]||!fb.torque_on[i])return false;
  stream_=c;history_count_=0;history_head_=0;
- Sent& h=history_[0];h.at_us=now_us;h.sequence=status_.accepted_sequence;for(unsigned i=0;i<12;i++)h.q[i]=target_[i];
+ // The initial held/primed pose predates this stream; this seed is not a TX.
+ Sent& h=history_[0];h.at_us=now_us;h.held_seed=true;h.sequence=status_.accepted_sequence;for(unsigned i=0;i<12;i++)h.q[i]=target_[i];
  history_count_=1;last_release_us_=now_us;hold_sequence_=0;hold_since_us_=0;
  for(unsigned i=0;i<12;i++){checked_us_[i]=fb.sampled_at_us[i];exceed_[i]=0;status_.stream_error_rad[i]=0;}
  status_.validated_sequence=status_.tx_sequence=status_.observed_sequence=status_.accepted_sequence;status_.settled_sequence=0;
@@ -189,6 +191,9 @@ bool MotionExecutor::frameTx(const double target[12],const MotionExecutionFacts&
 bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameValidation& v,uint64_t release_us,uint64_t deadline_us,bool final,
                             const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now,uint64_t now_us) {
  if(status_.state!=ExecutorState::STREAMING){++status_.frames_refused;return reject("STREAM_NOT_ACTIVE");}
+ // PRE_TX monitors only references already transmitted, never candidate.
+ monitor(f,fb,now,now_us);
+ if(!streaming())return false;
  if(fb.pending()){++status_.frames_refused;return false;}
  if(const char* reason=gate(f,now))return reject(reason);
  if(!frame.valid||!frame.sequence||static_cast<int32_t>(frame.sequence-status_.validated_sequence)<=0)return reject("FRAME_SEQUENCE");
@@ -205,6 +210,7 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
   actuator::ActuatorCommand cmd;uint8_t bus;
   if(!resolve(i,candidate[i],&cmd,&bus))return reject("TARGET_OR_MAPPING");
   if(!(candidate[i]>=stream_.region_min_rad[i]&&candidate[i]<=stream_.region_max_rad[i]))return reject("TARGET_OUTSIDE_CERTIFIED_REGION");
+  if(stream_.local_path_box&&std::fabs(candidate[i]-target_[i])>stream_.max_step_rad)return reject("PATH_STEP_LIMIT");
   const double vel=(candidate[i]-target_[i])/dt;
   if(std::fabs(vel)>envelope_.max_velocity_rad_s+1e-9)return reject("RATE_LIMIT");
   if(dt_prev>0){const double acc=(vel-velocity_[i])/(.5*(dt+dt_prev));if(std::fabs(acc)>envelope_.max_acceleration_rad_s2+1e-9)return reject("ACCELERATION_LIMIT");}
@@ -216,7 +222,7 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  for(unsigned i=0;i<12;i++){previous_[i]=target_[i];target_[i]=candidate[i];velocity_[i]=pending_velocity_[i];}
  Sent& h=history_[(history_head_+history_count_)%kHistory];
  if(history_count_==kHistory)history_head_=(history_head_+1)%kHistory;else ++history_count_;
- h.at_us=status_.last_tx_complete_us;h.sequence=frame.sequence;for(unsigned i=0;i<12;i++)h.q[i]=candidate[i];
+ h.at_us=status_.last_tx_complete_us;h.held_seed=false;h.sequence=frame.sequence;for(unsigned i=0;i<12;i++)h.q[i]=candidate[i];
  status_.tx_sequence=status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;last_release_us_=release_us;
  if(final){status_.state=ExecutorState::HOLD;hold_sequence_=frame.sequence;hold_since_us_=now_us;status_.reason="HOLD";}
  monitor(f,fb,now,now_us);
@@ -230,38 +236,48 @@ double MotionExecutor::referenceRange(unsigned j,uint64_t from,uint64_t to,doubl
   if(h.at_us>to)break;
   if(k+1<history_count_&&history_[(history_head_+k+1)%kHistory].at_us<=from)continue;
   const double q=h.q[j];if(!any){a=b=q;any=true;}else{a=std::fmin(a,q);b=std::fmax(b,q);}}
- if(!any){const Sent& h=history_[history_head_];a=b=h.q[j];}
+ if(!any){const Sent& h=history_[history_head_];if(stream_.local_path_box&&!h.held_seed)return -1;a=b=h.q[j];}
  *lo=a;*hi=b;return b-a;
 }
 void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now,uint64_t now_us) {
  if(!streaming())return;
  if(const char* r=gate(f,now)){stop(r);return;}
+ if(now_us<last_release_us_){stop("STREAM_CLOCK_INVALID");return;}
  if(status_.state==ExecutorState::STREAMING&&now_us>last_release_us_&&now_us-last_release_us_>stream_.max_frame_gap_us){stop("STREAM_STARVED");return;}
  uint64_t oldest=UINT64_MAX;bool settled=true;
+ uint64_t anchor=UINT64_MAX;
+ for(unsigned i=0;i<12;++i)anchor=std::min(anchor,fb.sampled_at_us[i]);
  const double settle_tolerance=envelope_.arrival_tolerance_rad>0?std::fmin(envelope_.arrival_tolerance_rad,stream_.tube_rad):stream_.tube_rad;
  for(unsigned i=0;i<12;i++){
   if(!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us){stop("FEEDBACK_CLOCK_INVALID");return;}
   if(now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){stop("STREAM_FEEDBACK_STALE");return;}
-  if(fb.recovering[i]){settled=false;continue;}
+  if(fb.recovering[i]){settled=false;oldest=0;continue;}
   if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i])){stop("FEEDBACK_INVALID");return;}
   if(!fb.torque_on[i]){stop("TORQUE_LOST");return;}
   actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}
   // Geometry: the measured joint must stay in the certified box (+/- tube).
   if(fb.actual_rad[i]<stream_.region_min_rad[i]-stream_.tube_rad||fb.actual_rad[i]>stream_.region_max_rad[i]+stream_.tube_rad){stop("OUTSIDE_CERTIFIED_REGION");return;}
+  if(stream_.local_path_box){
+   // ONE common sent endpoint, active at the oldest sample. A vector made
+   // from twelve different historic endpoints is not a certified joint box.
+   double lo,hi;if(referenceRange(i,anchor,anchor,&lo,&hi)<0){stop("REFERENCE_HISTORY_MISSING");return;}
+   if(fb.actual_rad[i]<lo-stream_.tube_rad||fb.actual_rad[i]>hi+stream_.tube_rad){stop("OUTSIDE_PATH_BOX");return;}
+  }
   if(fb.sampled_at_us[i]>checked_us_[i]){
    const uint64_t t=fb.sampled_at_us[i],lag=static_cast<uint64_t>(stream_.max_lag_s*1e6);
-   double lo,hi;referenceRange(i,t>lag?t-lag:0,t,&lo,&hi);
+   double lo,hi;if(referenceRange(i,t>lag?t-lag:0,t,&lo,&hi)<0){stop("REFERENCE_HISTORY_MISSING");return;}
    const double q=fb.actual_rad[i],e=q<lo?lo-q:q>hi?q-hi:0;
    status_.stream_error_rad[i]=e;if(e>status_.stream_peak_error_rad){status_.stream_peak_error_rad=e;status_.worst_joint=static_cast<uint8_t>(i);}
    if(e>stream_.tube_rad){if(++exceed_[i]>=stream_.persist_samples){stop("TRACKING_LAG_PERSISTENT");return;}}else exceed_[i]=0;
    checked_us_[i]=t;
   }
   if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];
-  settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
+  settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::isfinite(fb.speed_rad_s[i])&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
  }
  for(unsigned k=history_count_;k-->0;){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<oldest){if(h.sequence>status_.observed_sequence)status_.observed_sequence=h.sequence;break;}}
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
  if(status_.state==ExecutorState::HOLD){
+  status_.settled_sequence=0;
   if(status_.observed_sequence==hold_sequence_&&settled)status_.settled_sequence=hold_sequence_;
   else if(now_us-hold_since_us_>stream_.hold_timeout_us)stop("HOLD_SETTLE_TIMEOUT");
  }

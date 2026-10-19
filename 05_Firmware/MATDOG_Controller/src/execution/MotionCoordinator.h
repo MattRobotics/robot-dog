@@ -116,6 +116,9 @@ class MotionCoordinator : public core::SemanticMotionPlanner {
   const motion::operational_walk::WalkProfile* walk_profile_=nullptr;
   const core::MonotonicClock64* clock_=nullptr;
   double walkTime(uint32_t now_ms) const {return clock_?(clock_->now()/1e6):now_ms/1000.0;}
+  double stand_min_[12]{},stand_max_[12]{};
+  uint64_t stand_release_us_=0,stand_first_release_us_=0;
+  void streamStand(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
   void streamWalk(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
   uint32_t submitted_sequence_=0,arm_generation_=0;
 };

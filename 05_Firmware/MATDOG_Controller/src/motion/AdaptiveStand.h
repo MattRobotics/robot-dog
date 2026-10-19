@@ -68,7 +68,7 @@ class AdaptiveStand {
   const FixturePoseClassification& proneClassification() const {return prone_;}
   bool physicalReadiness() const {return physicalReady_;}
   const JointTargetFrame& referenceTarget() const {return previous_.target;}
-  bool pendingFinal() const {return pendingValid_&&segmentIndex_+1==segmentIntervals_;}
+  bool pendingFinal() const {return pendingValid_&&(timeDriven_?pendingTimeS_>=endpoint_.durationS:segmentIndex_+1==segmentIntervals_);}
   void noteSubmitted(uint32_t sequence){if(pendingValid_&&assessed_&&pending_.target.sequence==sequence)submitted_=true;}
   // Fixture STAND height change (commanded, not measured: the fixture observation
   // carries a declared body pose). Only from a VERIFIED STAND, at fixed canonical
@@ -101,6 +101,8 @@ class AdaptiveStand {
   LegJointAngles entry_offset_[4]{};
   uint16_t entry_knot_=UINT16_MAX;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
+  double referenceAtS_=0, referenceTimeS_=0, pendingTimeS_=0;
+  bool timeDriven_=false;
   bool pendingValid_=false, assessed_=false, physicalReady_=false, submitted_=false;
   FixtureEntryPlan entry_{};
   FixturePoseClassification prone_{};

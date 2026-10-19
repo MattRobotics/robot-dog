@@ -217,6 +217,56 @@ void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const Joint
  const bool final=walk_.state()==motion::FeedbackWalkState::HOLD;
  if(executor_->stream(frame_.target,v,now_us,now_us+scheduler_.periodUs(),final,facts,fb,now,now_us))submitted_sequence_=frame_.target.sequence;
 }
+// Same executor, scheduler, geometry generator and assessment path as WALK /
+// finite motion. Only structural STAND endpoints enter HOLD; microframes use TX.
+void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
+ executor_->monitor(facts,fb,now,now_us);
+ if(!executor_->active())return;
+ bool arrived=false;
+ if(executor_->status().state==ExecutorState::HOLD){
+  if(!executor_->endStream())return;
+  arrived=true;
+ }
+ const uint32_t period=static_cast<uint32_t>(std::llround(feedback_policy_.samplePeriodS*1e6));
+ // A second call after Controller assessment transmits the SAME generated
+ // reference at this release; it must not consume a second scheduler tick.
+ const bool refreshed=frame_.target.valid&&!frame_.executable&&assessment_.sequence==frame_.target.sequence;
+ if(arrived||refreshed||!scheduler_.running()||scheduler_.poll(now_us).release){
+  auto o=observation_;
+  o.acknowledgedSequence=stand_.pendingFinal()?executor_->status().completed_sequence:executor_->status().tx_sequence;
+  o.acknowledged=o.acknowledgedSequence!=0;
+  frame_=stand_.update(o,now_us/1e6,true);stand_release_us_=now_us;
+ }
+ if(stand_.state()==motion::AdaptiveStandState::REJECTED){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
+ if(stand_.state()==motion::AdaptiveStandState::STAND){
+  scheduler_.stop();
+  if(commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
+     !stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,now_us/1e6))executor_->stop("HEIGHT_ADJUST_REFUSED");
+  return;
+ }
+ if(executor_->status().state==ExecutorState::READY){
+  if(stand_.pendingFinal()&&frame_.target.sequence==submitted_sequence_)return;
+  for(unsigned i=0;i<12;++i){stand_min_[i]=feedback_policy_.jointLimits[i/3][i%3].lower;stand_max_[i]=feedback_policy_.jointLimits[i/3][i%3].upper;}
+  StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=0;c.settle_speed_rad_s=0;
+  c.local_path_box=true;c.max_step_rad=feedback_policy_.maxJointStepRad;
+  c.feedback_max_age_us=MotionExecutor::kTimedFeedbackMaxAgeMs*1000;
+  c.hold_timeout_us=executor_->trackingTimeoutUs();c.max_frame_gap_us=MotionExecutor::kTimedMaxFrameGapMs*1000;c.persist_samples=3;
+  c.region_min_rad=stand_min_;c.region_max_rad=stand_max_;
+  if(!executor_->beginStream(c,fb,now_us)){executor_->stop("STREAM_BEGIN_REFUSED");return;}
+  stand_first_release_us_=now_us+period;
+  scheduler_.start(stand_first_release_us_,period);return;
+ }
+ if(now_us<stand_first_release_us_)return;
+ if(!frame_.target.valid||!frame_.executable||!frame_.physicalReadiness||frame_.target.sequence==submitted_sequence_)return;
+ // The assessment retains the original collision/swept/support certificate.
+ FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();
+ v.collision_clear=assessment_.sweptCollisionClear;v.support_valid=assessment_.supportCompatible;
+ v.path_continuous=assessment_.continuousBoundsConfirmed;v.configuration_valid=assessment_.geometryIdentityVerified;
+ v.final=stand_.pendingFinal();
+ if(executor_->stream(frame_.target,v,now_us,stand_release_us_+period,v.final,facts,fb,now,now_us)){
+  submitted_sequence_=frame_.target.sequence;stand_.noteSubmitted(frame_.target.sequence);
+ }
+}
 void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
  if(executor_&&executor_->status().safe_off_required)pending_walk_=false;
  synchronizeSession();
@@ -247,17 +297,11 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
 
  if(walking_&&active_spec_.timeDriven){streamWalk(facts,fb,now,now_us);return;}
  const bool timed=!walking_&&executor_->timedSegmentsActive();
- if(timed){
-  // Monitor first, before consuming a timed ACK or sending the next target.
-  executor_->update(facts,fb,now,now_us);if(!executor_->active())return;
-  if(executor_->status().state==ExecutorState::READY&&frame_.target.valid&&
-     frame_.target.sequence==executor_->status().completed_sequence&&scheduler_.running()&&
-     !scheduler_.poll(now_us).release)return;
- }
+ if(!walking_&&(timed||executor_->streaming())){streamStand(facts,fb,now,now_us);return;}
  auto o=observation_;o.acknowledged=executor_->status().completed_sequence!=0;o.acknowledgedSequence=executor_->status().completed_sequence;
  // Observations remain externally measured. Targets never overwrite actual
  // joints, base height or contact evidence in order to manufacture tracking.
- frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6),timed);
+ frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6));
  // The certified entry just verified its 150 mm STAND and a lower height was requested:
  // continue in the SAME update, so the command is never completed at the intermediate height.
  if(!walking_&&stand_.state()==motion::AdaptiveStandState::STAND&&commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
@@ -272,7 +316,6 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  const uint32_t ttl=static_cast<uint32_t>(feedback_policy_.segmentTimeoutS*1000);
  v.final=walking_||stand_.pendingFinal();
  if(executor_->submit(frame_.target,v,now,ttl,feedback_policy_.samplePeriodS,facts,fb,now)){
-  if(timed&&!scheduler_.running())scheduler_.start(now_us+static_cast<uint64_t>(feedback_policy_.samplePeriodS*1e6),static_cast<uint32_t>(feedback_policy_.samplePeriodS*1e6));
   submitted_sequence_=frame_.target.sequence;if(!walking_)stand_.noteSubmitted(frame_.target.sequence);
  }
 }
