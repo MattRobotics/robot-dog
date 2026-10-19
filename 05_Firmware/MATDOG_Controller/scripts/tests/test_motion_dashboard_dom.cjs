@@ -338,6 +338,7 @@ async function boot(enabled = false, options = {}) {
   assert.strictEqual(p.q('#motion').firstChild.textContent, 'PRONTO', 'operational badge uses Motion status');
   assert(!p.q('#motion-cause').textContent.includes('NON AUTORIZZATO'));
   assert(!p.q('#motion-quick')?.textContent.includes('usare la fixture'));
+  p.device.status.last_sequence=11;
   p.device.status.active_command={sequence:11,outcome:'ACCEPTED',reason:'OK'};
   await p.motionPoll();
   assert(p.q('#motion-result').textContent.includes('esecuzione non completata'));
@@ -345,6 +346,8 @@ async function boot(enabled = false, options = {}) {
   await p.motionPoll();
   assert(p.q('#motion-result').textContent.includes('INTERROTTO'));
   assert(p.q('#motionWhy').textContent.includes('STALE_FEEDBACK'));
+  p.q('#motion-q-stop').click(); await settle();
+  assert(p.q('#motion-result').textContent.includes('COMPLETED')&&!p.q('#motion-result').textContent.includes('STALE_FEEDBACK'), 'older terminal snapshot cannot replace the new STOP ACK');
   delete p.device.status.active_command;
   await p.motionPoll();
   assert(!p.q('#motion-stand').disabled, 'READY + Controller-available STAND: no extra consent step in the UI');

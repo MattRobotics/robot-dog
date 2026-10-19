@@ -1316,7 +1316,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.speed_signed=t.present_speed<0?0:((t.present_speed&0x8000)?-(t.present_speed&0x7fff):t.present_speed&0x7fff);
       r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
       r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;r.control_at_ms=millis();
-      if(fast&&r.read_ok){operational_control_at_ms_=r.control_at_ms;operational_control_next_=static_cast<uint8_t>((operational_control_next_+1)%12);}
+      if(fast&&r.read_ok&&slot==operational_control_next_){operational_control_at_ms_=r.control_at_ms;operational_control_next_=static_cast<uint8_t>((operational_control_next_+1)%12);}
     } else {
       servo::ServoBus::FastFeedback t{};
       r.read_ok=joint&&servo_bus_.readFastFeedback(joint->bus_id,&t,transaction_ms);

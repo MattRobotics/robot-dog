@@ -106,7 +106,7 @@ void controlCacheRecovery(){
   for(uint32_t now=405;now<=600&&!r.executor.status().safe_off_required;now+=5){
    const bool full=fixed?controlReadDue(true,slot,next,now,last,20,control[slot],400):
      slot==next&&now-last>=20;
-   if(full){control[slot]=now;last=now;next=(next+1)%12;}
+   if(full){control[slot]=now;if(slot==next){last=now;next=(next+1)%12;}}
    const bool valid=now-control[slot]<=400;
    r.feedback.read_ok[slot]=valid;r.feedback.recovering[slot]=!valid;
    if(valid){r.feedback.sampled_at_ms[slot]=now;r.feedback.sampled_at_us[slot]=now*1000ull;slot=(slot+1)%12;}
