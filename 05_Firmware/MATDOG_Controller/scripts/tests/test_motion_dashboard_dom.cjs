@@ -77,7 +77,16 @@ async function boot(enabled = false, options = {}) {
   return { dom, device, q, calls, errors, pulse, motionPoll, fireTimer, timers, close: () => dom.window.close() };
 }
 (async () => {
-  let p = await boot();
+  let p = await boot(true);
+  p.device.status.operational={system_health:'READY',phase:'READY',reason:'OK',motion_authority:'GRANTED',walk:'WALK_BOUND'};
+  await p.motionPoll();
+  // Call the actual global renderer directly: the HTTP refresh catch used to
+  // swallow ReferenceError and window.error alone never detected it.
+  assert.doesNotThrow(()=>p.dom.window.eval(`st={mode:'RUN',system_health:'READY',power_state:'RUN',authority:'MOTION',calibration_hardware_motion_authorized:'NO',calibration_available:'YES',calibration_persist_verdict:'VALID_ACKNOWLEDGED',imu_rv_count:'10'};renderStatus();`));
+  assert(p.q('#calList').textContent.includes('VALID_ACKNOWLEDGED'), 'render reaches sections after both old why references');
+  assert.strictEqual(p.q('#motion').firstChild.textContent,'PRONTO');
+  p.close();
+  p = await boot();
   assert.deepStrictEqual(p.errors, [], 'shipped scripts execute without DOM errors');
   assert.strictEqual(p.dom.window.document.querySelectorAll('nav button').length, 7);
   for (const id of ['dashboard', 'wifi', 'ap', 'performance', 'ota', 'diagnostics', 'motion-control']) {

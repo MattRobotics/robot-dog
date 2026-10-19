@@ -1294,13 +1294,19 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       startup_qualification_.phase()==calibration::StartupQualificationPhase::REFUSED||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(profileActive()?2u:20u)){
     const uint32_t transaction_ms=validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:commissioning_bound_?commissioning_params_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs;
-    // Streaming (Issue #52): fast 56..70 reads round-robin, several per tick
-    // within a bounded budget, each stamped at its own completion; the slow
-    // 40..49 control block (torque/goal/profile/limit) rotates one joint per
-    // 100 ms. Otherwise (prime/entry/STAND): the reviewed combined read.
+    // ARMING, timed STAND and streaming WALK: three round-robin fast reads
+    // per successful tick, stamped individually at completion. Control 40..49
+    // rotates at 20 ms (finite) / 100 ms (streaming), with expired-cache retry.
+    // Idle, PRIME and ENERGIZE retain one combined read per tick.
     const bool fast=motion_executor_.streaming()||motion_executor_.timedSegmentsActive()||operational_session_.state()==execution::MotionSessionState::ARMING;
-    const unsigned reads=fast?3:1;const uint32_t budget_started=millis();
-    for(unsigned k=0;k<reads&&(k==0||millis()-budget_started<2);++k){
+    bool poll_ok=true;
+    for(unsigned k=0;execution::operationalPollReadAllowed(fast,k,poll_ok);++k){
+    // A pending STOP may preempt between synchronous reads, never after a
+    // whole new batch. Each individual read keeps its existing IO timeout.
+    if(k&&http_transport_.serviceStopLane(millis())){
+      stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
+      emergencyTorqueOffBurst();break;
+    }
     const unsigned slot=operational_poll_next_;
     const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
     execution::RawJointObservation r=operational_producer_.raw(slot);
@@ -1338,7 +1344,8 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     if(r.read_ok&&joint&&r.temperature>70){int direct=-1;
       r.temperature=servo_bus_.readPresentTemperatureDirect(joint->bus_id,&direct)?direct:r.temperature;}
     operational_producer_.ingest(slot,r,geometry_profile_,actuator::geometry_data::kProvenance,actuator_policy_.transforms());
-    operational_poll_next_=(!r.read_ok||r.position>=4096)?slot:static_cast<uint8_t>((slot+1)%12);operational_poll_at_ms_=r.sampled_at_ms;
+    poll_ok=r.read_ok&&r.position<4096;
+    operational_poll_next_=poll_ok?static_cast<uint8_t>((slot+1)%12):slot;operational_poll_at_ms_=r.sampled_at_ms;
     }
   }
   now_ms=millis(); // freshness uses completion time, never the pre-read clock

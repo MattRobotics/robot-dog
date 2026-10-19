@@ -21,6 +21,12 @@ inline bool controlReadDue(bool fast,unsigned slot,unsigned next,uint32_t now,
                            uint32_t sampled_control,uint32_t max_age){
  return !fast||(slot==next&&now-last_control>=period)||now-sampled_control>=max_age;
 }
+// A successful fast batch services three distinct slots before planner work.
+// Do not truncate this quota with a 2 ms wall slice: a valid synchronous read
+// can consume that slice by itself. An error ends the batch for supervision.
+inline bool operationalPollReadAllowed(bool fast,unsigned completed,bool previous_ok){
+ return previous_ok&&completed<(fast?3u:1u);
+}
 // Pure read producer boundary. Failure replaces the slot; never replay a last
 // successful value as fresh. No q0 constants, target substitution or support.
 class OperationalFeedback {

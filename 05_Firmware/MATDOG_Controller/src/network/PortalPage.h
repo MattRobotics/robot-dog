@@ -109,7 +109,7 @@ function renderStatus(){
  const mods=$('#mods');mods.textContent='';
  for(const [k,label] of [['imu','IMU'],['bms','BMS'],['servo','SERVO'],['led','LED']]){const v=s[k+'_availability']||'UNKNOWN';mods.append(E('span','chip '+(CLASS[v]||''),label+' '+v))}
  rows('#sysList',[['Calibrazione in corso',yn(s.calibration_holds_authority)],['Inibizione attuatori',s.authority_inhibited==='YES'?'ATTIVA · '+s.authority_inhibit_reason:'non attiva'],['Stato OTA',s.ota_state],['Memoria libera',s.heap_free?Math.round(s.heap_free/1024)+' kB (minimo '+Math.round(s.heap_min_free/1024)+' kB)':null],['Stack controller libero (minimo)',s.loop_stack_min_free?s.loop_stack_min_free+' B':null]]);
- $('#safety').textContent=why.length?'Stato di sicurezza: attuatori bloccati (fail-closed). I comandi Motion sono subordinati alle capability del Controller.':'Stato di sicurezza: gli attuatori possono essere comandati dal controller.';
+ $('#safety').textContent='Disponibilità, avanzamento ed errori dei comandi sono riportati nello stato Motion del Controller.';
  // Battery: a value is shown as current only when the controller calls it fresh.
  const valid=s.bms_valid==='YES',fresh=s.bms_fresh==='YES',soc=parseFloat(s.bms_soc_percent),bar=$('#socBar');
  const crit=s.led_battery_critical==='YES'||soc<=BAT_CRIT,low=s.led_battery_warning==='YES'||soc<=BAT_LOW;
@@ -142,7 +142,7 @@ function renderStatus(){
  rows('#servoList',[['Bus servo',s.servo_detected,s.servo_detected==='ONLINE'?'ok':s.servo_detected==='NO_RESPONSE'?'bad':'na'],['Popolazione attesa',s.servo_expected_now?s.servo_expected_now+' servo ('+s.servo_canonical+' ID canonici)':null],
   ['Popolazione rilevata',census==='NOT_RUN'?'non verificata dal boot':s.servo_census_present+' presenti · '+s.servo_census_missing+' mancanti · '+census,census==='PASS'?'ok':census==='NOT_RUN'?'na':'bad'],
   ['Autorità di controllo',s.authority],['Torque enable',s.actuator_readiness_torque_enable,gate(s.actuator_readiness_torque_enable)],['Position command',s.actuator_readiness_position_command,gate(s.actuator_readiness_position_command)],
-  ['Movimento',why.length?'INIBITO':'ABILITATO',why.length?'lock':'bad']]);
+  ['Movimento operativo','Vedi stato Motion']]);
  const avail=s.calibration_available;
  chip('#calBadge',avail==='YES'?'DISPONIBILE':avail==='NO'?'NON DISPONIBILE':'N/D',avail==='YES'?'ok':avail==='NO'?'warn':'');
  rows('#calList',[['Record persistente',s.calibration_persist_verdict,s.calibration_persist_verdict==='VALID_ACKNOWLEDGED'?'ok':'warn'],['Generazione acknowledged',s.calibration_ack_generation],['Record integro',yn(s.calibration_record_intact),s.calibration_record_intact==='YES'?'ok':'warn'],

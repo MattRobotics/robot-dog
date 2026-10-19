@@ -121,12 +121,70 @@ void controlCacheRecovery(){
  // Wrapping millisecond epoch and an expired cache independent of cursor.
  CHECK(controlReadDue(true,3,7,10,9,20,UINT32_MAX-400,400));
 }
+// Scheduling experiment: real Executor + frame backend + production batch rule.
+// Transaction/loop durations are explicit synthetic inputs, NOT hardware WCET.
+// Coordinator maxima are taken from the five 19-Oct traces; the remaining
+// loop cost is varied. Samples are stamped only when their read completes.
+void timedPolling(){
+ const uint32_t work_us[]={10587,12654,10400,10395,10620};
+ for(unsigned overhead_us:{3000u,5000u})for(unsigned scenario=0;scenario<4;++scenario)for(bool fixed:{false,true}){
+  Rig r;r.envelope.frame_writes=r.envelope.timed_segments=true;r.envelope.feedback_max_age_ms=400;
+  r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;CHECK(r.arm());
+  uint64_t clock=100000;unsigned slot=0,control_next=0;uint32_t control_at=100;
+  uint32_t controls[12];unsigned seen[12]{};uint32_t max_gap=0,max_check_age=0;
+  for(unsigned j=0;j<12;++j){r.feedback.sampled_at_ms[j]=24+6*j;r.feedback.sampled_at_us[j]=(24+6*j)*1000;controls[j]=24+6*j;}
+  bool injected=false,stopped=false;uint32_t failure_sample=0;unsigned ticks=0;
+  for(;ticks<300&&!r.executor.status().safe_off_required;++ticks){
+   const uint64_t batch_started=clock;bool ok=true;
+   for(unsigned k=0;fixed?operationalPollReadAllowed(true,k,ok):(k<3&&(k==0||clock-batch_started<2000));++k){
+    if(scenario==3&&ticks==30&&k==1){r.executor.stop("OPERATOR_STOP");stopped=true;break;}
+    const uint32_t before=clock/1000;
+    const bool full=!r.feedback.read_ok[slot]||controlReadDue(true,slot,control_next,before,control_at,20,controls[slot],400);
+    const bool fail=scenario>0&&scenario<3&&ticks>=30&&slot==7&&(!injected||scenario==2);
+    clock+=fail&&scenario==2?8000:full?2000:1000;
+    const uint32_t at=clock/1000;
+    if(fail){if(!injected)failure_sample=r.feedback.sampled_at_ms[slot];injected=true;
+     r.feedback.read_ok[slot]=false;r.feedback.recovering[slot]=true;ok=false;}
+    else{
+     if(full){controls[slot]=at;if(slot==control_next){control_at=at;control_next=(control_next+1)%12;}}
+     max_gap=std::max(max_gap,at-r.feedback.sampled_at_ms[slot]);
+     r.feedback.actual_rad[slot]=r.executor.targetRadians()[slot];
+     r.feedback.sampled_at_ms[slot]=at;r.feedback.sampled_at_us[slot]=clock;
+     r.feedback.read_ok[slot]=true;r.feedback.recovering[slot]=false;++seen[slot];slot=(slot+1)%12;
+    }
+   }
+   const auto snapshot=r.feedback;const unsigned frames_before=r.backend.frames;
+   clock+=work_us[ticks%5];const uint32_t now=clock/1000;
+   for(unsigned j=0;j<12;++j)max_check_age=std::max(max_check_age,now-snapshot.sampled_at_ms[j]);
+   r.executor.update(r.facts,snapshot,now,clock);
+   if(r.executor.status().state==ExecutorState::READY&&!snapshot.pending()){
+    const unsigned seq=r.executor.status().accepted_sequence+1;
+    auto frame=r.frame(seq,.001*std::sin(seq*.01));auto v=r.validation(seq);v.final=false;
+    CHECK(r.executor.submit(frame,v,now,1000,.020,r.facts,snapshot,now));
+    r.executor.update(r.facts,snapshot,now,clock);
+   }
+   if(snapshot.pending()||stopped)CHECK(r.backend.frames==frames_before);
+   clock+=(r.backend.frames-frames_before)*r.backend.tx_us+overhead_us;
+  }
+  std::printf("POLL_TIMING fixed=%u scenario=%u overhead_us=%u ticks=%u frames=%u max_gap_ms=%u max_check_age_ms=%u reason=%s\n",
+   fixed,scenario,overhead_us,ticks,r.backend.frames,max_gap,max_check_age,r.executor.status().reason);
+  CHECK(r.backend.attempts==0);CHECK(r.backend.writes.size()==r.backend.frames*12);
+  if(!fixed){CHECK(r.executor.status().safe_off_required);REASON(r.executor.status().reason,"STALE_FEEDBACK");}
+  else if(scenario<2){CHECK(!r.executor.status().safe_off_required);CHECK(r.backend.frames>50);CHECK(max_check_age<=100);
+   for(unsigned n:seen){CHECK(n>30);}
+   if(scenario==1)CHECK(injected);}
+  else if(scenario==2){CHECK(injected&&r.executor.status().safe_off_required);REASON(r.executor.status().reason,"STALE_FEEDBACK");
+   CHECK(r.executor.status().feedback_sample_ms==failure_sample);CHECK(r.executor.status().feedback_budget_ms==100);
+   const unsigned n=r.backend.frames;r.executor.update(r.facts,r.feedback,clock/1000,clock);CHECK(r.backend.frames==n);}
+  else{CHECK(stopped&&r.executor.status().safe_off_required);REASON(r.executor.status().reason,"OPERATOR_STOP");}
+ }
+}
 int main(){
  {Operational op;auto stop=command(motion::Intent::STOP,1);stop.issued_at_ms=0;stop.ttl_ms=1;
   auto r=op.readiness();r.fault=true;r.operational_permit=false;r.hardware_approved=false;op.b.service.refresh(r,10000);
   CHECK(op.b.service.command(stop,10000).outcome==motion::CommandOutcome::ACCEPTED);
   CHECK(op.b.r.executor.status().safe_off_required);}
- controlCacheRecovery();stopDuringStartup();retryBeforeFrame();noProceduralPermit();retryFeedback();directWalk();
+ timedPolling();controlCacheRecovery();stopDuringStartup();retryBeforeFrame();noProceduralPermit();retryFeedback();directWalk();
  stand_backend::run();postValidationAdmissionClock();operationalRefusals();
  operationalStandEndToEnd(0);phaseTimedRouteContract();
  std::printf("MOTION_REMEDIATION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
