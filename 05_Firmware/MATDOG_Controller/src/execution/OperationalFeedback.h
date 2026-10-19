@@ -13,6 +13,14 @@ struct RawJointObservation {
  int load=-1,current=-1;        // kept from the fast block (Issue #52)
  uint32_t control_at_ms=0;      // when the slow 40..49 block was last read
 };
+// A retry must be able to renew an expired control block even when the
+// round-robin control cursor points elsewhere. Otherwise the fast read is
+// discarded forever at this slot and all remaining encoders starve.
+inline bool controlReadDue(bool fast,unsigned slot,unsigned next,uint32_t now,
+                           uint32_t last_control,uint32_t period,
+                           uint32_t sampled_control,uint32_t max_age){
+ return !fast||(slot==next&&now-last_control>=period)||now-sampled_control>=max_age;
+}
 // Pure read producer boundary. Failure replaces the slot; never replay a last
 // successful value as fresh. No q0 constants, target substitution or support.
 class OperationalFeedback {

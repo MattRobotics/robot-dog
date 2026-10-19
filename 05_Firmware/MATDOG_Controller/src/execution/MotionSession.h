@@ -54,7 +54,7 @@ class MotionSession {
  MotionExecutor* executor_=nullptr;core::ActuatorAuthorityArbiter* arbiter_=nullptr;
  const actuator::CalibrationGeometryProfile* geometry_=nullptr;const actuator::GeometryProvenance* provenance_=nullptr;
  core::AuthorityLease lease_{};LocalTrialEvidence evidence_{};ExecutionEnvelope envelope_{};
- MotionSessionState state_=MotionSessionState::OFF;const char* reason_="LOCAL_TRIAL_EVIDENCE_REQUIRED";
+ MotionSessionState state_=MotionSessionState::OFF;const char* reason_="IDLE";
  motion::JointTargetFrame micro_start_{};FrameValidation micro_path_{};
  bool micro_active_=false;unsigned micro_joint_=0,micro_step_=0,micro_intervals_=0;
  double micro_delta_=0,micro_duration_=0;

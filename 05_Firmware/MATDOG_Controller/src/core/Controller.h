@@ -275,6 +275,7 @@ class Controller {
   uint8_t canonical_leg_ids_[12]{};
   uint8_t operational_control_next_=0;uint32_t operational_control_at_ms_=0;
   bool safe_off_burst_sent_=false;
+  uint32_t operational_work_max_us_=0; // coordinator work since latest ARM, diagnosis only
   struct StopMetrics { uint64_t latched_us=0,last_target_tx_us=0,off_tx_start_us=0,off_tx_done_us=0,all_off_verified_us=0;uint16_t off_bytes=0;uint8_t verify_rounds=0; } stop_metrics_{};
   void emergencyTorqueOffBurst();
   uint8_t motion_safe_off_next_=0;

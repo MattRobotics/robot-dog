@@ -20,13 +20,16 @@ const char* MotionExecutor::gate(const MotionExecutionFacts& f,uint32_t /*now*/)
  if(active()&&(lease_.generation!=f.lease.generation||policy_epoch_!=policy_->epoch()))return "SESSION_CHANGED";
  return nullptr;
 }
-const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now) const {
+const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now) {
  const uint32_t age=timedSegmentsActive()?std::min(envelope_.feedback_max_age_ms,kTimedFeedbackMaxAgeMs):envelope_.feedback_max_age_ms;
  for(unsigned i=0;i<12;i++){
-  if(static_cast<int32_t>(now-f.sampled_at_ms[i])<0)return "FEEDBACK_CLOCK_INVALID";
-  if(now-f.sampled_at_ms[i]>age)return "STALE_FEEDBACK";
-  if((!f.read_ok[i]&&!f.recovering[i])||!std::isfinite(f.actual_rad[i]))return "FEEDBACK_INVALID";
-  if(!f.torque_on[i])return "TORQUE_LOST";
+  const char* reason=nullptr;
+  if(static_cast<int32_t>(now-f.sampled_at_ms[i])<0)reason="FEEDBACK_CLOCK_INVALID";
+  else if(now-f.sampled_at_ms[i]>age)reason="STALE_FEEDBACK";
+  else if((!f.read_ok[i]&&!f.recovering[i])||!std::isfinite(f.actual_rad[i]))reason="FEEDBACK_INVALID";
+  else if(!f.torque_on[i])reason="TORQUE_LOST";
+  if(reason){status_.feedback_failed_joint=i;status_.feedback_checked_ms=now;
+   status_.feedback_sample_ms=f.sampled_at_ms[i];status_.feedback_budget_ms=age;return reason;}
  }
  return nullptr;
 }
@@ -114,6 +117,7 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
    const char* why="";
    tracking_started_us_=now_us?now_us:now*1000ull;
    if(!frameTx(target_,f,tracking_started_us_,&why)){stop(why);return;}
+   status_.tx_sequence=status_.accepted_sequence;
    status_.next_joint=12;status_.state=ExecutorState::TRACKING;tracking_since_ms_=now;return;
   }
   const unsigned i=status_.next_joint;actuator::ActuatorCommand cmd;uint8_t bus;

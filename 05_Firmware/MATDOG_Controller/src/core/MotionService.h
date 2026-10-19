@@ -38,7 +38,7 @@ struct MotionTelemetry {
  bool validation_capable=false,fixture_scope=false,load_scope=false,foot_load_proven=false;unsigned supervised_segment=0;
  const char* source="UNKNOWN";
  const char* session_profile_sha256="";
- const char* session_state="OFF";const char* session_reason="LOCAL_TRIAL_EVIDENCE_REQUIRED";
+ const char* session_state="OFF";const char* session_reason="IDLE";
  const char* session_last_revoke="";const char* session_failure="";int session_failed_joint=-1;
  // Runtime test policy view (read-only). Distinct reasons, never one badge.
  const char* runtime_mode="DIAGNOSTIC";const char* limits_scope="NONE";const char* restore="NOT_RUN";

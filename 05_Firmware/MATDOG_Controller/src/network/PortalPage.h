@@ -54,7 +54,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{
 <div id="message" role="status" hidden></div>
 <nav><button data-page="dashboard" class="on">Dashboard</button><button data-page="wifi">Wi-Fi</button><button data-page="ap">Access Point</button><button data-page="performance">Performance</button><button data-page="ota">OTA</button><button data-page="diagnostics">Diagnostics</button></nav>
 <section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, la sessione dura 5 minuti; la Dashboard visibile la rinnova. La presenza Motion scade dopo 3 s senza heartbeat.</p><button>Accedi</button></form></section>
-<section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">MOVIMENTO NON AUTORIZZATO<span id="motionWhy"></span></div></div>
+<section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">STATO MOTION IN ATTESA<span id="motionWhy"></span></div></div>
 <div id="staleNote">Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.</div>
 <div class="cards">
 <div class="card"><h3>Stato generale</h3><div class="kpis"><div><small>Sistema</small><b id="health">—</b></div><div><small>Alimentazione</small><b id="power">—</b></div><div><small>Authority</small><b id="authority">—</b></div></div><div class="mods" id="mods"></div><dl id="sysList"></dl><p class="note" id="safety"></p></div>
@@ -101,15 +101,8 @@ function renderStatus(){
  $('#lockNote').hidden=s.mode==='MAINTENANCE';
  const mode=s.mode||'UNKNOWN',faulty=s.system_health==='FAULT'||(s.power_state&&s.power_state!=='RUN');
  $('#mode').textContent=mode;$('#modeBar').className='mode '+(faulty?'bad':mode==='MAINTENANCE'?'maint':mode==='RUN'?'run':'');
- // Movement is reported as possible only when every gate says so.
- const why=[];
- if(s.calibration_hardware_motion_authorized!=='YES')why.push('motion hardware NO');
- if(s.authority==='NONE')why.push('authority NONE');
- if(s.authority_inhibited==='YES')why.push('inibizione '+s.authority_inhibit_reason);
- if(s.actuator_readiness_torque_enable!=='READY')why.push('torque '+(s.actuator_readiness_torque_enable||'N/D'));
- if(s.actuator_readiness_position_command!=='READY')why.push('posizione '+(s.actuator_readiness_position_command||'N/D'));
- const m=$('#motion');m.className='motion'+(why.length?'':' live');
- m.firstChild.textContent=why.length?'MOVIMENTO NON AUTORIZZATO':'MOVIMENTO ABILITATO';$('#motionWhy').textContent=why.join(' · ');
+ // Operational Motion status is rendered from /api/motion/status by
+ // MotionDashboard, not from the historical calibration authorization.
  const h=$('#health');h.textContent=s.system_health||'N/D';h.style.color=s.system_health==='READY'?'var(--ok)':s.system_health==='FAULT'?'var(--bad)':'var(--warn)';
  const p=$('#power');p.textContent=s.power_state||'N/D';p.style.color=s.power_state==='RUN'?'':'var(--warn)';
  $('#authority').textContent=s.authority||'N/D';

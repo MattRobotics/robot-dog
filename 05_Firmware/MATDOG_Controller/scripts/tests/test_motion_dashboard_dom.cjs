@@ -335,6 +335,18 @@ async function boot(enabled = false, options = {}) {
   const opText = p.q('#motion-state').textContent;
   assert(opText.includes('SistemaREADY') && opText.includes('CalibrazioneRESTORED') && opText.includes('Feedback giuntiAVAILABLE') && opText.includes('Motion AuthorityGRANTED'));
   assert(opText.includes('Collegamento teleoperazioneattivo'));
+  assert.strictEqual(p.q('#motion').firstChild.textContent, 'PRONTO', 'operational badge uses Motion status');
+  assert(!p.q('#motion-cause').textContent.includes('NON AUTORIZZATO'));
+  assert(!p.q('#motion-quick')?.textContent.includes('usare la fixture'));
+  p.device.status.active_command={sequence:11,outcome:'ACCEPTED',reason:'OK'};
+  await p.motionPoll();
+  assert(p.q('#motion-result').textContent.includes('esecuzione non completata'));
+  p.device.status.active_command={sequence:11,outcome:'ABORTED',reason:'STALE_FEEDBACK'};
+  await p.motionPoll();
+  assert(p.q('#motion-result').textContent.includes('INTERROTTO'));
+  assert(p.q('#motionWhy').textContent.includes('STALE_FEEDBACK'));
+  delete p.device.status.active_command;
+  await p.motionPoll();
   assert(!p.q('#motion-stand').disabled, 'READY + Controller-available STAND: no extra consent step in the UI');
   assert(p.q('[data-action="posture.lie_down"]').disabled, 'unimplemented action stays disabled');
   assert(p.q('[data-action="posture.lie_down"]').closest('.motion-action').textContent.includes('planned'), 'unimplemented action is labelled as such');

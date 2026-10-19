@@ -88,16 +88,45 @@ void retryBeforeFrame(){
  const auto n=r.backend.writes.size();r.feedback.read_ok[0]=false;r.feedback.recovering[0]=true;
  r.executor.update(r.facts,r.feedback,101);CHECK(r.backend.writes.size()==n&&!r.executor.status().safe_off_required);
  r.feedback.read_ok[0]=true;r.feedback.recovering[0]=false;r.fresh(105);
- r.executor.update(r.facts,r.feedback,105);CHECK(r.backend.writes.size()==n+12);
+ r.executor.update(r.facts,r.feedback,105);CHECK(r.backend.writes.size()==n+12);CHECK(r.executor.status().tx_sequence==1);
  r.executor.update(r.facts,r.feedback,206);CHECK(r.executor.status().safe_off_required);
  REASON(r.executor.status().reason,"STALE_FEEDBACK");
+}
+// Real production executor and control scheduling predicate, with deterministic
+// serial transaction durations. This reproduces starvation, not a claim that
+// the hardware log identifies this as its first cause.
+void controlCacheRecovery(){
+ for(bool fixed:{false,true}){
+  Rig r;r.envelope.frame_writes=true;r.envelope.timed_segments=true;
+  r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;CHECK(r.arm());
+  uint32_t control[12]{};for(auto& t:control)t=100;
+  // One expired control block, while the slow rotation points elsewhere.
+  control[0]=0;unsigned slot=0,next=1;uint32_t last=400;
+  r.fresh(400);
+  for(uint32_t now=405;now<=600&&!r.executor.status().safe_off_required;now+=5){
+   const bool full=fixed?controlReadDue(true,slot,next,now,last,20,control[slot],400):
+     slot==next&&now-last>=20;
+   if(full){control[slot]=now;last=now;next=(next+1)%12;}
+   const bool valid=now-control[slot]<=400;
+   r.feedback.read_ok[slot]=valid;r.feedback.recovering[slot]=!valid;
+   if(valid){r.feedback.sampled_at_ms[slot]=now;r.feedback.sampled_at_us[slot]=now*1000ull;slot=(slot+1)%12;}
+   r.executor.update(r.facts,r.feedback,now,now*1000ull);
+  }
+  if(!fixed){CHECK(r.executor.status().safe_off_required);REASON(r.executor.status().reason,"STALE_FEEDBACK");
+   CHECK(r.executor.status().feedback_checked_ms==505);CHECK(r.executor.status().feedback_budget_ms==100);}
+  else{CHECK(!r.executor.status().safe_off_required);
+   // Silence remains a fault under exactly the same 100 ms bound.
+   r.executor.update(r.facts,r.feedback,701,701000);CHECK(r.executor.status().safe_off_required);}
+ }
+ // Wrapping millisecond epoch and an expired cache independent of cursor.
+ CHECK(controlReadDue(true,3,7,10,9,20,UINT32_MAX-400,400));
 }
 int main(){
  {Operational op;auto stop=command(motion::Intent::STOP,1);stop.issued_at_ms=0;stop.ttl_ms=1;
   auto r=op.readiness();r.fault=true;r.operational_permit=false;r.hardware_approved=false;op.b.service.refresh(r,10000);
   CHECK(op.b.service.command(stop,10000).outcome==motion::CommandOutcome::ACCEPTED);
   CHECK(op.b.r.executor.status().safe_off_required);}
- stopDuringStartup();retryBeforeFrame();noProceduralPermit();retryFeedback();directWalk();
+ controlCacheRecovery();stopDuringStartup();retryBeforeFrame();noProceduralPermit();retryFeedback();directWalk();
  stand_backend::run();postValidationAdmissionClock();operationalRefusals();
  operationalStandEndToEnd(0);phaseTimedRouteContract();
  std::printf("MOTION_REMEDIATION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);

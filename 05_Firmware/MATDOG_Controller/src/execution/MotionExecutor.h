@@ -63,6 +63,8 @@ struct ExecutorStatus {
   uint64_t last_tx_complete_us=0;
   double stream_error_rad[12]{}, stream_peak_error_rad=0;
   uint8_t worst_joint=0xff;
+  int8_t feedback_failed_joint=-1;
+  uint32_t feedback_checked_ms=0, feedback_sample_ms=0, feedback_budget_ms=0;
 };
 // Streaming contract. Tracking is a following monitor: geometry safety comes
 // from the certified box (every target inside region, measured inside region
@@ -114,7 +116,7 @@ class MotionExecutor {
  private:
   uint32_t segment_duration_ms_=0;
   const char* gate(const MotionExecutionFacts&,uint32_t) const;
-  const char* feedbackFailure(const JointFeedback&,uint32_t) const;
+  const char* feedbackFailure(const JointFeedback&,uint32_t);
   bool resolve(uint8_t index,double radians,actuator::ActuatorCommand*,uint8_t*) const;
   bool reject(const char* reason);
   actuator::SafeActuatorPolicy* policy_=nullptr;

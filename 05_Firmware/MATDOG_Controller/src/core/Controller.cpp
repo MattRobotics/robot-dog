@@ -1306,7 +1306,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     execution::RawJointObservation r=operational_producer_.raw(slot);
     const uint32_t read_started=millis();
     const uint32_t control_period=motion_executor_.streaming()?100:20;
-    const bool control_due=!fast||(slot==operational_control_next_&&millis()-operational_control_at_ms_>=control_period);
+    const uint32_t control_max_age=motion_executor_.streaming()?1500:reviewed_motion_.execution.feedback_max_age_ms;
+    const bool control_due=!r.read_ok||execution::controlReadDue(fast,slot,operational_control_next_,millis(),
+      operational_control_at_ms_,control_period,r.control_at_ms,control_max_age);
     if(control_due){
       servo::ServoBus::ControlFeedbackSnapshot t{};
       r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,transaction_ms);
@@ -1314,7 +1316,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.speed_signed=t.present_speed<0?0:((t.present_speed&0x8000)?-(t.present_speed&0x7fff):t.present_speed&0x7fff);
       r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
       r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;r.control_at_ms=millis();
-      if(fast){operational_control_at_ms_=r.control_at_ms;operational_control_next_=static_cast<uint8_t>((operational_control_next_+1)%12);}
+      if(fast&&r.read_ok){operational_control_at_ms_=r.control_at_ms;operational_control_next_=static_cast<uint8_t>((operational_control_next_+1)%12);}
     } else {
       servo::ServoBus::FastFeedback t{};
       r.read_ok=joint&&servo_bus_.readFastFeedback(joint->bus_id,&t,transaction_ms);
@@ -1322,7 +1324,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
       r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;
       // Torque state from the slow block, valid only while recent (monitor, not per sample).
-      if(millis()-r.control_at_ms>(motion_executor_.streaming()?1500:reviewed_motion_.execution.feedback_max_age_ms))r.read_ok=false;
+      if(millis()-r.control_at_ms>control_max_age)r.read_ok=false;
     }
     r.transaction_ms=millis()-read_started;
     // The encoder sample instant is the block's completion, before any confirmation read.
@@ -1498,6 +1500,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // During the coordinated stop too: losing the heartbeat at any phase = SAFE_OFF.
   if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&motion_coordinator_.walking()&&operatorPresent(now_ms)){
     motion_coordinator_.renewWalk(now_ms);motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));}
+  if(session_before!=execution::MotionSessionState::ARMED&&operational_session_.state()==execution::MotionSessionState::ARMED)
+    operational_work_max_us_=0;
+  const uint32_t work_started_us=micros();
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));
   if(profileActive()&&(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||validation_present_)&&
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
@@ -1515,12 +1520,31 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
         motion_coordinator_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
     }
   }
+  operational_work_max_us_=std::max(operational_work_max_us_,static_cast<uint32_t>(micros()-work_started_us));
   motion_executor_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
+  emergencyTorqueOffBurst(); // physical stop precedes diagnostics and telemetry
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
     char trace[192];const int n=snprintf(trace,sizeof(trace),"MOTION_FIRST_STOP now_ms=%lu session=%s reason=%s tx_sequence=%lu\r\n",
       (unsigned long)millis(),operational_session_.stateName(),motion_executor_.status().reason,
       (unsigned long)motion_executor_.status().tx_sequence);
     if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
+  }
+  // One bounded record at the first stop only; samples retain their real age.
+  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
+    const uint32_t at=millis();unsigned oldest=0;
+    for(unsigned i=1;i<12;++i)if(at-operational_feedback_.sampled_at_ms[i]>at-operational_feedback_.sampled_at_ms[oldest])oldest=i;
+    const auto& failure=motion_executor_.status();
+    if(failure.feedback_failed_joint>=0)oldest=static_cast<unsigned>(failure.feedback_failed_joint);
+    const auto& raw=operational_producer_.raw(oldest);
+    char detail[384];const int n=snprintf(detail,sizeof(detail),
+      "MOTION_FEEDBACK_STOP checker=%s checked_ms=%lu budget_ms=%lu joint=%u sample_ms=%lu age_ms=%lu read_ok=%u recovering=%u raw_ok=%u control_ms=%lu poll_next=%u poll_ms=%lu transaction_ms=%lu executor_age_ms=%lu session_age_ms=%lu frames_tx=%lu work_max_us=%lu\r\n",
+      failure.feedback_failed_joint>=0?"EXECUTOR":"SESSION_OR_COORDINATOR",(unsigned long)failure.feedback_checked_ms,
+      (unsigned long)failure.feedback_budget_ms,oldest,(unsigned long)operational_feedback_.sampled_at_ms[oldest],(unsigned long)(at-operational_feedback_.sampled_at_ms[oldest]),
+      operational_feedback_.read_ok[oldest],operational_feedback_.recovering[oldest],raw.read_ok,(unsigned long)raw.control_at_ms,
+      operational_poll_next_,(unsigned long)operational_poll_at_ms_,(unsigned long)raw.transaction_ms,
+      (unsigned long)std::min(reviewed_motion_.execution.feedback_max_age_ms,execution::MotionExecutor::kTimedFeedbackMaxAgeMs),
+      (unsigned long)reviewed_motion_.execution.feedback_max_age_ms,(unsigned long)motion_executor_.status().frames_tx,(unsigned long)operational_work_max_us_);
+    if(n>0&&static_cast<size_t>(n)<sizeof(detail))writeAdmissionTrace(Serial,detail,n);
   }
   ready.operational_permit=operational_facts_.operator_permit&&operational_session_.state()==execution::MotionSessionState::ARMED;
   // Compatibility telemetry only: operational availability is determined by
@@ -1613,6 +1637,7 @@ void Controller::emergencyTorqueOffBurst() {
   if(safe_off_burst_sent_||!build::kServoPowerAvailable)return;
   if(!(motion_executor_.status().safe_off_required||operational_session_.safeOffRequired()))return;
   safe_off_burst_sent_=true;
+  if(stop_metrics_.all_off_verified_us)stop_metrics_=StopMetrics{};
   if(!stop_metrics_.latched_us){stop_metrics_.latched_us=motion_clock_.extend(micros());}
   stop_metrics_.last_target_tx_us=motion_executor_.status().last_tx_complete_us;
   // ONE SYNC_WRITE TorqueEnable=0 to the twelve leg ids: no poll, no readback,
