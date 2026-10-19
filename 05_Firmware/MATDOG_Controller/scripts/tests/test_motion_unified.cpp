@@ -11,13 +11,97 @@ struct StreamRig {
   r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;r.envelope.tracking_timeout_ms=4000;
   for(unsigned i=0;i<12;++i){lo[i]=-.1;hi[i]=.1;r.feedback.sampled_at_us[i]=100000;}
   CHECK(r.arm());StreamConfig c;c.tube_rad=.020;c.local_path_box=true;c.max_step_rad=.004;
-  c.settle_speed_rad_s=0;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
+  c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
   c.region_min_rad=lo;c.region_max_rad=hi;CHECK(r.executor.beginStream(c,r.feedback,100000));
  }
  void fresh(uint64_t t,double q){for(unsigned i=0;i<12;++i){r.feedback.sampled_at_ms[i]=t/1000;r.feedback.sampled_at_us[i]=t;r.feedback.actual_rad[i]=q;}}
  bool send(unsigned seq,double q,uint64_t t,bool final=false){return r.executor.stream(r.frame(seq,q),r.validation(seq),t,t+20000,final,r.facts,r.feedback,t/1000,t);}
  void monitor(uint64_t t){r.executor.monitor(r.facts,r.feedback,t/1000,t);}
 };
+// Counterexamples use existing production executor, mapping and certified path.
+void residualGeometry(bool fixed){
+ Bench b;auto& r=b.r;motion::PhaseTimedRoute route;const auto& profile=motion::operational_walk::kStandProfile;
+ CHECK(motion::buildPhaseTimedRoute(true,.999*profile.velocityRadS,.999*profile.accelerationRadS2/2,profile.samplePeriodS,&route));
+ const double t0=route.durationS[4]/2;
+ auto path=[&](double t){return motion::phaseTimedSample(route,4,t0+t,true).target;};
+ const auto start=path(0);double lo[12],hi[12];
+ CHECK(r.arbiter.request(ActuatorAuthority::MOTION,OperatingMode::RUN,&r.facts.lease)==AuthorityResult::GRANTED);
+ for(unsigned i=0;i<12;++i){r.feedback.actual_rad[i]=slot(start,i);r.feedback.sampled_at_us[i]=100000;r.feedback.torque_on[i]=true;
+  lo[i]=b.limits[i][0];hi[i]=b.limits[i][1];}
+ r.envelope.frame_writes=r.envelope.timed_segments=true;r.envelope.max_velocity_rad_s=.19;r.envelope.max_acceleration_rad_s2=2;
+ r.envelope.tracking_tolerance_rad=.020;r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;CHECK(r.arm());
+ StreamConfig c;c.local_path_box=true;c.max_step_rad=.004;c.tube_rad=.020;c.settle_speed_rad_s=0;
+ c.feedback_max_age_us=c.max_frame_gap_us=100000;c.hold_timeout_us=4000000;c.persist_samples=3;c.region_min_rad=lo;c.region_max_rad=hi;
+ CHECK(r.executor.beginStream(c,r.feedback,100000));
+ std::vector<std::pair<uint64_t,motion::JointTargetFrame>> sent{{100000,start}};
+ double tracking=0,oldest_error=0,witness_error=0;bool ok=true,whole_box=false;unsigned frames=0;
+ for(unsigned k=1;k<=8&&ok;++k){const uint64_t now=100000+k*20000;
+  // The true simultaneous pose path(t+50 ms) is ON the certified polyline.
+  // Samples are quantized, with 7 ms between slots (77 ms snapshot skew).
+  uint64_t oldest=UINT64_MAX,newest=0;
+  for(unsigned i=0;i<12;++i){const uint64_t at=std::max<uint64_t>(100000,now-(11-i)*7000);
+   const auto actual=path((at-100000)*1e-6+.050);
+   r.feedback.actual_rad[i]=qOf(r,i,tickOf(r,i,slot(actual,i)));
+   r.feedback.sampled_at_us[i]=at;r.feedback.sampled_at_ms[i]=at/1000;
+   oldest=std::min(oldest,at);newest=std::max(newest,at);
+   const auto* ref=&sent.front().second;for(const auto& h:sent)if(h.first<=at)ref=&h.second;
+   tracking=std::max(tracking,std::abs(r.feedback.actual_rad[i]-slot(*ref,i)));}
+  const auto* old=&sent.front().second;for(const auto& h:sent)if(h.first<=oldest)old=&h.second;
+  oldest_error=0;for(unsigned i=0;i<12;++i)oldest_error=std::max(oldest_error,std::abs(r.feedback.actual_rad[i]-slot(*old,i)));
+  whole_box=false;witness_error=1e9;
+  for(const auto& h:sent){if(h.first>newest)continue;double e=0;
+   for(unsigned i=0;i<12;++i)e=std::max(e,std::abs(r.feedback.actual_rad[i]-slot(h.second,i)));
+   witness_error=std::min(witness_error,e);whole_box=whole_box||e<=.020;}
+  CHECK(tracking<=.020&&whole_box);auto f=path(k*.020);f.sequence=k;
+  ok=r.executor.stream(f,r.validation(k),now,now+20000,false,r.facts,r.feedback,now/1000,now);
+  if(ok){sent.push_back({r.executor.status().last_tx_complete_us,f});++frames;}
+ }
+ std::printf("RESIDUAL_GEOMETRY fixed=%d running=%d frames=%u tracking_mrad=%.3f oldest_box_mrad=%.3f common_witness_mrad=%.3f reason=%s certified_polyline=true hardware=false\n",fixed,ok,frames,tracking*1000,oldest_error*1000,witness_error*1000,r.executor.status().reason);
+ if(fixed){
+  CHECK(ok);const uint64_t now=280000;const auto frames_before=r.backend.frames;
+  for(unsigned i=0;i<12;++i){const uint64_t at=now-(11-i)*7000;const auto actual=path((at-100000)*1e-6+.050);
+   r.feedback.actual_rad[i]=qOf(r,i,tickOf(r,i,slot(actual,i)));r.feedback.sampled_at_us[i]=at;r.feedback.sampled_at_ms[i]=at/1000;}
+  r.feedback.sampled_at_us[1]=203000;r.feedback.sampled_at_us[4]=now;
+  for(unsigned i:{1u,4u}){const auto* ref=&sent.front().second;for(const auto& h:sent)if(h.first<=r.feedback.sampled_at_us[i])ref=&h.second;
+   r.feedback.actual_rad[i]=slot(*ref,i)+(i==1?.019:-.019);}
+  bool common=false;double per_joint=0;
+  for(unsigned i=0;i<12;++i){const auto* ref=&sent.front().second;for(const auto& h:sent)if(h.first<=r.feedback.sampled_at_us[i])ref=&h.second;
+   per_joint=std::max(per_joint,std::abs(r.feedback.actual_rad[i]-slot(*ref,i)));}
+  for(const auto& h:sent){bool inside=true;for(unsigned i=0;i<12;++i)inside=inside&&std::abs(r.feedback.actual_rad[i]-slot(h.second,i))<=.020;common=common||inside;}
+  CHECK(per_joint<=.020&&!common);r.executor.monitor(r.facts,r.feedback,now/1000,now);
+  REASON(r.executor.status().reason,"OUTSIDE_PATH_BOX");CHECK(r.backend.frames==frames_before);
+  std::printf("RESIDUAL_GEOMETRY_UNSAFE per_joint_mrad=%.3f common_box=%d reason=%s\n",per_joint*1000,common,r.executor.status().reason);
+ }else{CHECK(!ok&&oldest_error>.020);REASON(r.executor.status().reason,"OUTSIDE_PATH_BOX");}
+}
+void residualHold(bool fixed){
+ for(unsigned mode=0;mode<3;++mode){StreamRig s;CHECK(s.send(1,.003,120000,true));bool arrived=false;
+  for(unsigned n=0;n<52&&!s.r.executor.status().safe_off_required;++n){const uint64_t now=140000+n*80000;
+   for(unsigned i=0;i<12;++i){
+    s.r.feedback.sampled_at_us[i]=122000+n*80000+i*1000;s.r.feedback.sampled_at_ms[i]=s.r.feedback.sampled_at_us[i]/1000;
+    // Zero; adjacent-position-count oscillation with +/-1 speed count;
+    // actual motion at ten counts/s while momentarily inside arrival band.
+    s.r.feedback.actual_rad[i]=mode==1?(1+((n+i)%2))*motion::tolerance::kTickRad:mode==2?.003+.0012*(n%4<2?n%4:4-n%4):.003;
+    s.r.feedback.speed_rad_s[i]=mode==0?0:mode==1?((n+i)%2?1:-1)*motion::tolerance::kTickRad:10*motion::tolerance::kTickRad;}
+   s.monitor(now);if(s.r.executor.status().settled_sequence){arrived=true;break;}}
+  std::printf("RESIDUAL_HOLD mode=%u fixed=%d arrived=%d reason=%s hardware=false\n",mode,fixed,arrived,s.r.executor.status().reason);
+  CHECK(arrived==(mode==0||(fixed&&mode==1)));
+  if(mode==1&&!fixed)REASON(s.r.executor.status().reason,"HOLD_SETTLE_TIMEOUT");
+  if(mode==2)REASON(s.r.executor.status().reason,"HOLD_SETTLE_TIMEOUT");
+ }
+}
+
+void residualSpeedUnits(){
+ Rig r;OperationalFeedback producer;double max_error=0;
+ for(int sign:{-1,1})for(unsigned i=0;i<12;++i){
+  RawJointObservation sample;sample.read_ok=true;sample.position=tickOf(r,i,.0015);sample.torque=1;sample.status=0;
+  sample.temperature=30;sample.voltage=114;sample.sampled_at_ms=100;sample.sampled_at_us=100000;sample.speed_signed=sign;
+  producer.ingest(i,sample,r.geometry,geometry_data::kProvenance,r.policy.transforms());
+  const auto fb=producer.snapshot(100,100);CHECK(fb.read_ok[i]);
+  const double expected=sign*actuator::jointDirection(r.geometry,slotIdentity(i))*motion::tolerance::kTickRad;
+  max_error=std::max(max_error,std::abs(fb.speed_rad_s[i]-expected));
+ }
+ CHECK(max_error<1e-15);std::printf("RESIDUAL_SPEED_UNIT rad_s_per_count=%.12f rounding_error=%.12f\n",motion::tolerance::kTickRad,max_error);
+}
 void temporalContracts(){
  // The old PRE_TX branch rejects this future target (.022 rad away).
  // Only the held reference (0, .019 rad away) is relevant before this TX.
@@ -32,10 +116,12 @@ void temporalContracts(){
   s.r.feedback.sampled_at_us[11]=122001;s.r.feedback.recovering[11]=true;s.monitor(123000);
   CHECK(s.r.executor.status().settled_sequence==0);
   s.r.feedback.recovering[11]=false;s.r.feedback.speed_rad_s[3]=.01;s.monitor(123000);CHECK(s.r.executor.status().settled_sequence==0);
-  s.r.feedback.speed_rad_s[3]=0;s.monitor(123000);CHECK(s.r.executor.status().settled_sequence==1);
+  s.r.feedback.speed_rad_s[3]=0;s.monitor(123000);CHECK(s.r.executor.status().settled_sequence==0);
+  s.fresh(223000,.003);s.monitor(223000);CHECK(s.r.executor.status().settled_sequence==1);
   // New feedback leaving the tighter arrival band revokes settlement.
-  s.fresh(124000,-.014);s.monitor(124000);CHECK(s.r.executor.status().settled_sequence==0);
-  s.fresh(125000,.003);s.monitor(125000);CHECK(s.r.executor.endStream());CHECK(s.r.executor.status().completed_sequence==1);}
+  s.fresh(224000,-.014);s.monitor(224000);CHECK(s.r.executor.status().settled_sequence==0);
+  s.fresh(225000,.003);s.monitor(225000);CHECK(!s.r.executor.endStream());
+  s.fresh(325000,.003);s.monitor(325000);CHECK(s.r.executor.endStream());CHECK(s.r.executor.status().completed_sequence==1);}
  // Three NEW divergent samples stop tracking even inside the independent
  // historical geometric box. Old snapshots cannot count as extra samples.
  {StreamRig s;CHECK(s.send(1,.003,120000));CHECK(s.send(2,.006,140000));CHECK(s.send(3,.009,160000));
@@ -120,6 +206,15 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
  if(walk){
   for(unsigned k=0;k<120&&ok;++k)ok=d.tick();
   op.walk_ok=true;op.refresh();
+  if(!from_ready){
+   d.physics(d.now_us+1000);b.now=d.now_us/1000;d.clock.extend(static_cast<uint32_t>(d.now_us));
+   motion::AdaptiveObservation o;double q[12];
+   for(unsigned i=0;i<12;++i){q[i]=b.r.feedback.actual_rad[i];b.r.feedback.sampled_at_us[i]=d.now_us-i*20;b.r.feedback.sampled_at_ms[i]=b.r.feedback.sampled_at_us[i]/1000;
+    b.r.feedback.speed_rad_s[i]=(i%2?1:-1)*motion::tolerance::kTickRad;}
+   observe(o,q,b.now);o.stationary=false;b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,b.now,d.now_us);
+   CHECK(!std::strcmp(b.coordinator.state(),"STAND")&&!b.coordinator.walking());
+   std::puts("RESIDUAL_STAND_NOISE waiting_for_WALK=true no_extra_operator_gate=true");
+  }
   if(!from_ready)CHECK(walkCommand(op,30,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1)).outcome==motion::CommandOutcome::ACCEPTED);
   d.m.speed_rad_s=motion::operational_walk::kStandardDrive.goalSpeed*motion::tolerance::kTickRad;
   d.m.acc_rad_s2=motion::operational_walk::kStandardDrive.acceleration*100*motion::tolerance::kTickRad;
@@ -146,10 +241,12 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
 }
 int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
+ const bool fixed=std::getenv("MATDOG_RESIDUAL_BASELINE")==nullptr;
+ residualGeometry(fixed);residualHold(fixed);if(fixed)residualSpeedUnits();
+ if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
  temporalContracts();safetyFaults();
  StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
  m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);
- m.name="ASYNC_84MS";m.jitter_us=0;m.loop_us=21000;m.read_us=1000;standReplay(m);
- m.name="LOADED_6MS";m.loop_us=6000;m.read_us=420;standReplay(m,true,true);
+ m.name="ASYNC_84MS";m.jitter_us=0;m.loop_us=21000;m.read_us=1000;standReplay(m,true,true);
  std::printf("UNIFIED_MOTION failures=%d hardware=false\n",failures);return failures?1:0;
 }

@@ -36,7 +36,8 @@ struct JointFeedback {
   uint32_t sampled_at_ms[12]{};
   double actual_rad[12]{};
   // Issue #52: real per-joint sample instant on the monotonic 64-bit clock
-  // (read completion), and the measured speed (rad/s, signed). 0 = unknown.
+  // (read completion; timestamp 0 is invalid), and measured signed rad/s.
+  // Speed zero is a valid measurement, not a missing-value marker.
   uint64_t sampled_at_us[12]{};
   double speed_rad_s[12]{};
 };
@@ -56,7 +57,8 @@ struct ExecutorStatus {
   bool safe_off_required=false;
   // Streaming sequences (Issue #52). TX is NOT application; observed = every
   // joint sampled after that frame's TX-complete; settled = HOLD target reached
-  // by fresh samples, inside the tube, with zero measured speed.
+  // by fresh samples, inside the tube, below the configured speed ceiling.
+  // STAND additionally requires measured position stability across samples.
   uint32_t validated_sequence=0, tx_sequence=0, observed_sequence=0, settled_sequence=0;
   uint32_t frames_tx=0, frames_refused=0;
   uint32_t last_frame_interval_us=0, max_frame_interval_us=0;
@@ -73,7 +75,7 @@ struct ExecutorStatus {
 // consecutive fresh samples is a physical failure to follow -> stop.
 struct StreamConfig {
   double tube_rad=0, max_lag_s=0, settle_speed_rad_s=0;
-  // STAND uses a single historical endpoint box for the measured vector,
+  // STAND requires one common transmitted endpoint box for the measured vector,
   // independent of timestamp-aligned per-joint tracking. No WALK lag allowance.
   bool local_path_box=false;
   double max_step_rad=0;
@@ -112,6 +114,7 @@ class MotionExecutor {
   void monitor(const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms,uint64_t now_us);
   // HOLD settled -> READY holding the final target (segment mode resumes).
   bool endStream();
+  bool measuredStandQuiet() const {return stand_quiet_;}
   bool streaming() const { return status_.state==ExecutorState::STREAMING||status_.state==ExecutorState::HOLD; }
   void stop(const char* reason="STOP");
   void confirmSafeOff(bool all_verified_off);
@@ -141,6 +144,11 @@ class MotionExecutor {
   // streaming state
   bool frameTx(const double target[12],const MotionExecutionFacts&,uint64_t now_us,const char** why);
   double referenceRange(unsigned joint,uint64_t from_us,uint64_t to_us,double* lo,double* hi) const;
+  bool pathBoxContains(const JointFeedback&) const;
+  bool observeStandQuiet(const JointFeedback&,uint64_t now_us);
+  bool stand_quiet_=false;
+  uint64_t quiet_since_us_[12]{},quiet_sample_us_[12]{};
+  double quiet_min_[12]{},quiet_max_[12]{};
   StreamConfig stream_{};
   static constexpr unsigned kHistory=48;
   struct Sent { uint64_t at_us=0; uint32_t sequence=0; bool held_seed=false; double q[12]{}; };

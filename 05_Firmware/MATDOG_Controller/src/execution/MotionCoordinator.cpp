@@ -233,6 +233,7 @@ void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const Join
  const bool refreshed=frame_.target.valid&&!frame_.executable&&assessment_.sequence==frame_.target.sequence;
  if(arrived||refreshed||!scheduler_.running()||scheduler_.poll(now_us).release){
   auto o=observation_;
+  if(arrived)o.stationary=executor_->measuredStandQuiet();
   o.acknowledgedSequence=stand_.pendingFinal()?executor_->status().completed_sequence:executor_->status().tx_sequence;
   o.acknowledged=o.acknowledgedSequence!=0;
   frame_=stand_.update(o,now_us/1e6,true);stand_release_us_=now_us;
@@ -247,7 +248,7 @@ void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const Join
  if(executor_->status().state==ExecutorState::READY){
   if(stand_.pendingFinal()&&frame_.target.sequence==submitted_sequence_)return;
   for(unsigned i=0;i<12;++i){stand_min_[i]=feedback_policy_.jointLimits[i/3][i%3].lower;stand_max_[i]=feedback_policy_.jointLimits[i/3][i%3].upper;}
-  StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=0;c.settle_speed_rad_s=0;
+  StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=0;c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;
   c.local_path_box=true;c.max_step_rad=feedback_policy_.maxJointStepRad;
   c.feedback_max_age_us=MotionExecutor::kTimedFeedbackMaxAgeMs*1000;
   c.hold_timeout_us=executor_->trackingTimeoutUs();c.max_frame_gap_us=MotionExecutor::kTimedMaxFrameGapMs*1000;c.persist_samples=3;
@@ -289,6 +290,11 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
   return; // hold the current target; never advance an uncertain trajectory
  }
 
+ if(!walking_&&executor_->timedSegmentsActive()&&
+    (stand_.state()==motion::AdaptiveStandState::STAND||stand_.state()==motion::AdaptiveStandState::VERIFY_STAND)){
+  executor_->monitor(facts,fb,now,now_us);
+  observation_.stationary=executor_->measuredStandQuiet();
+ }
  if(pending_walk_&&stand_.state()==motion::AdaptiveStandState::STAND&&executor_->status().state==ExecutorState::READY){
   auto command=pending_walk_command_;pending_walk_=false;
   command.issued_at_ms=now;

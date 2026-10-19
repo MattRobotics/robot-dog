@@ -161,6 +161,7 @@ bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,u
     c.tube_rad>motion::tolerance::kTrackingRad||c.max_lag_s!=0||
     c.feedback_max_age_us>kTimedFeedbackMaxAgeMs*1000))return false;
  for(unsigned i=0;i<12;i++)if(!fb.read_ok[i]||!fb.torque_on[i])return false;
+ stand_quiet_=false;
  stream_=c;history_count_=0;history_head_=0;
  // The initial held/primed pose predates this stream; this seed is not a TX.
  Sent& h=history_[0];h.at_us=now_us;h.held_seed=true;h.sequence=status_.accepted_sequence;for(unsigned i=0;i<12;i++)h.q[i]=target_[i];
@@ -224,7 +225,7 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  if(history_count_==kHistory)history_head_=(history_head_+1)%kHistory;else ++history_count_;
  h.at_us=status_.last_tx_complete_us;h.held_seed=false;h.sequence=frame.sequence;for(unsigned i=0;i<12;i++)h.q[i]=candidate[i];
  status_.tx_sequence=status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;last_release_us_=release_us;
- if(final){status_.state=ExecutorState::HOLD;hold_sequence_=frame.sequence;hold_since_us_=now_us;status_.reason="HOLD";}
+ if(final){stand_quiet_=false;for(unsigned i=0;i<12;++i){quiet_since_us_[i]=quiet_sample_us_[i]=0;}status_.state=ExecutorState::HOLD;hold_sequence_=frame.sequence;hold_since_us_=now_us;status_.reason="HOLD";}
  monitor(f,fb,now,now_us);
  return status_.state==ExecutorState::STREAMING||status_.state==ExecutorState::HOLD;
 }
@@ -239,14 +240,53 @@ double MotionExecutor::referenceRange(unsigned j,uint64_t from,uint64_t to,doubl
  if(!any){const Sent& h=history_[history_head_];if(stream_.local_path_box&&!h.held_seed)return -1;a=b=h.q[j];}
  *lo=a;*hi=b;return b-a;
 }
+bool MotionExecutor::pathBoxContains(const JointFeedback& fb) const {
+ // Each candidate is a WHOLE certified TX/initial held endpoint active in the
+ // acquisition interval. The same candidate must contain ALL twelve samples.
+ // This is geometric membership, separate from tracking at each sample time.
+ uint64_t oldest=UINT64_MAX,newest=0;
+ for(unsigned i=0;i<12;++i){oldest=std::min(oldest,fb.sampled_at_us[i]);newest=std::max(newest,fb.sampled_at_us[i]);}
+ for(unsigned k=0;k<history_count_;++k){const Sent& h=history_[(history_head_+k)%kHistory];
+  if(h.at_us>newest&&!h.held_seed)break;
+  if(k+1<history_count_&&history_[(history_head_+k+1)%kHistory].at_us<=oldest)continue;
+  bool inside=true;
+  for(unsigned i=0;i<12;++i)inside=inside&&std::fabs(fb.actual_rad[i]-h.q[i])<=stream_.tube_rad;
+  if(inside)return true;
+ }
+ return false;
+}
+bool MotionExecutor::observeStandQuiet(const JointFeedback& fb,uint64_t now_us){
+ // One speed-register count is the EXISTING WALK settle ceiling. Position
+ // must also stay inside one encoder bin (plus resolver rounding) for at
+ // least one complete feedback-age budget, on distinct post-TX samples.
+ bool all=true;
+ const double bin=motion::tolerance::kTickRad+2e-6;
+ for(unsigned i=0;i<12;++i){const auto t=fb.sampled_at_us[i];const double q=fb.actual_rad[i];
+  const double arrival=std::min(envelope_.arrival_tolerance_rad,stream_.tube_rad);
+  if(!fb.read_ok[i]||fb.recovering[i]||!fb.torque_on[i]||!t||t<=status_.last_tx_complete_us||t>now_us||
+     now_us-t>stream_.feedback_max_age_us||!std::isfinite(q)||std::fabs(q-target_[i])>arrival||
+     !std::isfinite(fb.speed_rad_s[i])||std::fabs(fb.speed_rad_s[i])>stream_.settle_speed_rad_s){quiet_since_us_[i]=0;all=false;continue;}
+  if(!quiet_since_us_[i]||t<quiet_sample_us_[i]){quiet_since_us_[i]=t;quiet_min_[i]=quiet_max_[i]=q;}
+  else if(t>quiet_sample_us_[i]){
+   const double lo=std::min(quiet_min_[i],q),hi=std::max(quiet_max_[i],q);
+   if(hi-lo>bin){quiet_since_us_[i]=t;quiet_min_[i]=quiet_max_[i]=q;}
+   else {quiet_min_[i]=lo;quiet_max_[i]=hi;}
+  }
+  quiet_sample_us_[i]=t;
+  all=all&&t>=quiet_since_us_[i]&&t-quiet_since_us_[i]>=stream_.feedback_max_age_us;
+ }
+ return all;
+}
 void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now,uint64_t now_us) {
- if(!streaming())return;
+ if(!streaming()){
+  if(status_.state==ExecutorState::READY&&stream_.local_path_box&&hold_sequence_&&status_.completed_sequence==hold_sequence_)
+   stand_quiet_=observeStandQuiet(fb,now_us);
+  return;
+ }
  if(const char* r=gate(f,now)){stop(r);return;}
  if(now_us<last_release_us_){stop("STREAM_CLOCK_INVALID");return;}
  if(status_.state==ExecutorState::STREAMING&&now_us>last_release_us_&&now_us-last_release_us_>stream_.max_frame_gap_us){stop("STREAM_STARVED");return;}
  uint64_t oldest=UINT64_MAX;bool settled=true;
- uint64_t anchor=UINT64_MAX;
- for(unsigned i=0;i<12;++i)anchor=std::min(anchor,fb.sampled_at_us[i]);
  const double settle_tolerance=envelope_.arrival_tolerance_rad>0?std::fmin(envelope_.arrival_tolerance_rad,stream_.tube_rad):stream_.tube_rad;
  for(unsigned i=0;i<12;i++){
   if(!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us){stop("FEEDBACK_CLOCK_INVALID");return;}
@@ -257,12 +297,6 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
   actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}
   // Geometry: the measured joint must stay in the certified box (+/- tube).
   if(fb.actual_rad[i]<stream_.region_min_rad[i]-stream_.tube_rad||fb.actual_rad[i]>stream_.region_max_rad[i]+stream_.tube_rad){stop("OUTSIDE_CERTIFIED_REGION");return;}
-  if(stream_.local_path_box){
-   // ONE common sent endpoint, active at the oldest sample. A vector made
-   // from twelve different historic endpoints is not a certified joint box.
-   double lo,hi;if(referenceRange(i,anchor,anchor,&lo,&hi)<0){stop("REFERENCE_HISTORY_MISSING");return;}
-   if(fb.actual_rad[i]<lo-stream_.tube_rad||fb.actual_rad[i]>hi+stream_.tube_rad){stop("OUTSIDE_PATH_BOX");return;}
-  }
   if(fb.sampled_at_us[i]>checked_us_[i]){
    const uint64_t t=fb.sampled_at_us[i],lag=static_cast<uint64_t>(stream_.max_lag_s*1e6);
    double lo,hi;if(referenceRange(i,t>lag?t-lag:0,t,&lo,&hi)<0){stop("REFERENCE_HISTORY_MISSING");return;}
@@ -274,10 +308,12 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
   if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];
   settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::isfinite(fb.speed_rad_s[i])&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
  }
+ if(stream_.local_path_box&&!pathBoxContains(fb)){stop("OUTSIDE_PATH_BOX");return;}
  for(unsigned k=history_count_;k-->0;){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<oldest){if(h.sequence>status_.observed_sequence)status_.observed_sequence=h.sequence;break;}}
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
  if(status_.state==ExecutorState::HOLD){
   status_.settled_sequence=0;
+  if(stream_.local_path_box){stand_quiet_=observeStandQuiet(fb,now_us);settled=settled&&stand_quiet_;}
   if(status_.observed_sequence==hold_sequence_&&settled)status_.settled_sequence=hold_sequence_;
   else if(now_us-hold_since_us_>stream_.hold_timeout_us)stop("HOLD_SETTLE_TIMEOUT");
  }

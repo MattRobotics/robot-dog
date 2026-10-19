@@ -1,5 +1,6 @@
 #include "OperationalFeedback.h"
 #include "../servo/ServoPopulation.h"
+#include "../motion/OperationalTolerance.h"
 #include <cstring>
 namespace matdog { namespace execution {
 void OperationalFeedback::ingest(unsigned i,const RawJointObservation& sample,const actuator::CalibrationGeometryProfile& geometry,
@@ -21,9 +22,9 @@ void OperationalFeedback::ingest(unsigned i,const RawJointObservation& sample,co
  if(actuator::resolveRawToUrdfQ(geometry,provenance,*t,sample.position,&q)!=actuator::TargetResolveStatus::OK)return;
  feedback_.actual_rad[i]=q/1e6;feedback_.read_ok[i]=true;
  // Speed in the joint frame: q = sign * (raw - q0) scale, same direction as the position map.
- {actuator::MicroRad q1=0;const uint16_t next=static_cast<uint16_t>(sample.position<4095?sample.position+1:sample.position-1);
-  if(actuator::resolveRawToUrdfQ(geometry,provenance,*t,next,&q1)==actuator::TargetResolveStatus::OK){
-   const double per_tick=(q1-q)/1e6*(sample.position<4095?1:-1);feedback_.speed_rad_s[i]=sample.speed_signed*per_tick;}}
+ // A register step/s is a velocity quantum, not the finite difference of
+ // two rounded micro-radian positions (which alternates 1533/1534 urad).
+ feedback_.speed_rad_s[i]=sample.speed_signed*actuator::jointDirection(geometry,identity)*motion::tolerance::kTickRad;
  last_valid_.read_ok[i]=true;last_valid_.sampled_at_ms[i]=feedback_.sampled_at_ms[i];
  last_valid_.sampled_at_us[i]=feedback_.sampled_at_us[i];last_valid_.actual_rad[i]=feedback_.actual_rad[i];
  last_valid_.torque_on[i]=feedback_.torque_on[i];last_valid_.speed_rad_s[i]=feedback_.speed_rad_s[i];
