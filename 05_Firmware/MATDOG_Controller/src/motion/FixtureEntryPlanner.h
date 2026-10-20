@@ -35,8 +35,10 @@ struct FixtureEntryPlan {
   // Measured-start entry (Core Motion V5): the stage clock is the common S-curve law over the stage progress
   // [0,1] (planMeasuredEntry); planFixtureEntry keeps the certified quintic. When durationS exceeds the law's own
   // time (whole-sample rounding, floor) the law is dilated uniformly (v/k, a/k^2): never a dwell.
+  // Only the progress limits are stored (the plan is closed form and re-evaluated per sample): keeps the plan small on the
+  // 16 KB Controller stack (a stored profile added ~700 B to every copy of the plan).
   bool lawValid[kFixtureEntryStages]{};
-  ScurveProfile law[kFixtureEntryStages];
+  LawLimits lawLimits[kFixtureEntryStages]{};
   unsigned failedJoint=12;          // slot LF hip..LH lower, 12 = none
   double startDeviationRad=0;       // max |start - certificate start|
   // Measured-start planner diagnostics (which sample/keep-out, how much room).
