@@ -68,19 +68,18 @@ bool socketIpv4(const sockaddr_storage &address, socklen_t size,
   }
   return false;
 }
-bool socketFacts(httpd_req_t *req, HttpTransportRequest &r) {
+bool socketFacts(httpd_req_t *req, HttpTransportRequest &r,const char** failure=nullptr) {
+  auto deny=[&](const char* why){if(failure)*failure=why;return false;};
   sockaddr_storage local{}, peer{};
   socklen_t n = sizeof(local);
   int fd = httpd_req_to_sockfd(req);
   uint32_t local_ip = 0, peer_ip = 0;
   uint16_t local_port = 0, peer_port = 0;
-  if (getsockname(fd, reinterpret_cast<sockaddr *>(&local), &n) != 0 ||
-      !socketIpv4(local, n, local_ip, local_port))
-    return false;
+  if(getsockname(fd,reinterpret_cast<sockaddr*>(&local),&n)!=0)return deny("SOCKET_LOCAL_READ_FAILED");
+  if(!socketIpv4(local,n,local_ip,local_port))return deny("SOCKET_LOCAL_NOT_IPV4");
   n = sizeof(peer);
-  if (getpeername(fd, reinterpret_cast<sockaddr *>(&peer), &n) != 0 ||
-      !socketIpv4(peer, n, peer_ip, peer_port))
-    return false;
+  if(getpeername(fd,reinterpret_cast<sockaddr*>(&peer),&n)!=0)return deny("SOCKET_PEER_READ_FAILED");
+  if(!socketIpv4(peer,n,peer_ip,peer_port))return deny("SOCKET_PEER_NOT_IPV4");
   r.ap_socket = ntohl(local_ip) == 0xc0a80401u;
   r.peer = peer_ip;
   r.local_ipv4=local_ip;
@@ -310,24 +309,34 @@ void HttpTransport::lifecycleTick() {
   if (gate.closing.load() && !server_ && !tls_server_)
     gate.listeners_closed.store(true); // successful stops, never a timeout
 }
-bool HttpTransport::admitAdmin(HttpTransportRequest &request) {
+bool HttpTransport::admitAdmin(HttpTransportRequest &request,const char** failure) {
   auto &gate = service_->networkAdminAccess();
   request.admin_generation = gate.generation();
-  return gate.allowed(request.admin_generation) && WifiManager::verifyAdminRadio();
+  if(!gate.allowed(request.admin_generation,failure))return false;
+  return WifiManager::verifyAdminRadio(failure);
 }
-bool HttpTransport::motionStaAdmitted(const HttpTransportRequest& r) const {
+bool HttpTransport::motionStaAdmitted(bool tls,uint32_t local_ipv4,uint32_t generation,const char** failure) const {
+  auto deny=[&](const char* why){if(failure)*failure=why;return false;};
   const auto& w=service_->wifiStatus();auto& gate=service_->networkAdminAccess();
   wifi_mode_t mode=WIFI_MODE_NULL;wifi_ap_record_t ap{};
-  return r.tls&&!r.ap_socket&&r.local_ipv4&&r.local_ipv4==w.ipv4&&
-    r.admin_generation==gate.generation()&&!gate.closing.load()&&!gate.radio_fault.load()&&
-    gate.phase.load()==NetworkPhase::CLIENT_STA&&w.run_mode&&w.connected&&
-    static_cast<RoleReason>(w.role_reason)==RoleReason::RUN_STA&&
-    esp_wifi_get_mode(&mode)==ESP_OK&&mode==WIFI_MODE_STA&&esp_wifi_sta_get_ap_info(&ap)==ESP_OK;
+  if(!tls)return deny("STA_TLS_REQUIRED");
+  if(!local_ipv4||local_ipv4!=w.ipv4)return deny("STA_SOCKET_IP_MISMATCH");
+  if(generation!=gate.generation())return deny("GATE_GENERATION_CHANGED");
+  if(gate.closing.load())return deny("GATE_CLOSING");
+  if(gate.radio_fault.load())return deny("GATE_RADIO_FAULT");
+  if(gate.phase.load()!=NetworkPhase::CLIENT_STA)return deny("GATE_NOT_CLIENT_STA");
+  if(!w.run_mode||!w.connected||static_cast<RoleReason>(w.role_reason)!=RoleReason::RUN_STA)return deny("STA_RUN_LINK_REQUIRED");
+  if(esp_wifi_get_mode(&mode)!=ESP_OK||mode!=WIFI_MODE_STA)return deny("STA_NOT_EXCLUSIVE");
+  if(esp_wifi_sta_get_ap_info(&ap)!=ESP_OK)return deny("STA_DRIVER_DISCONNECTED");
+  return true;
 }
-bool HttpTransport::admitMotion(HttpTransportRequest& r){
-  if(r.ap_socket)return admitAdmin(r);
+bool HttpTransport::motionStaAdmitted(const HttpTransportRequest& r) const {
+  return !r.ap_socket&&motionStaAdmitted(r.tls,r.local_ipv4,r.admin_generation);
+}
+bool HttpTransport::admitMotion(HttpTransportRequest& r,const char** failure){
+  if(r.ap_socket)return admitAdmin(r,failure);
   r.admin_generation=service_->networkAdminAccess().generation();
-  return motionStaAdmitted(r);
+  return motionStaAdmitted(r.tls,r.local_ipv4,r.admin_generation,failure);
 }
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response, char* large_text, size_t large_cap,
@@ -1185,8 +1194,11 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   const uint32_t t0=millis();
   HttpTransportRequest r{};
   if(req->method==HTTP_GET)r.kind=!strcmp(req->uri,"/api/motion/status")?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
-  if(!socketFacts(req,r) || (!(req->method==HTTP_GET&&self->admitReadOnly(r))&& !self->admitMotion(r)))
-    return sendJsonError(req,"403 Forbidden","ADMIN_AP_REQUIRED");
+  const char* admission_failure="SOCKET_FACTS";
+  if(!socketFacts(req,r,&admission_failure) || (!(req->method==HTTP_GET&&self->admitReadOnly(r))&& !self->admitMotion(r,&admission_failure))){
+    httpd_resp_set_hdr(req,"X-Matdog-Admission",admission_failure);
+    return sendJsonError(req,"403 Forbidden",admission_failure);
+  }
   char session_cookie[256]{};httpd_req_get_hdr_value_str(req,"Cookie",session_cookie,sizeof(session_cookie));
   cookieValue(session_cookie,"md_session",r.cookie);
   if(req->method==HTTP_GET) {
@@ -1210,7 +1222,7 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
     httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
     r.kind=HttpRequestKind::MOTION_COMMAND;
     r.stop_epoch=self->stop_epoch_.load();
-    if(r.motion_command.intent==motion::Intent::STOP&&r.ap_socket){
+    if(r.motion_command.intent==motion::Intent::STOP){
       // STOP lane: never waits for the ordinary mailbox (a status or command
       // request may hold it for up to its budget). The Controller validates
       // and applies it first thing in its next loop.
@@ -1242,22 +1254,26 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   if(!stop_pending_.load())return false;
   // Only the fields the STOP admission needs (the full request is ~2 KB of
   // loop stack). Copied under the lane lock.
-  struct { uint32_t sequence,peer,admin_generation; bool local_authorized,ap_socket; char cookie[65],csrf[65]; motion::MotionCommand motion_command; } req;
+  struct { uint32_t sequence,peer,admin_generation,local_ipv4; bool local_authorized,ap_socket,tls; char cookie[65],csrf[65]; motion::MotionCommand motion_command; } req;
   if(stop_lock_.exchange(true,std::memory_order_acquire))return false;   // writer mid-copy: next loop
   req.sequence=stop_request_.sequence;req.peer=stop_request_.peer;req.admin_generation=stop_request_.admin_generation;
   req.local_authorized=stop_request_.local_authorized;req.ap_socket=stop_request_.ap_socket;
+  req.tls=stop_request_.tls;req.local_ipv4=stop_request_.local_ipv4;
   memcpy(req.cookie,stop_request_.cookie,sizeof(req.cookie));memcpy(req.csrf,stop_request_.csrf,sizeof(req.csrf));
   req.motion_command=stop_request_.motion_command;
   stop_pending_.store(false);stop_lock_.store(false,std::memory_order_release);
   bool applied=false;stop_ack_ok_.store(false);stop_ack_[0]=0;
-  // Same admission as an AP MOTION_COMMAND in serviceRequest(): admin AP lease
-  // of the request's generation, verified radio, portal of that generation,
-  // then session + CSRF + local origin. A revocation in between fences it.
+  // Recheck the same AP or RUN_STA/TLS admission as serviceRequest under
+  // its fence. Socket facts were captured by the handler; generation/link and
+  // portal remain live checks. No mailbox wait for either admitted transport.
   auto &gate = service_->networkAdminAccess();
   AdminLease lease(gate);
-  const bool admitted=lease&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio();
-  if(admitted&&(portal_generation_!=req.admin_generation||portal_sta_)){portal_.reset();portal_generation_=req.admin_generation;portal_sta_=false;}
-  if(admitted&&req.local_authorized&&req.ap_socket&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
+  const bool sta_motion=!req.ap_socket&&motionStaAdmitted(req.tls,req.local_ipv4,req.admin_generation);
+  const bool admitted=lease&&(sta_motion||(req.ap_socket&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio()));
+  if(admitted&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)){
+    portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
+  }
+  if(admitted&&req.local_authorized&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
     stop_epoch_.fetch_add(1);             // every command received before this STOP is superseded
     service_->operatorHeartbeat(now_ms);
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
@@ -1347,13 +1363,20 @@ esp_err_t HttpTransport::handleTwin(httpd_req_t* req) {
 esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);
   HttpTransportRequest r{};
-  if (!socketFacts(req, r))
-    return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "Socket unavailable");
+  const char* admission_failure="SOCKET_FACTS";
+  if(!socketFacts(req,r,&admission_failure)){
+    httpd_resp_set_hdr(req,"X-Matdog-Admission",admission_failure);
+    return sendJsonError(req,"403 Forbidden",admission_failure);
+  }
   const bool motion_auth=!strcmp(req->uri,"/api/motion/login")||!strcmp(req->uri,"/api/motion/session")||!strcmp(req->uri,"/api/motion/logout");
   const bool ro=req->method==HTTP_GET&&!strcmp(req->uri,"/wifi/status");
   if(ro)r.kind=HttpRequestKind::WIFI_STATUS;
-  if(!(ro&&(self->admitReadOnly(r)||self->admitMotion(r))) && (motion_auth?!self->admitMotion(r):!self->admitAdmin(r)))
-    return httpd_resp_send_err(req,HTTPD_403_FORBIDDEN,"ADMIN_AP_OR_MOTION_TLS_REQUIRED");
+  const bool admitted=ro?(self->admitReadOnly(r)||self->admitMotion(r,&admission_failure)):
+    motion_auth?self->admitMotion(r,&admission_failure):self->admitAdmin(r,&admission_failure);
+  if(!admitted){
+    httpd_resp_set_hdr(req,"X-Matdog-Admission",admission_failure);
+    return sendJsonError(req,"403 Forbidden",admission_failure);
+  }
   if (req->method == HTTP_GET)
     r.kind = HttpRequestKind::WIFI_STATUS;
   else {

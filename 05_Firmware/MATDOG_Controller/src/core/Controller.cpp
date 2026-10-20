@@ -1286,6 +1286,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // no calibration/discovery producer is using the bus; at most one ID/tick.
   // SAFE_OFF always precedes polling. 100 ms x two reads is still an OPEN WCET
   // gate: this code cannot qualify the sequential bus by executing it.
+  const uint32_t poll_started_us=micros();
   if(build::kServoPowerAvailable && !motion_executor_.status().safe_off_required && !operational_session_.safeOffRequired() &&
      (authority_.current()==ActuatorAuthority::NONE||authority_.current()==ActuatorAuthority::MOTION) &&
      servo_bus_.scanState()!=servo::ScanState::RUNNING && servo_preflight_.state()!=servo::ServoPreflight::State::RUNNING && !q0_capture_.active() &&
@@ -1348,6 +1349,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     operational_poll_next_=poll_ok?static_cast<uint8_t>((slot+1)%12):slot;operational_poll_at_ms_=r.sampled_at_ms;
     }
   }
+  motion_cycle_.poll_us=static_cast<uint32_t>(micros()-poll_started_us);
   now_ms=millis(); // freshness uses completion time, never the pre-read clock
   operational_feedback_=operational_producer_.snapshot(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   const auto& calibration = runtime_restore_.snapshot();
@@ -1510,6 +1512,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   if(session_before!=execution::MotionSessionState::ARMED&&operational_session_.state()==execution::MotionSessionState::ARMED)
     operational_work_max_us_=0;
   const uint32_t work_started_us=micros();
+  const char* const phase_before_work=motion_coordinator_.state();
   motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));
   if(profileActive()&&(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||validation_present_)&&
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
@@ -1527,14 +1530,25 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
         motion_coordinator_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
     }
   }
-  operational_work_max_us_=std::max(operational_work_max_us_,static_cast<uint32_t>(micros()-work_started_us));
+  const uint32_t planner_us=static_cast<uint32_t>(micros()-work_started_us);
+  operational_work_max_us_=std::max(operational_work_max_us_,planner_us);
+  const uint32_t executor_started_us=micros();
   motion_executor_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
+  const uint32_t executor_us=static_cast<uint32_t>(micros()-executor_started_us);
   emergencyTorqueOffBurst(); // physical stop precedes diagnostics and telemetry
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
     char trace[192];const int n=snprintf(trace,sizeof(trace),"MOTION_FIRST_STOP now_ms=%lu session=%s reason=%s tx_sequence=%lu\r\n",
       (unsigned long)millis(),operational_session_.stateName(),motion_executor_.status().reason,
       (unsigned long)motion_executor_.status().tx_sequence);
     if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
+  }
+  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
+    char budget[256];const int n=snprintf(budget,sizeof(budget),
+      "MOTION_SERVICE_BUDGET phase=%s gap_us=%lu before_motion_us=%lu imu_us=%lu bms_us=%lu poll_us=%lu planner_us=%lu executor_us=%lu\r\n",
+      phase_before_work,(unsigned long)motion_cycle_.gap_us,(unsigned long)motion_cycle_.before_motion_us,
+      (unsigned long)motion_cycle_.imu_us,(unsigned long)motion_cycle_.bms_us,(unsigned long)motion_cycle_.poll_us,
+      (unsigned long)planner_us,(unsigned long)executor_us);
+    if(n>0&&static_cast<size_t>(n)<sizeof(budget))writeAdmissionTrace(Serial,budget,n);
   }
   // One bounded record at the first stop only; samples retain their real age.
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
@@ -1663,7 +1677,10 @@ void Controller::emergencyTorqueOffBurst() {
 }
 
 void Controller::update(uint32_t now_ms) {
-  motion_clock_.extend(micros());
+  const uint32_t cycle_started_us=micros();
+  motion_cycle_.gap_us=motion_cycle_.started_us?cycle_started_us-motion_cycle_.started_us:0;
+  motion_cycle_.started_us=cycle_started_us;
+  motion_clock_.extend(cycle_started_us);
   // Issue #52: an authenticated Dashboard STOP waits in its own one-slot lane
   // (never behind the ordinary mailbox); it is validated and applied here,
   // first, and the torque-OFF burst leaves before any diagnostic or poll.
@@ -1684,10 +1701,14 @@ void Controller::update(uint32_t now_ms) {
   // (operational readiness) keeps the AP that serves the Android Dashboard.
   wifi_.setRunMode(operating_mode_.routerRole());
 
+  const uint32_t imu_started_us=micros();
   imu_.update(now_ms);
+  motion_cycle_.imu_us=static_cast<uint32_t>(micros()-imu_started_us);
   system_state_.setImuHealth(imu_.health());
 
+  const uint32_t bms_started_us=micros();
   daly_.update(now_ms, operating_mode_.mode());
+  motion_cycle_.bms_us=static_cast<uint32_t>(micros()-bms_started_us);
   system_state_.setBmsHealth(daly_.health());
 
   led_.update(now_ms);
@@ -1715,6 +1736,7 @@ void Controller::update(uint32_t now_ms) {
   // Same tick the executor turned terminal: record, complete the session,
   // revoke the permit. See updateFullLegFinalization().
   updateFullLegFinalization();
+  motion_cycle_.before_motion_us=static_cast<uint32_t>(micros()-cycle_started_us);
   updateOperationalMotion(now_ms);
 
   // System-level servo health is a population verdict under ROBOT_POWERED,

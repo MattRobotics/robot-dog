@@ -80,9 +80,12 @@ bool AdaptiveStand::requestHeightAdjust(double h,uint32_t firstSequence,double n
   if(state_!=AdaptiveStandState::STAND||policy_.mode!=FeedbackMode::FIXTURE_REVIEW||!previous_.target.valid||!previous_.cartesian.valid||
      !std::isfinite(h)||h<=0||h>.150||firstSequence==0||!std::isfinite(now)||std::abs(previous_.cartesian.body.translationM.z-h)<1e-9)return false;
   request_.targetHeightM=h;request_.firstSequence=firstSequence;request_.acquisition=nullptr;request_.entry=nullptr;
-  // V1's smaller frame box uses .19 rad/s. Twelve seconds per 50 mm keeps
-  // the existing fixed-contact quintic inside that rate envelope.
-  request_.riseDurationS=std::max(12.0,12.0*std::abs(previous_.cartesian.body.translationM.z-h)/.050);
+  // Retain the fixed-contact quintic and the existing 12 s / 50 mm rate
+  // budget. For smaller moves, sqrt(span) preserves an acceleration budget
+  // instead of imposing a 12 s dwell. Actual IK derivatives, per-frame step
+  // and release-clock dynamics still pass the unchanged runtime checks.
+  const double scale=std::abs(previous_.cartesian.body.translationM.z-h)/.050;
+  request_.riseDurationS=std::max(2*policy_.samplePeriodS,12.0*std::max(scale,std::sqrt(scale)));
   route_.count=0;route_.pairedProne=false;timedActive_=false;entryActive_=false;adjust_=true;
   pendingValid_=assessed_=submitted_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
   state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;

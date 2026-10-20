@@ -102,15 +102,16 @@ private:
   static void lifecycleEntry(void *self);
   void lifecycle();
   void lifecycleTick();
-  bool admitAdmin(HttpTransportRequest &request);
+  bool admitAdmin(HttpTransportRequest &request,const char** failure=nullptr);
   bool admitReadOnly(HttpTransportRequest&);
   bool readOnlyAdmitted(const HttpTransportRequest&) const;
   bool registerReadOnlyHandlers(httpd_handle_t);
   bool http_readonly_=false;
   uint32_t portal_generation_ = 0;
   bool portal_sta_=false;
-  bool admitMotion(HttpTransportRequest&);
+  bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
   bool motionStaAdmitted(const HttpTransportRequest&) const;
+  bool motionStaAdmitted(bool tls,uint32_t local_ipv4,uint32_t generation,const char** failure=nullptr) const;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
   // failure (optional) names why false was returned: MAILBOX_BUSY,
   // ADMIN_GATE_CLOSED or CONTROLLER_LOOP_LATE. timeout_ms bounds the wait.

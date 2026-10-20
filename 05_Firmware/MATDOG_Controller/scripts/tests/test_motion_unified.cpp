@@ -2,6 +2,8 @@
 #define MATDOG_OPERATIONAL_NO_MAIN
 #include "test_operational_motion.cpp"
 #include <chrono>
+#include "../../src/motion/TimedStand.h"
+#include "../../src/motion/StandHeightRegion.h"
 namespace {
 struct StreamRig {
  Rig r;double lo[12],hi[12];
@@ -344,15 +346,68 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false,bool ex
  const auto n=b.r.backend.frames;for(unsigned k=0;k<5;++k)d.tick();CHECK(b.r.executor.status().safe_off_required&&b.session.safeOffRequired()&&b.r.backend.frames==n);
  return st;
 }
+// Offline candidate uses the SAME fixed-contact quintic and protected height box.
+// Dense numerical survey is not a continuous proof or hardware qualification.
+void heightTimingSurvey(){
+ Bench b;double peak_v=0,peak_a=0,peak_step=0;unsigned paths=0,samples=0;
+ std::vector<std::pair<double,double>> cases;
+ for(unsigned from=60;from<=150;from+=5)for(unsigned to=60;to<=150;to+=5)if(from!=to)cases.push_back({double(from),double(to)});
+ for(double from:{60.,100.,149.,150.})for(double span:{.00001,.001,1.})
+  cases.push_back({from,from==150?from-span:from+span});
+ for(const auto& heights:cases){
+  const double from=heights.first,to=heights.second;
+  auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=std::min(from,to)/1000.;d.standBodyHeightM=std::max(from,to)/1000.;
+  const double scale=std::abs(double(to)-from)/50.;
+  const double duration=std::max(.040,12*std::max(scale,std::sqrt(scale)));
+  const unsigned n=std::max(256u,static_cast<unsigned>(std::ceil(duration/.020)));
+  auto previous=motion::evaluateTimedStand(d,0,duration,d.standSeed);CHECK(previous.status==motion::TimedStatus::OK);
+  for(unsigned k=0;k<=n;++k){const auto f=motion::evaluateTimedStand(d,double(k)/n,duration,previous.geometry.target.legs);
+   CHECK(f.status==motion::TimedStatus::OK&&motion::heightTargetInRegion(f.geometry.target));
+   for(unsigned i=0;i<12;++i){
+    const auto& v=f.velocityRadS[i/3];const auto& a=f.accelerationRadS2[i/3];
+    peak_v=std::max(peak_v,std::abs(i%3==0?v.hip:i%3==1?v.upper:v.lower));
+    peak_a=std::max(peak_a,std::abs(i%3==0?a.hip:i%3==1?a.upper:a.lower));
+    if(k)peak_step=std::max(peak_step,std::abs(slot(f.geometry.target,i)-slot(previous.geometry.target,i)));
+    CHECK(slot(f.geometry.target,i)>=b.runtime.feedback.jointLimits[i/3][i%3].lower&&slot(f.geometry.target,i)<=b.runtime.feedback.jointLimits[i/3][i%3].upper);
+   }
+   previous=f;++samples;
+  }++paths;
+ }
+ CHECK(peak_v<=.19&&peak_a<=2&&peak_step<=.004);
+ std::printf("HEIGHT_TIMING_SURVEY paths=%u samples=%u v_max=%.9f a_max=%.9f step_max=%.9f current_limits=true hardware=false\n",paths,samples,peak_v,peak_a,peak_step);
+}
+void heightReplay(bool jitter=false){
+ Operational op(2.);auto& b=op.b;
+ CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
+ for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+ StreamModel m;m.loop_us=4000;m.reads_per_tick=3;m.jitter_us=jitter?1200:0;StreamDriver d(op,m);
+ bool ok=true;
+ while(ok&&std::strcmp(b.coordinator.state(),"STAND")&&d.now_us<60000000)ok=d.tick();
+ CHECK(ok&&!std::strcmp(b.coordinator.state(),"STAND"));if(!ok)return;
+ unsigned seq=10;
+ for(double h:{.149,.140,.150,.100,.060,.150}){
+  const auto start=d.now_us;const auto before=b.r.backend.frames;
+  const auto ack=op.standAt(h,seq++);CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);
+  while(ok&&std::strcmp(b.coordinator.state(),"STAND")&&d.now_us-start<60000000)ok=d.tick();
+  std::printf("HEIGHT_CHAIN jitter=%d target_mm=%.0f elapsed_s=%.6f frames=%u state=%s reason=%s hardware=false\n",jitter,h*1000,(d.now_us-start)/1e6,b.r.backend.frames-before,b.coordinator.state(),b.r.executor.status().reason);
+  CHECK(ok&&!std::strcmp(b.coordinator.state(),"STAND")&&std::abs(b.coordinator.stand().standHeightM()-h)<1e-9);
+  if(!ok)return;
+ }
+ for(double h:{0.,.020,.040}){const auto before=b.r.backend.frames;const auto ack=op.standAt(h,seq++);
+  CHECK(ack.outcome==motion::CommandOutcome::REJECTED&&b.r.backend.frames==before);}
+}
 }
 int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
  if(std::getenv("MATDOG_TX_CLOCK_ONLY")){backendClockArrival();return failures?1:0;}
+ if(std::getenv("MATDOG_HEIGHT_SURVEY_ONLY")){heightTimingSurvey();return failures?1:0;}
+ if(std::getenv("MATDOG_HEIGHT_CHAIN_ONLY")){heightReplay();heightReplay(true);return failures?1:0;}
  backendClockArrival();
  const bool fixed=std::getenv("MATDOG_RESIDUAL_BASELINE")==nullptr;
  residualGeometry(fixed);residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
  temporalContracts();proneStatus();recoveryAndImu();releaseClockRates();safetyFaults();
+ heightTimingSurvey();heightReplay();heightReplay(true);
  StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
  m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);
  m.name="ASYNC_84MS";m.jitter_us=0;m.loop_us=21000;m.read_us=1000;standReplay(m,true,true);

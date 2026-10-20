@@ -22,12 +22,13 @@ def between(s,a,b):
 tree=ast.parse((here/'test_ap_transport.py').read_text())
 fixture=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='fixture' for t in n.targets))
 fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "motion/MotionContract.h"\n#include "network/NetworkPolicy.h"')
+fixture=fixture.replace('int httpd_resp_sendstr(', 'int httpd_resp_set_status(httpd_req_t*r,const char*s) { r->status=atoi(s);return 0; }\nint httpd_resp_sendstr(', 1)
 fixture=fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture=fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0','constexpr int HTTP_GET=0')
 # The portal now answers with two Set-Cookie headers; the HTTPD double keeps both.
 fixture=fixture.replace('{ r->response_headers[k]=v;return 0; }','{ auto &h=r->response_headers[k]; if(std::string(k)=="Set-Cookie"&&!h.empty())h+="\\n"; else h.clear(); h+=v; return 0; }')
 assert 'h+="\\n"' in fixture
-fixture=fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
+fixture=fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(const char** failure=nullptr); };
 struct FakeService {
  AdminAccess gate;
  struct {bool run_mode=false,connected=false;uint32_t ipv4=0;uint8_t role_reason=0;} motion_wifi;
@@ -41,16 +42,18 @@ fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=fal
  bool registerReadOnlyHandlers(void*);
  bool readOnlyAdmitted(const HttpTransportRequest&) const;
  bool admitReadOnly(HttpTransportRequest&);
- bool admitMotion(HttpTransportRequest&);
+ bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
  bool motionStaAdmitted(const HttpTransportRequest&) const;
+ bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** failure=nullptr) const;
  uint32_t portal_generation_=0;
  bool revoke_before_service=false;
- bool admitAdmin(HttpTransportRequest&);
+ bool admitAdmin(HttpTransportRequest&,const char** failure=nullptr);
  void lifecycleTick();
  void *server_=nullptr,*tls_server_=nullptr;
  std::atomic<bool> desired_{false},tls_desired_{false},listening_{false},tls_listening_{false},manual_stop_{false};
  bool registerHandlers(void*,bool=true);
  static esp_err_t handlePage(httpd_req_t*);
+ static esp_err_t sendJsonError(httpd_req_t*,const char*,const char*,uint32_t elapsed_ms=0);
  static esp_err_t handleStatus(httpd_req_t*) {return 0;}
  static esp_err_t handleMotion(httpd_req_t*) {return 0;}
  static esp_err_t handleCalibrationRestore(httpd_req_t*) {return 0;}  // Issue #48 route (AP-only), exercised by its own tests
@@ -254,13 +257,14 @@ int main() {
 '''
 helpers=between(c,'\nbool readHexHeader','\nvoid jsonString');helpers=helpers[helpers.index('\n}')+2:]
 types='enum class HttpRequestKind'+between(h,'enum class HttpRequestKind','// Two optional listeners')
-handler='esp_err_t HttpTransport::handleWifi'+between(c,'esp_err_t HttpTransport::handleWifi','\n\n} // namespace network')
+json_error='esp_err_t HttpTransport::sendJsonError'+between(c,'esp_err_t HttpTransport::sendJsonError','bool HttpTransport::readBoundedBody')
+handler=json_error+'esp_err_t HttpTransport::handleWifi'+between(c,'esp_err_t HttpTransport::handleWifi','\n\n} // namespace network')
 cases='case HttpRequestKind::WIFI_STATUS:'+between(c,'case HttpRequestKind::WIFI_STATUS:','case HttpRequestKind::OTA_CHALLENGE:')
 lifecycle='void HttpTransport::lifecycleTick()'+between(c,'void HttpTransport::lifecycleTick()','bool HttpTransport::admitAdmin(')
 admit='bool HttpTransport::admitAdmin('+between(c,'bool HttpTransport::admitAdmin(','bool HttpTransport::dispatch(')
 register='bool HttpTransport::registerHandlers'+between(c,'bool HttpTransport::registerHandlers','void HttpTransport::lifecycle()')
 page='esp_err_t HttpTransport::handlePage'+between(c,'esp_err_t HttpTransport::handlePage','esp_err_t HttpTransport::handleMotion')
-verify='bool WifiManager::verifyAdminRadio()'+between(w,'bool WifiManager::verifyAdminRadio()','// Arduino delivers role events asynchronously.')
+verify='bool WifiManager::verifyAdminRadio('+between(w,'bool WifiManager::verifyAdminRadio(','// Arduino delivers role events asynchronously.')
 unit=fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+register+page+lifecycle+admit+verify).replace('// PRODUCTION_HANDLER',handler).replace('// PRODUCTION_SERVICE_CASES',cases)
 with tempfile.TemporaryDirectory(prefix='matdog-ap-only-') as d:
     cpp,exe=Path(d)/'probe.cpp',Path(d)/'probe';cpp.write_text(unit)

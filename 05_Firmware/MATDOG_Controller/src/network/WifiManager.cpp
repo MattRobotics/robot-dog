@@ -286,15 +286,20 @@ void WifiManager::update(uint32_t now_ms) {
     snapshot_max_us_ = status_.last_update_us;
   status_.max_update_us = snapshot_max_us_;
 }
-bool WifiManager::verifyAdminRadio() {
+bool WifiManager::verifyAdminRadio(const char** failure) {
+  auto deny=[&](const char* why){if(failure)*failure=why;return false;};
   wifi_mode_t mode = WIFI_MODE_NULL;
   wifi_ap_record_t record{};
   const esp_err_t sta = esp_wifi_sta_get_ap_info(&record);
-  return esp_wifi_get_mode(&mode) == ESP_OK && mode == WIFI_MODE_AP &&
-         WiFi.AP.started() && !WiFi.STA.started() &&
-         WiFi.status() != WL_CONNECTED && static_cast<uint32_t>(WiFi.localIP()) == 0 &&
-         (sta == ESP_ERR_WIFI_NOT_CONNECT || sta == ESP_ERR_WIFI_CONN) &&
-         static_cast<uint32_t>(WiFi.softAPIP()) == static_cast<uint32_t>(IPAddress(192,168,4,1));
+  if(esp_wifi_get_mode(&mode)!=ESP_OK)return deny("AP_MODE_READ_FAILED");
+  if(mode!=WIFI_MODE_AP)return deny("AP_NOT_EXCLUSIVE");
+  if(!WiFi.AP.started())return deny("AP_NOT_STARTED");
+  if(WiFi.STA.started())return deny("STA_STILL_STARTED");
+  if(WiFi.status()==WL_CONNECTED)return deny("STA_STILL_CONNECTED");
+  if(static_cast<uint32_t>(WiFi.localIP())!=0)return deny("STA_IP_PRESENT");
+  if(sta!=ESP_ERR_WIFI_NOT_CONNECT&&sta!=ESP_ERR_WIFI_CONN)return deny("STA_DRIVER_PRESENT");
+  if(static_cast<uint32_t>(WiFi.softAPIP())!=static_cast<uint32_t>(IPAddress(192,168,4,1)))return deny("AP_IP_MISMATCH");
+  return true;
 }
 // Arduino delivers role events asynchronously. Each owned command must consume
 // its complete role-change acknowledgment before another command can be issued.

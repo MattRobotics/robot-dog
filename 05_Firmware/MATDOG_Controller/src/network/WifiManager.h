@@ -102,7 +102,7 @@ public:
 }
   bool configure(const ConfigPatch &patch, uint32_t generation = 0);
   AdminAccess &adminAccess() { return admin_; }
-  static bool verifyAdminRadio();
+  static bool verifyAdminRadio(const char** failure=nullptr);
   bool configBusy() const { return config_busy_.load(); }
   // The operating mode chooses the radio role (network/NetworkPolicy.h). The
   // "AP always" flag of older records is kept in storage and status but is not

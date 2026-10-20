@@ -52,6 +52,7 @@ async function boot(enabled = false, options = {}) {
         if (failure === 'invalid_json') return reply('invalid JSON');
         if (failure === 'http_error') return reply('{"reason":"SERVICE_UNAVAILABLE"}', 503);
         if (failure === 'text403') return reply('<html>403 Forbidden ADMIN_AP_REQUIRED</html>', 403);
+        if (failure === 'guard403') return reply('{"version":1,"ok":false,"error":"STA_STILL_STARTED"}', 403);
         if (failure === 'json503') return reply('{"version":1,"ok":false,"error":"CONTROLLER_LOOP_LATE","elapsed_ms":1201}', 503);
         if (url === '/api/calibration/restore') {
           device.restores.push({ body: JSON.parse(init.body), csrf: init.headers['X-Csrf-Token'], type: init.headers['Content-Type'] });
@@ -294,7 +295,7 @@ async function boot(enabled = false, options = {}) {
   p.close();
 
   // --- 14 Oct regressions -----------------------------------------------
-  for (const [failure, code, text] of [['text403', 'HTTP_403', '403 Forbidden ADMIN_AP_REQUIRED'], ['json503', 'HTTP_503', 'CONTROLLER_LOOP_LATE']]) {
+  for (const [failure, code, text] of [['text403', 'HTTP_403', '403 Forbidden ADMIN_AP_REQUIRED'], ['guard403', 'HTTP_403', 'STA_STILL_STARTED'], ['json503', 'HTTP_503', 'CONTROLLER_LOOP_LATE']]) {
     p = await boot(true);
     p.device.failures['/api/motion/status'] = [failure];
     await p.motionPoll();

@@ -26,7 +26,7 @@ fixture = fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0', 'constexpr int H
 fixture = fixture.replace('#include <mutex>', '#include <mutex>\n#include <atomic>\n#include <cstdlib>\n#include "network/TwinAssets.h"\n#include "network/RestoreRequestJson.h"', 1)
 fixture = fixture.replace('int httpd_resp_sendstr(', 'int httpd_resp_set_status(httpd_req_t*r,const char*s) { r->status=atoi(s);return 0; }\nint httpd_resp_sendstr(', 1)
 fixture = fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
-fixture = fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(); };
+fixture = fixture.replace('struct FakeService {', '''class WifiManager { public: static bool verifyAdminRadio(const char** failure=nullptr); };
 struct FakeService {
  AdminAccess gate;
  struct {bool run_mode=false,connected=false;uint32_t ipv4=0;uint8_t role_reason=0;} motion_wifi;
@@ -46,12 +46,13 @@ struct FakeService {
 fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' bool portal_sta_=false;
  bool admitReadOnly(HttpTransportRequest&);
  bool readOnlyAdmitted(const HttpTransportRequest&) const;
- bool admitMotion(HttpTransportRequest&);
+ bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
  bool motionStaAdmitted(const HttpTransportRequest&) const;
+ bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** failure=nullptr) const;
  uint32_t portal_generation_=0;
  bool busy=false,revoke_before_service=false,stop_before_service=false;
  char motion_capabilities_[kMotionCapabilitiesBytes]{};
- bool admitAdmin(HttpTransportRequest&);
+ bool admitAdmin(HttpTransportRequest&,const char** failure=nullptr);
  static esp_err_t handleMotion(httpd_req_t*);
  static esp_err_t handleCalibrationRestore(httpd_req_t*);
  static esp_err_t handleTwin(httpd_req_t*);
@@ -170,11 +171,28 @@ int main() {
  tlsStatus.status=200;tlsStatus.headers["Cookie"]="md_session="+std::string(s.portal_.cookie());runMotion(tlsStatus);
  check(tlsStatus.status==200,"authenticated STA actual/status snapshot");
  auto tlsStop=motionRequest(s,command("MOTION.STOP"));tlsStop.headers["Host"]="192.168.1.16";tlsStop.headers["Origin"]="https://192.168.1.16";
- runMotion(tlsStop);check(tlsStop.status==200,"authenticated STA semantic STOP");
+ s.busy=true;runMotion(tlsStop);check(tlsStop.status==200,"authenticated STA STOP bypasses busy ordinary mailbox");s.busy=false;
+ {const unsigned before=s.service.command_calls;auto denied=tlsStop;denied.status=200;denied.consumed=0;denied.headers["X-Csrf-Token"]=std::string(64,'0');runMotion(denied);
+  check(denied.status==403&&s.service.command_calls==before,"priority STA STOP preserves CSRF");}
+ {const unsigned before=s.service.command_calls;s.revoke_before_service=true;auto revoked=tlsStop;revoked.status=200;revoked.consumed=0;runMotion(revoked);s.revoke_before_service=false;
+  check(revoked.status==403&&s.service.command_calls==before,"priority STA STOP rechecks revocation before latch");s.service.gate.open();s.service.gate.phase.store(NetworkPhase::CLIENT_STA);}
+
  auto insecure=tlsStop;endpoint(local_addr,local_len,0xc0a80110u,true,80);runMotion(insecure);check(insecure.status==403,"plain STA HTTP denied");
  endpoint(local_addr,local_len,0xc0a80110u,true,443);s.service.motion_wifi.connected=false;auto lost=tlsStop;runMotion(lost);check(lost.status==403,"STA link loss fences command");
  s.service.motion_wifi.run_mode=false;adminRadio();endpoints();s.service.gate.phase.store(NetworkPhase::ADMIN_AP);
  login(s);
+ {s.busy=true;auto fast=motionRequest(s,command("MOTION.STOP"));runMotion(fast);s.busy=false;
+  check(fast.status==200,"authenticated AP STOP bypasses busy ordinary mailbox");}
+ {auto verifyDenial=[&](const char* reason){auto r=request(s,"/api/motion/status","");r.method=HTTP_GET;runMotion(r);
+   check(r.status==403&&r.response.find(reason)!=std::string::npos&&r.response_headers["X-Matdog-Admission"]==reason,"403 identifies actual admission subguard");};
+  socket_error=true;verifyDenial("SOCKET_LOCAL_READ_FAILED");endpoints();
+  local_len=8;verifyDenial("SOCKET_LOCAL_NOT_IPV4");endpoints();
+  peer_len=8;verifyDenial("SOCKET_PEER_NOT_IPV4");endpoints();
+  s.service.gate.closing.store(true);verifyDenial("GATE_CLOSING");s.service.gate.closing.store(false);
+  s.service.gate.radio_fault.store(true);verifyDenial("GATE_RADIO_FAULT");s.service.gate.radio_fault.store(false);
+  WiFi.mode_value=WIFI_AP_STA;verifyDenial("AP_NOT_EXCLUSIVE");adminRadio();
+  WiFi.STA.running=true;verifyDenial("STA_STILL_STARTED");WiFi.STA.running=false;
+ }
  {const unsigned before=s.service.command_calls;s.stop_before_service=true;auto late=motionRequest(s,command("POSTURE.STAND","{\"target_height_m\":0.15}"));runMotion(late);s.stop_before_service=false;
   check(late.status==403&&late.response.find("SUPERSEDED_BY_STOP")!=std::string::npos&&s.service.command_calls==before,"a command received before an applied STOP never executes after it (Issue #52)");}
  s.revoke_before_service=true;auto pending=motionRequest(s,command("MOTION.STOP"));runMotion(pending);check(pending.status==403,"revocation between handler and Controller service fences request");s.revoke_before_service=false;s.service.gate.open();
@@ -206,7 +224,7 @@ types = 'enum class HttpRequestKind'+between(h, 'enum class HttpRequestKind', '/
 handler = 'esp_err_t HttpTransport::handleMotion'+between(c, 'esp_err_t HttpTransport::handleMotion', 'esp_err_t HttpTransport::handleWifi')
 wifi_handler = 'esp_err_t HttpTransport::handleWifi'+between(c, 'esp_err_t HttpTransport::handleWifi', '\n\n} // namespace network')
 admit = 'bool HttpTransport::admitAdmin('+between(c, 'bool HttpTransport::admitAdmin(', 'bool HttpTransport::dispatch(')
-verify = 'bool WifiManager::verifyAdminRadio()'+between(w, 'bool WifiManager::verifyAdminRadio()', '// Arduino delivers role events asynchronously.')
+verify = 'bool WifiManager::verifyAdminRadio('+between(w, 'bool WifiManager::verifyAdminRadio(', '// Arduino delivers role events asynchronously.')
 admission = between(c, '  resp.sequence = req.sequence;\n', '  switch (req.kind) {')
 cases = 'case HttpRequestKind::MOTION_STATUS:'+between(c, 'case HttpRequestKind::MOTION_STATUS:', 'case HttpRequestKind::WIFI_STATUS:')
 login_case = 'case HttpRequestKind::MOTION_LOGIN: case HttpRequestKind::WIFI_LOGIN:'+between(c, 'case HttpRequestKind::WIFI_LOGIN:', 'case HttpRequestKind::WIFI_SESSION:')

@@ -28,7 +28,7 @@ unit = fixture + r'''
 using matdog::core::OperatingMode;
 struct HttpTransportRequest { uint32_t admin_generation=0; };
 struct ServiceNetworkView { WifiManager* wifi; AdminAccess& networkAdminAccess() { return wifi->adminAccess(); } };
-struct TransportProbe { ServiceNetworkView* service_; bool admitAdmin(HttpTransportRequest&); };
+struct TransportProbe { ServiceNetworkView* service_; bool admitAdmin(HttpTransportRequest&,const char** failure=nullptr); };
 ''' + admit + r'''
 unsigned semantic_checks=0;
 #define ASSERT_MODE(x) do { ++semantic_checks; CHECK(x); } while(0)
