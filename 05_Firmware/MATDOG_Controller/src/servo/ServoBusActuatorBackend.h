@@ -56,7 +56,7 @@ class ServoBusActuatorBackend final : public actuator::ActuatorBackend {
     if (bus_ == nullptr) return actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
     ServoBus::FrameTx tx{};
     bus_->syncWriteGoalPositions(bus_ids, ticks, &tx);
-    if (report) { report->tx_started = tx.started; report->tx_complete = tx.complete; report->tx_started_us = tx.started_us;
+    if (report) { report->controller_clock = true; report->tx_started = tx.started; report->tx_complete = tx.complete; report->tx_started_us = tx.started_us;
                   report->tx_complete_us = tx.complete_us; report->bytes = tx.bytes; }
     return tx.started ? actuator::BackendWriteOutcome::UNCERTAIN : actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
   }

@@ -296,6 +296,8 @@ struct StreamDriver {
     motion::AdaptiveObservation o;observe(o,sample_q,b.now);uint64_t oldest=UINT64_MAX;bool still=true;
     for(unsigned i=0;i<12;++i){oldest=std::min(oldest,sample_us[i]);still=still&&std::abs(sample_v[i])<1e-12;}
     o.stampS=oldest/1e6;o.stationary=still;o.externalSupportConfirmed=present();
+    // Same wrapping clock as the real ServoBus backend; TX delay matches physics.
+    b.r.backend.absolute_frame_clock=true;b.r.backend.frame_clock_us=static_cast<uint32_t>(now_us);b.r.backend.tx_us=m.tx_us;
     b.coordinator.observe(o);b.coordinator.update(b.r.facts,b.r.feedback,b.now,now_us);
     // As the Controller: reviewed offline-certified assessment of a planned segment frame.
     {const auto& frame=b.coordinator.frame();

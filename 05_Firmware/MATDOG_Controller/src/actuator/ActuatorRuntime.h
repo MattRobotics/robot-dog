@@ -122,6 +122,9 @@ class ActuatorBackend {
   // UNCONFIRMED until measurements follow (MotionExecutor tracking).
   struct FrameTxReport {
     bool tx_started = false, tx_complete = false;
+    // True when these are original readings of the Controller's wrapping
+    // micros() clock. False retains duration-only reports (host doubles).
+    bool controller_clock = false;
     uint32_t tx_started_us = 0, tx_complete_us = 0;
     uint16_t bytes = 0;
   };

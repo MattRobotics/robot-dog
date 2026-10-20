@@ -179,7 +179,16 @@ bool MotionExecutor::frameTx(const double target[12],const MotionExecutionFacts&
  actuator::ActuatorBackend::FrameTxReport report;
  const auto r=runtime_->executeFrame(&tx,bus,nullptr,&report);
  if(r==actuator::FrameExecuteResult::TX_COMPLETE_UNCONFIRMED){
-  const uint64_t at=now_us+(report.tx_complete_us-report.tx_started_us);
+  uint64_t at=now_us+static_cast<uint32_t>(report.tx_complete_us-report.tx_started_us);
+  if(report.controller_clock){
+   // Map the ORIGINAL UART completion into the caller's extended epoch.
+   // now_us precedes validation/commit/packet preparation, not just UART TX.
+   // Modular subtraction also handles micros() wrapping during that work.
+   const uint32_t elapsed=report.tx_complete_us-static_cast<uint32_t>(now_us);
+   const uint32_t before_tx=report.tx_started_us-static_cast<uint32_t>(now_us);
+   if(elapsed>INT32_MAX||before_tx>elapsed){*why="FRAME_TX_CLOCK_INVALID";return false;}
+   at=now_us+elapsed;
+  }
   const uint64_t gap=status_.last_tx_complete_us&&at>=status_.last_tx_complete_us?at-status_.last_tx_complete_us:0;
   status_.last_frame_interval_us=gap>UINT32_MAX?UINT32_MAX:static_cast<uint32_t>(gap);
   status_.max_frame_interval_us=std::max(status_.max_frame_interval_us,status_.last_frame_interval_us);

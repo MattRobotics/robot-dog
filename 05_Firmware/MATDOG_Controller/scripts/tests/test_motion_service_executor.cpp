@@ -46,12 +46,13 @@ class Backend : public ActuatorBackend {
   // exists, so UNCERTAIN + tx_complete); REFUSE = zero bytes; PARTIAL = TX
   // started but not completed.
   enum class FrameMode { TX_OK, REFUSE, PARTIAL } frame_mode = FrameMode::TX_OK;
-  unsigned frames = 0; uint32_t tx_us = 1040;
+  unsigned frames = 0; uint32_t tx_us = 1040, frame_clock_us = 0;
+  bool absolute_frame_clock = false;
   BackendWriteOutcome writeGoalPositionFrame(const uint8_t bus[12], const uint16_t tick[12], FrameTxReport* r) override {
     if (r) *r = FrameTxReport{};
     if (frame_mode == FrameMode::REFUSE) return BackendWriteOutcome::VERIFIED_NOT_APPLIED;
     ++frames; for (unsigned i = 0; i < 12; ++i) writes.push_back({bus[i], tick[i]});
-    if (r) { r->tx_started = true; r->tx_complete = frame_mode == FrameMode::TX_OK; r->tx_started_us = 0; r->tx_complete_us = tx_us; r->bytes = 104; }
+    if (r) { r->controller_clock = absolute_frame_clock; r->tx_started = true; r->tx_complete = frame_mode == FrameMode::TX_OK; r->tx_started_us = frame_clock_us; r->tx_complete_us = frame_clock_us+tx_us; r->bytes = 104; }
     return BackendWriteOutcome::UNCERTAIN;
   }
 };

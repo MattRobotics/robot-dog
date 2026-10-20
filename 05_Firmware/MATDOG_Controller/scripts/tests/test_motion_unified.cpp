@@ -5,19 +5,46 @@
 namespace {
 struct StreamRig {
  Rig r;double lo[12],hi[12];
- StreamRig(){
+ StreamRig(uint64_t seed_us=100000){
   r.envelope.frame_writes=r.envelope.timed_segments=true;
   r.envelope.max_velocity_rad_s=.19;r.envelope.max_acceleration_rad_s2=2;
   r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;r.envelope.tracking_timeout_ms=4000;
   for(unsigned i=0;i<12;++i){lo[i]=-.1;hi[i]=.1;r.feedback.sampled_at_us[i]=100000;}
   CHECK(r.arm());StreamConfig c;c.tube_rad=.020;c.local_path_box=true;c.max_step_rad=.004;
   c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
-  c.region_min_rad=lo;c.region_max_rad=hi;CHECK(r.executor.beginStream(c,r.feedback,100000));
+  c.region_min_rad=lo;c.region_max_rad=hi;for(unsigned i=0;i<12;++i){r.feedback.sampled_at_us[i]=seed_us;r.feedback.sampled_at_ms[i]=seed_us/1000;}
+  CHECK(r.executor.beginStream(c,r.feedback,seed_us));
  }
  void fresh(uint64_t t,double q){for(unsigned i=0;i<12;++i){r.feedback.sampled_at_ms[i]=t/1000;r.feedback.sampled_at_us[i]=t;r.feedback.actual_rad[i]=q;}}
  bool send(unsigned seq,double q,uint64_t t,bool final=false){return r.executor.stream(r.frame(seq,q),r.validation(seq),t,t+20000,final,r.facts,r.feedback,t/1000,t);}
  void monitor(uint64_t t){r.executor.monitor(r.facts,r.feedback,t/1000,t);}
 };
+// The UART clock must include validation/commit time before UART start.
+void backendClockArrival(){
+ {StreamRig s;s.r.backend.absolute_frame_clock=true;s.r.backend.frame_clock_us=125000;
+  CHECK(s.send(1,.003,120000,true));const auto complete=s.r.executor.status().last_tx_complete_us;
+  CHECK(complete==126040);
+  s.fresh(122000,.003);s.monitor(130000); // cached sample before REAL TX-complete
+  s.fresh(222000,.003);s.monitor(222000);
+  const auto premature=s.r.executor.status().settled_sequence;CHECK(premature==0);
+  s.fresh(322000,.003);s.monitor(322000);CHECK(s.r.executor.status().settled_sequence==1);
+  std::printf("BACKEND_CLOCK caller=120000 tx_start=125000 tx_end=126040 recorded=%llu premature_settled=%u final_settled=%u hardware=false\n",(unsigned long long)complete,premature,s.r.executor.status().settled_sequence);
+ }
+ {const uint64_t epoch=1ull<<32;StreamRig s(epoch-40000);
+  s.r.backend.absolute_frame_clock=true;s.r.backend.frame_clock_us=static_cast<uint32_t>(epoch-1000);s.r.backend.tx_us=2040;
+  CHECK(s.send(1,.003,epoch-20000));CHECK(s.r.executor.status().last_tx_complete_us==epoch+1040);
+  std::printf("BACKEND_CLOCK_WRAP expected=%llu actual=%llu hardware=false\n",(unsigned long long)(epoch+1040),(unsigned long long)s.r.executor.status().last_tx_complete_us);
+ }
+ {StreamRig s;s.r.backend.absolute_frame_clock=true;s.r.backend.frame_clock_us=119999;
+  CHECK(!s.send(1,.003,120000));REASON(s.r.executor.status().reason,"FRAME_TX_CLOCK_INVALID");
+  const auto sent=s.r.backend.frames;CHECK(!s.send(2,.003,140000));CHECK(s.r.backend.frames==sent);}
+ {Rig r;r.envelope.frame_writes=true;r.backend.absolute_frame_clock=true;r.backend.frame_clock_us=106000;
+  CHECK(r.arm());CHECK(r.submit(r.frame(1,.003)));r.executor.update(r.facts,r.feedback,101,101000);
+  CHECK(r.executor.status().last_tx_complete_us==107040);
+  r.fresh(102,.003);r.executor.update(r.facts,r.feedback,108,108000);CHECK(r.executor.status().completed_sequence==0);
+  r.fresh(109,.003);r.executor.update(r.facts,r.feedback,109,109000);CHECK(r.executor.status().completed_sequence==1);}
+
+}
 // Counterexamples use existing production executor, mapping and certified path.
 void residualGeometry(bool fixed){
  Bench b;auto& r=b.r;motion::PhaseTimedRoute route;const auto& profile=motion::operational_walk::kStandProfile;
@@ -320,6 +347,8 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false,bool ex
 }
 int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
+ if(std::getenv("MATDOG_TX_CLOCK_ONLY")){backendClockArrival();return failures?1:0;}
+ backendClockArrival();
  const bool fixed=std::getenv("MATDOG_RESIDUAL_BASELINE")==nullptr;
  residualGeometry(fixed);residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
