@@ -103,7 +103,7 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
         vP=std::fmin(vP,vJ/delta);aP=std::fmin(aP,amax/delta);any=true;}}
     plan.lawValid[st]=false;
     if(any){ScurveProfile profile;
-      if(profile.plan(1.0,{vP,aP,aP/kLawAccelRampS})){plan.lawLimits[st]={vP,aP,aP/kLawAccelRampS};plan.lawValid[st]=true;T=std::fmax(minStage,profile.durationS());}}
+      if(profile.plan(1.0,{vP,aP,aP/kLawAccelRampS})){plan.lawV[st]=vP;plan.lawA[st]=aP;plan.lawJ[st]=aP/kLawAccelRampS;plan.lawValid[st]=true;T=std::fmax(minStage,profile.durationS());}}
     plan.durationS[st]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;
     if(!std::isfinite(plan.durationS[st])||plan.durationS[st]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
   plan.status=EntryStatus::OK;return plan;
@@ -113,7 +113,7 @@ LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,d
   if(plan.status!=EntryStatus::OK||stage>=kFixtureEntryStages||!std::isfinite(u)||u<0||u>1)return f;
   TimeLawSample law;
   if(plan.lawValid[stage]){  // dilated common S-curve
-    ScurveProfile profile;if(!profile.plan(1.0,plan.lawLimits[stage]))return f;
+    ScurveProfile profile;if(!profile.plan(1.0,LawLimits{plan.lawV[stage],plan.lawA[stage],plan.lawJ[stage]}))return f;
     const double k=profile.durationS()/plan.durationS[stage];const auto q=profile.at(u*plan.durationS[stage]*k);
     law.valid=true;law.progress=q.s<0?0:q.s>1?1:q.s;law.velocity=q.v*k;law.acceleration=q.a*k*k;
   }else law=quinticTimeLaw(u,plan.durationS[stage]);

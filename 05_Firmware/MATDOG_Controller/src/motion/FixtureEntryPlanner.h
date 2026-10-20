@@ -38,7 +38,7 @@ struct FixtureEntryPlan {
   // Only the progress limits are stored (the plan is closed form and re-evaluated per sample): keeps the plan small on the
   // 16 KB Controller stack (a stored profile added ~700 B to every copy of the plan).
   bool lawValid[kFixtureEntryStages]{};
-  LawLimits lawLimits[kFixtureEntryStages]{};
+  double lawV[kFixtureEntryStages]{}, lawA[kFixtureEntryStages]{}, lawJ[kFixtureEntryStages]{};   // progress limits per stage
   unsigned failedJoint=12;          // slot LF hip..LH lower, 12 = none
   double startDeviationRad=0;       // max |start - certificate start|
   // Measured-start planner diagnostics (which sample/keep-out, how much room).
