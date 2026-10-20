@@ -226,6 +226,10 @@ void Controller::begin() {
   }
 
   imu_.begin();
+  // Core Motion V5: IMU acquisition owns its task (SPI + INT, bounded drain). If the
+  // task cannot be created the Controller falls back to the same bounded service pass
+  // inline - never the library's blocking wait.
+  if(!imu_.startTask())Serial.printf("IMU_TASK=%s\n",imu_.availability().init==InitializationState::INITIALIZED?"START_FAILED_INLINE_FALLBACK":"NOT_STARTED");
   system_state_.setImuHealth(imu_.health());
 
   daly_.begin();
@@ -1334,10 +1338,6 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       // Torque state from the slow block, valid only while recent (monitor, not per sample).
       if(millis()-r.control_at_ms>control_max_age)r.read_ok=false;
     }
-    r.transaction_ms=millis()-read_started;
-    // The encoder sample instant is the block's completion, before any confirmation read.
-    r.sampled_at_ms=millis();r.sampled_at_us=motion_clock_.extend(micros());
-    if(profileActive()&&r.transaction_ms>2*transaction_ms+2)r.read_ok=false;
     if(servo_bus_.lastBusOutcome()==servo::BusOutcome::ABORTED_STOP){
       // A pending STOP abandoned this wait: neither a new sample nor a bus failure, so the
       // previous sample keeps its own timestamp. The STOP is authenticated now; a rejected
@@ -1348,6 +1348,10 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       }
       poll_ok=false;break;
     }
+    r.transaction_ms=millis()-read_started;
+    // The encoder sample instant is the block's completion, before any confirmation read.
+    r.sampled_at_ms=millis();r.sampled_at_us=motion_clock_.extend(micros());
+    if(profileActive()&&r.transaction_ms>2*transaction_ms+2)r.read_ok=false;
     // dev.3 thermal artifact (2026-10-06 hardware evidence): a MOVING servo can
     // return a spurious >70 C byte inside a valid 56..70 block frame. Confirm a
     // block over-temperature (after the bus budget check of the block
@@ -1554,12 +1558,21 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
   }
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
-    char budget[256];const int n=snprintf(budget,sizeof(budget),
+    char budget[384];const int n=snprintf(budget,sizeof(budget),
       "MOTION_SERVICE_BUDGET phase=%s gap_us=%lu before_motion_us=%lu imu_us=%lu bms_us=%lu poll_us=%lu planner_us=%lu executor_us=%lu\r\n",
       phase_before_work,(unsigned long)motion_cycle_.gap_us,(unsigned long)motion_cycle_.before_motion_us,
       (unsigned long)motion_cycle_.imu_us,(unsigned long)motion_cycle_.bms_us,(unsigned long)motion_cycle_.poll_us,
       (unsigned long)planner_us,(unsigned long)executor_us);
     if(n>0&&static_cast<size_t>(n)<sizeof(budget))writeAdmissionTrace(Serial,budget,n);
+    // IMU service evidence (own task): arrival spacing and age of the Rotation Vector the
+    // Motion gate judged, and whether the sensor was ever left with data pending.
+    const auto& is=imu_.serviceStats();const auto io=imu_.orientationSnapshot();
+    const int n2=snprintf(budget,sizeof(budget),
+      "MOTION_IMU_SERVICE task=%u rv=%lu rv_age_ms=%ld rv_gap_last_us=%lu rv_gap_max_us=%lu sensor_age_us=%ld service_max_us=%lu service_gap_max_us=%lu budget_stops=%lu backlog_stops=%lu resets=%lu\r\n",
+      imu_.taskRunning()?1u:0u,(unsigned long)is.rv,io.valid?static_cast<long>(static_cast<int32_t>(millis()-io.sampled_at_ms)):-1L,
+      (unsigned long)is.rv_gap_last_us,(unsigned long)is.rv_gap_max_us,(long)io.sensor_age_us,(unsigned long)is.max_service_us,
+      (unsigned long)is.max_gap_us,(unsigned long)is.budget_stops,(unsigned long)is.backlog_stops,(unsigned long)is.resets);
+    if(n2>0&&static_cast<size_t>(n2)<sizeof(budget))writeAdmissionTrace(Serial,budget,n2);
   }
   // One bounded record at the first stop only; samples retain their real age.
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
@@ -1673,6 +1686,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     }
   } else { motion_safe_off_mask_=0;motion_safe_off_next_=0;safe_off_burst_sent_=false; }
 }
+bool Controller::stopPreempt(void* self) {
+  return static_cast<Controller*>(self)->http_transport_.stopPending();
+}
 void Controller::emergencyTorqueOffBurst() {
   if(safe_off_burst_sent_||!build::kServoPowerAvailable)return;
   if(!(motion_executor_.status().safe_off_required||operational_session_.safeOffRequired()))return;
@@ -1685,9 +1701,6 @@ void Controller::emergencyTorqueOffBurst() {
   stop_metrics_.off_tx_start_us=motion_clock_.extend(micros());
   stop_metrics_.off_bytes=servo_bus_.syncTorqueOff(canonical_leg_ids_,12);
   stop_metrics_.off_tx_done_us=motion_clock_.extend(micros());
-}
-bool Controller::stopPreempt(void* self) {
-  return static_cast<Controller*>(self)->http_transport_.stopPending();
 }
 
 void Controller::update(uint32_t now_ms) {
@@ -1716,7 +1729,7 @@ void Controller::update(uint32_t now_ms) {
   wifi_.setRunMode(operating_mode_.routerRole());
 
   const uint32_t imu_started_us=micros();
-  imu_.update(now_ms);
+  if(!imu_.taskRunning())imu_.service(now_ms);
   motion_cycle_.imu_us=static_cast<uint32_t>(micros()-imu_started_us);
   system_state_.setImuHealth(imu_.health());
 

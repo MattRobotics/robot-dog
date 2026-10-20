@@ -705,11 +705,20 @@ bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
   -o "$OUT/test_operational_readiness" "$SCRIPT_DIR/test_operational_readiness.cpp" "$SKETCH_DIR/src/core/OperationalReadiness.cpp"
 "$OUT/test_operational_readiness"
-# V1 release regression: measured replay, quantized following/arrival,
-# operational STAND/height, STANDARD cycle/STOP, heartbeat and stale data.
+# Core Motion V5 (2026-10-20): bounded servo UART transactions with STOP priority
+# (production ServoBus + installed SCServo, virtual-time UART), the IMU acquisition
+# core (ASan/UBSan + TSan snapshot) and Motion cadence with slow/blocking services.
+bash "$SCRIPT_DIR/run_servo_bus_deadline_tests.sh"
+bash "$SCRIPT_DIR/run_imu_feed_tests.sh"
+python3 "$SCRIPT_DIR/run_motion_isolation_tests.py"
+# Unified Motion regression (V2-V4 corrections: release clock, post-TX completion,
+# 7 HOLDs, STAND/WALK STANDARD/height, STOP/SAFE_OFF, recovery, PRONE indicator).
+# This replaces run_tolerance_v1_tests.py as the gate: that V1 harness was already
+# failing 133 checks on the V4 candidate (9d7eadb) because it predates the V2-V4
+# release-clock/TX-complete contracts; the file is kept, unreferenced.
 # The extended multi-million-check STANDARD/experimental FAST matrix remains
-# available explicitly via run_operational_motion_tests.py; not the V1 gate.
-python3 "$SCRIPT_DIR/run_tolerance_v1_tests.py"
+# available explicitly via run_operational_motion_tests.py.
+python3 "$SCRIPT_DIR/run_motion_unified_tests.py"
 python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 # Production Motion/RESTORE/Twin HTTP handlers, security envelope and operator
 # heartbeat proof (2026-10-15: was only in the release list and had regressed).
