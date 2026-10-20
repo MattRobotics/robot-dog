@@ -198,6 +198,7 @@ void Controller::begin() {
   // No module's begin() may command motion, enable torque, or write
   // EEPROM/DCD/BMS config (handoff sections 5/10/28).
   servo_bus_.begin();
+  servo_bus_.setStopPreempt(&Controller::stopPreempt,this);
   system_state_.setServoHealth(servo_bus_.health());
 
   // Bind the ONE canonical census service to the ONE ServoBus.
@@ -1304,7 +1305,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     for(unsigned k=0;execution::operationalPollReadAllowed(fast,k,poll_ok);++k){
     // A pending STOP may preempt between synchronous reads, never after a
     // whole new batch. Each individual read keeps its existing IO timeout.
-    if(k&&http_transport_.serviceStopLane(millis())){
+    if(http_transport_.stopPending()&&http_transport_.serviceStopLane(millis())){
       stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
       emergencyTorqueOffBurst();break;
     }
@@ -1337,13 +1338,23 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     // The encoder sample instant is the block's completion, before any confirmation read.
     r.sampled_at_ms=millis();r.sampled_at_us=motion_clock_.extend(micros());
     if(profileActive()&&r.transaction_ms>2*transaction_ms+2)r.read_ok=false;
+    if(servo_bus_.lastBusOutcome()==servo::BusOutcome::ABORTED_STOP){
+      // A pending STOP abandoned this wait: neither a new sample nor a bus failure, so the
+      // previous sample keeps its own timestamp. The STOP is authenticated now; a rejected
+      // one simply resumes polling on the next tick.
+      if(http_transport_.serviceStopLane(millis())){
+        stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
+        emergencyTorqueOffBurst();
+      }
+      poll_ok=false;break;
+    }
     // dev.3 thermal artifact (2026-10-06 hardware evidence): a MOVING servo can
     // return a spurious >70 C byte inside a valid 56..70 block frame. Confirm a
     // block over-temperature (after the bus budget check of the block
     // itself) with ONE direct register read (the value dev.3
     // decides on); a confirmed over-temperature still invalidates the joint.
     if(r.read_ok&&joint&&r.temperature>70){int direct=-1;
-      r.temperature=servo_bus_.readPresentTemperatureDirect(joint->bus_id,&direct)?direct:r.temperature;}
+      r.temperature=servo_bus_.readPresentTemperatureDirect(joint->bus_id,&direct,transaction_ms)?direct:r.temperature;}
     operational_producer_.ingest(slot,r,geometry_profile_,actuator::geometry_data::kProvenance,actuator_policy_.transforms());
     poll_ok=r.read_ok&&r.position<4096;
     operational_poll_next_=poll_ok?static_cast<uint8_t>((slot+1)%12):slot;operational_poll_at_ms_=r.sampled_at_ms;
@@ -1674,6 +1685,9 @@ void Controller::emergencyTorqueOffBurst() {
   stop_metrics_.off_tx_start_us=motion_clock_.extend(micros());
   stop_metrics_.off_bytes=servo_bus_.syncTorqueOff(canonical_leg_ids_,12);
   stop_metrics_.off_tx_done_us=motion_clock_.extend(micros());
+}
+bool Controller::stopPreempt(void* self) {
+  return static_cast<Controller*>(self)->http_transport_.stopPending();
 }
 
 void Controller::update(uint32_t now_ms) {

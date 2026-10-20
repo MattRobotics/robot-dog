@@ -471,7 +471,7 @@ def check_servo_id_write(files):
             fail(f"{path}: second raw writer must be the reviewed RAM-only output reducer")
         else:
             compact=re.sub(r"\s+", "", reducer.group(1))
-            for token in ("id<0||id>253||!ceiling||ceiling>1000", "st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0", "current<0||current>1023||ceiling>current", "if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);", "returnclassifyServoWriteVerify(st_.readWord(id,SMS_STS_TORQUE_LIMIT_L),ceiling);"):
+            for token in ("id<0||id>253||!ceiling||ceiling>1000", "st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0", "current<0||current>1023||ceiling>current", "if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);", "constintfinal_limit=st_.readWord(id,SMS_STS_TORQUE_LIMIT_L);", "returnclassifyServoWriteVerify(final_limit,ceiling);"):
                 if token not in compact:fail(f"{path}: reduceValidationOutputWhileOff() lost {token!r}")
     by_name = {p.name: c for p, c in files}
     header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", ""))
@@ -1741,7 +1741,7 @@ def check_thermal_confirmation(files):
         "ServoReadValidation.h": (
             "frame[2] != id", "frame[3] != width + 2", "frame[4] != 0", "return sum == 255"),
         "ValidatedServoRead.h": (
-            "millis() - started < IOTimeOut", "drained < 64", "validServoReadPacket(packet, size, id, width)"),
+            "bus.mayWait()", "BusTransaction::kDrainMaxBytes", "validServoReadPacket(packet, size, id, width)"),
         "ServoBus.h": ("ValidatedServoRead st_;",),
     }
     # PRIME diagnostics preserve the parser verdict but return a detailed enum
@@ -1768,8 +1768,8 @@ inline diagnostics::ReadValidity servoReadValidity(const uint8_t* frame, uint8_t
 """, "return servoReadValidity(frame,size,id,width)==diagnostics::ReadValidity::VALID;")
         required["ValidatedServoRead.h"] = (
             "return ReadCaptured(id,address,data,width,nullptr);",
-            "millis() - started < IOTimeOut", "drained < 64",
-            "const auto validity=servoReadValidity(packet,size,id,width);",
+            "BusTransaction::kDrainMaxBytes",
+            "const auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;",
             "if (validity!=ReadValidity::VALID) return 0; "
             "for (uint8_t i = 0; i < width; ++i) data[i] = packet[i + 5]; return width;")
     for name, tokens in required.items():
@@ -1784,11 +1784,23 @@ inline diagnostics::ReadValidity servoReadValidity(const uint8_t* frame, uint8_t
                      else token in body)
             if not match:
                 fail(f"{path}: thermal/UART safety invariant missing: {token}")
+        if name == "ValidatedServoRead.h":
+            # Core Motion V5: both the SDK hook (readSCS) and the direct validated read
+            # must wait ONLY through the absolute-deadline gate; the inter-byte IOTimeOut
+            # may not come back as the bound, and no SCServo write may bypass the gate.
+            if re.sub(r"\s+", "", code).count("bus.mayWait()") < 2:
+                fail(f"{path}: thermal/UART safety invariant missing: absolute deadline gate in every reply wait")
+            if "IOTimeOut" in re.sub(r"const uint32_t us = static_cast<uint32_t>\(IOTimeOut\) \* 1000u;", "", code):
+                fail(f"{path}: thermal/UART safety invariant missing: IOTimeOut may not bound a servo wait")
+            if code.count("bus.allowTx()") < 2:
+                fail(f"{path}: thermal/UART safety invariant missing: TX suppression after the budget is spent")
         if detailed and name == "ValidatedServoRead.h":
             # The only successful READ return must be the validated width.
             # Capture instrumentation may return failure, never early success.
             compact = re.sub(r"\s+", "", code)
-            returns = re.findall(r"\breturn\s+([^;]+);", code)
+            read_part = code[code.index("int Read(uint8_t id"):code.index(" private:")]
+            returns = re.findall(r"\breturn\s+([^;]+);", read_part)
+            compact = re.sub(r"\s+", "", read_part)
             allowed = {"0", "width", "ReadCaptured(id,address,data,width,nullptr)",
                        "Read(id,address,&data,1)==1?data:-1",
                        "Read(id,address,data,2)==2?data[0]|(data[1]<<8):-1"}
@@ -2809,14 +2821,17 @@ def check_servo_timeout_not_global(files):
             fail(f"{path}: ServoBus::begin() assigns st_.IOTimeOut directly - this makes "
                  f"the servo bus timeout a standing global override instead of a scoped, "
                  f"per-transaction one (see ScopedIOTimeout)")
-        if "ScopedIOTimeout" not in code:
-            fail(f"{path}: expected ScopedIOTimeout guard usage not found")
+        if "BusGuard" not in code:
+            fail(f"{path}: expected BusGuard (absolute-deadline transaction) usage not found")
 
     for path, code in files:
-        if path.name != "ServoBus.h":
+        if path.name != "BusTransaction.h":
             continue
-        if "class ScopedIOTimeout" not in code:
-            fail(f"{path}: ScopedIOTimeout RAII guard not found")
+        if "class BusGuard" not in code:
+            fail(f"{path}: BusGuard RAII transaction guard not found")
+    for path, code in files:
+        if path.name == "ServoBus.cpp" and re.search(r"\bIOTimeOut\b", code):
+            fail(f"{path}: ServoBus may not use the inter-byte IOTimeOut; every transaction is a BusGuard")
 
 
 def check_servo_timeout_categories_finding1(files):
@@ -2847,7 +2862,7 @@ def check_servo_timeout_categories_finding1(files):
                      f"instead (Session 2.3 Finding 1)")
             if "kOperationalTimeoutMs" not in body:
                 fail(f"{path}: {fn_name}() does not use kOperationalTimeoutMs - expected "
-                     f"an explicit ScopedIOTimeout(st_, kOperationalTimeoutMs) guard "
+                     f"an explicit BusGuard sized from kOperationalTimeoutMs "
                      f"(Session 2.3 Finding 1)")
 
     for path, code in files:

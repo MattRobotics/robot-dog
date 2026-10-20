@@ -4,8 +4,24 @@
 #include "ServoProfile.h"
 #include "ServoPacket.h"
 
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
+
 namespace matdog {
 namespace servo {
+
+namespace {
+// Identity of the thread that may use the servo UART (captured in begin()).
+uintptr_t busOwnerToken() {
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+  return reinterpret_cast<uintptr_t>(xTaskGetCurrentTaskHandle());
+#else
+  return 1;
+#endif
+}
+}  // namespace
 
 const char* toString(SafeOffResult result) {
   switch (result) {
@@ -24,12 +40,13 @@ bool ServoBus::begin() {
       pins::kServoTx);
 
   st_.pSerial = &servo_uart_;
+  // Exactly one task may use the servo UART: the one that calls begin().
+  st_.bus.bindOwner(&busOwnerToken);
 
-  // IOTimeOut is deliberately NOT touched here — see kDiagnosticTimeoutMs/
-  // kOperationalTimeoutMs and ScopedIOTimeout in ServoBus.h (Session 2.2
-  // Finding C, refined Session 2.3 Finding 1). Every method below names
-  // its own timeout explicitly via the guard; nothing relies on whatever
-  // IOTimeOut happens to already be set to.
+  // IOTimeOut is deliberately NOT touched here. Core Motion V5: every method
+  // below opens a BusGuard (BusTransaction.h) that names its own absolute
+  // budget (total + per-reply phase); SCServo's inter-byte IOTimeOut is no
+  // longer consulted by any ServoBus path, so nothing relies on it.
 
   // ServoBus::begin() itself performs no ping, scan, torque or write.
   // Under ROBOT_POWERED the Controller may subsequently ARM the reviewed
@@ -53,16 +70,20 @@ core::AvailabilityStatus ServoBus::availability() const {
 
 bool ServoBus::ping(int id) {
   if (id < 0 || id > 253) return false;
-  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+  BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
+  if (!guard.ok()) return false;
   int result = st_.Ping(static_cast<uint8_t>(id));
+  guard.result(result >= 0);
   last_detected_ = (result >= 0) ? core::DetectedState::ONLINE : core::DetectedState::NO_RESPONSE;
   return result >= 0;
 }
 
 bool ServoBus::readModel(int id, int* model_out) {
   if (id < 0 || id > 253 || model_out == nullptr) return false;
-  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+  BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
+  if (!guard.ok()) return false;
   int model = st_.readWord(static_cast<uint8_t>(id), SMS_STS_MODEL_L);
+  guard.result(model >= 0);
   if (model < 0) return false;
   *model_out = model;
   return true;
@@ -99,15 +120,16 @@ void ServoBus::update(uint32_t now_ms) {
   // for why this is "incremental with bounded per-ID blocking", not
   // non-blocking. Measures its own duration (micros()) so the actual
   // per-ID and total cost is evidence, not a claim — see
-  // ScanResult::max_ping_us / elapsed_ms. ScopedIOTimeout bounds this
+  // ScanResult::max_ping_us / elapsed_ms. BusGuard bounds this
   // single Ping() to the diagnostic timeout and restores the previous
   // value immediately after, every tick.
   const int id = scan_next_id_;
   const uint32_t ping_start_us = micros();
   bool responded;
   {
-    ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
-    responded = st_.Ping(static_cast<uint8_t>(id)) >= 0;
+    BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
+    responded = guard.ok() && st_.Ping(static_cast<uint8_t>(id)) >= 0;
+    guard.result(responded);
   }
   const uint32_t ping_us = micros() - ping_start_us;
   if (ping_us > scan_result_.max_ping_us) {
@@ -137,7 +159,10 @@ SafeOffResult ServoBus::safeOff(int id) {
   // — this is the safety de-escalation path, reachable from any
   // OperatingMode, and must not inherit a timeout tuned for
   // MAINTENANCE-only absence detection.
-  ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
+  // Never preemptible: SAFE_OFF must complete its (bounded) write and readback.
+  const unsigned long phase_ms = validation_timeout_ms_ ? validation_timeout_ms_ : kOperationalTimeoutMs;
+  BusGuard guard(st_.bus, us(phase_ms, 2), us(phase_ms), false);
+  if (!guard.ok()) return SafeOffResult::UNVERIFIED_NO_RESPONSE;
 
   // The write's own ACK (SCS::Ack(), via EnableTorque -> writeByte) is
   // informational only — see the SafeOffResult comment in ServoBus.h for
@@ -147,6 +172,7 @@ SafeOffResult ServoBus::safeOff(int id) {
   st_.EnableTorque(static_cast<uint8_t>(id), 0);
 
   int torque_enable = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+  guard.result(torque_enable >= 0);
 
   if (torque_enable < 0) {
     // No readback response at all: we cannot prove anything, so we must
@@ -163,7 +189,10 @@ SafeOffResult ServoBus::safeOff(int id) {
 ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
-  ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
+  // Preemptible: a pending STOP must never be followed by a torque-ON attempt.
+  const unsigned long phase_ms = validation_timeout_ms_ ? validation_timeout_ms_ : kOperationalTimeoutMs;
+  BusGuard guard(st_.bus, us(phase_ms, 2), us(phase_ms), true);
+  if (!guard.ok()) return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
   st_.EnableTorque(static_cast<uint8_t>(id), 1);
 
   // Independent readback is the sole authority, matching safeOff()'s rule:
@@ -171,6 +200,7 @@ ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
   // verdict - see ServoWriteVerifyResult's file comment for why a lost ACK
   // on this half-duplex bus cannot be read as "not applied".
   const int torque_enable = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+  guard.result(torque_enable >= 0);
   last_detected_ = (torque_enable < 0) ? core::DetectedState::NO_RESPONSE
                                        : core::DetectedState::ONLINE;
   return classifyServoWriteVerify(torque_enable, 1);
@@ -185,7 +215,9 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
   }
   const bool search = profile == GoalMotionProfile::SEARCH_ENVELOPE;
 
-  ScopedIOTimeout guard(st_, validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
+  const unsigned long phase_ms = validation_timeout_ms_ ? validation_timeout_ms_ : kOperationalTimeoutMs;
+  BusGuard guard(st_.bus, us(phase_ms, 2), us(phase_ms), true);
+  if (!guard.ok()) return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
   goal_capture_=diagnostics::GoalWriteCapture{};
   goal_capture_.attempted=true;goal_capture_.id=static_cast<uint8_t>(id);goal_capture_.position=target_tick;
   goal_capture_.speed=search?kSearchEnvelopeSpeed:validation_speed_?validation_speed_:kBoundedWriteSpeed;
@@ -208,6 +240,7 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
       return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
     }
     auto readGoalWord=[&](unsigned address){const unsigned i=address-SMS_STS_TORQUE_ENABLE;return static_cast<uint16_t>(control[i]|(control[i+1]<<8));};
+    guard.result(true);
     last_detected_=core::DetectedState::ONLINE;
     goal_capture_.position_read=readGoalWord(SMS_STS_GOAL_POSITION_L);goal_capture_.speed_read=readGoalWord(SMS_STS_GOAL_SPEED_L);
     goal_capture_.acc_read=control[SMS_STS_ACC-SMS_STS_TORQUE_ENABLE];
@@ -223,6 +256,7 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
   // write that was just issued. GoalPosition is a register latch with no
   // travel delay, exactly like PositionOffset's own read-back verification.
   const int goal_readback = st_.readWord(static_cast<uint8_t>(id), SMS_STS_GOAL_POSITION_L);
+  guard.result(goal_readback >= 0);
   last_detected_ = (goal_readback < 0) ? core::DetectedState::NO_RESPONSE
                                        : core::DetectedState::ONLINE;
   return classifyServoWriteVerify(goal_readback, static_cast<int32_t>(target_tick));
@@ -231,13 +265,15 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
 ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit(int id) {
   if (id < 0 || id > 253) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  BusGuard guard(st_.bus, us(kOperationalTimeoutMs, 2), us(kOperationalTimeoutMs), true);
+  if (!guard.ok()) return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
   // RAM register 48 (SRAM, read/write); never the EEPROM Max Torque.
   st_.writeWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L, kReviewedRamTorqueLimit);
 
   // Independent readback is the sole verdict - see ServoWriteVerifyResult.
   const int torque_limit_readback =
       st_.readWord(static_cast<uint8_t>(id), SMS_STS_TORQUE_LIMIT_L);
+  guard.result(torque_limit_readback >= 0);
   last_detected_ = (torque_limit_readback < 0) ? core::DetectedState::NO_RESPONSE
                                                : core::DetectedState::ONLINE;
   return classifyServoWriteVerify(torque_limit_readback,
@@ -246,13 +282,17 @@ ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit(int id) {
 
 ServoWriteVerifyResult ServoBus::reduceValidationOutputWhileOff(int id,uint16_t ceiling){
  if(id<0||id>253||!ceiling||ceiling>1000)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
- ScopedIOTimeout guard(st_,validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs);
+ const unsigned long phase_ms=validation_timeout_ms_?validation_timeout_ms_:kOperationalTimeoutMs;
+ BusGuard guard(st_.bus,us(phase_ms,4),us(phase_ms),false);
+ if(!guard.ok())return ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
  // De-escalation only, SRAM address 48. No authority acquisition, no EEPROM.
  if(st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
  const int current=st_.readWord(id,SMS_STS_TORQUE_LIMIT_L);
  if(current<0||current>1023||ceiling>current)return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
  if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);
- return classifyServoWriteVerify(st_.readWord(id,SMS_STS_TORQUE_LIMIT_L),ceiling);
+ const int final_limit=st_.readWord(id,SMS_STS_TORQUE_LIMIT_L);
+ guard.result(final_limit>=0);
+ return classifyServoWriteVerify(final_limit,ceiling);
 }
 bool ServoBus::readControlFeedback(int id, ControlFeedbackSnapshot* out) {
  return readControlFeedbackBudgeted(id,out,kOperationalTimeoutMs);
@@ -262,7 +302,9 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
   *out = ControlFeedbackSnapshot{};
 
   if(timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return false;
-  ScopedIOTimeout guard(st_,timeout_ms);
+  // Two blocks share ONE absolute budget of two reply phases; preemptible by STOP.
+  BusGuard guard(st_.bus, us(timeout_ms, 2), us(timeout_ms), true);
+  if (!guard.ok()) return false;
 
   // Block 1: SMS_STS_TORQUE_ENABLE (40) .. SMS_STS_TORQUE_LIMIT_H (49).
   uint8_t control[SMS_STS_TORQUE_LIMIT_H - SMS_STS_TORQUE_ENABLE + 1] = {0};
@@ -278,6 +320,7 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
     last_detected_ = core::DetectedState::NO_RESPONSE;
     return false;
   }
+  guard.result(true);
   last_detected_ = core::DetectedState::ONLINE;
 
   // SMS_STS is little-endian (End = 0): low byte first.
@@ -303,6 +346,7 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
 bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report) {
   FrameTx local{};FrameTx& r=report?*report:local;r=FrameTx{};
   if(!validation_speed_||!validation_acceleration_)return false;   // no reviewed drive pair: nothing sent
+  if(!st_.bus.idleAndOwned())return false;                          // unique UART owner, no overlap with an open transaction
   uint8_t packet[packet::kGoalFrameBytes];
   const size_t n=packet::buildGoalFrame(ids,ticks,12,validation_speed_,validation_acceleration_,packet,sizeof(packet));
   if(n!=packet::kGoalFrameBytes)return false;
@@ -318,14 +362,17 @@ uint16_t ServoBus::syncTorqueOff(const uint8_t* ids, unsigned count) {
   uint8_t packet[packet::kTorqueOffBytesMax];
   const size_t n=packet::buildTorqueOff(ids,count,packet,sizeof(packet));
   if(!n)return 0;
+  if(!st_.bus.idleAndOwned())return 0;                              // ownership is not waived for SAFE_OFF
   const size_t written=servo_uart_.write(packet,n);
   servo_uart_.flush();
   return static_cast<uint16_t>(written);
 }
 SafeOffResult ServoBus::verifyTorqueOff(int id, uint32_t timeout_ms) {
   if(id<0||id>253||timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return SafeOffResult::UNVERIFIED_NO_RESPONSE;
-  ScopedIOTimeout guard(st_,timeout_ms);
+  BusGuard guard(st_.bus,us(timeout_ms),us(timeout_ms),false);   // safety verification: bounded, never preempted
+  if(!guard.ok())return SafeOffResult::UNVERIFIED_NO_RESPONSE;
   const int torque_enable=st_.readByte(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE);
+  guard.result(torque_enable>=0);
   if(torque_enable<0){last_detected_=core::DetectedState::NO_RESPONSE;return SafeOffResult::UNVERIFIED_NO_RESPONSE;}
   last_detected_=core::DetectedState::ONLINE;
   return torque_enable==0?SafeOffResult::VERIFIED_OFF:SafeOffResult::VERIFY_FAILED;
@@ -334,10 +381,12 @@ bool ServoBus::readFastFeedback(int id, FastFeedback* out, uint32_t timeout_ms) 
   if(id<0||id>253||out==nullptr)return false;
   *out=FastFeedback{};
   if(timeout_ms<2||timeout_ms>kOperationalTimeoutMs)return false;
-  ScopedIOTimeout guard(st_,timeout_ms);
+  BusGuard guard(st_.bus,us(timeout_ms),us(timeout_ms),true);    // one reply phase, preemptible by STOP
+  if(!guard.ok())return false;
   uint8_t feedback[SMS_STS_PRESENT_CURRENT_H - SMS_STS_PRESENT_POSITION_L + 1] = {0};
   if(st_.Read(static_cast<uint8_t>(id),SMS_STS_PRESENT_POSITION_L,feedback,sizeof(feedback))!=static_cast<int>(sizeof(feedback))){
     last_detected_=core::DetectedState::NO_RESPONSE;return false;}
+  guard.result(true);
   last_detected_=core::DetectedState::ONLINE;
   auto le16=[&](int a){const int o=a-SMS_STS_PRESENT_POSITION_L;return static_cast<int>(feedback[o])|(static_cast<int>(feedback[o+1])<<8);};
   out->present_position=le16(SMS_STS_PRESENT_POSITION_L);out->present_speed=le16(SMS_STS_PRESENT_SPEED_L);
@@ -355,7 +404,10 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   // state reads; it must not silently inherit a timeout tuned for
   // MAINTENANCE-only absence detection just because @SERVO READ happens to
   // be MAINTENANCE-gated today.
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  // Maintenance/diagnostic composite (ping + six reads): one absolute budget of
+  // three operational reply phases, however progressively the replies arrive.
+  BusGuard guard(st_.bus, us(kOperationalTimeoutMs, 3), us(kOperationalTimeoutMs), false);
+  if (!guard.ok()) return false;
 
   int ping = st_.Ping(static_cast<uint8_t>(id));
   if (ping < 0) {
@@ -371,15 +423,23 @@ bool ServoBus::readRuntimeState(int id, RuntimeState* out) {
   out->present_temperature = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
   out->torque_enable       = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
   out->present_current     = st_.readWord(static_cast<uint8_t>(id), SMS_STS_PRESENT_CURRENT_L);
-
-  return true;
+  // Every field must have been read: a partially answered composite is not a
+  // state (callers treat true as "position and torque are valid").
+  const bool complete = out->present_position >= 0 && out->present_speed >= 0 && out->present_load >= 0 &&
+                        out->present_voltage >= 0 && out->present_temperature >= 0 && out->torque_enable >= 0 &&
+                        out->present_current >= 0;
+  guard.result(complete);
+  return complete;
 }
 
-bool ServoBus::readPresentTemperatureDirect(int id, int* celsius_out) {
+bool ServoBus::readPresentTemperatureDirect(int id, int* celsius_out, uint32_t timeout_ms) {
   if (id < 0 || id > 253 || celsius_out == nullptr) return false;
-  // An operational safety read, like readRuntimeState(): operational timeout.
-  ScopedIOTimeout guard(st_, kOperationalTimeoutMs);
+  if (timeout_ms < 2 || timeout_ms > kOperationalTimeoutMs) timeout_ms = kOperationalTimeoutMs;
+  // An operational safety read, like readRuntimeState(): operational timeout class.
+  BusGuard guard(st_.bus, us(timeout_ms), us(timeout_ms), false);
+  if (!guard.ok()) return false;
   const int celsius = st_.readByte(static_cast<uint8_t>(id), SMS_STS_PRESENT_TEMPERATURE);
+  guard.result(celsius >= 0);
   if (celsius < 0) {
     last_detected_ = core::DetectedState::NO_RESPONSE;
     return false;
@@ -394,9 +454,11 @@ bool ServoBus::readPositionOffset(int id, int16_t* out) {
 
   // Diagnostic timeout: this is provisioning verification, not an operational
   // control read, and an absent unit must fail fast rather than stall the loop.
-  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+  BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
+  if (!guard.ok()) return false;
 
   const int raw = st_.readWord(static_cast<uint8_t>(id), SMS_STS_OFS_L);
+  guard.result(raw >= 0);
   if (raw < 0) {
     last_detected_ = core::DetectedState::NO_RESPONSE;
     return false;  // no answer is not an offset of zero
@@ -410,10 +472,12 @@ bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32
   if (id < 0 || id > 253 || out == nullptr) return false;
   if (width != 1 && width != 2) return false;  // refuse, never guess
 
-  ScopedIOTimeout guard(st_, kDiagnosticTimeoutMs);
+  BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
+  if (!guard.ok()) return false;
 
   const int raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
                                : st_.readWord(static_cast<uint8_t>(id), address);
+  guard.result(raw >= 0);
   if (raw < 0) {
     last_detected_ = core::DetectedState::NO_RESPONSE;
     return false;

@@ -175,6 +175,8 @@ class Controller {
                                    const calibration::FullLegHeldObservation& o);
 
   servo::ServoBus servo_bus_;
+  // Bus-wait preemption hook (BusTransaction): true while a Dashboard STOP waits in its lane.
+  static bool stopPreempt(void* self);
   // The LF V25 runtime PresentTemperature over-limit confirmation's bus port:
   // fresh direct reads through servo_bus_ and the oracle's 50 ms wait.
   class ServoThermalReadPort : public calibration::ThermalReadPort {

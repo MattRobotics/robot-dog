@@ -85,6 +85,10 @@ public:
   // it through the ControllerService, and advances the STOP epoch that makes
   // every motion command received before it SUPERSEDED_BY_STOP. True = applied.
   bool serviceStopLane(uint32_t now_ms);
+  // Lock-free flag read: a STOP request is waiting in the lane (not yet
+  // validated). The servo bus polls it to abandon a non-safety wait early; the
+  // request is still authenticated by serviceStopLane() before anything changes.
+  bool stopPending() const { return stop_pending_.load(std::memory_order_acquire); }
 
 private:
   static esp_err_t handleStatus(httpd_req_t *req);

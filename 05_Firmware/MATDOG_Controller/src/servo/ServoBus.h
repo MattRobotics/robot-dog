@@ -115,7 +115,7 @@ class ServoBus {
   // readRuntimeState() — so the documented "operational timeout = 100ms,
   // diagnostic timeout = 20ms" split was not actually true in code. Two
   // named constants now exist and every method states, explicitly, via
-  // ScopedIOTimeout, which one it uses — there is no "default/untouched"
+  // BusGuard (BusTransaction.h), which one it uses — there is no "default/untouched"
   // case to trust implicitly:
   //   kDiagnosticTimeoutMs (20ms) — @SERVO SCAN's per-ID probe, ping(),
   //     readModel(): bounded absence-detection only, MAINTENANCE-only today.
@@ -200,6 +200,13 @@ class ServoBus {
   ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
                                            GoalMotionProfile profile);
   const diagnostics::GoalWriteCapture& lastGoalWriteCapture() const {return goal_capture_;}
+  // STOP priority on the bus: while a non-safety transaction waits for a reply it
+  // polls fn(ctx) (a lock-free flag read); true abandons the transaction at once.
+  // SAFE_OFF/verify transactions are never preempted. This is software priority:
+  // it does not make the physical stop instantaneous on a busy or faulty UART.
+  void setStopPreempt(BusTransaction::PreemptFn fn, void* ctx) { st_.bus.bindPreempt(fn, ctx); }
+  const BusStats& busStats() const { return st_.bus.stats(); }
+  BusOutcome lastBusOutcome() const { return st_.bus.outcome(); }
 
   // The reviewed RAM TorqueLimit (LF V25 hardware oracle, matdog.rs
   // TORQUE_LIMIT = 500, "still only half of the ST3215 command range"). The
@@ -307,7 +314,7 @@ class ServoBus {
   // V25 read_motor_temperature_direct() the runtime over-limit confirmation
   // needs (calibration/ThermalConfirmation.h). Read-only; false and *out
   // untouched if the servo does not answer.
-  bool readPresentTemperatureDirect(int id, int* celsius_out);
+  bool readPresentTemperatureDirect(int id, int* celsius_out, uint32_t timeout_ms = kOperationalTimeoutMs);
 
   // -------------------------------------------------------------------------
   // H0 preflight reads — READ-ONLY, no write path exists for any of them
@@ -342,32 +349,15 @@ class ServoBus {
   bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out);
 
  private:
-  // RAII guard: saves SMS_STS::IOTimeOut (a plain public field, not a
-  // vendored-library edit), sets it to the given timeout for the guard's
-  // scope, and restores the saved value on every exit path (destructor
-  // runs on early `return` too, not just fall-through). Generic over which
-  // of the two named timeouts above it applies — every call site names its
-  // choice explicitly (Session 2.3 Finding 1), there is no implicit
-  // "leave it at whatever it already was" case. Deliberately not
-  // copyable/movable: exactly one guard per transaction, matching "no
-  // overengineering" from the handoff.
+  // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -
+  // ONE absolute budget (total + per-reply phase) on a wrap-safe microsecond
+  // clock, a single owner, STOP preemption for non-safety transactions and TX
+  // suppression once the budget is spent. SCServo's inter-byte IOTimeOut is
+  // never consulted by ServoBus. Each method states its own phase count.
+  static constexpr uint32_t us(unsigned long ms, unsigned phases = 1) { return static_cast<uint32_t>(ms) * 1000u * phases; }
   uint32_t validation_timeout_ms_=0;
   diagnostics::GoalWriteCapture goal_capture_{};
   uint16_t validation_speed_=0;uint8_t validation_acceleration_=0;
-  class ScopedIOTimeout {
-   public:
-    ScopedIOTimeout(SMS_STS& st, unsigned long timeout_ms)
-        : st_(st), previous_ms_(st.IOTimeOut) {
-      st_.IOTimeOut = timeout_ms;
-    }
-    ~ScopedIOTimeout() { st_.IOTimeOut = previous_ms_; }
-    ScopedIOTimeout(const ScopedIOTimeout&) = delete;
-    ScopedIOTimeout& operator=(const ScopedIOTimeout&) = delete;
-
-   private:
-    SMS_STS& st_;
-    unsigned long previous_ms_;
-  };
 
   HardwareSerial servo_uart_{1};  // matches frozen bench source's UART index.
   ValidatedServoRead st_;
