@@ -260,12 +260,14 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false,bool ex
  if(explore){
   // OFFLINE ONLY: no production profile is changed. Keep the certified step,
   // tube, measured entry and seven HOLDs; test a faster reference clock.
-  auto p=b.runtime.feedback;p.samplePeriodS=.004;
-  for(unsigned i=0;i<4;++i){p.maxVelocityRadS[i]={1,1,1};p.maxAccelerationRadS2[i]={5,5,5};}
+  // MATDOG_EXPLORE="v,a,period_ms" overrides the default 1 rad/s, 5 rad/s^2, 4 ms (sensitivity sweeps only).
+  double ev=1,ea=5,ep=4;if(const char* e=std::getenv("MATDOG_EXPLORE"))std::sscanf(e,"%lf,%lf,%lf",&ev,&ea,&ep);
+  auto p=b.runtime.feedback;p.samplePeriodS=ep/1000.;
+  for(unsigned i=0;i<4;++i){p.maxVelocityRadS[i]={ev,ev,ev};p.maxAccelerationRadS2[i]={ea,ea,ea};}
   motion::AcquisitionRoute route;route.pairedProne=route.phaseTimed=route.geometryIdentityVerified=true;
-  route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;route.phaseVelocityRadS=1;route.phaseAccelerationRadS2=5;
+  route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;route.phaseVelocityRadS=ev;route.phaseAccelerationRadS2=ea;
   CHECK(b.coordinator.configure(p,b.runtime.walk,&route));
-  b.r.envelope.max_velocity_rad_s=1;b.r.envelope.max_acceleration_rad_s2=5;
+  b.r.envelope.max_velocity_rad_s=ev;b.r.envelope.max_acceleration_rad_s2=ea;
  }
  const uint32_t requested_ms=b.now;
  if(from_ready){op.publish();op.walk_ok=true;op.refresh();const auto ack=walkCommand(op,1,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1));std::printf("AUTO_STAND admission=%s\n",ack.reason);CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);}
@@ -274,6 +276,7 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false,bool ex
  CHECK(b.session.state()==MotionSessionState::ARMED&&op.armer.calls==1);
  m.speed_rad_s=motion::operational_walk::kStandProfile.drive.goalSpeed*motion::tolerance::kTickRad;
  m.acc_rad_s2=motion::operational_walk::kStandProfile.drive.acceleration*100*motion::tolerance::kTickRad;
+ if(explore){double gs=0,ac=0;if(const char* e=std::getenv("MATDOG_EXPLORE_DRIVE")){std::sscanf(e,"%lf,%lf",&gs,&ac);m.speed_rad_s=gs*motion::tolerance::kTickRad;m.acc_rad_s2=ac*100*motion::tolerance::kTickRad;}}
  StreamDriver d(op,m);const uint64_t start=d.now_us;uint64_t last_tx=0;unsigned previous=0;
  uint64_t samples[12]{};double last_q[12];for(unsigned i=0;i<12;++i)last_q[i]=b.r.executor.targetRadians()[i];
  struct PhaseStats {double seconds=0,hold=0,length=0,first[12]{},last[12]{};unsigned frames=0,holds=0;bool seen=false;};
@@ -400,12 +403,27 @@ void heightReplay(bool jitter=false){
   CHECK(ack.outcome==motion::CommandOutcome::REJECTED&&b.r.backend.frames==before);}
 }
 }
+// Coherence of every operational profile (reference, period, step cap, drive pair) with the lateness each can absorb.
+void dynamicProfiles(){
+ const char* why="";CHECK(motion::operational_walk::dynamicProfilesCoherent(&why));
+ using namespace motion::operational_walk;using motion::DynamicProfile;using motion::analyzeDynamicProfile;
+ DynamicProfile list[]={dynamicProfile(kStandProfile),dynamicProfile(kStandardProfile),dynamicProfile(kFastProfile),
+   // OFFLINE candidate, NOT enabled (needs kMinSamplePeriodS 0.02->0.01): faster reference, finer period, the already reviewed WALK drive pair.
+   DynamicProfile{"STAND_CANDIDATE_OFFLINE",.22,2.,0,.010,.004,1000,50}};
+ for(const auto& d:list){const auto a=analyzeDynamicProfile(d);CHECK(a.valid);
+  std::printf("DYNAMIC_PROFILE %-24s v=%.3f a=%.2f T_ms=%.0f step_mrad=%.2f step_headroom_ms=%.2f accel_safe_lateness_ms=%.2f drive=%u/%u ratio_v=%.2f ratio_a=%.2f valid=%d\n",
+   d.name,d.velocityRadS,d.accelerationRadS2,d.periodS*1000,a.stepAtNominalRad*1000,a.stepHeadroomMs,a.accelSafeLatenessMs,d.goalSpeed,d.acc,a.driveSpeedRatio,a.driveAccelRatio,a.valid);}
+ // fail-closed examples
+ CHECK(!analyzeDynamicProfile(DynamicProfile{"BAD_STEP",.3,2,0,.020,.004,300,20}).valid);
+ CHECK(!analyzeDynamicProfile(DynamicProfile{"BAD_DRIVE",.19,2,0,.020,.004,100,20}).valid);
+}
 int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
+ if(std::getenv("MATDOG_EXPLORE_ONLY")){StreamModel m;m.name="EXPLORE";m.loop_us=std::getenv("MATDOG_EXPLORE_LOOP_US")?std::atoi(std::getenv("MATDOG_EXPLORE_LOOP_US")):2000;m.reads_per_tick=3;m.ideal=std::getenv("MATDOG_EXPLORE_REAL")==nullptr;m.stop_short_ticks=5;if(const char* e=std::getenv("MATDOG_EXPLORE_STALL")){unsigned every=0,us=0;std::sscanf(e,"%u,%u",&every,&us);m.stall_every_ms=every;m.stall_us=us;}standReplay(m,false,false,true);return failures?1:0;}
  if(std::getenv("MATDOG_TX_CLOCK_ONLY")){backendClockArrival();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_SURVEY_ONLY")){heightTimingSurvey();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_CHAIN_ONLY")){heightReplay();heightReplay(true);return failures?1:0;}
- backendClockArrival();
+ backendClockArrival();dynamicProfiles();
  const bool fixed=std::getenv("MATDOG_RESIDUAL_BASELINE")==nullptr;
  residualGeometry(fixed);residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;

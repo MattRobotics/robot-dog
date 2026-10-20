@@ -46,7 +46,9 @@ struct CommissioningCaps {
   static constexpr uint16_t kMaxPrimeClampTicks=16;  // ~1.4 deg, inward only
   static constexpr double kMaxVelocityRadS=.35, kMaxAccelerationRadS2=2, kMaxTrackingRad=motion::tolerance::kTrackingRad;
   static constexpr double kMaxStepRad=.01, kMinSamplePeriodS=.02, kMaxSamplePeriodS=.1;
-  static constexpr double kMinStageS=1, kMaxStageS=60, kMinRouteScale=1, kMaxRouteScale=100;
+  // kMinStageS: two frames at the minimum period. The 1 s floor predates the derived law; stage times are now
+  // DERIVED from {v, a, step} (planMeasuredEntry), so a floor only needs to keep a stage observable.
+  static constexpr double kMinStageS=0.04, kMaxStageS=60, kMinRouteScale=1, kMaxRouteScale=100;
   static constexpr double kMaxProneDeviationRad=.2617993877991494; // 15 deg recognition ceiling
   static constexpr uint32_t kMaxFeedbackAgeMs=1000, kMaxBatchMs=3000, kMaxTrackingMs=10000, kMaxSegmentMs=30000, kMaxImuAgeMs=3000;
   static constexpr int kMaxTemperatureC=70;

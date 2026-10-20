@@ -113,6 +113,7 @@ bool applyOperationalStandProfile(CommissioningParameters& p,const char** reason
   next.max_step_rad=s.maxStepRad;next.entry_min_stage_s=s.minEntryStageS;
   next.tracking_tolerance_rad=motion::tolerance::kTrackingRad;
   if(!validCommissioningParameters(next,reason))return false;
+  if(!motion::operational_walk::dynamicProfilesCoherent(reason))return false;   // STAND + WALK profiles: step cap, drive pair, period
   p=next;return true;
 }
 bool buildCommissioningRuntime(const CommissioningParameters& p,const double limits[12][2],uint32_t generation,uint32_t epoch,ReviewedMotionRuntime* out){

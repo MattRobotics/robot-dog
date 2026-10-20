@@ -19,6 +19,7 @@
 #include <cmath>
 #include "FeedbackWalk.h"
 #include "OperationalTolerance.h"
+#include "MotionLaw.h"
 
 namespace matdog { namespace motion { namespace operational_walk {
 
@@ -94,10 +95,10 @@ extern const WalkProfile* const kProfiles[kProfileCount];
 // Acceleration envelope remains 2 rad/s^2; the planner uses half at corners.
 // Drive pair (RAM, STAND frames): GoalSpeed 300 steps/s = 0.46 rad/s (x2.4 over v),
 // ACC 20 = 3.07 rad/s^2 (x1.5 over the envelope). Entry stages derive their
-// durations from the same rates (minimum stage 1 s, the compiled floor).
+// durations from the same rates through the common S-curve law (floor: two frames).
 // Offline numbers; NOT measured on hardware.
 struct StandProfile { double velocityRadS, accelerationRadS2, samplePeriodS, maxStepRad, minEntryStageS; DriveProfile drive; };
-constexpr StandProfile kStandProfile{0.19, 2.0, 0.020, tolerance::kMaxStepRad, 1.0, {300, 20}};
+constexpr StandProfile kStandProfile{0.19, 2.0, 0.020, tolerance::kMaxStepRad, 0.040, {300, 20}};
 static_assert(kStandProfile.velocityRadS * kStandProfile.samplePeriodS <= kStandProfile.maxStepRad, "STAND frame step must stay inside the tube");
 
 // Executor/planner ceilings must cover every profile (checked in MotionCoordinator.cpp).
@@ -112,6 +113,12 @@ WalkSpecification specification(const WalkProfile& profile);
 inline WalkSpecification specification() { return specification(kStandardProfile); }
 // Live gen-1 limits must contain the profile box +/- the tracking tube.
 bool fitsLimits(const WalkProfile& profile, const FeedbackPolicy& policy, double tube_rad, unsigned* failed_joint = nullptr);
+
+// Core Motion V5: reference envelope, frame period, per-frame step cap and ST3215 GoalSpeed/ACC of every operational
+// profile must be mutually coherent (MotionLaw.h analyzeDynamicProfile). Fail-closed at admission; reason names the cause.
+DynamicProfile dynamicProfile(const StandProfile& profile);
+DynamicProfile dynamicProfile(const WalkProfile& profile);
+bool dynamicProfilesCoherent(const char** reason);
 
 // Union of every commanded joint target of the three presets (ramp, steady
 // cycles, coordinated stop), radians, slot leg*3+{HIP,UPPER,LOWER}; produced

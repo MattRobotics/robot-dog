@@ -18,6 +18,8 @@
 
 namespace matdog { namespace motion {
 
+// Acceleration ramp time that sets the jerk limit of derived laws (j = a / ramp): 5 frames at 20 ms.
+constexpr double kLawAccelRampS = 0.1;
 struct LawLimits { double vMax = 0, aMax = 0, jMax = 0; };   // path units/s, /s^2, /s^3 (all > 0)
 
 struct SpeedChange { double timeS = 0, distance = 0, peakAccel = 0; bool valid = false; };

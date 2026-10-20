@@ -57,6 +57,21 @@ WalkSpecification specification(const WalkProfile& p) {
   w.regionMinRad = p.regionMinRad; w.regionMaxRad = p.regionMaxRad;
   return w;
 }
+DynamicProfile dynamicProfile(const StandProfile& p) {
+  return DynamicProfile{"STAND", p.velocityRadS, p.accelerationRadS2, 0, p.samplePeriodS, p.maxStepRad, p.drive.goalSpeed, p.drive.acceleration};
+}
+DynamicProfile dynamicProfile(const WalkProfile& p) {
+  return DynamicProfile{p.name, p.maxVelocityRadS, p.maxAccelerationRadS2, 0, kStreamPeriodS, p.maxJointStepRad, p.drive.goalSpeed, p.drive.acceleration};
+}
+bool dynamicProfilesCoherent(const char** reason) {
+  const char* why = "OK";
+  bool ok = true;
+  auto check = [&](const DynamicProfile& d) { const auto a = analyzeDynamicProfile(d); if (ok && !a.valid) { ok = false; why = a.reason; } };
+  check(dynamicProfile(kStandProfile));
+  for (const WalkProfile* p : kProfiles) check(dynamicProfile(*p));
+  if (reason) *reason = why;
+  return ok;
+}
 bool fitsLimits(const WalkProfile& prof, const FeedbackPolicy& p, double tube, unsigned* failed) {
   if (!std::isfinite(tube) || tube <= 0) return false;
 #ifdef MATDOG_HOST_REGION_SURVEY

@@ -88,14 +88,22 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
     return plan;
   }
   const JointTargetFrame* frames[]={&plan.start,&plan.middle,&plan.goal};
-  for(unsigned st=0;st<kFixtureEntryStages;++st){double T=minStage;
+  for(unsigned st=0;st<kFixtureEntryStages;++st){double T=minStage,vP=1e18,aP=1e18;bool any=false;
     for(unsigned i=0;i<12;++i){if(!moves(st,i))continue;
       const double delta=std::abs(at(*frames[st+1],i)-at(*frames[st],i));
       const double vmax=rate(p.maxVelocityRadS[i/3],i%3),amax=rate(p.maxAccelerationRadS2[i/3],i%3);
       if(!std::isfinite(vmax)||vmax<=0||!std::isfinite(amax)||amax<=0){plan.failedJoint=i;plan.status=EntryStatus::RATE_POLICY;return plan;}
       // Quintic peaks: velocity 1.875 d/T, acceleration 10/sqrt(3) d/T^2, step 1.875 d dt/T.
       T=std::fmax(T,1.875*delta/vmax);T=std::fmax(T,std::sqrt(5.773502691896258*delta/amax));
-      T=std::fmax(T,1.875*delta*p.samplePeriodS/p.maxJointStepRad);}
+      T=std::fmax(T,1.875*delta*p.samplePeriodS/p.maxJointStepRad);
+      // Common law: every joint moves delta_i * s(t), s in [0,1]; the binding joint sets the progress limits
+      // (velocity incl. the per-sample step cap, acceleration; jerk from a fixed ramp).
+      if(delta>1e-9){
+        const double vJ=std::fmin(vmax,p.maxJointStepRad/p.samplePeriodS);
+        vP=std::fmin(vP,vJ/delta);aP=std::fmin(aP,amax/delta);any=true;}}
+    plan.lawValid[st]=false;
+    if(any){ScurveProfile profile;
+      if(profile.plan(1.0,{vP,aP,aP/kLawAccelRampS})){plan.law[st]=profile;plan.lawValid[st]=true;T=std::fmax(minStage,profile.durationS());}}
     plan.durationS[st]=std::ceil(T*(1+1e-9)/p.samplePeriodS)*p.samplePeriodS;
     if(!std::isfinite(plan.durationS[st])||plan.durationS[st]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
   plan.status=EntryStatus::OK;return plan;
@@ -103,7 +111,12 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
 LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body){
   LocomotionFrame f;
   if(plan.status!=EntryStatus::OK||stage>=kFixtureEntryStages||!std::isfinite(u)||u<0||u>1)return f;
-  const auto law=quinticTimeLaw(u,plan.durationS[stage]);if(!law.valid)return f;
+  TimeLawSample law;
+  if(plan.lawValid[stage]){  // dilated common S-curve
+    const double k=plan.law[stage].durationS()/plan.durationS[stage];const auto q=plan.law[stage].at(u*plan.durationS[stage]*k);
+    law.valid=true;law.progress=q.s<0?0:q.s>1?1:q.s;law.velocity=q.v*k;law.acceleration=q.a*k*k;
+  }else law=quinticTimeLaw(u,plan.durationS[stage]);
+  if(!law.valid)return f;
   const JointTargetFrame& a=stage==0?plan.start:plan.middle;const JointTargetFrame& b=stage==0?plan.middle:plan.goal;
   f.target=a;f.target.sequence=0;
   for(unsigned i=0;i<12;++i){const double d=at(b,i)-at(a,i);

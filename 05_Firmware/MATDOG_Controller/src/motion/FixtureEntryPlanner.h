@@ -2,6 +2,7 @@
 #define MATDOG_MOTION_FIXTURE_ENTRY_PLANNER_H
 #include "MotionFeedback.h"
 #include "StartPoseArchitecture.h"
+#include "MotionLaw.h"
 namespace matdog { namespace motion {
 // Pure joint-space entry from the MEASURED armed pose to the head of the
 // fixture route. Stage 0 moves only the four LOWER joints (out of the folded
@@ -31,6 +32,11 @@ struct FixtureEntryPlan {
   EntryStatus status=EntryStatus::INVALID_INPUT;
   JointTargetFrame start{}, middle{}, goal{};
   double durationS[kFixtureEntryStages]{};
+  // Measured-start entry (Core Motion V5): the stage clock is the common S-curve law over the stage progress
+  // [0,1] (planMeasuredEntry); planFixtureEntry keeps the certified quintic. When durationS exceeds the law's own
+  // time (whole-sample rounding, floor) the law is dilated uniformly (v/k, a/k^2): never a dwell.
+  bool lawValid[kFixtureEntryStages]{};
+  ScurveProfile law[kFixtureEntryStages];
   unsigned failedJoint=12;          // slot LF hip..LH lower, 12 = none
   double startDeviationRad=0;       // max |start - certificate start|
   // Measured-start planner diagnostics (which sample/keep-out, how much room).
