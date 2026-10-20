@@ -154,6 +154,7 @@ class MotionExecutor {
   struct Sent { uint64_t at_us=0; uint32_t sequence=0; bool held_seed=false; double q[12]{}; };
   Sent history_[kHistory]{};
   unsigned history_count_=0, history_head_=0;
+  uint64_t previous_release_interval_us_=0;
   uint64_t last_release_us_=0, hold_since_us_=0, checked_us_[12]{};
   uint8_t exceed_[12]{};
   uint32_t hold_sequence_=0;

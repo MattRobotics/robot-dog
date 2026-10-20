@@ -26,6 +26,16 @@ inline const char* fixturePoseReasonName(FixturePoseReason r) {
   return i < sizeof(names) / sizeof(names[0]) ? names[i] : "UNKNOWN";
 }
 
+inline FixturePoseReason fixtureProneJointReason(unsigned joint,double a) {
+  if(!std::isfinite(a))return FixturePoseReason::NONFINITE;
+  switch(joint%3){
+    case 0: if(std::abs(a)>.35)return FixturePoseReason::HIP_BAND;break;
+    case 1: if(a<.87||a>1.92)return FixturePoseReason::UPPER_BAND;break;
+    case 2: if(a> -1.22||a< -2.0)return FixturePoseReason::LOWER_BAND;break;
+  }
+  return FixturePoseReason::OK;
+}
+
 struct FixturePoseClassification {
   FixturePoseKind kind = FixturePoseKind::UNKNOWN;
   double maxNominalErrorRad = 0.0;
@@ -69,11 +79,8 @@ inline FixturePoseClassification classifyFixtureProne(
     squaredSum += deviation * deviation;
     // A folded leg must retain the physically consistent signs. Values are
     // broad recognizer checks, never a replacement for collision clearance.
-    switch (j % 3) {
-      case 0: out.reason = FixturePoseReason::HIP_BAND; if (std::abs(a) > 0.35) return out; break; // hip near neutral
-      case 1: out.reason = FixturePoseReason::UPPER_BAND; if (a < 0.87 || a > 1.92) return out; break; // upper down/folded
-      case 2: out.reason = FixturePoseReason::LOWER_BAND; if (a > -1.22 || a < -2.0) return out; break; // lower folded
-    }
+    out.reason=fixtureProneJointReason(static_cast<unsigned>(j),a);
+    if(out.reason!=FixturePoseReason::OK)return out;
   }
   out.rmsNominalErrorRad = std::sqrt(squaredSum / 12.0);
   out.failedJointIndex = out.maxErrorJointIndex;

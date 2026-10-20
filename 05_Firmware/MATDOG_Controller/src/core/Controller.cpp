@@ -1583,6 +1583,14 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
     telemetry.joint_mapped[i]=operational_feedback_.read_ok[i];
     telemetry.raw_ok[i]=operational_producer_.raw(i).read_ok&&operational_producer_.raw(i).position<4096;
   }
+  {static const auto head=motion::pairedProneSample(0,0,true); // immutable route head, no per-tick planner work
+   telemetry.prone_reference_valid=calibration.restored&&commissioning_bound_&&head.target.valid;
+   telemetry.prone_stationary=true;
+   telemetry.prone_max_deviation_rad=commissioning_params_.prone_max_deviation_rad;
+   telemetry.prone_max_rms_rad=commissioning_params_.prone_max_rms_rad;
+   for(unsigned i=0;i<12;++i){const auto& q=head.target.legs[i/3];
+    telemetry.prone_nominal_rad[i]=i%3==0?q.hip:i%3==1?q.upper:q.lower;
+    telemetry.prone_stationary=telemetry.prone_stationary&&operational_producer_.raw(i).speed==0;}}
   telemetry.restore_decision=calibration::toString(last_restore_verdict_.decision);
   telemetry.restore_reason=calibration::toString(last_restore_verdict_.reason);
   if(!strcmp(last_restore_trigger_,"NONE")){telemetry.restore_decision="NOT_EVALUATED";telemetry.restore_reason="BOOT_EVALUATION_PENDING";}

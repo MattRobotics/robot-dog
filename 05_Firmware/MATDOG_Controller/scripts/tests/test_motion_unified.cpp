@@ -130,6 +130,62 @@ void temporalContracts(){
   REASON(s.r.executor.status().reason,"TRACKING_LAG_PERSISTENT");}
  std::puts("TEMPORAL_CONTRACTS PASS: no future-target gate, post-TX all-12 arrival, quiet speed, new-sample persistence");
 }
+// Identical reference clock, differing bus completion durations. These are
+// deterministic counterexamples, not a reconstruction of hardware frame 218.
+void proneStatus(){
+ core::MotionService service;core::MotionTelemetry t;
+ const auto head=motion::pairedProneSample(0,0,true);CHECK(head.target.valid);
+ t.prone_reference_valid=t.prone_stationary=true;t.feedback_max_age_ms=100;
+ t.prone_max_deviation_rad=.17453292519943295;t.prone_max_rms_rad=.12217304763960307;
+ for(unsigned i=0;i<12;++i){t.prone_nominal_rad[i]=t.actual_rad[i]=slot(head.target,i);t.joint_at_ms[i]=100;t.joint_mapped[i]=t.raw_ok[i]=true;}
+ char json[6144];
+ auto expect=[&](const char* state,uint32_t now=100){service.publishTelemetry(t);CHECK(service.statusJson(json,sizeof(json),now));CHECK(std::strstr(json,state)!=nullptr);};
+ expect("\"state\":\"IN_PRONE\"");CHECK(std::strstr(json,"\"in_window\":12"));
+ t.actual_rad[0]+=.18;expect("\"state\":\"OUT_OF_PRONE\"");CHECK(std::strstr(json,"\"in_window\":11"));
+ t.actual_rad[0]=t.prone_nominal_rad[0];
+ expect("\"state\":\"UNKNOWN\"",201);t.joint_at_ms[11]=101;expect("\"state\":\"UNKNOWN\"");
+ t.joint_at_ms[11]=100;t.feedback_recovering=true;expect("\"state\":\"UNKNOWN\"");
+ t.feedback_recovering=false;t.joint_mapped[11]=false;expect("\"state\":\"UNKNOWN\"");
+ t.joint_mapped[11]=true;t.prone_stationary=false;expect("\"state\":\"UNKNOWN\"");
+ t.prone_stationary=true;t.prone_reference_valid=false;expect("\"state\":\"UNKNOWN\"");
+ std::puts("PRONE_STATUS PASS in/out/stale/future/recovering/unmapped/moving/no-reference; recognition only");
+}
+void recoveryAndImu(){
+ entryPlanner();classifierOnMeasuredPose();
+ {Bench b;b.evidence.prime_clamp_max_ticks=0;CHECK(!b.session.request(b.evidence,b.r.facts,b.r.envelope,b.r.feedback,true,b.now));CHECK(b.r.backend.writes.empty());}
+ {Bench b;b.evidence.prime_clamp_max_ticks=2;CHECK(!b.session.request(b.evidence,b.r.facts,b.r.envelope,b.r.feedback,true,b.now));CHECK(b.r.backend.writes.empty());}
+ {Bench b;CHECK(b.session.request(b.evidence,b.r.facts,b.r.envelope,b.r.feedback,true,b.now));
+  CHECK(b.session.primeClampMask()==((1u<<2)|(1u<<5)|(1u<<8)|(1u<<11)));}
+ {Operational op;op.b.r.feedback.actual_rad[0]=.6;
+  const auto ack=op.stand();REASON(ack.reason,"PRE_ARM_NOT_PRONE");CHECK(op.armer.calls==0&&op.b.r.backend.writes.empty());}
+ {Rig r;r.feedback.actual_rad[0]=.2;CHECK(!r.arm());REASON(r.executor.status().reason,"START_OUTSIDE_LIMITS");CHECK(r.backend.writes.empty());}
+ {Operational op;CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
+  for(unsigned k=0;k<40&&op.b.coordinator.arming();++k)op.tickArming();
+  CHECK(op.b.session.state()==MotionSessionState::ARMED);
+  op.b.evidence.imu_fresh=false;op.b.evidence.scope_loss="IMU_STALE";
+  const auto n=op.b.r.backend.writes.size();op.b.session.update(op.b.evidence,op.b.r.facts,op.b.r.feedback,op.b.now);
+  CHECK(op.b.session.safeOffRequired());REASON(op.b.session.reason(),"IMU_STALE");
+  op.b.r.executor.update(op.b.r.facts,op.b.r.feedback,op.b.now+1);CHECK(op.b.r.backend.writes.size()==n);}
+ std::puts("RECOVERY_IMU PASS measured prime/entry and out-of-domain refusal; stale evidence latches SAFE_OFF; no sensor-service claim");
+}
+void releaseClockRates(){
+ {StreamRig s;uint64_t time=100000;double q=0;const uint32_t intervals[]={17000,23000,21000,19000};
+  for(unsigned k=0;k<4;++k){time+=intervals[k];s.fresh(time,q);q+=(.04+.01*k)*intervals[k]*1e-6;s.r.backend.tx_us=1040+500*k;CHECK(s.send(k+1,q,time));}}
+ for(bool excessive:{false,true}){
+  StreamRig s;s.r.backend.tx_us=19000;
+  CHECK(s.send(1,.0016,120000));
+  s.r.backend.tx_us=1040;s.fresh(140000,.0016);CHECK(s.send(2,.0032,140000));
+  s.fresh(160000,.0032);
+  const double next=excessive?.0062:.0055;
+  const bool sent=s.send(3,next,160000);
+  const double v=(next-.0032)/.020;
+  std::printf("RELEASE_CLOCK excessive=%d dt_ms=20 dt_prev_release_ms=20 dt_prev_tx_ms=2.040 v_prev=.080 v_next=%.6f a_release=%.6f a_mixed=%.6f sent=%d reason=%s hardware=false\n",
+   excessive,v,(v-.08)/.020,(v-.08)/.011020,sent,s.r.executor.status().reason);
+  CHECK(sent==!excessive);
+  if(excessive){REASON(s.r.executor.status().reason,"ACCELERATION_LIMIT");
+   const auto n=s.r.backend.frames;s.send(4,.0063,180000);CHECK(s.r.backend.frames==n);}
+ }
+}
 void safetyFaults(){
  const char* reasons[]={"OPERATOR_STOP","OUTSIDE_PATH_BOX","STREAM_FEEDBACK_STALE","FEEDBACK_CLOCK_INVALID","TARGET_OR_MAPPING","SEGMENT_UNVALIDATED","FRAME_TX_UNCERTAIN","FRAME_REFUSED_ZERO_BYTES","POWER_OR_BMS","TORQUE_LOST","FEEDBACK_INVALID","STREAM_CLOCK_INVALID","PATH_STEP_LIMIT","HOLD_SETTLE_TIMEOUT","STREAM_FEEDBACK_STALE","STREAM_STARVED","ACTUAL_OUTSIDE_LIMITS","TARGET_OUTSIDE_CERTIFIED_REGION"};
  for(unsigned kind=0;kind<18;++kind){StreamRig s;
@@ -170,8 +226,19 @@ void safetyFaults(){
  std::puts("SAFETY_FAULTS PASS: STOP, divergence, lost/recovering/future feedback, raw limit, collision, uncertain/refused TX, power, torque, clock, step/rate/acceleration, HOLD timeout, SAFE_OFF latch");
 }
 struct RunStats {Dist gaps,regular,age,sample_period,work;unsigned frames=0,checkpoints=0;double elapsed=0,tracking=0,step=0;};
-RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
+RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false,bool explore=false){
  Operational op(2.,-92.070442,1,walk);auto& b=op.b;
+ if(explore){
+  // OFFLINE ONLY: no production profile is changed. Keep the certified step,
+  // tube, measured entry and seven HOLDs; test a faster reference clock.
+  auto p=b.runtime.feedback;p.samplePeriodS=.004;
+  for(unsigned i=0;i<4;++i){p.maxVelocityRadS[i]={1,1,1};p.maxAccelerationRadS2[i]={5,5,5};}
+  motion::AcquisitionRoute route;route.pairedProne=route.phaseTimed=route.geometryIdentityVerified=true;
+  route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;route.phaseVelocityRadS=1;route.phaseAccelerationRadS2=5;
+  CHECK(b.coordinator.configure(p,b.runtime.walk,&route));
+  b.r.envelope.max_velocity_rad_s=1;b.r.envelope.max_acceleration_rad_s2=5;
+ }
+ const uint32_t requested_ms=b.now;
  if(from_ready){op.publish();op.walk_ok=true;op.refresh();const auto ack=walkCommand(op,1,motion::operational_walk::profileVelocity(motion::operational_walk::kStandardProfile,1));std::printf("AUTO_STAND admission=%s\n",ack.reason);CHECK(ack.outcome==motion::CommandOutcome::ACCEPTED);}
  else CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
  for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
@@ -180,17 +247,25 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
  m.acc_rad_s2=motion::operational_walk::kStandProfile.drive.acceleration*100*motion::tolerance::kTickRad;
  StreamDriver d(op,m);const uint64_t start=d.now_us;uint64_t last_tx=0;unsigned previous=0;
  uint64_t samples[12]{};double last_q[12];for(unsigned i=0;i<12;++i)last_q[i]=b.r.executor.targetRadians()[i];
+ struct PhaseStats {double seconds=0,hold=0,length=0,first[12]{},last[12]{};unsigned frames=0,holds=0;bool seen=false;};
+ PhaseStats phases[16]{};
  RunStats st;bool ok=true,last_final=false,no_micro_arrival=true,one_frame=true,all_post=true;
  while(ok&&std::strcmp(b.coordinator.state(),"STAND")&&!b.coordinator.walking()&&d.now_us-start<90000000){
   if(from_ready&&d.present())b.service.renewTeleop(b.now,250); // Controller renews also during automatic STAND
+  const auto phase_before=b.coordinator.stand().state();const bool held_before=b.r.executor.status().state==ExecutorState::HOLD;
+  const uint64_t before=d.now_us;
   const auto c0=std::chrono::steady_clock::now();ok=d.tick();const auto c1=std::chrono::steady_clock::now();
   st.work.add(std::chrono::duration<double,std::micro>(c1-c0).count());
+  const unsigned ph=static_cast<unsigned>(phase_before);if(ph<16){phases[ph].seconds+=(d.now_us-before)*1e-6;if(held_before)phases[ph].hold+=(d.now_us-before)*1e-6;}
   const auto& es=b.r.executor.status();st.tracking=std::max(st.tracking,es.stream_peak_error_rad);
   for(unsigned i=0;i<12;++i){st.age.add((d.now_us-d.sample_us[i])/1000.);
    if(samples[i]!=d.sample_us[i]){if(samples[i])st.sample_period.add((d.sample_us[i]-samples[i])/1000.);samples[i]=d.sample_us[i];}}
   if(d.frames_seen!=previous){one_frame=one_frame&&d.frames_seen==previous+1;
    if(last_tx){st.gaps.add((es.last_tx_complete_us-last_tx)/1000.);if(!last_final)st.regular.add((es.last_tx_complete_us-last_tx)/1000.);}
    last_tx=es.last_tx_complete_us;previous=d.frames_seen;last_final=b.coordinator.stand().pendingFinal();
+   const unsigned ph=static_cast<unsigned>(b.coordinator.stand().state());if(ph<16){auto& p=phases[ph];double length=0;
+    for(unsigned i=0;i<12;++i){if(!p.seen)p.first[i]=last_q[i];p.last[i]=b.r.executor.targetRadians()[i];length=std::max(length,std::abs(p.last[i]-last_q[i]));}
+    p.seen=true;++p.frames;p.length+=length;if(last_final)++p.holds;}
    if(last_final)++st.checkpoints;
    else no_micro_arrival=no_micro_arrival&&es.completed_sequence<es.tx_sequence;
    for(unsigned i=0;i<12;++i){st.step=std::max(st.step,std::abs(b.r.executor.targetRadians()[i]-last_q[i]));last_q[i]=b.r.executor.targetRadians()[i];}}
@@ -199,8 +274,12 @@ RunStats standReplay(StreamModel m,bool walk=false,bool from_ready=false){
  st.frames=d.frames_seen;st.elapsed=(d.now_us-start)/1e6;
  std::printf("STAND_REPLAY model=%s ok=%d elapsed_s=%.6f frames=%u checkpoints=%u gap_ms_p50=%.3f p99=%.3f max=%.3f regular_ms_p50=%.3f p99=%.3f max=%.3f feedback_age_ms_max=%.3f sample_period_ms_p50=%.3f max=%.3f tracking_peak_mrad=%.3f step_mrad=%.3f host_tick_work_us_p50=%.1f p99=%.1f max=%.1f reason=%s frame=%s hardware=false\n",
   m.name,ok,st.elapsed,st.frames,st.checkpoints,st.gaps.pct(.5),st.gaps.pct(.99),st.gaps.max(),st.regular.pct(.5),st.regular.pct(.99),st.regular.max(),st.age.max(),st.sample_period.pct(.5),st.sample_period.max(),st.tracking*1000,st.step*1000,st.work.pct(.5),st.work.pct(.99),st.work.max(),b.r.executor.status().reason,motion::feedbackReasonName(b.coordinator.frame().reason));
- CHECK(ok&&(!std::strcmp(b.coordinator.state(),"STAND")||b.coordinator.walking()));
- CHECK(st.checkpoints==7&&no_micro_arrival&&one_frame&&all_post&&st.step<=.004+1e-12);
+ for(unsigned ph=0;ph<16;++ph)if(phases[ph].seconds||phases[ph].seen){const auto& p=phases[ph];double net=0;
+  for(unsigned i=0;i<12;++i)net=std::max(net,std::abs(p.last[i]-p.first[i]));
+  std::printf("PHASE model=%s phase=%s seconds=%.6f frames=%u net_inf_rad=%.9f length_inf_rad=%.9f holds=%u hold_s=%.6f\n",m.name,motion::adaptiveStandStateName(static_cast<motion::AdaptiveStandState>(ph)),p.seconds,p.frames,net,p.length,p.holds,p.hold);}
+ std::printf("END_TO_END model=%s prime_arm_s=%.6f total_s=%.6f five_second_result=%s exploratory=%d hardware=false\n",m.name,(start-requested_ms*1000ull)*1e-6,(d.now_us-requested_ms*1000ull)*1e-6,ok&&d.now_us-requested_ms*1000ull<=5000000&&!std::strcmp(b.coordinator.state(),"STAND")?"PASS":"FAIL",explore);
+ if(!explore)CHECK(ok&&(!std::strcmp(b.coordinator.state(),"STAND")||b.coordinator.walking()));
+ if(ok)CHECK(st.checkpoints==7&&no_micro_arrival&&one_frame&&all_post&&st.step<=.004+1e-12);
  CHECK(b.r.backend.frames==st.frames&&writesInsideLimits(b));
  if(!ok||(!b.coordinator.walking()&&std::strcmp(b.coordinator.state(),"STAND")))return st;
  if(walk){
@@ -244,9 +323,10 @@ int main(){
  const bool fixed=std::getenv("MATDOG_RESIDUAL_BASELINE")==nullptr;
  residualGeometry(fixed);residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
- temporalContracts();safetyFaults();
+ temporalContracts();proneStatus();recoveryAndImu();releaseClockRates();safetyFaults();
  StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
  m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);
  m.name="ASYNC_84MS";m.jitter_us=0;m.loop_us=21000;m.read_us=1000;standReplay(m,true,true);
+ m=StreamModel{};m.name="OFFLINE_1RAD_5RAD_4MS";m.loop_us=4000;m.reads_per_tick=3;m.ideal=true;standReplay(m,false,false,true);
  std::printf("UNIFIED_MOTION failures=%d hardware=false\n",failures);return failures?1:0;
 }

@@ -143,6 +143,17 @@ async function boot(enabled = false, options = {}) {
   p.dom.window.dispatchEvent(new p.dom.window.Event('offline')); await settle();
   assert(p.q('#motion-stand').disabled, 'connection loss disables capability');
   p.close();
+  p = await boot(true);
+  for (const [state, color] of [['IN_PRONE', 'rgb(34, 197, 94)'], ['OUT_OF_PRONE', 'rgb(239, 68, 68)'], ['UNKNOWN', 'rgb(156, 163, 175)']]) {
+    p.device.status.prone = { state, in_window: state === 'UNKNOWN' ? null : 11, worst_joint: 2, worst_offset_rad: -.18, reason: 'TEST' };
+    await p.motionPoll();
+    assert(p.q('#motion-prone').textContent.includes(state));
+    assert.strictEqual(p.q('#motion-prone').style.color, color);
+  }
+  p.device.status.prone = { state: 'IN_PRONE', in_window: 12, worst_joint: 0, worst_offset_rad: 0, reason: 'OK' };
+  await p.motionPoll();p.dom.window.dispatchEvent(new p.dom.window.Event('offline'));await settle();
+  assert(p.q('#motion-prone').textContent.includes('UNKNOWN'), 'connection loss cannot retain green PRONE');
+  p.close();
   // Diagnostics separate telemetry delivery, policy, faults and capability age.
   p = await boot(true);
   p.q('#motion-control').hidden = false;

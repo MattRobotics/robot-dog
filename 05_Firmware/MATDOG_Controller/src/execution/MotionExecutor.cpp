@@ -165,7 +165,7 @@ bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,u
  stream_=c;history_count_=0;history_head_=0;
  // The initial held/primed pose predates this stream; this seed is not a TX.
  Sent& h=history_[0];h.at_us=now_us;h.held_seed=true;h.sequence=status_.accepted_sequence;for(unsigned i=0;i<12;i++)h.q[i]=target_[i];
- history_count_=1;last_release_us_=now_us;hold_sequence_=0;hold_since_us_=0;
+ history_count_=1;last_release_us_=now_us;previous_release_interval_us_=0;hold_sequence_=0;hold_since_us_=0;
  for(unsigned i=0;i<12;i++){checked_us_[i]=fb.sampled_at_us[i];exceed_[i]=0;status_.stream_error_rad[i]=0;}
  status_.validated_sequence=status_.tx_sequence=status_.observed_sequence=status_.accepted_sequence;status_.settled_sequence=0;
  status_.stream_peak_error_rad=0;status_.worst_joint=0xff;
@@ -204,8 +204,10 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  double candidate[12];
  for(unsigned leg=0;leg<4;leg++){candidate[leg*3]=frame.legs[leg].hip;candidate[leg*3+1]=frame.legs[leg].upper;candidate[leg*3+2]=frame.legs[leg].lower;}
  const double dt=(release_us-last_release_us_)*1e-6;
- const Sent& last=history_[(history_head_+history_count_-1)%kHistory];
- const double dt_prev=history_count_>1?(last.at_us-history_[(history_head_+history_count_-2)%kHistory].at_us)*1e-6:0;
+ // Both secant velocities belong to the reference release clock. TX history
+ // belongs exclusively to measured tracking/arrival; UART duration jitter must
+ // not change the acceleration denominator (or weaken a true rate refusal).
+ const double dt_prev=previous_release_interval_us_*1e-6;
  // The WHOLE frame is checked before the first byte.
  for(unsigned i=0;i<12;i++){
   actuator::ActuatorCommand cmd;uint8_t bus;
@@ -224,7 +226,8 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  Sent& h=history_[(history_head_+history_count_)%kHistory];
  if(history_count_==kHistory)history_head_=(history_head_+1)%kHistory;else ++history_count_;
  h.at_us=status_.last_tx_complete_us;h.held_seed=false;h.sequence=frame.sequence;for(unsigned i=0;i<12;i++)h.q[i]=candidate[i];
- status_.tx_sequence=status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;last_release_us_=release_us;
+ status_.tx_sequence=status_.accepted_sequence=frame.sequence;status_.submitted_at_ms=now;
+ previous_release_interval_us_=release_us-last_release_us_;last_release_us_=release_us;
  if(final){stand_quiet_=false;for(unsigned i=0;i<12;++i){quiet_since_us_[i]=quiet_sample_us_[i]=0;}status_.state=ExecutorState::HOLD;hold_sequence_=frame.sequence;hold_since_us_=now_us;status_.reason="HOLD";}
  monitor(f,fb,now,now_us);
  return status_.state==ExecutorState::STREAMING||status_.state==ExecutorState::HOLD;

@@ -1,4 +1,5 @@
 #include "MotionService.h"
+#include "../motion/FixturePoseClassifier.h"
 #include "../motion/OperationalWalkProfile.h"
 #include <cstring>
 #include <cmath>
@@ -185,6 +186,26 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  w.add(",\"operational\":{\"system_health\":\"%s\",\"calibration\":\"%s\",\"joint_feedback\":\"%s\",\"motion_authority\":\"%s\",\"phase\":\"%s\",\"reason\":\"%s\",\"mode\":\"%s\",\"entry_reason\":\"%s\",\"operator_present\":%s,\"walk\":\"%s\",\"walk_cycles\":%.3f,\"walk_drive\":%s}",
   telemetry_.system_health,telemetry_.calibration_state,telemetry_.joint_feedback,telemetry_.motion_authority,telemetry_.readiness_phase,
   telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false",telemetry_.walk,telemetry_.walk_cycles,telemetry_.walk_drive?"true":"false");
+ // Evaluate at serialization time: a cached green must expire with any one
+ // of the twelve samples. This is the existing ENTRY recognizer, not admission.
+ {bool valid=telemetry_.prone_reference_valid&&!telemetry_.feedback_recovering;
+  unsigned count=0,worst=0;double error=0;
+  for(unsigned i=0;i<12;++i){
+   valid=valid&&telemetry_.joint_mapped[i]&&telemetry_.raw_ok[i]&&telemetry_.joint_at_ms[i]!=0&&
+    static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0&&now-telemetry_.joint_at_ms[i]<=telemetry_.feedback_max_age_ms&&
+    std::isfinite(telemetry_.actual_rad[i])&&std::isfinite(telemetry_.prone_nominal_rad[i]);
+   const double e=std::abs(telemetry_.actual_rad[i]-telemetry_.prone_nominal_rad[i]);
+   if(e>error){error=e;worst=i;}if(e<=telemetry_.prone_max_deviation_rad&&motion::fixtureProneJointReason(i,telemetry_.actual_rad[i])==motion::FixturePoseReason::OK)++count;
+  }
+  const auto pose=motion::classifyFixtureProne(telemetry_.actual_rad,telemetry_.prone_nominal_rad,
+    telemetry_.prone_reference_valid,telemetry_.prone_stationary,telemetry_.prone_max_deviation_rad,telemetry_.prone_max_rms_rad);
+  const bool known=valid&&telemetry_.prone_stationary&&pose.reason!=motion::FixturePoseReason::INVALID_THRESHOLDS&&pose.reason!=motion::FixturePoseReason::NONFINITE;
+  const char* state=!known?"UNKNOWN":pose.kind==motion::FixturePoseKind::PRONE_COMPATIBLE?"IN_PRONE":"OUT_OF_PRONE";
+  w.add(",\"prone\":{\"state\":\"%s\",\"reference\":\"ENTRY_RECOGNITION_WINDOW\",\"reason\":\"%s\",\"in_window\":",state,
+    !valid?"REFERENCE_OR_FEEDBACK_UNAVAILABLE":motion::fixturePoseReasonName(pose.reason));
+  if(valid)w.add("%u,\"worst_joint\":%u,\"worst_offset_rad\":%.6f",count,worst,telemetry_.actual_rad[worst]-telemetry_.prone_nominal_rad[worst]);
+  else w.add("null,\"worst_joint\":null,\"worst_offset_rad\":null");
+  w.add("}");}
  w.add(",\"active_command\":");
  char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
  w.add(",\"motion_timing\":{\"frames_tx\":%lu,\"last_tx_complete_us\":%llu,\"last_interval_us\":%lu,\"max_interval_us\":%lu}",(unsigned long)(s?s->frames_tx:0),(unsigned long long)(s?s->last_tx_complete_us:0),(unsigned long)(s?s->last_frame_interval_us:0),(unsigned long)(s?s->max_frame_interval_us:0));

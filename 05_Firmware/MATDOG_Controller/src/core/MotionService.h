@@ -28,6 +28,9 @@ class SemanticMotionPlanner {
   virtual const char* armingFailure() const { return nullptr; }
 };
 struct MotionTelemetry {
+ // Read-only PRONE entry recognition window; never nominal-pose or safety proof.
+ bool prone_reference_valid=false, prone_stationary=false;
+ double prone_nominal_rad[12]{}, prone_max_deviation_rad=0, prone_max_rms_rad=0;
  bool feedback_recovering=false;
  bool joints_valid=false, quaternion_valid=false, height_valid=false,raw_valid=false;
  uint32_t joint_at_ms[12]{};
