@@ -15,7 +15,7 @@ CXX="${CXX:-g++}"
   "$SKETCH_DIR/src/motion/BodyPose.cpp" "$SKETCH_DIR/src/motion/PoseSupport.cpp" \
   "$SKETCH_DIR/src/motion/Gait.cpp" "$SKETCH_DIR/src/motion/Locomotion.cpp" \
   "$SKETCH_DIR/src/motion/MotionState.cpp" "$SKETCH_DIR/src/motion/StartupAcquisition.cpp" \
-  "$SKETCH_DIR/src/motion/TimedStand.cpp" "$SKETCH_DIR/src/motion/StandTransition.cpp" \
+  "$SKETCH_DIR/src/motion/TimedStand.cpp" "$SKETCH_DIR/src/motion/MotionLaw.cpp" "$SKETCH_DIR/src/motion/StandTransition.cpp" \
   "$SKETCH_DIR/src/motion/StandTrajectory.cpp" "$SKETCH_DIR/src/motion/FootContact.cpp" \
   "$SKETCH_DIR/src/motion/ContactMode.cpp" "$SKETCH_DIR/src/motion/TiltedContactIk.cpp" \
   "$SKETCH_DIR/src/motion/LegKinematics.cpp" "$SKETCH_DIR/src/motion/LegInverseKinematics.cpp" \

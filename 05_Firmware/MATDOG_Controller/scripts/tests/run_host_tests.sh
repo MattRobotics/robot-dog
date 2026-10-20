@@ -710,6 +710,7 @@ bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
 # core (ASan/UBSan + TSan snapshot) and Motion cadence with slow/blocking services.
 bash "$SCRIPT_DIR/run_servo_bus_deadline_tests.sh"
 bash "$SCRIPT_DIR/run_imu_feed_tests.sh"
+bash "$SCRIPT_DIR/run_motion_law_tests.sh"
 python3 "$SCRIPT_DIR/run_motion_isolation_tests.py"
 # Unified Motion regression (V2-V4 corrections: release clock, post-TX completion,
 # 7 HOLDs, STAND/WALK STANDARD/height, STOP/SAFE_OFF, recovery, PRONE indicator).

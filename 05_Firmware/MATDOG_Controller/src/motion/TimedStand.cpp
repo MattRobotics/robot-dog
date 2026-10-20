@@ -8,6 +8,7 @@ bool validDuration(double t) {
   const double inverse=1.0/t;
   return std::isfinite(inverse*inverse)&&inverse*inverse>0;
 }
+double jointOf(const LegJointAngles& q,unsigned j){return j==0?q.hip:j==1?q.upper:q.lower;}
 bool solve3(const double j[3][3], const double b[3], double x[3]) {
   double a[3][4];
   for(unsigned r=0;r<3;++r) {for(unsigned c=0;c<3;++c)a[r][c]=j[r][c];a[r][3]=b[r];}
@@ -70,6 +71,76 @@ TimeLawSample quinticTimeLaw(double u,double t) {
   result.acceleration=60*u*(1-u)*(1-2*u)*inverse*inverse;
   if(!std::isfinite(result.velocity)||!std::isfinite(result.acceleration))return {};
   return result;
+}
+TimedStandSample evaluateStandWithLaw(const StandDefinition& d,const TimeLawSample& law,const LegJointAngles seeds[4]) {
+  TimedStandSample result;
+  if(!law.valid||!std::isfinite(law.progress)||law.progress<0||law.progress>1||!std::isfinite(law.velocity)||!std::isfinite(law.acceleration)) {result.status=TimedStatus::INVALID_TIMING;return result;}
+  const auto geometry=sampleStandPath(d,law.progress,seeds);
+  if(!geometry.target.valid) {result.status=TimedStatus::PATH_FAILURE;return result;}
+  for(unsigned i=0;i<4;++i) {
+    double qs[3],qss[3];
+    if(!pathDerivatives(static_cast<LegId>(i),geometry.target.legs[i],d.standBodyHeightM-d.lowBodyHeightM,qs,qss)) {
+      result={};result.status=TimedStatus::SINGULAR_DERIVATIVE;return result;
+    }
+    double velocity[3],acceleration[3];
+    for(unsigned j=0;j<3;++j) {
+      velocity[j]=qs[j]*law.velocity;
+      acceleration[j]=qss[j]*law.velocity*law.velocity+qs[j]*law.acceleration;
+      if(!std::isfinite(velocity[j])||!std::isfinite(acceleration[j])) {
+        result={};result.status=TimedStatus::SINGULAR_DERIVATIVE;return result;
+      }
+    }
+    result.velocityRadS[i]={velocity[0],velocity[1],velocity[2]};
+    result.accelerationRadS2[i]={acceleration[0],acceleration[1],acceleration[2]};
+  }
+  result.geometry=geometry;
+  result.body.translationM.z=geometry.bodyHeightM;
+  result.progress=law.progress;
+  result.phase=law.progress==0?TrajectoryPhase::ACQUISITION_HOLD:TrajectoryPhase::CONTACT_LOCKED_RISE;
+  result.status=TimedStatus::OK;return result;
+}
+StandPathDynamics standPathDynamics(const StandDefinition& d,const LegJointAngles seeds[4],unsigned samples) {
+  StandPathDynamics r;
+  if(samples<2||samples>4096)return r;
+  const auto first=sampleStandPath(d,0,seeds);
+  if(!first.target.valid)return r;
+  LegJointAngles previous[4];for(unsigned i=0;i<4;++i)previous[i]=first.target.legs[i];
+  double qs0[12]{};
+  for(unsigned k=0;k<=samples;++k) {
+    const auto g=sampleStandPath(d,static_cast<double>(k)/samples,previous);
+    if(!g.target.valid)return StandPathDynamics{};
+    for(unsigned i=0;i<4;++i) {
+      double qs[3],qss[3];
+      if(!pathDerivatives(static_cast<LegId>(i),g.target.legs[i],d.standBodyHeightM-d.lowBodyHeightM,qs,qss))return StandPathDynamics{};
+      for(unsigned j=0;j<3;++j) {
+        r.qsMaxRadPerProgress=std::fmax(r.qsMaxRadPerProgress,std::fabs(qs[j]));
+        r.qssMaxRadPerProgress=std::fmax(r.qssMaxRadPerProgress,std::fabs(qss[j]));
+      }
+    }
+    for(unsigned i=0;i<4;++i)previous[i]=g.target.legs[i];
+    if(k==0)for(unsigned i=0;i<12;++i)qs0[i]=jointOf(g.target.legs[i/3],i%3);
+    else if(k==samples)for(unsigned i=0;i<12;++i)r.displacementInfRad=std::fmax(r.displacementInfRad,std::fabs(jointOf(g.target.legs[i/3],i%3)-qs0[i]));
+  }
+  r.valid=std::isfinite(r.qsMaxRadPerProgress)&&std::isfinite(r.qssMaxRadPerProgress)&&r.qsMaxRadPerProgress>0;
+  return r;
+}
+bool planStandHeightLaw(const StandDefinition& d,const LegJointAngles seeds[4],double jointV,double jointA,double rampS,double minDurationS,StandHeightLaw* out) {
+  if(!out)return false;
+  *out=StandHeightLaw{};
+  if(!std::isfinite(jointV)||jointV<=0||!std::isfinite(jointA)||jointA<=0||!std::isfinite(rampS)||rampS<=0)return false;
+  const auto path=standPathDynamics(d,seeds,64);
+  if(!path.valid)return false;
+  // p' <= v/|qs|max and the centripetal part qss*p'^2 may use at most half of the acceleration budget.
+  double vP=jointV/path.qsMaxRadPerProgress;
+  if(path.qssMaxRadPerProgress>1e-12)vP=std::fmin(vP,std::sqrt(0.5*jointA/path.qssMaxRadPerProgress));
+  const double aP=(jointA-path.qssMaxRadPerProgress*vP*vP)/path.qsMaxRadPerProgress;
+  if(!(vP>0)||!(aP>0)||!std::isfinite(vP)||!std::isfinite(aP))return false;
+  ScurveProfile profile;
+  if(!profile.plan(1.0,{vP,aP,aP/rampS}))return false;
+  out->valid=true;out->profile=profile;out->durationS=std::fmax(minDurationS,profile.durationS());
+  out->progressVMax=vP;out->progressAMax=aP;out->progressJMax=aP/rampS;
+  out->jointVRadS=jointV;out->jointARadS2=jointA;out->path=path;
+  return true;
 }
 TimedStandSample evaluateTimedStand(const StandDefinition& d,double u,double duration,const LegJointAngles seeds[4]) {
   TimedStandSample result;

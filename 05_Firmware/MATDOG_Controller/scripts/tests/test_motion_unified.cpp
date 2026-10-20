@@ -357,11 +357,14 @@ void heightTimingSurvey(){
  for(const auto& heights:cases){
   const double from=heights.first,to=heights.second;
   auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=std::min(from,to)/1000.;d.standBodyHeightM=std::max(from,to)/1000.;
-  const double scale=std::abs(double(to)-from)/50.;
-  const double duration=std::max(.040,12*std::max(scale,std::sqrt(scale)));
-  const unsigned n=std::max(256u,static_cast<unsigned>(std::ceil(duration/.020)));
-  auto previous=motion::evaluateTimedStand(d,0,duration,d.standSeed);CHECK(previous.status==motion::TimedStatus::OK);
-  for(unsigned k=0;k<=n;++k){const auto f=motion::evaluateTimedStand(d,double(k)/n,duration,previous.geometry.target.legs);
+  // Production law (AdaptiveStand::requestHeightAdjust): envelope .19 rad/s / 2 rad/s^2, 12 ms lateness tolerance.
+  motion::StandHeightLaw law;const auto seed=motion::generateStandTarget(d);motion::LegJointAngles seeds[4];for(unsigned i=0;i<4;++i)seeds[i]=seed.target.legs[i];
+  const double vref=motion::velocityForLateness(.19,2.,.020,.004,motion::kHeightLatenessToleranceS);
+  CHECK(vref>0&&motion::planStandHeightLaw(d,seeds,vref,1.,motion::kHeightAccelRampS,.040,&law));
+  const double duration=law.durationS;
+  const unsigned n=std::max(2u,static_cast<unsigned>(std::ceil(duration/.020)));   // real 20 ms frame steps
+  auto previous=motion::evaluateStandWithLaw(d,law.at(0),d.standSeed);CHECK(previous.status==motion::TimedStatus::OK);
+  for(unsigned k=0;k<=n;++k){const auto f=motion::evaluateStandWithLaw(d,law.at(duration*k/n),previous.geometry.target.legs);
    CHECK(f.status==motion::TimedStatus::OK&&motion::heightTargetInRegion(f.geometry.target));
    for(unsigned i=0;i<12;++i){
     const auto& v=f.velocityRadS[i/3];const auto& a=f.accelerationRadS2[i/3];

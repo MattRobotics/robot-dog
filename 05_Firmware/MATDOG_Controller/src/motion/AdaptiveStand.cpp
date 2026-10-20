@@ -76,16 +76,38 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
   }
   request_.acquisition=nullptr;request_.entry=nullptr;state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
+bool AdaptiveStand::riseDefinition(const LocomotionFrame& start,double targetZ,StandDefinition* d,bool* ascending) const{
+  if(!d||!ascending||!start.cartesian.valid||!start.target.valid||!std::isfinite(targetZ)||targetZ<=0)return false;
+  const double z0=start.cartesian.body.translationM.z;
+  if(!(z0>0)||z0==targetZ)return false;
+  *d=canonicalStandDefinition();BodyPose origin=start.cartesian.body;origin.translationM.z=0;
+  for(unsigned i=0;i<4;++i){Vector3 local;if(!pointToBase(origin,start.cartesian.feet[i],local))return false;
+    d->contactsWorldM[i]=local;d->contactsWorldM[i].z=0;d->standSeed[i]=start.target.legs[i];}
+  *ascending=targetZ>z0;
+  d->lowBodyHeightM=*ascending?z0:targetZ;d->standBodyHeightM=*ascending?targetZ:z0;
+  return true;
+}
 bool AdaptiveStand::requestHeightAdjust(double h,uint32_t firstSequence,double now){
   if(state_!=AdaptiveStandState::STAND||policy_.mode!=FeedbackMode::FIXTURE_REVIEW||!previous_.target.valid||!previous_.cartesian.valid||
      !std::isfinite(h)||h<=0||h>.150||firstSequence==0||!std::isfinite(now)||std::abs(previous_.cartesian.body.translationM.z-h)<1e-9)return false;
   request_.targetHeightM=h;request_.firstSequence=firstSequence;request_.acquisition=nullptr;request_.entry=nullptr;
-  // Retain the fixed-contact quintic and the existing 12 s / 50 mm rate
-  // budget. For smaller moves, sqrt(span) preserves an acceleration budget
-  // instead of imposing a 12 s dwell. Actual IK derivatives, per-frame step
-  // and release-clock dynamics still pass the unchanged runtime checks.
+  // Core Motion V5: the duration is DERIVED by the common S-curve law (MotionLaw.h) from the live
+  // envelope, the real IK derivatives of this fixed-contact path and the release-jitter tolerance,
+  // not chosen. Same geometry, same box (heightTargetInRegion), same checkSegment/executor limits.
+  // If the law cannot be planned the qualified V4 duration (12 s / 50 mm, sqrt below) is kept.
   const double scale=std::abs(previous_.cartesian.body.translationM.z-h)/.050;
   request_.riseDurationS=std::max(2*policy_.samplePeriodS,12.0*std::max(scale,std::sqrt(scale)));
+  riseLawValid_=false;
+  {double vmax=0,amax=0;
+   for(const auto& v:policy_.maxVelocityRadS)vmax=std::fmax(vmax,std::fmax(std::abs(v.hip),std::fmax(std::abs(v.upper),std::abs(v.lower))));
+   for(const auto& a:policy_.maxAccelerationRadS2)amax=std::fmax(amax,std::fmax(std::abs(a.hip),std::fmax(std::abs(a.upper),std::abs(a.lower))));
+   StandDefinition d;bool ascending=false;
+   if(vmax>0&&amax>0&&riseDefinition(previous_,h,&d,&ascending)){
+     // Reference velocity: the largest <= the envelope whose release-lateness tolerance stays >= 12 ms
+     // (loop granularity + one short service stall); the planner uses half the acceleration envelope.
+     const double v=velocityForLateness(vmax,amax,policy_.samplePeriodS,policy_.maxJointStepRad,kHeightLatenessToleranceS);
+     if(v>0&&planStandHeightLaw(d,previous_.target.legs,v,0.5*amax,kHeightAccelRampS,2*policy_.samplePeriodS,&riseLaw_)){
+       riseLawValid_=true;request_.riseDurationS=riseLaw_.durationS;}}}
   route_.count=0;route_.pairedProne=false;timedActive_=false;entryActive_=false;adjust_=true;
   pendingValid_=assessed_=submitted_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
   state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
@@ -189,7 +211,12 @@ FeedbackFrame AdaptiveStand::generate(double now){
     if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
     pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
   }
-  const auto law=quinticTimeLaw(u,endpoint_.durationS);if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
+  // Height transitions use the common S-curve law planned at request time; every other segment keeps its quintic.
+  const bool lawRise=adjust_&&riseLawValid_&&state_==AdaptiveStandState::RISE;
+  TimeLawSample law;
+  if(lawRise)law=riseLaw_.at(pendingTimeS_);
+  else law=quinticTimeLaw(u,endpoint_.durationS);
+  if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
   CartesianSample c;c.body=endpoint_.body;c.body.translationM=mix(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.progress);
   c.bodyVelocity=rate(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.velocity);
   c.bodyAcceleration=rate(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.acceleration);
@@ -211,11 +238,20 @@ FeedbackFrame AdaptiveStand::generate(double now){
     const bool ascending=endpoint_.body.translationM.z>segmentStart_.cartesian.body.translationM.z;
     d.lowBodyHeightM=ascending?segmentStart_.cartesian.body.translationM.z:endpoint_.body.translationM.z;
     d.standBodyHeightM=ascending?endpoint_.body.translationM.z:segmentStart_.cartesian.body.translationM.z;
-    const auto timed=evaluateTimedStand(d,ascending?u:1-u,endpoint_.durationS,previous_.target.legs);
-    if(timed.status!=TimedStatus::OK)return reject(FeedbackReason::IK_FAILURE);
-    f.target=timed.geometry.target;
-    for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];
-      if(!ascending){auto& v=f.velocityRadS[i];v={-v.hip,-v.upper,-v.lower};}}
+    if(lawRise){
+      // Signed clock along the path coordinate: descending runs the same path backwards (p = 1-s, p' = -s', p'' = -s'').
+      TimeLawSample path=law;if(!ascending){path.progress=1-law.progress;path.velocity=-law.velocity;path.acceleration=-law.acceleration;}
+      const auto timed=evaluateStandWithLaw(d,path,previous_.target.legs);
+      if(timed.status!=TimedStatus::OK)return reject(FeedbackReason::IK_FAILURE);
+      f.target=timed.geometry.target;
+      for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];}
+    }else{
+      const auto timed=evaluateTimedStand(d,ascending?u:1-u,endpoint_.durationS,previous_.target.legs);
+      if(timed.status!=TimedStatus::OK)return reject(FeedbackReason::IK_FAILURE);
+      f.target=timed.geometry.target;
+      for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];
+        if(!ascending){auto& v=f.velocityRadS[i];v={-v.hip,-v.upper,-v.lower};}}
+    }
   }
   if(adjust_&&!heightTargetInRegion(f.target))return reject(FeedbackReason::OUTSIDE_CERTIFIED_REGION);
   auto r=checkSegment(f,previous_.target,policy_);

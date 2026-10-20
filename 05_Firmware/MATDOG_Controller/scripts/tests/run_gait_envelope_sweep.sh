@@ -4,5 +4,5 @@ set -euo pipefail
 D="$(cd "$(dirname "$0")" && pwd)";S="$D/../../src/motion";OUT="$(mktemp -d)";trap 'rm -rf "$OUT"' EXIT
 "${CXX:-g++}" -std=c++17 -O2 -Wall -Wextra -Werror -DDISABLED=0x00 -o "$OUT/sweep" "$D/gait_envelope_sweep.cpp" \
   "$S/Gait.cpp" "$S/Locomotion.cpp" "$S/BodyPose.cpp" "$S/PoseSupport.cpp" "$S/LegKinematics.cpp" "$S/LegInverseKinematics.cpp" \
-  "$S/MotionState.cpp" "$S/FootContact.cpp" "$S/ContactMode.cpp" "$S/TiltedContactIk.cpp" "$S/StandTrajectory.cpp" "$S/StandTransition.cpp" "$S/TimedStand.cpp" "$S/StartupAcquisition.cpp" "$S/MotionContract.cpp"
+  "$S/MotionState.cpp" "$S/FootContact.cpp" "$S/ContactMode.cpp" "$S/TiltedContactIk.cpp" "$S/StandTrajectory.cpp" "$S/StandTransition.cpp" "$S/TimedStand.cpp" "$S/MotionLaw.cpp" "$S/StartupAcquisition.cpp" "$S/MotionContract.cpp"
 "$OUT/sweep" "$@"

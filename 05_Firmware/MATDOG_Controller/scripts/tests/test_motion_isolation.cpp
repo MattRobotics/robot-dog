@@ -71,9 +71,10 @@ int main(){
  // step cap per 20 ms frame (v*T = 3.8 mrad of 4): a frame released later than ~1 ms slows that frame by the step cap and the
  // executor's secant acceleration (release-interval clock) exceeds 2 rad/s^2. That is fail-safe (SAFE_OFF), not hidden, and it
  // is the reason STAND needs a dynamic profile with release-jitter headroom (see MotionLaw / DynamicProfile). ----
- for(uint32_t stall_ms:{1u,2u,20u,57u,120u}){char n[64];std::snprintf(n,sizeof(n),"TO_BE qualified profile stall %u ms/500 ms",stall_ms);
+ for(uint32_t stall_ms:{1u,2u,3u,4u,5u,6u,7u,8u,9u,10u,12u,20u,57u,120u}){char n[64];std::snprintf(n,sizeof(n),"TO_BE qualified profile stall %u ms/500 ms",stall_ms);
   const auto r=runStand(n,tobeDt,3,500,stall_ms*1000);
-  if(stall_ms>=20)CHECK(!r.stood);}
+  if(stall_ms>=20)CHECK(!r.stood);
+  std::printf("STALL_SWEEP stall_ms=%u stood=%d reason=%s\n",stall_ms,r.stood,r.reason.c_str());}
  std::printf("MOTION_ISOLATION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
  return failures?1:0;
 }

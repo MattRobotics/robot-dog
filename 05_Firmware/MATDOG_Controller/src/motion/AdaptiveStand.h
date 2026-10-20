@@ -4,6 +4,7 @@
 #include "FixtureEntryPlanner.h"
 #include "FixturePoseClassifier.h"
 #include "PhaseTimedRoute.h"
+#include "TimedStand.h"
 namespace matdog { namespace motion {
 enum class AdaptiveStandState : uint8_t { IDLE, OBSERVE, CLASSIFY, ACQUIRE_SUPPORT, RISE, VERIFY_STAND, STAND, REJECTED, STOPPED, PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY, LOAD_TRANSFER, PAIRED_RISE,
   ENTRY_DISENGAGE, ENTRY_ALIGN };
@@ -45,6 +46,10 @@ struct AdaptiveStandRequest {
   const FixtureEntryPlan* entry=nullptr;
   double proneMaxDeviationRad=0, proneMaxRmsRad=0;
 };
+// Height-transition law constants (Core Motion V5). Offline decisions, not physical limits: a late frame may be absorbed
+// without a speed dip up to ~kHeightLatenessToleranceS (loop granularity + a short service stall); the acceleration
+// ramp time sets the jerk limit (a/ramp).
+constexpr double kHeightLatenessToleranceS=0.012, kHeightAccelRampS=0.1;
 class AdaptiveStand {
  public:
   bool prepareTimedRoute(const AcquisitionRoute&,const FeedbackPolicy&);
@@ -111,6 +116,11 @@ class AdaptiveStand {
   uint16_t approvedThrough_=UINT16_MAX;
   bool beginEntryStage();
   bool beginTimedPhase();
+  // Height transition: the fixed-contact path definition for a rise/descent from `start` to `targetZ`,
+  // shared by the request (law planning) and the per-frame generator.
+  bool riseDefinition(const LocomotionFrame& start,double targetZ,StandDefinition* definition,bool* ascending) const;
+  StandHeightLaw riseLaw_{};
+  bool riseLawValid_=false;
   PhaseTimedRoute timed_{};
   bool timedVariant_=false;
   uint8_t timedPhase_=0;
