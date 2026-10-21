@@ -37,36 +37,53 @@ struct RotationSample {
 static_assert(std::is_trivially_copyable<RotationSample>::value, "seqlock copy");
 static_assert(sizeof(RotationSample) % 4 == 0, "word copy");
 
-// Single writer, any number of readers, nobody ever waits: the writer bumps the
-// sequence to odd, stores, bumps to even; a reader that overlaps a write retries.
+// Single writer, any number of readers, nobody ever waits. Two slots: the writer fills the slot that is NOT
+// current (sequence odd while writing, even when done) and only then makes it current, so a reader always has
+// the latest COMPLETED sample with its original timestamp, even while the writer task is preempted halfway
+// through a publish. (The first version used one slot: a reader that overlapped a preempted writer got
+// "no sample" and the Motion Authority read that as IMU_STALE - see test_imu_feed.cpp.) A reader only retries
+// if the writer completes two further publishes during one 40-byte copy.
+// Sequentially consistent operations throughout: no standalone fences, so the protocol is also checkable
+// with ThreadSanitizer.
 template <typename T>
 class SeqSlot {
   static constexpr unsigned kWords = (sizeof(T) + 3) / 4;
  public:
-  // Sequentially consistent operations throughout: ordering is the whole point of
-  // a seqlock and the cost (12 words at 50 Hz) is irrelevant; no standalone fences,
-  // so the protocol is also checkable with ThreadSanitizer.
-  void publish(const T& v) {
+  void publish(const T& v) { publishBegin(v); publishEnd(); }
+  // Split form so a test can freeze the writer in the middle of a publish.
+  void publishBegin(const T& v) {
     uint32_t w[kWords] = {0};
     memcpy(w, &v, sizeof(T));
-    const uint32_t s = seq_.load();
-    seq_.store(s + 1);
-    for (unsigned i = 0; i < kWords; ++i) words_[i].store(w[i]);
-    seq_.store(s + 2);
+    next_ = (cur_.load() & 1u) ^ 1u;
+    Slot& s = slot_[next_];
+    const uint32_t q = s.seq.load();
+    s.seq.store(q + 1);
+    for (unsigned i = 0; i < kWords; ++i) s.words[i].store(w[i]);
+    pending_seq_ = q + 2;
+  }
+  void publishEnd() {
+    slot_[next_].seq.store(pending_seq_);
+    cur_.store(next_ | 2u);          // bit 1: something has been published
   }
   bool read(T* out) const {
     for (unsigned attempt = 0; attempt < 8; ++attempt) {
-      const uint32_t a = seq_.load();
+      const uint32_t c = cur_.load();
+      if (!(c & 2u)) return false;     // nothing published yet
+      const Slot& s = slot_[c & 1u];
+      const uint32_t a = s.seq.load();
       if (a & 1u) continue;
       uint32_t w[kWords];
-      for (unsigned i = 0; i < kWords; ++i) w[i] = words_[i].load();
-      if (seq_.load() == a) { memcpy(out, w, sizeof(T)); return a != 0; }
+      for (unsigned i = 0; i < kWords; ++i) w[i] = s.words[i].load();
+      if (s.seq.load() == a) { memcpy(out, w, sizeof(T)); return true; }
     }
     return false;
   }
  private:
-  std::atomic<uint32_t> seq_{0};
-  std::atomic<uint32_t> words_[kWords]{};
+  struct Slot { std::atomic<uint32_t> seq{0}; std::atomic<uint32_t> words[kWords]{}; };
+  Slot slot_[2];
+  std::atomic<uint32_t> cur_{0};
+  unsigned next_ = 0;                  // writer-only state
+  uint32_t pending_seq_ = 0;
 };
 
 struct ImuServiceStats {

@@ -92,6 +92,31 @@ int main(){
     CHECK(fresh(1500,s.rx_ms,600));CHECK(fresh(1600,s.rx_ms,600));CHECK(!fresh(1601,s.rx_ms,600));CHECK(!fresh(3000,s.rx_ms,600));   // real silence => stale => SAFE_OFF path
     CHECK(fresh(990,s.rx_ms,600));   // a sample received later in the same Controller loop is fresh, never 'stale by underflow'
   }
+  // ===== D2. IMU_STALE regression (hardware 21/10: revoked every ~60-100 s with continuous data) =====
+  {
+    // Pre-fix single-slot seqlock, kept here only to reproduce the defect.
+    struct LegacySlot {
+      std::atomic<uint32_t> seq{0},words[10]{};
+      void begin(const RotationSample& v){uint32_t w[10]={0};memcpy(w,&v,sizeof(v));const uint32_t s=seq.load();seq.store(s+1);for(unsigned i=0;i<10;++i)words[i].store(w[i]);}
+      bool read(RotationSample* o)const{for(unsigned k=0;k<8;++k){const uint32_t a=seq.load();if(a&1u)continue;uint32_t w[10];for(unsigned i=0;i<10;++i)w[i]=words[i].load();if(seq.load()==a){memcpy(o,w,sizeof(*o));return a!=0;}}return false;}
+    };
+    static_assert(sizeof(RotationSample)==40,"word count");
+    auto fresh=[](uint32_t now,uint32_t at,uint32_t max){return static_cast<int32_t>(now-at)<=static_cast<int32_t>(max);};
+    RotationSample a;a.valid=true;a.seq=1;a.rx_ms=1000;a.wxyz[0]=.5f;RotationSample b=a;b.seq=2;b.rx_ms=1020;
+    LegacySlot legacy;legacy.begin(a);legacy.seq.store(2);legacy.begin(b);          // writer frozen mid-publish of b
+    RotationSample got;CHECK(!legacy.read(&got));                                   // the defect: "no sample" => IMU_STALE
+    SeqSlot<RotationSample> slot;slot.publish(a);slot.publishBegin(b);              // same freeze, two-slot design
+    CHECK(slot.read(&got)&&got.valid&&got.seq==1&&got.rx_ms==1000);                 // latest COMPLETED sample, original stamp
+    CHECK(fresh(1100,got.rx_ms,600));                                               // transient: still fresh
+    slot.publishEnd();CHECK(slot.read(&got)&&got.seq==2&&got.rx_ms==1020);
+    // real loss: the writer never publishes again => the stamp ages out at the existing 600 ms limit
+    CHECK(fresh(1020+600,got.rx_ms,600)&&!fresh(1020+601,got.rx_ms,600));
+    // frozen mid-publish AND silent for > 600 ms: still STALE (old stamp is returned, never refreshed)
+    slot.publishBegin(b);CHECK(slot.read(&got)&&got.rx_ms==1020&&!fresh(1020+700,got.rx_ms,600));slot.publishEnd();
+    // never published => no sample
+    SeqSlot<RotationSample> empty;CHECK(!empty.read(&got));
+    std::printf("IMU_STALE_REGRESSION legacy_read_during_publish=NO_SAMPLE two_slot_read=last_completed(stamp kept) real_loss_after_600ms=STALE\n");
+  }
 #ifdef IMU_FEED_TSAN
   // ===== E. single-writer snapshot under real concurrency (TSan) =====
   {

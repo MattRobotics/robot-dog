@@ -555,7 +555,13 @@ void Controller::updateOperationalReadiness(uint32_t now_ms) {
   // loop is newer than now_ms. Unsigned now-sampled then underflowed to 'stale'
   // and the Motion Authority flapped GRANTED/REVOKED reason=BMS every 2 s DALY
   // poll (seen on hardware 2026-10-16). Signed age: newer = fresh.
-  {const auto imu=imu_.orientationSnapshot();f.imu_fresh=imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,600);}
+  {const auto imu=imu_.orientationSnapshot();f.imu_fresh=imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,600);
+   // Evidence for the next hardware log: on each fresh->stale edge, say WHICH of the two causes it is
+   // (no sample vs an old stamp) and how many snapshot reads have failed so far.
+   static bool was_stale=false;
+   if(!f.imu_fresh&&!was_stale)Serial.printf("IMU_STALE_DETAIL snapshot_valid=%u age_ms=%ld rv_count=%lu snapshot_read_failures=%lu\n",imu.valid?1u:0u,
+     imu.valid?static_cast<long>(static_cast<int32_t>(now_ms-imu.sampled_at_ms)):-1L,(unsigned long)imu_.rvCount(),(unsigned long)imu_.snapshotReadFailures());
+   was_stale=!f.imu_fresh;}
   {const auto& b=daly_.sample();f.bms_ok=b.valid&&sampleFresh(now_ms,b.sampled_at_ms,3000);for(unsigned i=0;i<4;++i)f.bms_ok=f.bms_ok&&b.alarms[i]==0;}
   f.power_ok=power_state_.state()==PowerState::RUN;
   f.inhibited=authority_.inhibited();

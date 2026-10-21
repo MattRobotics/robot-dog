@@ -63,12 +63,14 @@ class Bno085Imu {
   struct OrientationSnapshot { bool valid=false;uint32_t sampled_at_ms=0;double wxyz[4]{1,0,0,0};uint32_t seq=0;uint32_t rx_us=0;int32_t sensor_age_us=0;float accuracy_rad=0; };
   OrientationSnapshot orientationSnapshot() const {
     OrientationSnapshot o;RotationSample s;
-    if(!feed_.snapshot(&s)||!s.valid)return o;
+    if(!feed_.snapshot(&s)||!s.valid){if(feed_.rvCount())snapshot_failures_.fetch_add(1);return o;}
     o.valid=true;o.sampled_at_ms=s.rx_ms;o.seq=s.seq;o.rx_us=s.rx_us;o.sensor_age_us=s.sensor_age_us;o.accuracy_rad=s.accuracy_rad;
     for(unsigned i=0;i<4;++i){o.wxyz[i]=s.wxyz[i];}
     return o;
   }
   uint32_t rvCount() const { return feed_.rvCount(); }
+  // Reads that found no completed sample although one had been published (expected 0 with the two-slot snapshot).
+  uint32_t snapshotReadFailures() const { return snapshot_failures_.load(); }
   uint32_t runtimeResetCount() const { return runtime_reset_count_.load(); }
   // Service statistics for the first-stop trace (single writer: the IMU task; torn
   // reads are possible and harmless for diagnostics).
@@ -92,6 +94,7 @@ class Bno085Imu {
   std::atomic<core::DetectedState> detected_{core::DetectedState::UNKNOWN};
   std::atomic<bool> stream_enabled_{true};  // must default true: the viewer sends no commands.
   ImuFeed feed_;
+  mutable std::atomic<uint32_t> snapshot_failures_{0};
   void* task_ = nullptr;
   uint32_t last_service_us_ = 0;
   bool have_service_ = false;
