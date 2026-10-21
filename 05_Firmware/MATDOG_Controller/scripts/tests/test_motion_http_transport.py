@@ -12,6 +12,7 @@ import tempfile
 HERE = Path(__file__).resolve().parent
 SRC = HERE.parent.parent / 'src'
 c = (SRC/'network/HttpTransport.cpp').read_text()
+controller = (SRC/'core/Controller.cpp').read_text()
 h = (SRC/'network/HttpTransport.h').read_text()
 w = (SRC/'network/WifiManager.cpp').read_text()
 def between(text, start, end):
@@ -37,7 +38,8 @@ struct FakeService {
  AdminAccess &networkAdminAccess() { return gate; }
  bool motionStatus(char* out,size_t cap,uint32_t now) { ++status_calls;return motion.statusJson(out,cap,now); }
  bool motionCapabilities(char* out,size_t cap) { ++catalog_calls;return motion.capabilitiesJson(out,cap); }
- motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now) { ++command_calls;return motion.command(command,now); }
+ std::function<void()> admitted_stop;
+ motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now) { ++command_calls;if(command.intent==motion::Intent::STOP&&admitted_stop)admitted_stop();return motion.command(command,now); }
  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) { return motion.ackJson(ack,out,cap); }
  unsigned heartbeats=0,restore_calls=0;
  void operatorHeartbeat(uint32_t) { ++heartbeats; }
@@ -66,6 +68,7 @@ fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' boo
  std::atomic<bool> stop_lock_{false};HttpTransportRequest stop_request_{};std::atomic<bool> stop_pending_{false};
  std::atomic<uint32_t> stop_epoch_{0},stop_done_{0},stop_ticket_{0};char stop_ack_[512]{};std::atomic<bool> stop_ack_ok_{false};
  static constexpr uint32_t kStopLaneBudgetMs=600;bool serviceStopLane(uint32_t now_ms);
+ bool stopPending() const {return stop_pending_.load(std::memory_order_acquire);}
  static esp_err_t handleWifi(httpd_req_t*);''')
 fixture = fixture.replace('bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){', '''bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out,char* large_text=nullptr,size_t large_cap=0,uint32_t=3000,const char** failure=nullptr){
   if(busy){if(failure)*failure="MAILBOX_BUSY";return false;}
@@ -84,6 +87,7 @@ fixture = fixture.replace('sha.finish(s.service.digest);', 'sha.finish(s.service
 fixture = fixture.replace('struct httpd_req_t {', 'size_t recv_chunk=4096;uint32_t recv_delay_ms=0;\nstruct httpd_req_t {')
 fixture = fixture.replace('size_t z=std::min(n,r->body.size()-r->consumed);', 'clock_ms+=recv_delay_ms;size_t z=std::min({n,r->body.size()-r->consumed,recv_chunk});')
 platform = r'''
+uint32_t micros() {return static_cast<uint32_t>(clock_ms*1000);}
 WifiStub WiFi;
 esp_err_t esp_wifi_get_mode(wifi_mode_t *m) { if(!WiFi.mode_read_ok)return -1;*m=static_cast<wifi_mode_t>(WiFi.mode_value);return ESP_OK; }
 esp_err_t esp_wifi_sta_get_ap_info(wifi_ap_record_t*) { if(WiFi.connected)return ESP_OK;return WiFi.STA.started()?ESP_ERR_WIFI_NOT_CONNECT:ESP_ERR_WIFI_CONN; }
@@ -95,6 +99,16 @@ std::function<void()> g_stop_lane;
 void vTaskDelay(TickType_t) { if(g_stop_lane)g_stop_lane(); }
 '''
 fixture = fixture.replace('namespace matdog { namespace network {', platform+'\nnamespace matdog { namespace network {', 1)
+stop_hook = 'bool Controller::stopPreempt'+between(controller, 'bool Controller::stopPreempt', 'void Controller::emergencyTorqueOffBurst')
+fixture += '''
+namespace matdog { namespace core {
+class Controller { public:
+ network::HttpTransport http_transport_;
+ struct StopMetrics {uint64_t latched_us=0;} stop_metrics_;
+ struct Clock {uint64_t extend(uint32_t t){return t;}} motion_clock_;
+ static bool stopPreempt(void*);
+};
+'''+stop_hook+'\n} }\n'
 fixture += r'''
 void adminRadio() { WiFi.mode(WIFI_AP);WiFi.ap=true;WiFi.AP.running=true;WiFi.STA.running=false; }
 void login(HttpTransport& s) { clock_ms+=1000;auto r=request(s,"/wifi/login","token="+token);run(r);check(r.status==200,"production login");check(r.response_headers["Set-Cookie"].find("HttpOnly; SameSite=Strict; Path=/; Max-Age=300")!=std::string::npos,"session cookie reaches /api/motion and remains HttpOnly"); }
@@ -112,7 +126,9 @@ void expectReject(HttpTransport& s,const char* type,const char* params,const cha
  check(r.status==200&&r.response.find("\"outcome\":\"REJECTED\"")!=std::string::npos&&r.response.find(reason)!=std::string::npos,reason);
 }
 int main() {
- adminRadio();endpoints();HttpTransport s;provision(s);g_stop_lane=[&s]{if(s.revoke_before_service)s.service.gate.revoke();s.serviceStopLane(static_cast<uint32_t>(clock_ms));};
+ adminRadio();endpoints();core::Controller controller;auto& s=controller.http_transport_;provision(s);
+ bool bus_preempted=false;
+ g_stop_lane=[&]{if(s.revoke_before_service)s.service.gate.revoke();bus_preempted|=core::Controller::stopPreempt(&controller);s.serviceStopLane(static_cast<uint32_t>(clock_ms));};
  auto status=request(s,"/api/motion/status","");status.method=HTTP_GET;runMotion(status);
  check(status.status==200&&status.response.find("\"version\":1")!=std::string::npos,"production GET status");
  check(status.response_headers["Content-Type"]=="application/json"&&status.response_headers["Cache-Control"]=="no-store","JSON/no-store response");
@@ -123,6 +139,45 @@ int main() {
  check(caps.response.find("\"teleoperation\":false")!=std::string::npos,"Controller refuses unqualified teleoperation");
  auto unauth=motionRequest(s,command("MOTION.STOP"),false);runMotion(unauth);check(unauth.status==403&&s.service.command_calls==0,"cookie and CSRF required even for semantic writes");
  login(s);
+ // Actual production admission hook inside a PRIME/ENERGIZE backend call.
+ // Reuse the existing real MotionSession/policy fixture, without device I/O.
+ for(bool energize:{false,true}) {
+  Bench b;check(b.session.request(b.evidence,b.r.facts,b.r.envelope,b.r.feedback,true,b.now),"session setup");
+  if(energize)for(unsigned i=0;i<12;++i){b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);}
+  const auto phase=energize?execution::MotionSessionState::ENERGIZING:execution::MotionSessionState::PRIMING;
+  check(b.session.state()==phase,"PRIME/ENERGIZE reached");
+  for(unsigned fault=0;fault<5;++fault) {
+   auto r=motionRequest(s,command("MOTION.STOP"),fault!=0);
+   if(fault==1)r.headers["Cookie"]="md_session="+std::string(64,'0');
+   if(fault==2)r.headers["X-Csrf-Token"]=std::string(64,'0');
+   if(fault==3)clock_ms+=300000; // valid-looking cookie from an expired session
+   if(fault==4){login(s);r=motionRequest(s,command("MOTION.STOP"));s.service.gate.open();} // revoked generation
+   const auto writes=b.r.backend.writes.size();const auto torque=b.r.backend.torque_calls;
+   const auto calls=s.service.command_calls;bus_preempted=false;
+   b.r.backend.preempt=[&]{runMotion(r);return bus_preempted;};
+   b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);b.r.backend.preempt={};
+   check(r.status==403&&!bus_preempted&&s.service.command_calls==calls,"rejected STOP never aborts UART");
+   check(b.session.state()==phase&&!b.session.safeOffRequired()&&b.session.failedJoint()<0,"rejected STOP consumes no PRIME/ENERGIZE retries");
+   check(energize?b.r.backend.torque_calls==torque+1:b.r.backend.writes.size()==writes+1,"normal actuator step completes");
+   if(fault>=3)login(s);
+  }
+  // Genuine bus faults still consume the existing retry budget and require OFF.
+  b.r.backend.fail_next=3;b.r.backend.fail_outcome=actuator::BackendWriteOutcome::UNCERTAIN;
+  for(unsigned i=0;i<3;++i){b.fresh();b.session.update(b.evidence,b.r.facts,b.r.feedback,b.now);}
+  check(b.session.safeOffRequired(),"three genuinely uncertain writes retain SAFE_OFF");
+  for(bool started:{false,true}) {
+   Bench live;check(live.session.request(live.evidence,live.r.facts,live.r.envelope,live.r.feedback,true,live.now),"STOP live session");
+   if(energize)for(unsigned i=0;i<12;++i){live.fresh();live.session.update(live.evidence,live.r.facts,live.r.feedback,live.now);}
+   login(s);auto r=motionRequest(s,command("MOTION.STOP"));bus_preempted=false;
+   s.service.admitted_stop=[&]{live.session.revoke("OPERATOR_STOP");};
+   live.r.backend.fail_outcome=started?actuator::BackendWriteOutcome::UNCERTAIN:actuator::BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+   live.r.backend.preempt=[&]{runMotion(r);return bus_preempted;};
+   live.fresh();live.session.update(live.evidence,live.r.facts,live.r.feedback,live.now);
+   check(r.status==200&&bus_preempted&&live.session.safeOffRequired(),"admitted STOP preempts PRIME/ENERGIZE");
+   check(!strcmp(live.session.reason(),"OPERATOR_STOP")&&live.session.failedJoint()<0,"STOP decision survives callback unwind without retry");
+   s.service.admitted_stop={};
+  }
+ }
  auto stop=motionRequest(s,command("MOTION.STOP","{\"reason\":\"fixture\"}"));runMotion(stop);check(stop.status==200&&stop.response.find("COMPLETED")!=std::string::npos,"authorized semantic STOP acknowledges without actuator binding");
  // Deadman heartbeat (2026-10-15): only a status poll proving session AND CSRF (the Dashboard).
  {const unsigned h=s.service.heartbeats;auto g=request(s,"/api/motion/status","");g.method=HTTP_GET;g.headers["Cookie"]="md_session="+std::string(s.portal_.cookie());
@@ -231,9 +286,10 @@ login_case = 'case HttpRequestKind::MOTION_LOGIN: case HttpRequestKind::WIFI_LOG
 copy_start = c.index('      if(request.kind==HttpRequestKind::MOTION_CAPABILITIES')
 copy = c[copy_start:c.index('      xSemaphoreGive(slot_free_);', copy_start)]
 admit += 'bool HttpTransport::readOnlyAdmitted'+between(c,'bool HttpTransport::readOnlyAdmitted','void HttpTransport::lifecycle()')
-unit = fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+admit+verify).replace('// PRODUCTION_HANDLER',handler+wifi_handler).replace('// PRODUCTION_SERVICE_CASES',cases+login_case).replace('// PRODUCTION_SERVICE_ADMISSION',admission).replace('// PRODUCTION_CATALOG_COPY',copy)
+session_fixture = '#define MATDOG_FIXTURE_COMMISSIONING_NO_MAIN\n#define checks session_checks\n#define failures session_failures\n#include "'+str(HERE/'test_fixture_commissioning.cpp')+'"\n#undef checks\n#undef failures\n'
+unit = session_fixture+fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+admit+verify).replace('// PRODUCTION_HANDLER',handler+wifi_handler).replace('// PRODUCTION_SERVICE_CASES',cases+login_case).replace('// PRODUCTION_SERVICE_ADMISSION',admission).replace('// PRODUCTION_CATALOG_COPY',copy)
 with tempfile.TemporaryDirectory(prefix='matdog-motion-http-') as temp:
     cpp, exe = Path(temp)/'probe.cpp', Path(temp)/'probe';cpp.write_text(unit)
-    sources = ['network/AdminAccess.cpp','network/PortalSecurity.cpp','network/NetworkConfig.cpp','update/Sha256.cpp','update/Hmac256.cpp','core/MotionService.cpp','core/MotionJson.cpp','execution/MotionExecutor.cpp','actuator/ActuatorRuntime.cpp','actuator/ActuatorWritePolicy.cpp','actuator/CalibrationGeometryProfile.cpp','actuator/CalibrationTargetResolver.cpp','actuator/CalibrationSequencePlan.cpp','calibration/StartupRecoveryReference.cpp','calibration/CalibrationDomain.cpp','servo/ServoPopulation.cpp','core/ActuatorAuthority.cpp','core/OperatingMode.cpp']
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['FirstStrideReference.cpp','PairedProneRoute.cpp','PhaseTimedRoute.cpp','OperationalWalkProfile.cpp','StlContactGait.cpp','MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FixtureEntryPlanner.cpp','StartPoseArchitecture.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','MotionLaw.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
+    sources = ['network/AdminAccess.cpp','network/PortalSecurity.cpp','network/NetworkConfig.cpp','update/Sha256.cpp','update/Hmac256.cpp','core/MotionService.cpp','core/MotionJson.cpp','execution/MotionExecutor.cpp','execution/MotionSession.cpp','execution/MotionCoordinator.cpp','execution/CommissioningPolicy.cpp','actuator/ActuatorRuntime.cpp','actuator/ActuatorWritePolicy.cpp','actuator/CalibrationGeometryProfile.cpp','actuator/CalibrationTargetResolver.cpp','actuator/CalibrationSequencePlan.cpp','calibration/StartupRecoveryReference.cpp','calibration/CalibrationDomain.cpp','servo/ServoPopulation.cpp','core/ActuatorAuthority.cpp','core/OperatingMode.cpp']
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-Wno-unused-function','-DDISABLED=0x00','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(SRC),'-I',str(HERE/'network_stubs'),'-I',str(HERE/'nvs_stub'),str(cpp),*[str(SRC/p) for p in sources],*[str(SRC/'motion'/p) for p in ['FirstStrideReference.cpp','PairedProneRoute.cpp','PhaseTimedRoute.cpp','OperationalWalkProfile.cpp','StlContactGait.cpp','MotionContract.cpp','MotionFeedback.cpp','AdaptiveStand.cpp','FixtureEntryPlanner.cpp','StartPoseArchitecture.cpp','FeedbackWalk.cpp','BodyPose.cpp','PoseSupport.cpp','Gait.cpp','Locomotion.cpp','TimedStand.cpp','MotionLaw.cpp','StandTransition.cpp','StandTrajectory.cpp','FootContact.cpp','ContactMode.cpp','TiltedContactIk.cpp','LegKinematics.cpp','LegInverseKinematics.cpp','MotionState.cpp','StartupAcquisition.cpp']],'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)

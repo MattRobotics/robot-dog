@@ -15,25 +15,30 @@ class ValidatedServoRead : public SMS_STS {
  public:
   ValidatedServoRead() { bus.bindClock(&busClockUs); }
   BusTransaction bus;
+  bool replyPending(uint8_t id) const {
+    if (id < 254) for (auto bits : pending_[id]) if (bits) return true;
+    return false;
+  }
+  void discardReceived(uint8_t byte) { trackReply(byte); }
 
   // ---- SCServo hooks -------------------------------------------------------
   int readSCS(unsigned char* data, int length) override {
     int size = 0;
     if (pSerial == nullptr || length <= 0) return 0;
     while (size < length) {
-      const int byte = pSerial->read();
-      if (byte >= 0) { if (data) data[size] = static_cast<unsigned char>(byte); ++size; bus.onByte(); continue; }
       if (!bus.mayWait()) { bus.waitFailed(); break; }
+      const int byte = pSerial->read();
+      if (byte >= 0) { if (data) data[size] = static_cast<unsigned char>(byte); ++size; received(byte); }
     }
+    if (size == length && !bus.mayWait()) { bus.waitFailed(); return 0; }
     return size;
   }
   int writeSCS(unsigned char* data, int length) override {
-    if (data == nullptr || pSerial == nullptr || !startPacketPiece()) return 0;
-    return static_cast<int>(pSerial->write(data, length));
+    if (data == nullptr || pSerial == nullptr || length <= 0 || !startPacketPiece(data, length)) return 0;
+    const unsigned n = pSerial->write(data, length); sent(n, length); return static_cast<int>(n);
   }
   int writeSCS(unsigned char byte) override {
-    if (pSerial == nullptr || !startPacketPiece()) return 0;
-    return static_cast<int>(pSerial->write(&byte, 1));
+    return writeSCS(&byte, 1);
   }
   void rFlushSCS() override { drainRx(nullptr); }
   void wFlushSCS() override { endPacket(); }
@@ -65,20 +70,26 @@ class ValidatedServoRead : public SMS_STS {
     uint8_t size = 0;
     const uint32_t started = millis();
     if(capture)capture->started_ms=started;
-    const bool tx_allowed = bus.allowTx();
+    request_width_ = width;
+    const bool tx_allowed = bus.allowTx() && prepareReply(id, width);
     if (tx_allowed) {
-      tx_in_packet_ = true;
       writeBuf(id, address, &width, 1, INST_READ);
       endPacket();
       while (size < width + 6) {
-        const int byte = pSerial->read();
-        if (byte >= 0) { packet[size++] = static_cast<uint8_t>(byte); bus.onByte(); continue; }
         if (!bus.mayWait()) { bus.waitFailed(); break; }
+        const int byte = pSerial->read();
+        if (byte >= 0) { packet[size++] = static_cast<uint8_t>(byte); received(byte); }
       }
     }
-    const auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;
+    auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;
     if(capture){capture->size=size;capture->validity=validity;capture->finished_ms=millis();
       for(uint8_t i=0;i<size;++i)capture->bytes[i]=packet[i];}
+    // A fully buffered reply can cross the deadline while this task is descheduled.
+    // Packet structure alone never overrides the absolute transaction/phase budget.
+    if (validity == ReadValidity::VALID && !bus.mayWait()) {
+      bus.waitFailed(); validity = ReadValidity::DEADLINE;
+      if (capture) capture->validity = validity;
+    }
     if(own)bus.end(validity==ReadValidity::VALID);
     if (validity!=ReadValidity::VALID) return 0;
     for (uint8_t i = 0; i < width; ++i) data[i] = packet[i + 5];
@@ -103,25 +114,65 @@ class ValidatedServoRead : public SMS_STS {
     const uint32_t t0 = busClockUs();
     while (pSerial->available()) {
       if (n >= BusTransaction::kDrainMaxBytes || busDiffUs(busClockUs(), t0) >= static_cast<int32_t>(BusTransaction::kDrainMaxUs)) { bus.noteFlood(); return false; }
-      pSerial->read(); ++n;
+      const int byte = pSerial->read(); if (byte >= 0) trackReply(static_cast<uint8_t>(byte)); ++n;
     }
     if (drained_out) *drained_out = n;
     return true;
   }
   // One request may leave the UART in several writeSCS pieces; the permission to
   // send is decided once, at the first piece, so a deadline never cuts a packet.
-  bool startPacketPiece() {
-    if (tx_in_packet_) return true;
+  bool startPacketPiece(const uint8_t* data, int length) {
+    if (tx_in_packet_) return !bus.closedForTx();
     if (tx_suppress_) return false;
+    // Every ServoBus SDK request starts with writeBuf's complete header.
+    if (length < 5 || data[0] != 255 || data[1] != 255 || data[2] >= 254) return false;
+    tx_id_ = data[2]; tx_width_ = data[4] == INST_READ ? request_width_ : 0;
     if (!bus.allowTx()) { tx_suppress_ = true; return false; }
+    if (!prepareReply(tx_id_, tx_width_)) { tx_suppress_ = true; return false; }
     tx_in_packet_ = true;
     return true;
+  }
+  bool prepareReply(uint8_t id, uint8_t width) {
+    // No response carries an address or sequence. Silence cannot prove that a
+    // timed-out request will never answer. Keep its debt until a complete,
+    // checksummed reply is consumed; refuse indistinguishable requests meanwhile.
+    // Other IDs and a write's independent (different-length) readback still work.
+    if (id >= 254 || width > 32 || (pending_[id][width / 8] & (1u << (width % 8)))) {
+      bus.notePendingRx(); return false;
+    }
+    return true;
+  }
+  void sent(unsigned n, unsigned requested) {
+    bus.onTx(n, requested);
+    if (n) pending_[tx_id_][tx_width_ / 8] |= 1u << (tx_width_ % 8);
+  }
+  void received(uint8_t byte) { bus.onByte(); trackReply(byte); }
+  void discardPrefix(unsigned n) {
+    for (unsigned i = n; i < rx_size_; ++i) rx_[i-n] = rx_[i];
+    rx_size_ -= n;
+  }
+  void trackReply(uint8_t byte) {
+    if (rx_size_ == sizeof(rx_)) discardPrefix(1);
+    rx_[rx_size_++] = byte;
+    while (rx_size_ >= 4) {
+      if (rx_[0] != 255 || rx_[1] != 255 || rx_[2] >= 254 || rx_[3] < 2 || rx_[3] > 34) { discardPrefix(1); continue; }
+      const unsigned size = rx_[3] + 4;
+      if (rx_size_ < size) return;
+      uint8_t sum = 0; for (unsigned i = 2; i < size; ++i) sum += rx_[i];
+      if (sum != 255) { discardPrefix(1); continue; }
+      const uint8_t id = rx_[2], width = rx_[3] - 2;
+      pending_[id][width / 8] &= static_cast<uint8_t>(~(1u << (width % 8)));
+      discardPrefix(size);
+    }
   }
   void endPacket() {
     if (tx_in_packet_) bus.txDone();
     tx_in_packet_ = false; tx_suppress_ = false;
   }
   bool tx_in_packet_ = false, tx_suppress_ = false;
+  uint8_t request_width_ = 0, tx_id_ = 0, tx_width_ = 0;
+  uint8_t pending_[254][5]{}; // one bit per reply width 0..32 (0 = ACK/Ping)
+  uint8_t rx_[38]{}, rx_size_ = 0;
 };
 } }
 #endif

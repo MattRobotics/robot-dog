@@ -8,6 +8,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "calibration_record_golden.h"
 #include "../../src/execution/MotionExecutor.h"
@@ -35,7 +36,8 @@ class Backend : public ActuatorBackend {
   // Injected single-joint faults: the next fail_next goal/torque writes return
   // fail_outcome and change nothing (models a lost reply / refused write).
   int fail_next = 0, attempts = 0; BackendWriteOutcome fail_outcome = BackendWriteOutcome::UNCERTAIN;
-  bool injected() { ++attempts; if (fail_next > 0) { --fail_next; return true; } return false; }
+  std::function<bool()> preempt;
+  bool injected() { ++attempts; if (preempt && preempt()) return true; if (fail_next > 0) { --fail_next; return true; } return false; }
   BackendWriteOutcome enableTorque(uint8_t) override { if (injected()) return fail_outcome; ++torque_calls; return outcome; }
   BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t) override { ++torque_calls; return outcome; }
   BackendWriteOutcome writeGoalPosition(uint8_t bus, uint16_t tick, actuator::MotionProfile) override {

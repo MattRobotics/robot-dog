@@ -201,7 +201,7 @@ class ServoBus {
                                            GoalMotionProfile profile);
   const diagnostics::GoalWriteCapture& lastGoalWriteCapture() const {return goal_capture_;}
   // STOP priority on the bus: while a non-safety transaction waits for a reply it
-  // polls fn(ctx) (a lock-free flag read); true abandons the transaction at once.
+  // polls fn(ctx); true means an admitted STOP and abandons the transaction.
   // SAFE_OFF/verify transactions are never preempted. This is software priority:
   // it does not make the physical stop instantaneous on a busy or faulty UART.
   void setStopPreempt(BusTransaction::PreemptFn fn, void* ctx) { st_.bus.bindPreempt(fn, ctx); }

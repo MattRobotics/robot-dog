@@ -176,6 +176,9 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
   revoke(energize?"ENERGIZE_POLICY_REJECTED":"PRIME_POLICY_REJECTED");return;}
  actuator::WriteDecision commit=actuator::WriteDecision::ACCEPT;
  const auto result=runtime_->execute(&tx,bus,&commit);
+ // An admitted STOP can revoke this session from the UART wait callback.
+ // Do not overwrite that decision or consume a retry after unwinding it.
+ if(state_==MotionSessionState::SAFE_OFF_REQUIRED)return;
  if(result!=actuator::ExecuteResult::WRITTEN){
   failed_joint_=static_cast<int8_t>(next_);
   failure_detail_=result==actuator::ExecuteResult::NOT_EXECUTED?actuator::toString(commit):actuator::toString(result);

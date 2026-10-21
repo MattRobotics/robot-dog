@@ -37,7 +37,7 @@ class ReadAudit(unittest.TestCase):
             ('ValidatedServoRead.h','return ReadCaptured(id,address,data,width,nullptr);','return width;'),
             ('ValidatedServoRead.h','BusTransaction::kDrainMaxBytes','255'),
             ('ValidatedServoRead.h','if (!bus.mayWait()) { bus.waitFailed(); break; }',''),
-            ('ValidatedServoRead.h','const bool tx_allowed = bus.allowTx();','const bool tx_allowed = true;'),
+            ('ValidatedServoRead.h','const bool tx_allowed = bus.allowTx() && prepareReply(id, width);','const bool tx_allowed = true;'),
             ('ValidatedServoRead.h','uint8_t drained = 0;','return 10; uint8_t drained = 0;'),
             ('ValidatedServoRead.h','uint8_t drained = 0;','return width; uint8_t drained = 0;'),
             ('ValidatedServoRead.h','return Read(id, address, &data, 1) == 1 ? data : -1;','return data;'),

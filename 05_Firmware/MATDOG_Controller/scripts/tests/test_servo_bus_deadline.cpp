@@ -58,11 +58,13 @@ int main(){
     Rig r;r.uart->plan.silent=true;bool ok;const uint64_t e=r.timeIt(fastRead,&ok);
     CHECK(!ok&&r.bus.lastBusOutcome()==BusOutcome::NO_RESPONSE&&e<=8100&&e>=7900);
     std::printf("BUS_SILENT outcome=%s elapsed_us=%llu\n",toString(r.bus.lastBusOutcome()),(unsigned long long)e);
-    // recovery: next read is clean
-    r.uart->plan=HardwareSerial::ReplyPlan{};CHECK(fastRead(r));CHECK(r.bus.lastBusOutcome()==BusOutcome::OK);
+    // Silence is not proof that the old request can never answer. No fresh
+    // sample and no second indistinguishable request until that debt is settled.
+    r.uart->plan=HardwareSerial::ReplyPlan{};const auto requests=r.uart->requests.size();
+    CHECK(!fastRead(r));CHECK(r.bus.lastBusOutcome()==BusOutcome::RX_PENDING);CHECK(r.uart->requests.size()==requests);
   }
   {Rig r;r.uart->plan.truncate_to=12;bool ok;r.timeIt(fastRead,&ok);CHECK(!ok&&r.bus.lastBusOutcome()==BusOutcome::INCOMPLETE);
-   r.uart->plan=HardwareSerial::ReplyPlan{};CHECK(fastRead(r));}                       // stale RX drained, next read valid
+   r.uart->plan=HardwareSerial::ReplyPlan{};CHECK(!fastRead(r));CHECK(r.bus.lastBusOutcome()==BusOutcome::RX_PENDING);}
   {Rig r;r.uart->plan.corrupt_checksum=true;bool ok;const uint64_t e=r.timeIt(fastRead,&ok);
    CHECK(!ok&&r.bus.lastBusOutcome()==BusOutcome::CORRUPT&&e<2000);}
   {Rig r;r.uart->plan.wrong_id=true;bool ok;r.timeIt(fastRead,&ok);CHECK(!ok&&r.bus.lastBusOutcome()==BusOutcome::CORRUPT);}
@@ -86,9 +88,10 @@ int main(){
     Rig r;StopAt stop{0};r.bus.setStopPreempt(&stopPreempt,&stop);                    // STOP already pending
     const size_t before=r.uart->requests.size();
     CHECK(!fastRead(r));CHECK(r.uart->requests.size()==before);                       // no request leaves the UART
-    CHECK(r.bus.enableTorqueOn(kId)==ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE);  // never energize after STOP
+    CHECK(r.bus.lastBusOutcome()==BusOutcome::CANCELLED_STOP&&r.bus.busStats().last_tx_bytes==0);
+    CHECK(r.bus.enableTorqueOn(kId)==ServoWriteVerifyResult::VERIFIED_NOT_APPLIED);  // provably zero bytes
     CHECK(r.uart->requests.size()==before);
-    CHECK(r.bus.writeGoalPosition(kId,2048,GoalMotionProfile::BOUNDED)==ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE);
+    CHECK(r.bus.writeGoalPosition(kId,2048,GoalMotionProfile::BOUNDED)==ServoWriteVerifyResult::VERIFIED_NOT_APPLIED);
     CHECK(r.uart->requests.size()==before);
     // SAFE_OFF is NOT preemptible: torque goes to zero and is read back.
     r.uart->regs[kId][40]=1;
@@ -134,6 +137,39 @@ int main(){
     std::printf("BUS_RX_FLOOD outcome=RX_FLOOD requests_sent=0 elapsed_us=%llu\n",(unsigned long long)e);
   }
   // ===== 11. nominal 12-joint poll round and randomized invariants =====
+  {
+    Rig r;r.uart->regs[kId][56]=0x34;r.uart->regs[kId][57]=0x01;r.uart->plan.latency_us=9000;
+    CHECK(!fastRead(r));r.uart->regs[kId][56]=0x78;r.uart->regs[kId][57]=0x02;
+    r.uart->plan.latency_us=60;const size_t requests=r.uart->requests.size();const uint64_t t=host_us;
+    CHECK(!fastRead(r)&&r.bus.lastBusOutcome()==BusOutcome::RX_PENDING);
+    CHECK(r.uart->requests.size()==requests&&host_us-t<1000); // no recovery busy-wait
+    host_us+=2000;ServoBus::FastFeedback fb;
+    CHECK(r.bus.readFastFeedback(kId,&fb,8)&&fb.present_position==0x0278);
+    std::printf("BUS_LATE_REPLY old=0x0134 retry=RX_PENDING no_tx=1 recovered=0x%04x\n",fb.present_position);
+  }
+  {
+    Rig r;r.uart->plan.silent=true;CHECK(!fastRead(r));r.uart->plan.silent=false;
+    ServoBus::FastFeedback fb;CHECK(r.bus.readFastFeedback(kId+1,&fb,8)); // discovery/other IDs still work
+    host_us+=200000;const size_t requests=r.uart->requests.size();CHECK(!fastRead(r));CHECK(r.uart->requests.size()==requests);
+    CHECK(r.bus.safeOff(kId)==SafeOffResult::VERIFIED_OFF);CHECK(r.uart->regs[kId][40]==0); // distinct-length OFF readback remains usable
+    CHECK(!fastRead(r)&&r.bus.lastBusOutcome()==BusOutcome::RX_PENDING); // OFF cannot erase the unresolved old fast reply
+  }
+  {
+    Rig r;r.uart->jump_after_byte=21;r.uart->read_jump_us=9000;ServoBus::FastFeedback fb;
+    CHECK(!r.bus.readFastFeedback(kId,&fb,8));CHECK(r.bus.lastBusOutcome()!=BusOutcome::OK&&fb.present_position==-1);
+    std::printf("BUS_PACKET_COMPLETES_LATE rejected=1 last_tx_bytes=%u\n",r.bus.busStats().last_tx_bytes);
+  }
+  {
+    Rig r;r.uart->plan.silent=true;StopAt stop{host_us+1000};r.bus.setStopPreempt(&stopPreempt,&stop);
+    CHECK(r.bus.enableTorqueOn(kId)==ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE);
+    CHECK(r.bus.lastBusOutcome()==BusOutcome::ABORTED_STOP&&r.bus.busStats().last_tx_bytes>0&&r.uart->regs[kId][40]==1);
+    Rig partial;partial.uart->max_write=2;
+    CHECK(partial.bus.enableTorqueOn(kId)==ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE);
+    CHECK(partial.bus.lastBusOutcome()!=BusOutcome::CANCELLED_STOP&&partial.bus.busStats().last_tx_bytes==2);
+    partial.uart->pending.clear();partial.uart->max_write=SIZE_MAX;
+    CHECK(partial.bus.safeOff(kId)==SafeOffResult::VERIFIED_OFF&&partial.uart->regs[kId][40]==0);
+    std::puts("BUS_UNCERTAIN_WRITE started_stop=UNCERTAIN partial=UNCERTAIN safety_off=VERIFIED_OFF");
+  }
   {
     Rig r;const uint64_t t0=host_us;unsigned ok=0;for(unsigned i=0;i<12;++i){ok+=fastRead(r)?1:0;}
     const uint64_t e=host_us-t0;std::printf("BUS_NOMINAL 12x fast read ok=%u elapsed_us=%llu per_read_us=%.1f model: latency 60us + 21 bytes x 10us simulated\n",ok,(unsigned long long)e,e/12.0);

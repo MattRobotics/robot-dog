@@ -154,6 +154,13 @@ void ServoBus::update(uint32_t now_ms) {
 
 SafeOffResult ServoBus::safeOff(int id) {
   if (id < 0 || id > 253) return SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  if (st_.replyPending(static_cast<uint8_t>(id))) {
+    // Unresolved RX must never suppress de-escalation. This existing no-reply
+    // write cannot create another ambiguous ACK; verification remains honest.
+    const uint8_t bus_id = static_cast<uint8_t>(id);
+    if (!syncTorqueOff(&bus_id, 1)) return SafeOffResult::UNVERIFIED_NO_RESPONSE;
+    return verifyTorqueOff(id, validation_timeout_ms_ ? validation_timeout_ms_ : kOperationalTimeoutMs);
+  }
 
   // kOperationalTimeoutMs, NOT kDiagnosticTimeoutMs (Session 2.3 Finding 1)
   // — this is the safety de-escalation path, reachable from any
@@ -201,6 +208,7 @@ ServoWriteVerifyResult ServoBus::enableTorqueOn(int id) {
   // on this half-duplex bus cannot be read as "not applied".
   const int torque_enable = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
   guard.result(torque_enable >= 0);
+  if (st_.bus.cancelledBeforeTx()) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
   last_detected_ = (torque_enable < 0) ? core::DetectedState::NO_RESPONSE
                                        : core::DetectedState::ONLINE;
   return classifyServoWriteVerify(torque_enable, 1);
@@ -229,6 +237,7 @@ ServoWriteVerifyResult ServoBus::writeGoalPosition(int id, uint16_t target_tick,
       search ? kSearchEnvelopeSpeed : validation_speed_?validation_speed_:kBoundedWriteSpeed,
       search ? kSearchEnvelopeAcceleration : validation_acceleration_?validation_acceleration_:kBoundedWriteAcceleration);
   goal_capture_.write_done_ms=millis();
+  if (st_.bus.cancelledBeforeTx()) return ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
 
   if(!search&&validation_speed_){
     // The explicit validation profile requires independent SRAM readback of
@@ -351,7 +360,7 @@ bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t tick
   const size_t n=packet::buildGoalFrame(ids,ticks,12,validation_speed_,validation_acceleration_,packet,sizeof(packet));
   if(n!=packet::kGoalFrameBytes)return false;
   // Bounded drain of stale RX (a late reply must not be parsed later as ours).
-  for(unsigned k=0;k<64&&servo_uart_.available();++k)servo_uart_.read();
+  for(unsigned k=0;k<64&&servo_uart_.available();++k){const int byte=servo_uart_.read();if(byte>=0)st_.discardReceived(static_cast<uint8_t>(byte));}
   r.started=true;r.started_us=micros();
   const size_t written=servo_uart_.write(packet,n);
   servo_uart_.flush();                       // returns when the TX FIFO and shifter are empty

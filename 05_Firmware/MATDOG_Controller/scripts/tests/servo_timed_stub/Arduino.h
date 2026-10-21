@@ -46,10 +46,13 @@ class HardwareSerial {
   std::vector<uint8_t> pending;
   size_t unflushed=0,tx_bytes_total=0;uint64_t last_at=0;
   bool flood=false;                                 // babbling bus: a byte is always readable
+  unsigned bytes_read=0, jump_after_byte=0;
+  uint32_t read_jump_us=0;
+  size_t max_write=SIZE_MAX;                         // short UART write injection
   void begin(unsigned long,int,int,int){}
   void flush(){host_us+=unflushed*10;unflushed=0;}
   int available(){if(flood)return 1;int n=0;for(auto& t:rx)if(t.at<=host_us)++n;return n;}
-  int read(){if(flood)return 0xAA;if(rx.empty()||rx.front().at>host_us)return -1;const int b=rx.front().b;rx.pop_front();return b;}
+  int read(){if(flood)return 0xAA;if(rx.empty()||rx.front().at>host_us)return -1;const int b=rx.front().b;rx.pop_front();if(++bytes_read==jump_after_byte)host_us+=read_jump_us;return b;}
   static uint8_t checksum(const std::vector<uint8_t>& p){uint8_t sum=0;for(size_t i=2;i<p.size();++i)sum+=p[i];return static_cast<uint8_t>(~sum);}
   void schedule(std::vector<uint8_t> p){
     if(plan.silent)return;
@@ -70,7 +73,14 @@ class HardwareSerial {
     requests.push_back(p);
     if(p.size()<6||p[0]!=255||p[1]!=255)return;
     auto body=p;body.pop_back();if(checksum(body)!=p.back())return;
-    const int id=p[2],inst=p[4];if(id>=254)return;          // broadcast: no reply
+    const int id=p[2],inst=p[4];
+    if(id==254&&inst==0x83&&p.size()>=8){                // existing no-reply SYNC_WRITE (including SAFE_OFF)
+      const unsigned address=p[5],width=p[6];if(!width)return;
+      for(size_t i=7;i+width<p.size();i+=width+1)if(p[i]<254)
+        for(unsigned j=0;j<width&&address+j<71;++j)regs[p[i]][address+j]=p[i+1+j];
+      return;
+    }
+    if(id>=254)return;                                  // broadcast: no reply
     const int address=p[5];
     if(inst==3){                                           // WRITE: applied, then ACK
       for(size_t i=6;i+1<p.size();++i){const int reg=address+static_cast<int>(i)-6;if(reg<71)regs[id][reg]=p[i];}
@@ -80,6 +90,7 @@ class HardwareSerial {
     }else if(inst==1){schedule(frame(id,{}));}              // PING
   }
   size_t write(const uint8_t* p,size_t n){
+    n=std::min(n,max_write);
     unflushed+=n;tx_bytes_total+=n;
     for(size_t i=0;i<n;++i){
       pending.push_back(p[i]);

@@ -39,6 +39,8 @@ enum class BusOutcome : uint8_t {
   REFUSED_REENTRANT,   // another transaction was open
   REFUSED_FOREIGN_OWNER, // called from a task that does not own the bus
   REFUSED_UNOWNED_IO,  // SCServo I/O outside any transaction
+  RX_PENDING,         // an earlier reply is unresolved; no ambiguous request sent
+  CANCELLED_STOP,     // admitted STOP, provably zero bytes transmitted
 };
 const char* toString(BusOutcome);
 
@@ -46,6 +48,7 @@ struct BusStats {
   uint32_t transactions = 0, ok = 0, no_response = 0, incomplete = 0, corrupt = 0, total_deadline = 0;
   uint32_t aborted_stop = 0, rx_flood = 0, refused_reentrant = 0, refused_foreign = 0, unowned_io = 0;
   uint32_t suppressed_tx = 0;     // requests NOT sent because the transaction was already closed
+  uint32_t last_tx_bytes = 0;
   uint32_t max_elapsed_us = 0, last_elapsed_us = 0, max_overrun_us = 0;  // overrun = elapsed - total budget (>0 only by poll granularity)
 };
 
@@ -78,6 +81,7 @@ class BusTransaction {
     return true;
   }
   bool closedForTx() const { return open_ && (closed_ || abort_); }
+  bool cancelledBeforeTx() const { return abort_ && tx_bytes_ == 0; }
   BusOutcome outcome() const { return outcome_; }
   const BusStats& stats() const { return stats_; }
   uint32_t elapsedUs() const { return open_ ? busDiffUs(now(), start_us_) : stats_.last_elapsed_us; }
@@ -90,7 +94,7 @@ class BusTransaction {
     if (total_us == 0 || total_us > kMaxBudgetUs || phase_us == 0) { outcome_ = BusOutcome::NO_RESPONSE; return false; }
     open_ = true; closed_ = false; abort_ = false; preemptible_ = preemptible;
     total_us_ = total_us; phase_us_ = phase_us; start_us_ = now(); phase_start_us_ = start_us_;
-    bytes_this_phase_ = 0; bytes_total_ = 0; flood_ = false; deadline_hit_ = false; failed_wait_ = false;
+    bytes_this_phase_ = 0; bytes_total_ = 0; tx_bytes_ = 0; flood_ = false; pending_rx_ = false; deadline_hit_ = false; failed_wait_ = false;
     ++stats_.transactions;
     return true;
   }
@@ -98,12 +102,17 @@ class BusTransaction {
   // Called by the SCServo write hook before bytes leave the UART. False = suppress.
   bool allowTx() {
     if (!open_) { ++stats_.unowned_io; outcome_ = BusOutcome::REFUSED_UNOWNED_IO; return false; }
+    if (expired(now()) && total_us_ > phase_us_) deadline_hit_ = true;
     if (closed_ || abort_ || flood_ || expired(now())) { closed_ = true; ++stats_.suppressed_tx; return false; }
     if (preemptible_ && preemptNow()) { ++stats_.suppressed_tx; return false; }
     return true;
   }
   // The request has been handed to the UART: the reply phase starts now.
   void txDone() { if (open_) { phase_start_us_ = now(); bytes_this_phase_ = 0; } }
+  void onTx(unsigned sent, unsigned requested) {
+    tx_bytes_ += sent;
+    if (sent != requested) { closed_ = true; failed_wait_ = true; }
+  }
 
   // One reply-wait poll. Returns true while it is still legitimate to wait.
   // Call when no byte is available; on a received byte call onByte().
@@ -127,11 +136,13 @@ class BusTransaction {
   // A wait ended without the requested byte count.
   void waitFailed() { failed_wait_ = true; }
   void noteFlood() { flood_ = true; closed_ = true; }
+  void notePendingRx() { pending_rx_ = true; closed_ = true; }
   uint32_t drainBudgetUs() const { return kDrainMaxUs; }
 
   // Closes the transaction. `valid` = the caller's own packet validation passed.
   BusOutcome end(bool valid) {
     if (!open_) return outcome_;
+    if (valid && !mayWait()) { waitFailed(); valid = false; }
     const uint32_t elapsed = static_cast<uint32_t>(busDiffUs(now(), start_us_));
     // The caller's own validation is the verdict (an informational ACK that never
     // came does not fail a transaction whose readback validated). Otherwise the
@@ -139,11 +150,13 @@ class BusTransaction {
     BusOutcome o;
     if (valid) o = BusOutcome::OK;
     else if (flood_) o = BusOutcome::RX_FLOOD;
-    else if (abort_) o = BusOutcome::ABORTED_STOP;
+    else if (abort_) o = tx_bytes_ ? BusOutcome::ABORTED_STOP : BusOutcome::CANCELLED_STOP;
     else if (deadline_hit_) o = BusOutcome::TOTAL_DEADLINE;
+    else if (pending_rx_) o = BusOutcome::RX_PENDING;
     else if (failed_wait_) o = bytes_total_ == 0 ? BusOutcome::NO_RESPONSE : BusOutcome::INCOMPLETE;
     else o = BusOutcome::CORRUPT;
     outcome_ = o; open_ = false;
+    stats_.last_tx_bytes = tx_bytes_;
     stats_.last_elapsed_us = elapsed;
     if (elapsed > stats_.max_elapsed_us) stats_.max_elapsed_us = elapsed;
     if (elapsed > total_us_ && elapsed - total_us_ > stats_.max_overrun_us) stats_.max_overrun_us = elapsed - total_us_;
@@ -154,6 +167,7 @@ class BusTransaction {
       case BusOutcome::CORRUPT: ++stats_.corrupt; break;
       case BusOutcome::TOTAL_DEADLINE: ++stats_.total_deadline; break;
       case BusOutcome::ABORTED_STOP: ++stats_.aborted_stop; break;
+      case BusOutcome::CANCELLED_STOP: ++stats_.aborted_stop; break;
       case BusOutcome::RX_FLOOD: ++stats_.rx_flood; break;
       default: break;
     }
@@ -170,7 +184,8 @@ class BusTransaction {
     return false;
   }
   ClockFn clock_ = nullptr; PreemptFn preempt_ = nullptr; void* preempt_ctx_ = nullptr; OwnerFn owner_fn_ = nullptr; uintptr_t owner_ = 0;
-  bool open_ = false, closed_ = false, abort_ = false, preemptible_ = false, flood_ = false, deadline_hit_ = false, failed_wait_ = false;
+  bool open_ = false, closed_ = false, abort_ = false, preemptible_ = false, flood_ = false, pending_rx_ = false, deadline_hit_ = false, failed_wait_ = false;
+  uint32_t tx_bytes_ = 0;
   uint32_t total_us_ = 0, phase_us_ = 0, start_us_ = 0, phase_start_us_ = 0;
   uint16_t bytes_this_phase_ = 0, bytes_total_ = 0;
   BusOutcome outcome_ = BusOutcome::NONE;
@@ -184,6 +199,7 @@ inline const char* toString(BusOutcome o) {
     case BusOutcome::TOTAL_DEADLINE: return "TOTAL_DEADLINE"; case BusOutcome::ABORTED_STOP: return "ABORTED_STOP";
     case BusOutcome::RX_FLOOD: return "RX_FLOOD"; case BusOutcome::REFUSED_REENTRANT: return "REFUSED_REENTRANT";
     case BusOutcome::REFUSED_FOREIGN_OWNER: return "REFUSED_FOREIGN_OWNER"; case BusOutcome::REFUSED_UNOWNED_IO: return "REFUSED_UNOWNED_IO";
+    case BusOutcome::RX_PENDING: return "RX_PENDING"; case BusOutcome::CANCELLED_STOP: return "CANCELLED_STOP";
   }
   return "UNKNOWN";
 }

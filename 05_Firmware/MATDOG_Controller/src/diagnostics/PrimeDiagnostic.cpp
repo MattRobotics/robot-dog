@@ -14,6 +14,7 @@ const char* toString(ReadValidity v){
  case ReadValidity::LENGTH:return "WRONG_LENGTH";
  case ReadValidity::STATUS:return "SERVO_STATUS";
  case ReadValidity::CHECKSUM:return "BAD_CHECKSUM";
+ case ReadValidity::DEADLINE:return "DEADLINE";
  }
  return "UNKNOWN";
 }

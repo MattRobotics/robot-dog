@@ -4,7 +4,7 @@
 #include <stdint.h>
 namespace matdog { namespace diagnostics {
 enum class ReadValidity : uint8_t { NOT_ATTEMPTED, VALID, INVALID_ARGUMENT, RX_FLOOD, NO_RESPONSE,
- SHORT_PACKET, HEADER, ID, LENGTH, STATUS, CHECKSUM };
+  SHORT_PACKET, HEADER, ID, LENGTH, STATUS, CHECKSUM, DEADLINE };
 const char* toString(ReadValidity);
 struct ReadCapture {
  uint8_t id=0,address=0,width=0,size=0,drained=0,bytes[38]{};

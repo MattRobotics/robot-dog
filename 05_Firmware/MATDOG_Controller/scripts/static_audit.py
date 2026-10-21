@@ -1769,7 +1769,9 @@ inline diagnostics::ReadValidity servoReadValidity(const uint8_t* frame, uint8_t
         required["ValidatedServoRead.h"] = (
             "return ReadCaptured(id,address,data,width,nullptr);",
             "BusTransaction::kDrainMaxBytes",
-            "const auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;",
+            "auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;",
+            "while (size < length) { if (!bus.mayWait()) { bus.waitFailed(); break; }",
+            "while (size < width + 6) { if (!bus.mayWait()) { bus.waitFailed(); break; }",
             "if (validity!=ReadValidity::VALID) return 0; "
             "for (uint8_t i = 0; i < width; ++i) data[i] = packet[i + 5]; return width;")
     for name, tokens in required.items():

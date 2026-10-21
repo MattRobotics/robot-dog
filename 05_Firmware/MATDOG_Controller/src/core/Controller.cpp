@@ -1338,14 +1338,11 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       // Torque state from the slow block, valid only while recent (monitor, not per sample).
       if(millis()-r.control_at_ms>control_max_age)r.read_ok=false;
     }
-    if(servo_bus_.lastBusOutcome()==servo::BusOutcome::ABORTED_STOP){
-      // A pending STOP abandoned this wait: neither a new sample nor a bus failure, so the
-      // previous sample keeps its own timestamp. The STOP is authenticated now; a rejected
-      // one simply resumes polling on the next tick.
-      if(http_transport_.serviceStopLane(millis())){
-        stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
-        emergencyTorqueOffBurst();
-      }
+    if(servo_bus_.lastBusOutcome()==servo::BusOutcome::ABORTED_STOP||
+       servo_bus_.lastBusOutcome()==servo::BusOutcome::CANCELLED_STOP){
+      // The bus hook already authenticated AND applied STOP on this same
+      // Controller thread. Preserve the previous sample's original timestamp.
+      emergencyTorqueOffBurst();
       poll_ok=false;break;
     }
     r.transaction_ms=millis()-read_started;
@@ -1687,7 +1684,14 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   } else { motion_safe_off_mask_=0;motion_safe_off_next_=0;safe_off_burst_sent_=false; }
 }
 bool Controller::stopPreempt(void* self) {
-  return static_cast<Controller*>(self)->http_transport_.stopPending();
+  auto* c=static_cast<Controller*>(self);
+  // Pending is only a wake-up hint, never authority. Admission stays on the
+  // Controller thread (PortalSession is not shared with httpd). A rejected
+  // request returns false and the in-flight transaction continues untouched.
+  if(!c->http_transport_.stopPending()||!c->http_transport_.serviceStopLane(millis()))return false;
+  c->stop_metrics_=StopMetrics{};c->stop_metrics_.latched_us=c->motion_clock_.extend(micros());
+  // No UART use here: unwind the current BusGuard before the OFF burst.
+  return true;
 }
 void Controller::emergencyTorqueOffBurst() {
   if(safe_off_burst_sent_||!build::kServoPowerAvailable)return;
