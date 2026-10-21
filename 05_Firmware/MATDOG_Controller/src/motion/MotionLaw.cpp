@@ -111,16 +111,36 @@ double accelSafeLatenessS(double v, double a, double period, double step, double
   return maxLatenessS;
 }
 
+namespace {
+// The search below is ~124k secant evaluations in software double: ~1.13 s per call on the ESP32-S3 Controller
+// thread (RCA 2026-10-21: twelve pre-arm calls blocked the loop 13.6 s; every RAW sample aged past admission).
+// It is a pure function and every production caller (configure, pre-arm entry, STAND request, height
+// adjust) passes the same live envelope: keep the last result for bit-identical arguments. Controller thread
+// only (and single-threaded host tests) - not reentrant, like the planner's static path buffer.
+struct LatenessSearch { bool valid = false; double vCap = 0, a = 0, period = 0, step = 0, target = 0, v = 0; };
+LatenessSearch lastLatenessSearch;
+unsigned long latenessSearches = 0;
+}
+
 double velocityForLateness(double vCap, double a, double period, double step, double target) {
   if (!pos(vCap) || !pos(a) || !pos(period) || !pos(step) || !(target >= 0)) return 0;
+  auto& last = lastLatenessSearch;
+  if (last.valid && last.vCap == vCap && last.a == a && last.period == period && last.step == step && last.target == target) return last.v;
+  ++latenessSearches;
   const double vStep = step / period;                      // above this the nominal frame already exceeds the step cap
   double hi = vCap < vStep ? vCap : vStep;
   auto ok = [&](double v) { return accelSafeLatenessS(v, a, period, step, target + 1e-9) >= target; };
-  if (ok(hi)) return hi;
-  double lo = 0;
-  for (unsigned i = 0; i < 60; ++i) { const double mid = 0.5 * (lo + hi); (ok(mid) ? lo : hi) = mid; }
-  return lo;
+  double v = hi;
+  if (!ok(hi)) {
+    double lo = 0;
+    for (unsigned i = 0; i < 60; ++i) { const double mid = 0.5 * (lo + hi); (ok(mid) ? lo : hi) = mid; }
+    v = lo;
+  }
+  last = LatenessSearch{true, vCap, a, period, step, target, v};
+  return v;
 }
+
+unsigned long velocityForLatenessSearches() { return latenessSearches; }
 
 uint64_t microsFromSeconds(double s) {
   if (!(s > 0) || !std::isfinite(s) || s > 1e9) return 0;

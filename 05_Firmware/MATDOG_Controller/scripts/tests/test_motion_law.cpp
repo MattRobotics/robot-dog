@@ -58,6 +58,17 @@ int main(){
    CHECK(accel(L)<=a+1e-9&&accel(L+1e-4)>a);std::printf("LAW_LATENESS qualified_stand v=.19 a=2 T=20ms step=4mrad -> accel_safe_lateness_ms=%.3f step_headroom_ms=%.3f\n",L*1000,(step/v-T)*1000);
    CHECK(L>.005&&L<.012);
    CHECK(accelSafeLatenessS(.19,2,.02,.003,.08)==0);}   // v*T > step: invalid profile
+  // ===== 4b. lateness cruise: one search per envelope (RCA 2026-10-21, ~1.1 s each on the ESP32-S3) =====
+  {const unsigned long s0=velocityForLatenessSearches();
+   const double v=velocityForLateness(.19,2,.02,.004,kStreamLatenessToleranceS);
+   CHECK(v==.177);CHECK(velocityForLatenessSearches()==s0+1);             // the V6 contract cruise
+   const double again=velocityForLateness(.19,2,.02,.004,kStreamLatenessToleranceS);
+   CHECK(std::memcmp(&v,&again,sizeof v)==0&&velocityForLatenessSearches()==s0+1);
+   const double other=velocityForLateness(.5,2,.02,.004,kStreamLatenessToleranceS);   // another envelope searches
+   CHECK(other>0&&other<.5&&velocityForLatenessSearches()==s0+2);
+   const double back=velocityForLateness(.19,2,.02,.004,kStreamLatenessToleranceS);   // and back again: same bits
+   CHECK(std::memcmp(&v,&back,sizeof v)==0&&velocityForLatenessSearches()==s0+3);
+   CHECK(velocityForLateness(0,2,.02,.004,.012)==0&&velocityForLateness(.19,2,.02,.004,NAN)==0&&velocityForLatenessSearches()==s0+3);}
   // ===== 5. dynamic profile analysis =====
   {DynamicProfile stand{"STAND_QUALIFIED",.19,2.,0,.020,.004,300,20};const auto a=analyzeDynamicProfile(stand);
    CHECK(a.valid&&std::fabs(a.stepAtNominalRad-.0038)<1e-12&&a.driveSpeedRatio>2.4&&a.driveAccelRatio>1.5);

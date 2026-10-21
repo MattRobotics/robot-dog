@@ -450,6 +450,24 @@ void heightReplay(bool jitter=false){
 }
 // ===================== Core Motion V6 regressions (RCA phase 1 -> phase 2) =====================
 // C1 numeric contract: ONE RAW -> radians conversion for samples and limit ends, exact round trip, inclusive edges.
+// RCA 2026-10-21 (hardware, V6 2f7b818): the pre-arm dry run ran twelve identical lateness searches on the
+// Controller thread (12 x ~124k software-double evaluations, 13.6 s); every RAW sample was 13.6 s old at
+// admission (STALE_FEEDBACK, authority RAW_FEEDBACK_LOST, HTTP timeouts). After configuration - the one search,
+// torque OFF - no Controller-thread STAND path repeats it: pre-arm, arming, STAND request, entry and route,
+// a height change from STAND. The cruise keeps its V6 value bit for bit.
+void controllerThreadSearches(){
+ { Operational warm; }
+ const unsigned long before=motion::velocityForLatenessSearches();
+ { Operational op;auto& b=op.b;
+   CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED&&op.armer.calls==1);   // pre-arm dry run + admission
+   CHECK(motion::velocityForLatenessSearches()==before);
+   for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
+   CHECK(b.session.state()==MotionSessionState::ARMED); }
+ heightReplay();                                    // STAND from PRONE (entry, timed route), six height changes
+ CHECK(motion::velocityForLatenessSearches()==before);
+ CHECK(motion::velocityForLateness(.19,2,.02,.004,motion::kStreamLatenessToleranceS)==.177);
+ std::printf("CONTROLLER_THREAD_SEARCHES after_configure=%lu (pre-arm, arm, STAND, height)\n",motion::velocityForLatenessSearches()-before);
+}
 void numericContract(){
  Bench b;auto& r=b.r;unsigned ticks=0,edges=0;bool exact=true,roundtrip=true,agree=true;
  for(unsigned i=0;i<12;++i){const auto id=slotIdentity(i);const auto* t=r.policy.transforms().find(id,r.geometry.provenanceTag());const auto* l=r.policy.limits().find(id,r.geometry.provenanceTag());
@@ -692,7 +710,7 @@ int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
  if(std::getenv("MATDOG_EXPLORE_ONLY")){StreamModel m;m.name="EXPLORE";m.loop_us=std::getenv("MATDOG_EXPLORE_LOOP_US")?std::atoi(std::getenv("MATDOG_EXPLORE_LOOP_US")):2000;m.reads_per_tick=3;m.ideal=std::getenv("MATDOG_EXPLORE_REAL")==nullptr;m.stop_short_ticks=5;if(const char* e=std::getenv("MATDOG_EXPLORE_STALL")){unsigned every=0,us=0;std::sscanf(e,"%u,%u",&every,&us);m.stall_every_ms=every;m.stall_us=us;}standReplay(m,false,false,true);return failures?1:0;}
  if(std::getenv("MATDOG_TX_CLOCK_ONLY")){backendClockArrival();return failures?1:0;}
- if(std::getenv("MATDOG_V6_ONLY")){numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();pathBoxCases();return failures?1:0;}
+ if(std::getenv("MATDOG_V6_ONLY")){controllerThreadSearches();numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();pathBoxCases();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_SURVEY_ONLY")){heightTimingSurvey();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_CHAIN_ONLY")){heightReplay();heightReplay(true);return failures?1:0;}
  backendClockArrival();dynamicProfiles();
@@ -700,7 +718,7 @@ int main(){
  residualGeometry(fixed);pathBoxCases();residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
  temporalContracts();proneStatus();recoveryAndImu();releaseClockRates();safetyFaults();
- numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();
+ controllerThreadSearches();numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();
  heightTimingSurvey();heightReplay();heightReplay(true);
  StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
  m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);

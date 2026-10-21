@@ -81,6 +81,9 @@ DynamicAnalysis analyzeDynamicProfile(const DynamicProfile& profile);
 double accelSafeLatenessS(double velocityRadS, double accelerationRadS2, double periodS, double maxStepRad, double maxLatenessS);
 // Largest reference velocity v <= vCap whose lateness tolerance (above) is at least targetLatenessS (0 if none; vCap if it already is).
 double velocityForLateness(double vCap, double accelerationRadS2, double periodS, double maxStepRad, double targetLatenessS);
+// Full searches run by velocityForLateness (a repeated identical request returns the kept result). Host tests use it
+// to prove that no pre-arm / STAND / height path repeats the ~1.1 s ESP32-S3 search after configuration.
+unsigned long velocityForLatenessSearches();
 // Stream rule (OperationalWalkProfile.h kStreamMaxGapS, MotionExecutor kTimedMaxFrameGapMs): a release gap above this is refused.
 constexpr double kStreamMaxGapS = 0.100;
 // One progression contract for every streamed STAND phase (Core Motion V6): the release lateness a cruise absorbs
