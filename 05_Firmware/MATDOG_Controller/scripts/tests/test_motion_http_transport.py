@@ -46,6 +46,7 @@ struct FakeService {
  bool calibrationRestore(uint32_t,bool,char*,size_t) { ++restore_calls;return false; }
 ''')
 fixture = fixture.replace(' static esp_err_t handleWifi(httpd_req_t*);', ''' bool portal_sta_=false;
+ bool deferred_=false;   // production: fence contention defers to a later Controller pass (test_http_fence_contention.py)
  bool admitReadOnly(HttpTransportRequest&);
  bool readOnlyAdmitted(const HttpTransportRequest&) const;
  bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
@@ -78,7 +79,10 @@ fixture = fixture.replace('  switch(req.kind){', '''  auto serviceRequest = [&](
   // PRODUCTION_SERVICE_ADMISSION
   switch(req.kind){''')
 fixture = fixture.replace('   default: return false;', '   default: return;')
-fixture = fixture.replace('  *out=resp;return true;', '''  }; serviceRequest(); *out=resp;
+fixture = fixture.replace('  *out=resp;return true;', '''  }; serviceRequest();
+  // Synchronous double: no later Controller pass exists here, a deferral reads as late.
+  if(deferred_){deferred_=false;if(failure)*failure="CONTROLLER_LOOP_LATE";return false;}
+  *out=resp;
   [[maybe_unused]] const auto& request=req;[[maybe_unused]] auto* response=out;
   // PRODUCTION_CATALOG_COPY
   return true;''')

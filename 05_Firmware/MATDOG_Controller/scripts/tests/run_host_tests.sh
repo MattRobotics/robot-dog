@@ -724,6 +724,9 @@ python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 # Production Motion/RESTORE/Twin HTTP handlers, security envelope and operator
 # heartbeat proof (2026-10-15: was only in the release list and had regressed).
 python3 "$SCRIPT_DIR/test_motion_http_transport.py"
+# RCA 2026-10-21: admission fence contention on the production mailbox and STOP lane
+# (threads, TSan + ASan): retried within budget, never a false 403, STOP first and never acknowledged unapplied.
+python3 "$SCRIPT_DIR/test_http_fence_contention.py"
 python3 "$SCRIPT_DIR/test_ota_tls_client.py"
 python3 "$SCRIPT_DIR/test_static_audit_network_v3.py"
 python3 "$SCRIPT_DIR/test_prime_read_audit.py"

@@ -139,6 +139,7 @@ private:
   SemaphoreHandle_t request_ready_ = nullptr, response_ready_ = nullptr,
                     slot_free_ = nullptr;
   HttpMailbox mailbox_{};
+  bool deferred_ = false;   // pending request kept for a later Controller pass (Controller thread only)
   HttpTransportRequest pending_request_{};
   HttpTransportResponse pending_response_{};
   char motion_capabilities_[kMotionCapabilitiesBytes]{};

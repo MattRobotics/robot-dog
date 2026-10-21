@@ -38,6 +38,7 @@ struct FakeService {
 ''')
 fixture=fixture.replace('configureNetwork(const ConfigPatch&)', 'configureNetwork(const ConfigPatch&,uint32_t)').replace('accessPoint(bool)', 'accessPoint(bool,uint32_t)')
 fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=false;
+ bool deferred_=false;   // production: fence contention defers to a later Controller pass (test_http_fence_contention.py)
  bool http_readonly_=false;
  bool registerReadOnlyHandlers(void*);
  bool readOnlyAdmitted(const HttpTransportRequest&) const;
@@ -69,7 +70,7 @@ fixture=fixture.replace('  switch(req.kind){','''  if(revoke_before_service) ser
 # Prefix includes guard and generation-reset exactly as shipped, using response local.
 admission=between(c,'  resp.sequence = req.sequence;\n','  switch (req.kind) {')
 fixture=fixture.replace('// PRODUCTION_SERVICE_ADMISSION',admission)
-fixture=fixture.replace('  if(revoke_before_service)', '  auto serviceRequest = [&]() {\n  if(revoke_before_service)').replace('   default: return false;', '   default: return;').replace('  *out=resp;return true;', '  }; serviceRequest(); *out=resp;return true;')
+fixture=fixture.replace('  if(revoke_before_service)', '  auto serviceRequest = [&]() {\n  if(revoke_before_service)').replace('   default: return false;', '   default: return;').replace('  *out=resp;return true;', '  }; serviceRequest(); if(deferred_){deferred_=false;return false;} *out=resp;return true;')
 fixture = '#include "network/TwinHostPolicy.h"\n' + fixture
 platform=r'''
 WifiStub WiFi;

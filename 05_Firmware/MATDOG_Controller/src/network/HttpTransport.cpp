@@ -440,7 +440,18 @@ void HttpTransport::update(uint32_t now_ms) {
   }
   if (xSemaphoreTake(request_ready_, 0) != pdTRUE)
     return;
-  serviceRequest(now_ms);
+  // A deferred request is served on a later pass only while its reader still
+  // waits (bounded by its dispatch budget); once abandoned it is released
+  // unexecuted, so it never runs late or twice.
+  if (deferred_ && !mailbox_.awaitingResponse()) {
+    deferred_ = false; xSemaphoreGive(slot_free_); return;
+  }
+  // STOP precedence: a Motion command never runs while a STOP waits in its
+  // lane. The next pass applies the STOP first; the command is then refused
+  // SUPERSEDED_BY_STOP by its own epoch.
+  deferred_ = pending_request_.kind == HttpRequestKind::MOTION_COMMAND && stop_pending_.load();
+  if (!deferred_) serviceRequest(now_ms);   // may defer on fence contention
+  if (deferred_) { xSemaphoreGive(request_ready_); return; }
   ready_sequence_.store(pending_response_.sequence);
   if (mailbox_.claimDelivery())
     xSemaphoreGive(response_ready_);
@@ -460,10 +471,14 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   const bool sta_motion=(req.kind>=HttpRequestKind::MOTION_STATUS||req.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(req);
   const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
   AdminLease lease(gate);
-  if (admin_request && (!lease || !gate.allowed(req.admin_generation) ||
+  if (admin_request && (!gate.allowed(req.admin_generation) ||
                         !WifiManager::verifyAdminRadio())) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
   }
+  // Admissible facts but the fence is momentarily held (md_http_life verifies
+  // the radio every 50 ms): contention is not an authorization fact. update()
+  // retries on the next pass, where everything above is evaluated again.
+  if (admin_request && !lease) { deferred_ = true; return; }
   if(!req.ap_socket&&!req.tls&&req.local_ipv4&&!readonly){resp.message="LAN_READ_ONLY_REQUIRED";return;}
   if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
@@ -1252,6 +1267,12 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
 }
 bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   if(!stop_pending_.load())return false;
+  // Fence first, before the STOP is consumed: while md_http_life holds it the
+  // STOP stays pending (no ACK, not done) for the next service point - loop
+  // start, between servo reads, bus preemption - within the lane budget.
+  auto &gate = service_->networkAdminAccess();
+  AdminLease lease(gate);
+  if(!lease)return false;
   // Only the fields the STOP admission needs (the full request is ~2 KB of
   // loop stack). Copied under the lane lock.
   struct { uint32_t sequence,peer,admin_generation,local_ipv4; bool local_authorized,ap_socket,tls; char cookie[65],csrf[65]; motion::MotionCommand motion_command; } req;
@@ -1266,8 +1287,6 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   // Recheck the same AP or RUN_STA/TLS admission as serviceRequest under
   // its fence. Socket facts were captured by the handler; generation/link and
   // portal remain live checks. No mailbox wait for either admitted transport.
-  auto &gate = service_->networkAdminAccess();
-  AdminLease lease(gate);
   const bool sta_motion=!req.ap_socket&&motionStaAdmitted(req.tls,req.local_ipv4,req.admin_generation);
   const bool admitted=lease&&(sta_motion||(req.ap_socket&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio()));
   if(admitted&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)){
