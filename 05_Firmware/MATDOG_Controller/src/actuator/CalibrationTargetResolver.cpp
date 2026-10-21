@@ -1,5 +1,7 @@
 #include "CalibrationTargetResolver.h"
 
+#include <math.h>
+
 namespace matdog {
 namespace actuator {
 
@@ -99,6 +101,40 @@ TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
   }
   *q_urad_out = static_cast<MicroRad>(q);
   return TargetResolveStatus::OK;
+}
+
+bool radiansToMicroRad(double q_rad, MicroRad* q_urad_out) {
+  // |q| <= 2000 rad keeps llround inside int32 micro-radians; every URDF
+  // limit is far inside it, so nothing admissible is refused here.
+  if (q_urad_out == nullptr || !(q_rad >= -2000.0 && q_rad <= 2000.0)) return false;
+  *q_urad_out = static_cast<MicroRad>(llround(q_rad * 1e6));
+  return true;
+}
+
+TargetResolveStatus resolveRawToRadians(const CalibrationGeometryProfile& profile,
+                                        const GeometryProvenance& expected_provenance,
+                                        const JointTransform& transform,
+                                        uint16_t raw_tick,
+                                        double* q_rad_out) {
+  if (q_rad_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  MicroRad q = 0;
+  const TargetResolveStatus s = resolveRawToUrdfQ(profile, expected_provenance, transform, raw_tick, &q);
+  if (s == TargetResolveStatus::OK) *q_rad_out = microRadToRadians(q);
+  return s;
+}
+
+TargetResolveStatus resolveRadiansToRaw(const CalibrationGeometryProfile& profile,
+                                        const GeometryProvenance& expected_provenance,
+                                        const JointTransform& transform,
+                                        double q_rad,
+                                        uint16_t* raw_tick_out,
+                                        MicroRad* q_urad_out) {
+  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  MicroRad q = 0;
+  if (!radiansToMicroRad(q_rad, &q)) return TargetResolveStatus::REJECT_URDF_LIMIT;
+  const TargetResolveStatus s = resolveUrdfQToRaw(profile, expected_provenance, transform, q, raw_tick_out);
+  if (s == TargetResolveStatus::OK && q_urad_out != nullptr) *q_urad_out = q;
+  return s;
 }
 
 TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile,

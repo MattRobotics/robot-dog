@@ -99,7 +99,8 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
       // Common law: every joint moves delta_i * s(t), s in [0,1]; the binding joint sets the progress limits
       // (velocity incl. the per-sample step cap, acceleration; jerk from a fixed ramp).
       if(delta>1e-9){
-        const double vJ=std::fmin(vmax,p.maxJointStepRad/p.samplePeriodS);
+        // Cruise of the binding joint: the step-feasible speed that absorbs the common stream lateness (MotionLaw.h).
+        const double vJ=std::fmin(vmax,velocityForLateness(vmax,amax,p.samplePeriodS,p.maxJointStepRad,kStreamLatenessToleranceS));
         vP=std::fmin(vP,vJ/delta);aP=std::fmin(aP,amax/delta);any=true;}}
     plan.lawValid[st]=false;
     if(any){ScurveProfile profile;
@@ -108,15 +109,25 @@ FixtureEntryPlan planMeasuredEntry(const JointTargetFrame& start,const JointTarg
     if(!std::isfinite(plan.durationS[st])||plan.durationS[st]>p.segmentTimeoutS){plan.status=EntryStatus::RATE_POLICY;return plan;}}
   plan.status=EntryStatus::OK;return plan;
 }
-LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body){
-  LocomotionFrame f;
-  if(plan.status!=EntryStatus::OK||stage>=kFixtureEntryStages||!std::isfinite(u)||u<0||u>1)return f;
+static TimeLawSample stageLaw(const FixtureEntryPlan& plan,unsigned stage,double u){
   TimeLawSample law;
+  if(plan.status!=EntryStatus::OK||stage>=kFixtureEntryStages||!std::isfinite(u)||u<0||u>1)return law;
   if(plan.lawValid[stage]){  // dilated common S-curve
-    ScurveProfile profile;if(!profile.plan(1.0,LawLimits{plan.lawV[stage],plan.lawA[stage],plan.lawJ[stage]}))return f;
+    ScurveProfile profile;if(!profile.plan(1.0,LawLimits{plan.lawV[stage],plan.lawA[stage],plan.lawJ[stage]}))return law;
     const double k=profile.durationS()/plan.durationS[stage];const auto q=profile.at(u*plan.durationS[stage]*k);
     law.valid=true;law.progress=q.s<0?0:q.s>1?1:q.s;law.velocity=q.v*k;law.acceleration=q.a*k*k;
   }else law=quinticTimeLaw(u,plan.durationS[stage]);
+  return law;
+}
+bool fixtureEntryJoints(const FixtureEntryPlan& plan,unsigned stage,double u,double q[12]){
+  const auto law=stageLaw(plan,stage,u);if(!law.valid||!q)return false;
+  const JointTargetFrame& a=stage==0?plan.start:plan.middle;const JointTargetFrame& b=stage==0?plan.middle:plan.goal;
+  for(unsigned i=0;i<12;++i)q[i]=at(a,i)+(at(b,i)-at(a,i))*law.progress;
+  return true;
+}
+LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body){
+  LocomotionFrame f;
+  const auto law=stageLaw(plan,stage,u);
   if(!law.valid)return f;
   const JointTargetFrame& a=stage==0?plan.start:plan.middle;const JointTargetFrame& b=stage==0?plan.middle:plan.goal;
   f.target=a;f.target.sequence=0;

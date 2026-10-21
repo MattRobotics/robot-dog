@@ -67,5 +67,7 @@ FixtureEntryPlan planFixtureEntry(const JointTargetFrame& start,const JointTarge
                                   double minStageDurationS);
 // u in [0,1] within one stage. Returns an invalid frame for a bad stage/u.
 LocomotionFrame fixtureEntrySample(const FixtureEntryPlan& plan,unsigned stage,double u,const BodyPose& body);
+// The same twelve targets (slot order) without the display feet: what the release retimer searches over.
+bool fixtureEntryJoints(const FixtureEntryPlan& plan,unsigned stage,double u,double q[12]);
 } }
 #endif

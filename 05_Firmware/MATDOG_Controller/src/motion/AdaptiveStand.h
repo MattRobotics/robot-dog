@@ -46,15 +46,19 @@ struct AdaptiveStandRequest {
   const FixtureEntryPlan* entry=nullptr;
   double proneMaxDeviationRad=0, proneMaxRmsRad=0;
 };
-// Height-transition law constants (Core Motion V5). Offline decisions, not physical limits: a late frame may be absorbed
-// without a speed dip up to ~kHeightLatenessToleranceS (loop granularity + a short service stall); the acceleration
-// ramp time sets the jerk limit (a/ramp).
-constexpr double kHeightLatenessToleranceS=0.012, kHeightAccelRampS=0.1;
+// Height-transition law constant (Core Motion V5): the acceleration ramp time sets the jerk limit (a/ramp). The release
+// lateness every STAND stream absorbs is the common kStreamLatenessToleranceS (MotionLaw.h).
+constexpr double kHeightAccelRampS=0.1;
+// One streamed release (Core Motion V6): the executor's committed (last TRANSMITTED) frame, the release envelope it
+// checks and the instant of this release. atUs 0 = no release in this call (between streams: commit a verified
+// endpoint, verify, classify or open the next phase, but materialize no frame).
+struct StreamRelease { ReleaseState committed{}; ReleaseEnvelope envelope{}; uint64_t atUs=0; };
 class AdaptiveStand {
  public:
   bool prepareTimedRoute(const AcquisitionRoute&,const FeedbackPolicy&);
   bool request(const AdaptiveStandRequest& request,const FeedbackPolicy& policy,double nowS);
-  FeedbackFrame update(const AdaptiveObservation& observation,double nowS,bool timedReference=false);
+  // stream == nullptr: finite, acknowledged segments. Otherwise every frame is materialized for stream->atUs.
+  FeedbackFrame update(const AdaptiveObservation& observation,double nowS,const StreamRelease* stream=nullptr);
   bool assess(const SegmentAssessment& assessment,double nowS);
   void stop();
   AdaptiveStandState state() const {return state_;}
@@ -75,6 +79,17 @@ class AdaptiveStand {
   const JointTargetFrame& referenceTarget() const {return previous_.target;}
   bool pendingFinal() const {return pendingValid_&&(timeDriven_?pendingTimeS_>=endpoint_.durationS:segmentIndex_+1==segmentIntervals_);}
   void noteSubmitted(uint32_t sequence){if(pendingValid_&&assessed_&&pending_.target.sequence==sequence)submitted_=true;}
+  // Streamed candidate of `sequence`, assessed and not yet transmitted, with the release instant it was made for.
+  const FeedbackFrame* streamCandidate(uint32_t sequence) const {return pendingValid_&&assessed_&&!submitted_&&timeDriven_&&pending_.target.sequence==sequence?&pending_:nullptr;}
+  uint64_t candidateReleaseUs() const {return pendingValid_?pendingAtUs_:0;}
+  void discardCandidate(){if(pendingValid_&&!submitted_)pendingValid_=false;}
+  // A motion phase is open and has no frame in flight: the next stream may begin.
+  bool streamPhaseReady() const {return !pendingValid_&&(entryPending()||state_==AdaptiveStandState::RISE||state_==AdaptiveStandState::ACQUIRE_SUPPORT||
+    state_==AdaptiveStandState::PRE_ALIGN||state_==AdaptiveStandState::REAR_DEPLOY||state_==AdaptiveStandState::FRONT_DEPLOY||
+    state_==AdaptiveStandState::LOAD_TRANSFER||state_==AdaptiveStandState::PAIRED_RISE);}
+  // Operands of the planner's refusal (retimer, segment check), valid after a REJECTED update.
+  const RefusalRecord& refusal() const {return refusal_;}
+  unsigned lastRetimeEvaluations() const {return lastRetimeEvaluations_;}
   // Fixture STAND height change (commanded, not measured: the fixture observation
   // carries a declared body pose). Only from a VERIFIED STAND, at fixed canonical
   // contacts, through the same fixed-contact rise component and checkSegment
@@ -88,7 +103,17 @@ class AdaptiveStand {
   bool beginSegment(const AcquisitionWaypoint& endpoint);
   bool beginRise();
   bool beginPairedSegment();
-  FeedbackFrame generate(double nowS);
+  FeedbackReason retime(const StreamRelease& stream);
+  FeedbackFrame generate(double nowS,const StreamRelease* stream);
+  LocomotionFrame sampleAt(double tau,unsigned* segment) const;
+  LocomotionFrame samplePaired(double u) const;
+  LocomotionFrame sampleSegment(double tau,double u) const;
+  TimeLawSample riseLawAt(double tau,double u) const;
+  TimedStandSample riseSample(double tau,double u) const;
+  static bool jointsAt(const void* context,double tau,double q[12]);
+  bool riseJoints(double tau,double u,double q[12]) const;
+  bool sampledJoints(double tau,double q[12]) const;
+  void noteRefusal(const char* site,const ReleaseCheck& check,uint64_t atUs);
   FeedbackPolicy policy_{};
   AdaptiveStandRequest request_{};
   AcquisitionRoute route_{};
@@ -106,7 +131,11 @@ class AdaptiveStand {
   LegJointAngles entry_offset_[4]{};
   uint16_t entry_knot_=UINT16_MAX;
   double lastNow_=0, pendingSince_=0, verifySince_=0;
-  double referenceAtS_=0, referenceTimeS_=0, pendingTimeS_=0;
+  // Streamed progress: committed (last transmitted) and candidate tau within the phase, and the candidate's release.
+  double referenceTimeS_=0, pendingTimeS_=0;
+  uint64_t pendingAtUs_=0;
+  RefusalRecord refusal_{};
+  unsigned lastRetimeEvaluations_=0;
   bool timeDriven_=false;
   bool pendingValid_=false, assessed_=false, physicalReady_=false, submitted_=false;
   FixtureEntryPlan entry_{};
@@ -121,6 +150,8 @@ class AdaptiveStand {
   bool riseDefinition(const LocomotionFrame& start,double targetZ,StandDefinition* definition,bool* ascending) const;
   StandHeightLaw riseLaw_{};
   bool riseLawValid_=false;
+  StandDefinition riseDef_{};   // fixed-contact path of the current RISE segment (beginRise)
+  bool riseValid_=false, riseAscending_=false;
   PhaseTimedRoute timed_{};
   bool timedVariant_=false;
   uint8_t timedPhase_=0;

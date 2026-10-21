@@ -132,6 +132,13 @@ struct Rig {
   void writeAll() { for (uint32_t now = 101; now <= 112; ++now) executor.update(facts, feedback, now); }
 };
 
+// As OperationalFeedback::ingest: a NEW sample of joint i keeps the previous one (the producer's chronology, which the
+// executor's common-instant path box reconstructs from). Same instant = same sample.
+[[maybe_unused]] void sampleJoint(JointFeedback& f, unsigned i, uint64_t at_us, double q) {
+  if (f.sampled_at_us[i] && f.sampled_at_us[i] < at_us) { f.previous_at_us[i] = f.sampled_at_us[i]; f.previous_rad[i] = f.actual_rad[i]; }
+  f.sampled_at_us[i] = at_us; f.sampled_at_ms[i] = static_cast<uint32_t>(at_us / 1000); f.actual_rad[i] = q;
+}
+
 MotionReadiness ready() {
   MotionReadiness r; r.calibration_restored = r.calibration_accepted = r.limits_approved = true;
   r.hardware_approved = r.operational_permit = r.support_observable = true;

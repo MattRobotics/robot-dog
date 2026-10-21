@@ -34,32 +34,64 @@ const char* MotionExecutor::feedbackFailure(const JointFeedback& f,uint32_t now)
  }
  return nullptr;
 }
+JointResolve resolveJoint(const actuator::SafeActuatorPolicy& policy,const actuator::CalibrationGeometryProfile& geometry,const actuator::GeometryProvenance& provenance,
+                          unsigned i,double q,ResolvedJoint* out){
+ if(!out||i>=12)return JointResolve::MAPPING;
+ calibration::JointIdentity id;const auto* servo=actuator::slotServo(i);
+ if(!servo||!actuator::slotIdentity(i,&id))return JointResolve::MAPPING;
+ const auto* g=geometry.findJoint(id);if(!g||g->bus_id!=servo->bus_id)return JointResolve::MAPPING;
+ const auto* t=policy.transforms().find(id,geometry.provenanceTag());const auto* l=policy.limits().find(id,geometry.provenanceTag());
+ if(!t||!l)return JointResolve::MAPPING;
+ actuator::MicroRad urad=0;uint16_t tick=0;
+ if(actuator::resolveRadiansToRaw(geometry,provenance,*t,q,&tick,&urad)!=actuator::TargetResolveStatus::OK)return JointResolve::MAPPING;
+ out->command=actuator::ActuatorCommand{};out->command.operation=actuator::ActuatorOperation::POSITION_COMMAND;
+ out->command.joint=id;out->command.target_tick=tick;out->command.target_urad=urad;out->bus=servo->bus_id;out->tick=tick;out->limit=l;
+ return l->contains(tick)?JointResolve::OK:JointResolve::OUTSIDE_LIMITS;
+}
+namespace {
+motion::RefusalRecord record(const char* site,int joint,double value,double limit){
+ motion::RefusalRecord r;r.valid=true;r.site=site;r.joint=static_cast<int8_t>(joint);r.value=value;r.limit=limit;return r;
+}
+}
 bool MotionExecutor::reject(const char* reason) { status_.reason=reason; if(active())stop(reason);return false; }
-bool MotionExecutor::arm(const MotionExecutionFacts& f,const ExecutionEnvelope& e,const JointFeedback& fb,uint32_t now) {
+bool MotionExecutor::reject(const char* reason,const motion::RefusalRecord& why) { status_.reason=reason; if(active())stop(reason,&why);return false; }
+bool MotionExecutor::arm(const MotionExecutionFacts& f,const ExecutionEnvelope& e,const JointFeedback& fb,uint32_t now,const ArmHold* hold) {
  if(status_.state!=ExecutorState::OFF)return reject("EXECUTOR_BUSY");
+ refusal_={};contact_mask_=0;
  if(const char* reason=gate(f,now))return reject(reason);
  if(!e.approved||!std::isfinite(e.max_velocity_rad_s)||!std::isfinite(e.max_acceleration_rad_s2)||!std::isfinite(e.tracking_tolerance_rad)||e.max_velocity_rad_s<=0||e.max_acceleration_rad_s2<=0||e.tracking_tolerance_rad<=0||!e.feedback_max_age_ms||!e.batch_timeout_ms||!e.tracking_timeout_ms||e.feedback_max_age_ms>3000||e.batch_timeout_ms>3000||e.tracking_timeout_ms>30000)return reject("ENVELOPE_UNAPPROVED");
  if(e.timed_segments&&(!e.frame_writes||!std::isfinite(e.arrival_tolerance_rad)||e.arrival_tolerance_rad<=0||e.arrival_tolerance_rad>e.tracking_tolerance_rad))return reject("ENVELOPE_UNAPPROVED");
  if(fb.pending())return reject("FEEDBACK_RETRY_PENDING");
+ if(hold&&(!hold->hold_rad||(hold->contact_mask&&!hold->rest_rad)||hold->contact_mask>=(1u<<12)))return reject("ARM_HOLD_INVALID");
  envelope_=armed_envelope_=e;if(const char* why=feedbackFailure(fb,now))return reject(why);
  // A separately supervised prime/torque procedure is required before arm.
- // Arm itself issues no torque or position writes.
- for(unsigned i=0;i<12;i++){actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&cmd,&bus))return reject("START_OUTSIDE_LIMITS");previous_[i]=target_[i]=fb.actual_rad[i];velocity_[i]=0;}
+ // Arm itself issues no torque or position writes. The held reference is the
+ // PRIME goal (commanded, RAW-quantized) when the session supplies it.
+ for(unsigned i=0;i<12;i++){
+  const double ref=hold?hold->hold_rad[i]:fb.actual_rad[i];
+  actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(i,ref,&cmd,&bus))return reject("START_OUTSIDE_LIMITS");
+  if(hold&&(hold->contact_mask&(1u<<i))){
+   // Expected contact: the folded rest lies outside the hard limit on one side; the band ends at that limit end.
+   ResolvedJoint rest;if(resolveJoint(*policy_,*geometry_,*provenance_,i,hold->rest_rad[i],&rest)!=JointResolve::OUTSIDE_LIMITS)return reject("ARM_HOLD_INVALID");
+   const uint16_t edge=rest.tick<rest.limit->min_tick?rest.limit->min_tick:rest.limit->max_tick;
+   contact_lo_[i]=std::min(rest.tick,edge);contact_hi_[i]=std::max(rest.tick,edge);contact_mask_|=static_cast<uint16_t>(1u<<i);}
+  previous_[i]=target_[i]=ref;velocity_[i]=0;}
+ for(unsigned i=0;i<12;i++){
+  if(hold&&std::fabs(fb.actual_rad[i]-hold->hold_rad[i])>e.tracking_tolerance_rad)return reject("START_OUTSIDE_HOLD");
+  if(!actualAdmissible(i,fb.actual_rad[i]))return reject("START_OUTSIDE_LIMITS");}
  lease_=f.lease;permit_generation_=f.permit_generation;policy_epoch_=policy_->epoch();
  if(++arm_generation_==0)++arm_generation_;
  status_=ExecutorStatus{};status_.arm_generation=arm_generation_;status_.state=ExecutorState::READY;status_.reason="ARMED";return true;
 }
 bool MotionExecutor::resolve(uint8_t i,double q,actuator::ActuatorCommand* cmd,uint8_t* bus) const {
- if(i>=12||!cmd||!bus||!std::isfinite(q)||std::fabs(q)>2000)return false;
- // Canonical allocation is lower/upper/hip, semantic frames are hip/upper/lower.
- const auto* servo=servo::legServoAt((i/3)*3+(2-i%3));if(!servo)return false;
- calibration::JointIdentity identity;identity.leg=static_cast<calibration::Leg>(i/3);identity.joint=static_cast<calibration::JointKind>(i%3);std::strncpy(identity.physical_unit,servo->physical_unit,sizeof(identity.physical_unit)-1);
- const auto* j=geometry_->findJoint(identity);if(!j||j->bus_id!=servo->bus_id)return false;
- const auto* t=policy_->transforms().find(identity,policy_->currentGeometryTag());
- const auto* l=policy_->limits().find(identity,policy_->currentGeometryTag());if(!t||!l)return false;
- const auto urad=static_cast<actuator::MicroRad>(std::llround(q*1e6));uint16_t tick=0;
- if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,urad,&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
- *cmd=actuator::ActuatorCommand{};cmd->operation=actuator::ActuatorOperation::POSITION_COMMAND;cmd->joint=identity;cmd->target_tick=tick;cmd->target_urad=urad;*bus=j->bus_id;return true;
+ ResolvedJoint r;if(!cmd||!bus||resolveJoint(*policy_,*geometry_,*provenance_,i,q,&r)!=JointResolve::OK)return false;
+ *cmd=r.command;*bus=r.bus;return true;
+}
+bool MotionExecutor::actualAdmissible(unsigned i,double q) const {
+ ResolvedJoint r;const auto v=resolveJoint(*policy_,*geometry_,*provenance_,i,q,&r);
+ if(v==JointResolve::OK)return true;
+ // Between the measured rest and the hard limit only: never deeper into the contact than it was found.
+ return v==JointResolve::OUTSIDE_LIMITS&&(contact_mask_&(1u<<i))&&r.tick>=contact_lo_[i]&&r.tick<=contact_hi_[i];
 }
 bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameValidation& v,uint32_t issued,uint32_t ttl,double dt,const MotionExecutionFacts& f,const JointFeedback& fb,uint32_t now) {
  if(status_.state!=ExecutorState::READY)return reject("EXECUTOR_BUSY");
@@ -71,7 +103,7 @@ bool MotionExecutor::submit(const motion::JointTargetFrame& frame,const FrameVal
  if(!std::isfinite(dt)||dt<=0||dt>30)return reject("SEGMENT_DURATION");
  if(v.sequence!=frame.sequence||v.policy_epoch!=policy_->epoch()||v.geometry!=policy_->currentGeometryTag()||!v.collision_clear||!v.support_valid||!v.path_continuous||!v.configuration_valid)return reject("SEGMENT_UNVALIDATED");
  if(const char* why=feedbackFailure(fb,now))return reject(why);
- for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus))return reject("ACTUAL_OUTSIDE_LIMITS");}
+ for(unsigned i=0;i<12;i++)if(!actualAdmissible(i,fb.actual_rad[i]))return reject("ACTUAL_OUTSIDE_LIMITS",record("EXECUTOR_SUBMIT",i,fb.actual_rad[i],0));
  double candidate[12];
  for(unsigned leg=0;leg<4;leg++){candidate[leg*3]=frame.legs[leg].hip;candidate[leg*3+1]=frame.legs[leg].upper;candidate[leg*3+2]=frame.legs[leg].lower;}
  // Check the entire frame BEFORE the first write. Late failures cannot leave
@@ -96,7 +128,7 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
   if(status_.state!=ExecutorState::READY&&static_cast<int32_t>(now-deadline_ms_)>=0)stop("COMMAND_TIMEOUT");
   return;
  }
- for(unsigned i=0;i<12;i++){actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}}
+ for(unsigned i=0;i<12;i++)if(!actualAdmissible(i,fb.actual_rad[i])){const auto why=record("EXECUTOR_UPDATE",i,fb.actual_rad[i],0);stop("ACTUAL_OUTSIDE_LIMITS",&why);return;}
  if(status_.state==ExecutorState::READY){
   double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));
   status_.max_tracking_error_rad=error;
@@ -145,7 +177,7 @@ void MotionExecutor::update(const MotionExecutionFacts& f,const JointFeedback& f
  const double arrival=envelope_.timed_segments&&validation_.final?envelope_.arrival_tolerance_rad:envelope_.tracking_tolerance_rad;
  const bool released=!envelope_.timed_segments||(now_us?now_us>=tracking_started_us_&&now_us-tracking_started_us_>=segment_duration_ms_*1000ull:now-tracking_since_ms_>=segment_duration_ms_);
  const bool observed=fresh;
- if(error<=arrival&&observed&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason="TRACKED";}
+ if(error<=arrival&&observed&&released){for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=pending_velocity_[i];}status_.completed_sequence=status_.accepted_sequence;status_.state=ExecutorState::READY;status_.reason="TRACKED";contact_mask_=0;}
  else if(now-tracking_since_ms_>=envelope_.tracking_timeout_ms)stop(envelope_.timed_segments&&validation_.final?"ARRIVAL_TIMEOUT":"TRACKING_TIMEOUT");
 }
 // ---------------------------------------------------------------------------
@@ -158,6 +190,7 @@ bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,u
     !std::isfinite(c.settle_speed_rad_s)||c.settle_speed_rad_s<0||!c.feedback_max_age_us||c.feedback_max_age_us>500000||!c.hold_timeout_us||
     !c.max_frame_gap_us||c.max_frame_gap_us>500000||!c.persist_samples||c.persist_samples>20||!c.region_min_rad||!c.region_max_rad)return false;
  if(c.local_path_box&&(!std::isfinite(c.max_step_rad)||c.max_step_rad<=0||c.max_step_rad>motion::tolerance::kMaxStepRad||
+    !std::isfinite(c.sample_acceleration_bound_rad_s2)||!(c.sample_acceleration_bound_rad_s2>0)||
     c.tube_rad>motion::tolerance::kTrackingRad||c.max_lag_s!=0||
     c.feedback_max_age_us>kTimedFeedbackMaxAgeMs*1000))return false;
  for(unsigned i=0;i<12;i++)if(!fb.read_ok[i]||!fb.torque_on[i])return false;
@@ -167,6 +200,7 @@ bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,u
  Sent& h=history_[0];h.at_us=now_us;h.held_seed=true;h.sequence=status_.accepted_sequence;for(unsigned i=0;i<12;i++)h.q[i]=target_[i];
  history_count_=1;last_release_us_=now_us;previous_release_interval_us_=0;hold_sequence_=0;hold_since_us_=0;
  for(unsigned i=0;i<12;i++){checked_us_[i]=fb.sampled_at_us[i];exceed_[i]=0;status_.stream_error_rad[i]=0;}
+ box_instant_us_=0;box_unknown_=0;
  status_.validated_sequence=status_.tx_sequence=status_.observed_sequence=status_.accepted_sequence;status_.settled_sequence=0;
  status_.stream_peak_error_rad=0;status_.worst_joint=0xff;
  status_.state=ExecutorState::STREAMING;status_.reason="STREAMING";return true;
@@ -211,23 +245,25 @@ bool MotionExecutor::stream(const motion::JointTargetFrame& frame,const FrameVal
  if(release_us-last_release_us_>stream_.max_frame_gap_us)return reject("STREAM_GAP");
  if(v.sequence!=frame.sequence||v.policy_epoch!=policy_->epoch()||v.geometry!=policy_->currentGeometryTag()||!v.collision_clear||!v.support_valid||!v.path_continuous||!v.configuration_valid)return reject("SEGMENT_UNVALIDATED");
  double candidate[12];
- for(unsigned leg=0;leg<4;leg++){candidate[leg*3]=frame.legs[leg].hip;candidate[leg*3+1]=frame.legs[leg].upper;candidate[leg*3+2]=frame.legs[leg].lower;}
- const double dt=(release_us-last_release_us_)*1e-6;
- // Both secant velocities belong to the reference release clock. TX history
- // belongs exclusively to measured tracking/arrival; UART duration jitter must
- // not change the acceleration denominator (or weaken a true rate refusal).
- const double dt_prev=previous_release_interval_us_*1e-6;
- // The WHOLE frame is checked before the first byte.
+ for(unsigned i=0;i<12;i++)candidate[i]=motion::jointSlot(frame,i);
+ // The WHOLE frame is checked before the first byte: mapping, certified region,
+ // then the common release rule (MotionLaw checkRelease) against the committed
+ // frame, at the candidate's OWN reference instant. TX history belongs to
+ // measured tracking/arrival; UART and delivery duration never enter the rule.
  for(unsigned i=0;i<12;i++){
   actuator::ActuatorCommand cmd;uint8_t bus;
-  if(!resolve(i,candidate[i],&cmd,&bus))return reject("TARGET_OR_MAPPING");
-  if(!(candidate[i]>=stream_.region_min_rad[i]&&candidate[i]<=stream_.region_max_rad[i]))return reject("TARGET_OUTSIDE_CERTIFIED_REGION");
-  if(stream_.local_path_box&&std::fabs(candidate[i]-target_[i])>stream_.max_step_rad)return reject("PATH_STEP_LIMIT");
-  const double vel=(candidate[i]-target_[i])/dt;
-  if(std::fabs(vel)>envelope_.max_velocity_rad_s+1e-9)return reject("RATE_LIMIT");
-  if(dt_prev>0){const double acc=(vel-velocity_[i])/(.5*(dt+dt_prev));if(std::fabs(acc)>envelope_.max_acceleration_rad_s2+1e-9)return reject("ACCELERATION_LIMIT");}
-  pending_velocity_[i]=vel;
+  if(!resolve(i,candidate[i],&cmd,&bus))return reject("TARGET_OR_MAPPING",record("EXECUTOR_PRE_TX",i,candidate[i],0));
+  if(!(candidate[i]>=stream_.region_min_rad[i]&&candidate[i]<=stream_.region_max_rad[i]))
+   return reject("TARGET_OUTSIDE_CERTIFIED_REGION",record("EXECUTOR_PRE_TX",i,candidate[i],candidate[i]<stream_.region_min_rad[i]?stream_.region_min_rad[i]:stream_.region_max_rad[i]));
  }
+ const auto rule=motion::checkRelease(releaseState(),candidate,release_us,releaseEnvelope());
+ if(rule.verdict!=motion::ReleaseVerdict::OK){
+  motion::RefusalRecord why=record("EXECUTOR_PRE_TX",rule.joint<12?static_cast<int>(rule.joint):-1,rule.value,rule.limit);
+  why.sequence=frame.sequence;why.q=rule.q;why.qLast=rule.qLast;why.v=rule.v;why.vPrev=rule.vPrev;why.dtS=rule.dtS;why.dtPrevS=rule.dtPrevS;why.atUs=release_us;
+  return reject(motion::releaseVerdictName(rule.verdict),why);
+ }
+ const double dt=motion::secondsFromMicros(release_us-last_release_us_);   // the same arithmetic as checkRelease
+ for(unsigned i=0;i<12;i++)pending_velocity_[i]=(candidate[i]-target_[i])/dt;
  status_.validated_sequence=frame.sequence;
  const char* why="";
  if(!frameTx(candidate,f,now_us,&why)){++status_.frames_refused;return reject(why);}
@@ -252,20 +288,40 @@ double MotionExecutor::referenceRange(unsigned j,uint64_t from,uint64_t to,doubl
  if(!any){const Sent& h=history_[history_head_];if(stream_.local_path_box&&!h.held_seed)return -1;a=b=h.q[j];}
  *lo=a;*hi=b;return b-a;
 }
-bool MotionExecutor::pathBoxContains(const JointFeedback& fb) const {
- // Each candidate is a WHOLE certified TX/initial held endpoint active in the
- // acquisition interval. The same candidate must contain ALL twelve samples.
- // This is geometric membership, separate from tracking at each sample time.
- uint64_t oldest=UINT64_MAX,newest=0;
- for(unsigned i=0;i<12;++i){oldest=std::min(oldest,fb.sampled_at_us[i]);newest=std::max(newest,fb.sampled_at_us[i]);}
- for(unsigned k=0;k<history_count_;++k){const Sent& h=history_[(history_head_+k)%kHistory];
-  if(h.at_us>newest&&!h.held_seed)break;
-  if(k+1<history_count_&&history_[(history_head_+k+1)%kHistory].at_us<=oldest)continue;
-  bool inside=true;
-  for(unsigned i=0;i<12;++i)inside=inside&&std::fabs(fb.actual_rad[i]-h.q[i])<=stream_.tube_rad;
-  if(inside)return true;
+MotionExecutor::BoxVerdict MotionExecutor::pathBox(const JointFeedback& fb,uint64_t* instant,motion::RefusalRecord* why) const {
+ // Geometry of the MEASURED CONFIGURATION at one common instant t: the oldest of
+ // the latest samples, so every other joint has a later sample and normally an
+ // earlier one around t (interpolation between two real samples of the same
+ // joint, never extrapolation and never a target substituted for a sample).
+ // Twelve samples taken at different instants are never compared as one pose.
+ uint64_t t=UINT64_MAX;for(unsigned i=0;i<12;++i)t=std::min(t,fb.sampled_at_us[i]);*instant=t;
+ // The certified endpoint the servos were driven towards at t: the last TX
+ // complete at or before t, or the held seed for samples before the first TX.
+ const Sent* active=nullptr;
+ for(unsigned k=0;k<history_count_;++k){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<=t||(k==0&&h.held_seed))active=&h;else break;}
+ BoxVerdict verdict=BoxVerdict::PASS;
+ auto note=[&](BoxVerdict v,unsigned i,double x,double e,double u){
+  if(v==BoxVerdict::FAIL?verdict==BoxVerdict::FAIL:verdict!=BoxVerdict::PASS)return;
+  verdict=v;*why=record("PATH_BOX",static_cast<int>(i),e,stream_.tube_rad);why->q=x;why->qLast=active?active->q[i]:0;
+  why->sequence=active?active->sequence:0;why->atUs=t;why->sampleUs=fb.sampled_at_us[i];why->uncertainty=u;};
+ if(!active){note(BoxVerdict::UNKNOWN,0,0,0,0);return verdict;}
+ for(unsigned i=0;i<12;++i){
+  double x=fb.actual_rad[i],u=0;const uint64_t ti=fb.sampled_at_us[i];
+  if(ti!=t){
+   // Linear interpolation between the joint's previous and latest samples. Its
+   // error is bounded by A/2*(t-tp)*(ti-t) for |q''| <= A: an explicit,
+   // reported uncertainty charged INSIDE the tube, never added to it.
+   const uint64_t tp=fb.previous_at_us[i];
+   if(!tp||tp>t||ti<=tp||!(stream_.sample_acceleration_bound_rad_s2>0)){note(BoxVerdict::UNKNOWN,i,x,0,0);continue;}
+   const double a=motion::secondsFromMicros(t-tp),b=motion::secondsFromMicros(ti-t);
+   x=fb.previous_rad[i]+(fb.actual_rad[i]-fb.previous_rad[i])*(a/(a+b));
+   u=.5*stream_.sample_acceleration_bound_rad_s2*a*b;
+  }
+  const double e=std::fabs(x-active->q[i]);
+  if(e-u>stream_.tube_rad)note(BoxVerdict::FAIL,i,x,e,u);          // outside even at the most favourable position
+  else if(e+u>stream_.tube_rad)note(BoxVerdict::UNKNOWN,i,x,e,u);  // inside not provable at this instant
  }
- return false;
+ return verdict;
 }
 bool MotionExecutor::observeStandQuiet(const JointFeedback& fb,uint64_t now_us){
  // One speed-register count is the EXISTING WALK settle ceiling. Position
@@ -302,25 +358,35 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
  const double settle_tolerance=envelope_.arrival_tolerance_rad>0?std::fmin(envelope_.arrival_tolerance_rad,stream_.tube_rad):stream_.tube_rad;
  for(unsigned i=0;i<12;i++){
   if(!fb.sampled_at_us[i]||fb.sampled_at_us[i]>now_us){stop("FEEDBACK_CLOCK_INVALID");return;}
-  if(now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){stop("STREAM_FEEDBACK_STALE");return;}
+  if(now_us-fb.sampled_at_us[i]>stream_.feedback_max_age_us){auto why=record("MONITOR",i,motion::secondsFromMicros(now_us-fb.sampled_at_us[i]),motion::secondsFromMicros(stream_.feedback_max_age_us));why.sampleUs=fb.sampled_at_us[i];stop("STREAM_FEEDBACK_STALE",&why);return;}
   if(fb.recovering[i]){settled=false;oldest=0;continue;}
   if(!fb.read_ok[i]||!std::isfinite(fb.actual_rad[i])){stop("FEEDBACK_INVALID");return;}
   if(!fb.torque_on[i]){stop("TORQUE_LOST");return;}
-  actuator::ActuatorCommand actual;uint8_t bus;if(!resolve(i,fb.actual_rad[i],&actual,&bus)){stop("ACTUAL_OUTSIDE_LIMITS");return;}
+  if(!actualAdmissible(i,fb.actual_rad[i])){const auto why=record("MONITOR",i,fb.actual_rad[i],0);stop("ACTUAL_OUTSIDE_LIMITS",&why);return;}
   // Geometry: the measured joint must stay in the certified box (+/- tube).
-  if(fb.actual_rad[i]<stream_.region_min_rad[i]-stream_.tube_rad||fb.actual_rad[i]>stream_.region_max_rad[i]+stream_.tube_rad){stop("OUTSIDE_CERTIFIED_REGION");return;}
+  if(fb.actual_rad[i]<stream_.region_min_rad[i]-stream_.tube_rad||fb.actual_rad[i]>stream_.region_max_rad[i]+stream_.tube_rad){
+   const auto why=record("MONITOR",i,fb.actual_rad[i],fb.actual_rad[i]<stream_.region_min_rad[i]?stream_.region_min_rad[i]-stream_.tube_rad:stream_.region_max_rad[i]+stream_.tube_rad);
+   stop("OUTSIDE_CERTIFIED_REGION",&why);return;}
   if(fb.sampled_at_us[i]>checked_us_[i]){
-   const uint64_t t=fb.sampled_at_us[i],lag=static_cast<uint64_t>(stream_.max_lag_s*1e6);
+   const uint64_t t=fb.sampled_at_us[i],lag=motion::microsFromSeconds(stream_.max_lag_s);
    double lo,hi;if(referenceRange(i,t>lag?t-lag:0,t,&lo,&hi)<0){stop("REFERENCE_HISTORY_MISSING");return;}
    const double q=fb.actual_rad[i],e=q<lo?lo-q:q>hi?q-hi:0;
    status_.stream_error_rad[i]=e;if(e>status_.stream_peak_error_rad){status_.stream_peak_error_rad=e;status_.worst_joint=static_cast<uint8_t>(i);}
-   if(e>stream_.tube_rad){if(++exceed_[i]>=stream_.persist_samples){stop("TRACKING_LAG_PERSISTENT");return;}}else exceed_[i]=0;
+   if(e>stream_.tube_rad){if(++exceed_[i]>=stream_.persist_samples){auto why=record("MONITOR",i,e,stream_.tube_rad);why.q=q;why.sampleUs=t;stop("TRACKING_LAG_PERSISTENT",&why);return;}}else exceed_[i]=0;
    checked_us_[i]=t;
   }
   if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];
   settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::isfinite(fb.speed_rad_s[i])&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
  }
- if(stream_.local_path_box&&!pathBoxContains(fb)){stop("OUTSIDE_PATH_BOX");return;}
+ if(stream_.local_path_box){
+  // A proven exit stops at once; a configuration that cannot be certified at
+  // persist_samples consecutive DISTINCT common instants stops too (an unchanged
+  // snapshot is no new evidence). Per-joint tracking above stays independent.
+  uint64_t instant=0;motion::RefusalRecord why;const auto box=pathBox(fb,&instant,&why);
+  if(box==BoxVerdict::FAIL){stop("OUTSIDE_PATH_BOX",&why);return;}
+  if(instant!=box_instant_us_){box_instant_us_=instant;
+   if(box==BoxVerdict::UNKNOWN){if(++box_unknown_>=stream_.persist_samples){stop("OUTSIDE_PATH_BOX",&why);return;}}else box_unknown_=0;}
+ }
  for(unsigned k=history_count_;k-->0;){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<oldest){if(h.sequence>status_.observed_sequence)status_.observed_sequence=h.sequence;break;}}
  double error=0;for(unsigned i=0;i<12;i++)error=std::fmax(error,std::fabs(fb.actual_rad[i]-target_[i]));status_.max_tracking_error_rad=error;
  if(status_.state==ExecutorState::HOLD){
@@ -333,6 +399,7 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
 bool MotionExecutor::endStream() {
  if(status_.state!=ExecutorState::HOLD||status_.settled_sequence!=hold_sequence_||!hold_sequence_)return false;
  for(unsigned i=0;i<12;i++){previous_[i]=target_[i];velocity_[i]=0;}
+ contact_mask_=0;   // exit checkpoint: the first settled endpoint has left every expected contact
  status_.completed_sequence=status_.accepted_sequence=hold_sequence_;status_.state=ExecutorState::READY;status_.reason="TRACKED";return true;
 }
 bool MotionExecutor::selectRates(double v,double a) {
@@ -340,6 +407,13 @@ bool MotionExecutor::selectRates(double v,double a) {
     v>kWalkRateCeilingRadS||a>kWalkAccelerationCeilingRadS2)return false;
  envelope_.max_velocity_rad_s=v;envelope_.max_acceleration_rad_s2=a;return true;
 }
-void MotionExecutor::stop(const char* r) { if(status_.safe_off_required)return; status_.state=ExecutorState::SAFE_OFF_REQUIRED;status_.safe_off_required=true;status_.reason=r; }
+void MotionExecutor::stop(const char* r,const motion::RefusalRecord* why) {
+ if(status_.safe_off_required)return;
+ if(!refusal_.valid){
+  if(why&&why->valid)refusal_=*why;else{refusal_=motion::RefusalRecord{};refusal_.site=why&&why->site&&*why->site?why->site:"EXECUTOR";}
+  refusal_.valid=true;if(!refusal_.reason||!*refusal_.reason)refusal_.reason=r;
+ }
+ status_.state=ExecutorState::SAFE_OFF_REQUIRED;status_.safe_off_required=true;status_.reason=r;
+}
 void MotionExecutor::confirmSafeOff(bool off) { if(status_.safe_off_required&&off){status_.safe_off_required=false;status_.state=ExecutorState::OFF;} }
 } }

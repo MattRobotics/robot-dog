@@ -28,9 +28,10 @@ uint16_t tickOf(Rig& r,unsigned i,double q){
  const auto* t=r.policy.transforms().find(slotIdentity(i),r.geometry.provenanceTag());uint16_t tick=0;
  CHECK(t&&resolveUrdfQToRaw(r.geometry,geometry_data::kProvenance,*t,static_cast<MicroRad>(std::llround(q*1e6)),&tick)==TargetResolveStatus::OK);return tick;
 }
+// The producer's own conversion (OperationalFeedback): RAW -> radians through the canonical resolver.
 double qOf(Rig& r,unsigned i,uint16_t tick){
- const auto* t=r.policy.transforms().find(slotIdentity(i),r.geometry.provenanceTag());MicroRad q=0;
- CHECK(t&&resolveRawToUrdfQ(r.geometry,geometry_data::kProvenance,*t,tick,&q)==TargetResolveStatus::OK);return q*1e-6;
+ const auto* t=r.policy.transforms().find(slotIdentity(i),r.geometry.provenanceTag());double q=0;
+ CHECK(t&&resolveRawToRadians(r.geometry,geometry_data::kProvenance,*t,tick,&q)==TargetResolveStatus::OK);return q;
 }
 // URDF interval for every joint; each LOWER's folded-side edge sits just
 // inside the measured rest, as the gen-1 contact inset does on the robot.

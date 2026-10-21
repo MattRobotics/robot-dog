@@ -30,7 +30,7 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
   ok=true;reason="SAFE_OFF_REQUESTED";return reply();
  }
  if(!strcmp(t[0],"STATUS")&&n==1){ok=true;reason=boot_safe_off_pending_?"BOOT_SAFE_OFF_PENDING":validation_profile_.reason();return reply();}
- if(!strcmp(t[0],"JOINT")&&n==2){uint32_t j;if(!uintToken(t[1],j)||j>=12)return reply();const auto& r=operational_producer_.raw(j);const auto* servo=servo::legServoAt((j/3)*3+2-j%3);const auto fb=operational_producer_.snapshot(now,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
+ if(!strcmp(t[0],"JOINT")&&n==2){uint32_t j;if(!uintToken(t[1],j)||j>=12)return reply();const auto& r=operational_producer_.raw(j);const auto* servo=actuator::slotServo(j);const auto fb=operational_producer_.snapshot(now,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
   snprintf(out,size,"JOINT slot=%lu id=%u configured_unit=%s raw=%u torque=%d speed_raw=%d goal=%d goal_speed=%d goal_acc=%d output=%d temp=%d voltage_dv=%d status=%d stamp_ms=%lu age_ms=%lu transaction_ms=%lu mapped_valid=%u actual_rad=%.9f",(unsigned long)j,servo->bus_id,servo->physical_unit,r.position,r.torque,r.speed,r.goal_position,r.goal_speed,r.goal_acceleration,r.torque_limit,r.temperature,r.voltage,r.status,(unsigned long)r.sampled_at_ms,(unsigned long)(now-r.sampled_at_ms),(unsigned long)r.transaction_ms,fb.read_ok[j]?1u:0u,fb.actual_rad[j]);return true;}
  if(!strcmp(t[0],"SENSORS")&&n==1){const auto i=imu_.orientationSnapshot();const auto& b=daly_.sample();snprintf(out,size,"SENSORS uptime_ms=%lu imu_valid=%u imu_stamp_ms=%lu quaternion=%.9f,%.9f,%.9f,%.9f bms_valid=%u bms_stamp_ms=%lu soc=%.3f power=%s fault=%u boot_safe_off_pending=%u",(unsigned long)now,i.valid?1u:0u,(unsigned long)i.sampled_at_ms,i.wxyz[0],i.wxyz[1],i.wxyz[2],i.wxyz[3],b.valid?1u:0u,(unsigned long)b.sampled_at_ms,b.soc_percent,core::toString(power_state_.state()),system_state_.systemHealth()==SystemHealth::FAULT?1u:0u,boot_safe_off_pending_?1u:0u);return true;}
  // USB-local, read-only view of the PRIME failure records of the LAST
@@ -88,9 +88,9 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
   r.feedback.routeJointTubeRad=p.joint_tube_rad-r.execution.tracking_tolerance_rad-p.encoder_uncertainty_rad-p.mapping_uncertainty_rad-r.feedback.maxJointStepRad/2-p.drive_speed*p.speed_scale*r.execution.feedback_max_age_ms/1000;r.feedback.routePositionTubeM=p.position_tube_m;r.feedback.routeRotationTube=p.rotation_tube;
   // Integer admission insets one tick. Use its actual semantic bounds rather
   // than silently extending rounded endpoints beyond the approved raw limits.
-  for(unsigned i=0;i<12;++i){auto id=p.workspace.joint[i].joint;const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());actuator::MicroRad lo,hi;
-   if(!tr||!lim||actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){reason="LIMIT_TRANSFORM_FAILED";return reply();}
-   r.feedback.jointLimits[i/3][i%3]={std::fmin(lo,hi)*1e-6,std::fmax(lo,hi)*1e-6};
+  for(unsigned i=0;i<12;++i){auto id=p.workspace.joint[i].joint;const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());double lo,hi;
+   if(!tr||!lim||actuator::resolveRawToRadians(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||actuator::resolveRawToRadians(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){reason="LIMIT_TRANSFORM_FAILED";return reply();}
+   r.feedback.jointLimits[i/3][i%3]={std::fmin(lo,hi),std::fmax(lo,hi)};
   }
   // Qualification of the numeric target envelope is separate from the pose
   // corridor. All subsequent targets must remain inside the admitted limits.
@@ -109,7 +109,7 @@ bool Controller::localValidationCommand(const char* line,uint32_t now,char* out,
  if(!strcmp(t[0],"CEILING")&&n==4&&!strcmp(t[3],"CONFIRM_REDUCE_SRAM_OUTPUT_WHILE_TORQUE_OFF")){
   uint32_t nonce,j;if(!uintToken(t[1],nonce)||nonce!=validation_nonce_||!uintToken(t[2],j)||j>=12||!validation_present_||now-validation_presence_ms_>1000||!reviewed_motion_bound_||authority_.current()!=ActuatorAuthority::NONE||!operational_producer_.rawFresh(now,reviewed_motion_.execution.feedback_max_age_ms))return reply();
   for(unsigned i=0;i<12;++i)if(operational_producer_.raw(i).torque!=0)return reply();
-  const auto* servo=servo::legServoAt((j/3)*3+2-j%3);
+  const auto* servo=actuator::slotServo(j);
   ok=actuator_backend_.reduceValidationOutputWhileOff(servo->bus_id,validation_profile_.output_ceiling)==actuator::BackendWriteOutcome::VERIFIED_APPLIED;
   reason=ok?"OUTPUT_REDUCED_REQUIRE_FRESH_READBACK":"REDUCTION_REJECTED_NO_INCREASE_ALLOWED";return reply();
  }

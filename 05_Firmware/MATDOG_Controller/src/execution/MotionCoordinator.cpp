@@ -61,17 +61,15 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
    if(commissioning_.enabled&&commissioning_.measuredStart){final_height_m_=c.target_height_m;r.targetHeightM=.150;}
    if(acquisition_.count||acquisition_.pairedProne)r.acquisition=&acquisition_;
    if(commissioning_.enabled){
-    // The entry starts at the armed (held) pose, never at a nominal knot.
+    // The entry starts at the armed hold: the PRIME goals the executor holds, never a nominal knot.
     motion::JointTargetFrame start;start.valid=true;
-    for(unsigned i=0;i<12;++i){auto& q=start.legs[i/3];(i%3==0?q.hip:i%3==1?q.upper:q.lower)=executor_->targetRadians()[i];}
+    for(unsigned i=0;i<12;++i)motion::jointSlot(start,i)=executor_->targetRadians()[i];
     const auto head=motion::pairedProneSample(0,0,true);if(!head.target.valid)return "ROUTE_HEAD_INVALID";
     if(commissioning_.measuredStart){
-     // Reuse the pre-arm path only for the same held start (two rounded
-     // micro-radian conversions). Avoid repeating geometry work under torque.
+     // The pre-arm dry run planned from the SAME planPrime start (identical canonical radians): reuse it, never
+     // repeat the geometry work under torque. Any changed tick re-plans.
      bool same=entry_plan_.status==motion::EntryStatus::OK&&entry_plan_.start.valid;
-     for(unsigned i=0;i<12&&same;++i){const auto& a=entry_plan_.start.legs[i/3];const auto& b=start.legs[i/3];
-      const double x=i%3==0?a.hip:i%3==1?a.upper:a.lower,y=i%3==0?b.hip:i%3==1?b.upper:b.lower;
-      same=std::abs(x-y)<=2e-6;}
+     for(unsigned i=0;i<12&&same;++i)same=motion::jointSlot(entry_plan_.start,i)==motion::jointSlot(start,i);
      if(!same){
       motion::MeasuredEntryConfig m;m.keepouts=commissioning_.keepouts;m.keepoutCount=commissioning_.keepoutCount;m.pathMarginRad=commissioning_.pathMarginRad;
       entry_plan_=motion::planMeasuredEntry(start,head.target,feedback_policy_,m,commissioning_.minStageDurationS);
@@ -86,20 +84,19 @@ const char* MotionCoordinator::startStand(const motion::MotionCommand& c,uint32_
 const char* MotionCoordinator::preArmCheck(){
  const auto& o=observation_;
  if(!o.actual.valid||!o.stationary){entry_reason_="PRE_ARM_FEEDBACK_REQUIRED";return entry_reason_;}
+ if(!session_){entry_reason_="SESSION_NOT_BOUND";return entry_reason_;}
  const auto head=motion::pairedProneSample(0,0,true);if(!head.target.valid)return "ROUTE_HEAD_INVALID";
  double actual[12]{},nominal[12]{};
- for(unsigned i=0;i<12;++i){const auto& a=o.actual.legs[i/3];const auto& n=head.target.legs[i/3];
-  actual[i]=i%3==0?a.hip:i%3==1?a.upper:a.lower;nominal[i]=i%3==0?n.hip:i%3==1?n.upper:n.lower;}
+ for(unsigned i=0;i<12;++i){actual[i]=motion::jointSlot(o.actual,i);nominal[i]=motion::jointSlot(head.target,i);}
  const auto prone=motion::classifyFixtureProne(actual,nominal,o.externalSupportConfirmed,o.stationary,
                                               commissioning_.proneMaxDeviationRad,commissioning_.proneMaxRmsRad);
  if(prone.kind!=motion::FixturePoseKind::PRONE_COMPATIBLE){entry_reason_=motion::fixturePoseReasonName(prone.reason);return "PRE_ARM_NOT_PRONE";}
- // The session primes a LOWER resting past its folded limit just inside it
- // (MotionSession::insideTick, bounded there); plan from that same start.
+ // Plan from the start the session WILL hold: MotionSession::planPrime, the same
+ // function request() applies (folded LOWER off its expected contact, RAW domain).
+ PrimePlan prime;
+ if(const char* why=session_->planPrime(actual,TrialScope::FIXTURE_COMMISSIONING,commissioning_.primeClampMaxTicks,&prime)){entry_reason_=why;return why;}
  motion::JointTargetFrame start;start.valid=true;
- for(unsigned i=0;i<12;++i){double q=actual[i];
-  const double lo=feedback_policy_.jointLimits[i/3][i%3].lower;
-  if(i%3==2&&q<lo)q=lo+kPrimeInwardMarginTicks*2*3.14159265358979323846/4096;
-  auto& s=start.legs[i/3];(i%3==0?s.hip:i%3==1?s.upper:s.lower)=q;}
+ for(unsigned i=0;i<12;++i)motion::jointSlot(start,i)=prime.hold_rad[i];
  motion::MeasuredEntryConfig m;m.keepouts=commissioning_.keepouts;m.keepoutCount=commissioning_.keepoutCount;m.pathMarginRad=commissioning_.pathMarginRad;
  entry_plan_=motion::planMeasuredEntry(start,head.target,feedback_policy_,m,commissioning_.minStageDurationS);
  if(entry_plan_.status!=motion::EntryStatus::OK){entry_reason_=motion::entryStatusName(entry_plan_.status);return entry_reason_;}
@@ -192,10 +189,11 @@ void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const Joint
  if(!executor_->streaming()){
   if(executor_->status().state!=ExecutorState::READY)return;
   StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=w.streamMaxLagS;c.settle_speed_rad_s=w.streamSettleSpeedRadS;
-  c.feedback_max_age_us=static_cast<uint32_t>(std::llround(w.streamFeedbackMaxAgeS*1e6));c.hold_timeout_us=static_cast<uint32_t>(std::llround(w.streamHoldTimeoutS*1e6));
-  c.max_frame_gap_us=static_cast<uint32_t>(std::llround(w.streamMaxGapS*1e6));c.persist_samples=static_cast<uint8_t>(w.streamPersistSamples);
+  c.feedback_max_age_us=static_cast<uint32_t>(motion::microsFromSeconds(w.streamFeedbackMaxAgeS));c.hold_timeout_us=static_cast<uint32_t>(motion::microsFromSeconds(w.streamHoldTimeoutS));
+  c.max_frame_gap_us=static_cast<uint32_t>(motion::microsFromSeconds(w.streamMaxGapS));c.persist_samples=static_cast<uint8_t>(w.streamPersistSamples);
   c.region_min_rad=w.regionMinRad;c.region_max_rad=w.regionMaxRad;
-  if(!executor_->beginStream(c,fb,now_us)||!scheduler_.start(now_us+static_cast<uint64_t>(std::llround(w.streamPeriodS*1e6)),static_cast<uint32_t>(std::llround(w.streamPeriodS*1e6)))){executor_->stop("STREAM_BEGIN_REFUSED");return;}
+  const uint32_t period=static_cast<uint32_t>(motion::microsFromSeconds(w.streamPeriodS));
+  if(!executor_->beginStream(c,fb,now_us)||!scheduler_.start(now_us+period,period,period/core::kStreamReleaseWindowDivisor)){executor_->stop("STREAM_BEGIN_REFUSED");return;}
  }
  executor_->monitor(facts,fb,now,now_us);
  if(!executor_->streaming())return;   // stopped by the monitor: SAFE_OFF path
@@ -203,7 +201,7 @@ void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const Joint
  o.acknowledged=st.settled_sequence!=0;o.acknowledgedSequence=st.settled_sequence;
  const auto release=scheduler_.poll(now_us);
  if(!release.release&&walk_.state()!=motion::FeedbackWalkState::HOLD)return;
- frame_=walk_.streamUpdate(o,(now_us/1e6));
+ frame_=walk_.streamUpdate(o,motion::secondsFromMicros(now_us));
  if(walk_.state()==motion::FeedbackWalkState::STAND){
   if(!executor_->endStream()){executor_->stop("HOLD_NOT_SETTLED");return;}
   walking_=false;scheduler_.stop();executor_->restoreArmedRates();walk_profile_=nullptr;return;}
@@ -218,8 +216,34 @@ void MotionCoordinator::streamWalk(const MotionExecutionFacts& facts,const Joint
  if(executor_->stream(frame_.target,v,now_us,now_us+scheduler_.periodUs(),final,facts,fb,now,now_us))submitted_sequence_=frame_.target.sequence;
 }
 // Same executor, scheduler, geometry generator and assessment path as WALK /
-// finite motion. Only structural STAND endpoints enter HOLD; microframes use TX.
+// finite motion. Every frame is materialized by AdaptiveStand for ONE release
+// instant, from the executor's committed (last transmitted) frame, and keeps
+// that instant until it is transmitted. Only structural endpoints enter HOLD.
 void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
+ const uint32_t period=static_cast<uint32_t>(motion::microsFromSeconds(feedback_policy_.samplePeriodS));
+ // Second Controller call of a release tick: transmit the assessed candidate at
+ // the instant it was made for (the executor monitors before its first byte).
+ // A candidate whose window has passed is discarded, never re-stamped: the next
+ // release materializes a new one from the committed frame.
+ if(executor_->status().state==ExecutorState::STREAMING&&frame_.target.valid&&frame_.target.sequence!=submitted_sequence_){
+  if(const auto* candidate=stand_.streamCandidate(frame_.target.sequence)){
+   const uint64_t at=stand_.candidateReleaseUs();
+   const bool in_window=at&&now_us>=at&&now_us-at<period;
+   if(in_window&&candidate->physicalReadiness){
+    frame_=*candidate;
+    // The assessment retains the original collision/swept/support certificate.
+    FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();
+    v.collision_clear=assessment_.sweptCollisionClear;v.support_valid=assessment_.supportCompatible;
+    v.path_continuous=assessment_.continuousBoundsConfirmed;v.configuration_valid=assessment_.geometryIdentityVerified;
+    v.final=stand_.pendingFinal();
+    if(executor_->stream(frame_.target,v,at,at+period,v.final,facts,fb,now,now_us)){
+     submitted_sequence_=frame_.target.sequence;stand_.noteSubmitted(frame_.target.sequence);
+    }
+    return;   // stream() monitored this snapshot before its first byte and after the TX
+   }
+   if(!in_window)stand_.discardCandidate();
+  }
+ }
  executor_->monitor(facts,fb,now,now_us);
  if(!executor_->active())return;
  bool arrived=false;
@@ -227,46 +251,41 @@ void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const Join
   if(!executor_->endStream())return;
   arrived=true;
  }
- const uint32_t period=static_cast<uint32_t>(std::llround(feedback_policy_.samplePeriodS*1e6));
- // A second call after Controller assessment transmits the SAME generated
- // reference at this release; it must not consume a second scheduler tick.
- const bool refreshed=frame_.target.valid&&!frame_.executable&&assessment_.sequence==frame_.target.sequence;
- if(arrived||refreshed||!scheduler_.running()||scheduler_.poll(now_us).release){
-  auto o=observation_;
-  if(arrived)o.stationary=executor_->measuredStandQuiet();
-  o.acknowledgedSequence=stand_.pendingFinal()?executor_->status().completed_sequence:executor_->status().tx_sequence;
-  o.acknowledged=o.acknowledgedSequence!=0;
-  frame_=stand_.update(o,now_us/1e6,true);stand_release_us_=now_us;
- }
- if(stand_.state()==motion::AdaptiveStandState::REJECTED){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
- if(stand_.state()==motion::AdaptiveStandState::STAND){
-  scheduler_.stop();
-  if(commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
-     !stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,now_us/1e6))executor_->stop("HEIGHT_ADJUST_REFUSED");
-  return;
- }
+ auto o=observation_;
  if(executor_->status().state==ExecutorState::READY){
-  if(stand_.pendingFinal()&&frame_.target.sequence==submitted_sequence_)return;
+  // Between streams: commit a settled endpoint, verify, classify or open the
+  // next phase. No frame is materialized without a release.
+  const auto st=stand_.state();
+  if(arrived||st==motion::AdaptiveStandState::VERIFY_STAND||st==motion::AdaptiveStandState::STAND)o.stationary=executor_->measuredStandQuiet();
+  o.acknowledgedSequence=executor_->status().completed_sequence;o.acknowledged=o.acknowledgedSequence!=0;
+  const motion::StreamRelease idle{executor_->releaseState(),executor_->releaseEnvelope(),0};
+  frame_=stand_.update(o,motion::secondsFromMicros(now_us),&idle);
+  if(stand_.state()==motion::AdaptiveStandState::REJECTED){executor_->stop(motion::feedbackReasonName(frame_.reason),&stand_.refusal());return;}
+  if(stand_.state()==motion::AdaptiveStandState::STAND){
+   scheduler_.stop();
+   if(commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
+      !stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,motion::secondsFromMicros(now_us)))executor_->stop("HEIGHT_ADJUST_REFUSED");
+   return;
+  }
+  if(!stand_.streamPhaseReady())return;
   for(unsigned i=0;i<12;++i){stand_min_[i]=feedback_policy_.jointLimits[i/3][i%3].lower;stand_max_[i]=feedback_policy_.jointLimits[i/3][i%3].upper;}
   StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=0;c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;
   c.local_path_box=true;c.max_step_rad=feedback_policy_.maxJointStepRad;
+  c.sample_acceleration_bound_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
   c.feedback_max_age_us=MotionExecutor::kTimedFeedbackMaxAgeMs*1000;
   c.hold_timeout_us=executor_->trackingTimeoutUs();c.max_frame_gap_us=MotionExecutor::kTimedMaxFrameGapMs*1000;c.persist_samples=3;
   c.region_min_rad=stand_min_;c.region_max_rad=stand_max_;
   if(!executor_->beginStream(c,fb,now_us)){executor_->stop("STREAM_BEGIN_REFUSED");return;}
-  stand_first_release_us_=now_us+period;
-  scheduler_.start(stand_first_release_us_,period);return;
+  // A tick ending within the release window before a deadline serves it then, not one whole tick later.
+  scheduler_.start(now_us+period,period,period/core::kStreamReleaseWindowDivisor);return;
  }
- if(now_us<stand_first_release_us_)return;
- if(!frame_.target.valid||!frame_.executable||!frame_.physicalReadiness||frame_.target.sequence==submitted_sequence_)return;
- // The assessment retains the original collision/swept/support certificate.
- FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();
- v.collision_clear=assessment_.sweptCollisionClear;v.support_valid=assessment_.supportCompatible;
- v.path_continuous=assessment_.continuousBoundsConfirmed;v.configuration_valid=assessment_.geometryIdentityVerified;
- v.final=stand_.pendingFinal();
- if(executor_->stream(frame_.target,v,now_us,stand_release_us_+period,v.final,facts,fb,now,now_us)){
-  submitted_sequence_=frame_.target.sequence;stand_.noteSubmitted(frame_.target.sequence);
- }
+ // Streaming: one frame per scheduler release, materialized for THIS instant.
+ if(!scheduler_.poll(now_us).release)return;
+ o.acknowledgedSequence=stand_.pendingFinal()?executor_->status().completed_sequence:executor_->status().tx_sequence;
+ o.acknowledged=o.acknowledgedSequence!=0;
+ const motion::StreamRelease release{executor_->releaseState(),executor_->releaseEnvelope(),now_us};
+ frame_=stand_.update(o,motion::secondsFromMicros(now_us),&release);
+ if(stand_.state()==motion::AdaptiveStandState::REJECTED)executor_->stop(motion::feedbackReasonName(frame_.reason),&stand_.refusal());
 }
 void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeedback& fb,uint32_t now,uint64_t now_us){
  if(executor_&&executor_->status().safe_off_required)pending_walk_=false;
@@ -307,15 +326,15 @@ void MotionCoordinator::update(const MotionExecutionFacts& facts,const JointFeed
  auto o=observation_;o.acknowledged=executor_->status().completed_sequence!=0;o.acknowledgedSequence=executor_->status().completed_sequence;
  // Observations remain externally measured. Targets never overwrite actual
  // joints, base height or contact evidence in order to manufacture tracking.
- frame_=walking_?walk_.update(o,(now_us/1e6)):stand_.update(o,(now_us/1e6));
+ frame_=walking_?walk_.update(o,motion::secondsFromMicros(now_us)):stand_.update(o,motion::secondsFromMicros(now_us));
  // The certified entry just verified its 150 mm STAND and a lower height was requested:
  // continue in the SAME update, so the command is never completed at the intermediate height.
  if(!walking_&&stand_.state()==motion::AdaptiveStandState::STAND&&commissioning_.measuredStart&&std::abs(final_height_m_-stand_.standHeightM())>1e-9&&
     executor_->status().state==ExecutorState::READY){
-  if(!stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,now_us/1e6)){executor_->stop("HEIGHT_ADJUST_REFUSED");return;}
+  if(!stand_.requestHeightAdjust(final_height_m_,executor_->status().accepted_sequence+1,motion::secondsFromMicros(now_us))){executor_->stop("HEIGHT_ADJUST_REFUSED");return;}
  }
  if(walking_&&walk_.state()==motion::FeedbackWalkState::STAND){walking_=false;executor_->restoreArmedRates();return;}
- if((walking_&&walk_.state()==motion::FeedbackWalkState::REJECTED)||(!walking_&&stand_.state()==motion::AdaptiveStandState::REJECTED)){executor_->stop(motion::feedbackReasonName(frame_.reason));return;}
+ if((walking_&&walk_.state()==motion::FeedbackWalkState::REJECTED)||(!walking_&&stand_.state()==motion::AdaptiveStandState::REJECTED)){executor_->stop(motion::feedbackReasonName(frame_.reason),walking_?nullptr:&stand_.refusal());return;}
  if(feedback_policy_.mode==motion::FeedbackMode::SIMULATION||!frame_.physicalReadiness)return;
  if(!frame_.target.valid||!frame_.executable||frame_.target.sequence==submitted_sequence_)return;
  FrameValidation v;v.sequence=frame_.target.sequence;v.policy_epoch=policy_->epoch();v.geometry=policy_->currentGeometryTag();v.collision_clear=assessment_.sweptCollisionClear;v.support_valid=assessment_.supportCompatible;v.path_continuous=assessment_.continuousBoundsConfirmed;v.configuration_valid=assessment_.geometryIdentityVerified;

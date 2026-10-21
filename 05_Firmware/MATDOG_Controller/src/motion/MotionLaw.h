@@ -72,14 +72,64 @@ struct DynamicAnalysis {
 // Servo register scales used by the SDK/profile docs: 2*pi/4096 rad per step; ACC unit = 100 steps/s^2.
 constexpr double kServoTickRad = 6.28318530717958647692 / 4096.0;
 DynamicAnalysis analyzeDynamicProfile(const DynamicProfile& profile);
-// Largest release lateness L (seconds) for which one late frame (interval period+L) followed by an on-time frame keeps
-// |secant acceleration| <= aMax, with the generator advancing min(elapsed, maxStep/v) of path time per frame. Searched up
-// to maxLatenessS; the result is the FIRST violating lateness (the secant acceleration is not monotone in the lateness).
+// Largest release lateness L (seconds) a cruise at v can absorb: one late frame (interval period+L) must advance at most
+// maxStep, so its secant drops to min(v, maxStep/(period+L)); that deceleration must stay <= aMax over the mean
+// interval. The return to speed afterwards is ramped by retimeRelease and never adds a violation. Beyond L no target on
+// the path satisfies both the step and the acceleration bound (a true infeasibility of the profile, refused before TX).
+// The capped step is the one retimeRelease realizes (its bisection resolution), so L is a lateness it actually absorbs.
+// Searched up to maxLatenessS; the result is the FIRST violating lateness (the deceleration is not monotone in L).
 double accelSafeLatenessS(double velocityRadS, double accelerationRadS2, double periodS, double maxStepRad, double maxLatenessS);
 // Largest reference velocity v <= vCap whose lateness tolerance (above) is at least targetLatenessS (0 if none; vCap if it already is).
 double velocityForLateness(double vCap, double accelerationRadS2, double periodS, double maxStepRad, double targetLatenessS);
 // Stream rule (OperationalWalkProfile.h kStreamMaxGapS, MotionExecutor kTimedMaxFrameGapMs): a release gap above this is refused.
 constexpr double kStreamMaxGapS = 0.100;
+// One progression contract for every streamed STAND phase (Core Motion V6): the release lateness a cruise absorbs
+// without an infeasible frame - loop granularity plus one short service stall (the V5 height-transition decision,
+// now shared by the entry stages, the paired route and the height transitions). Each law's cruise velocity is DERIVED
+// from it through velocityForLateness(); envelopes, step cap and executor limits are unchanged.
+constexpr double kStreamLatenessToleranceS = 0.012;
+
+// ---- Canonical time units of Motion (Core Motion V6) ----------------------------------------------------------------
+// Every instant is a uint64 microsecond count of the Controller's MonotonicClock64. Seconds are DERIVED from it by one
+// correctly rounded conversion, for instants and intervals alike; a duration configured in seconds becomes
+// microseconds by one rounding. No module converts a clock reading by its own formula.
+inline double secondsFromMicros(uint64_t us) { return static_cast<double>(us) / 1e6; }
+uint64_t microsFromSeconds(double s);   // nearest microsecond; 0 for a non-positive or non-finite duration
+
+// ---- Release-secant contract (Core Motion V6) ----------------------------------------------------------------------
+// A streamed frame is a 12-joint target at its REFERENCE instant: the release instant the generator materialized it
+// for, kept unchanged until the frame is transmitted or discarded (never re-stamped). Two consecutive transmitted
+// frames define a secant velocity, two secants an acceleration over the mean of their intervals. For any reference
+// with |q''| <= A that secant acceleration is <= A whatever the sampling, so the rule is exact, not a heuristic.
+// The executor owns the committed state (the last TRANSMITTED frame, updated only after a successful TX); the
+// generator's retimer reads that same state and applies this same function, so a frame the generator emits is a frame
+// the executor admits bit for bit. The executor still re-checks every frame, independently, before the first byte.
+struct ReleaseState { const double* q = nullptr; const double* v = nullptr; uint64_t atUs = 0, intervalUs = 0; };
+struct ReleaseEnvelope { double velocityRadS = 0, accelerationRadS2 = 0, stepRad = 0; };   // stepRad 0: no step bound
+enum class ReleaseVerdict : uint8_t { OK, CLOCK, STEP, VELOCITY, ACCELERATION };
+const char* releaseVerdictName(ReleaseVerdict verdict);
+struct ReleaseCheck {
+  ReleaseVerdict verdict = ReleaseVerdict::CLOCK;
+  unsigned joint = 12;                                     // first violating slot (joint order), 12 = none
+  double q = 0, qLast = 0, v = 0, vPrev = 0, dtS = 0, dtPrevS = 0, value = 0, limit = 0;   // its operands
+  // Over ALL joints: a bound a larger progress would worsen (step, velocity, acceleration in the direction of motion)
+  // or one only a larger progress could satisfy (deceleration beyond the envelope).
+  bool tooFast = false, tooSlow = false;
+};
+ReleaseCheck checkRelease(const ReleaseState& last, const double q[12], uint64_t atUs, const ReleaseEnvelope& envelope);
+
+// Real time -> path progress (Core Motion V6; replaces the isolated min(elapsed, step/vmax) clamp). Returns the largest
+// progress tau in [tauLast, tauMax] whose target satisfies checkRelease against the committed state, where
+// tauMax = min(phase end, tauLast + real time elapsed since the committed frame): the reference never runs ahead of
+// real time and never catches up in a burst. On time this is tauMax (one evaluation); a late release, a polyline
+// corner or the return to speed after a slowdown is bounded by the same step/velocity/acceleration rule as the
+// executor. No admissible progress means the release came later than the profile can decelerate within its step:
+// `check` then carries the binding operands. `sample` evaluates the SAME path the frame is built from.
+using ProgressSample = bool (*)(const void* context, double tau, double q[12]);
+struct RetimeResult { bool found = false, sampleFailed = false; double tau = 0; ReleaseCheck check{}; unsigned evaluations = 0; };
+constexpr unsigned kRetimeIterations = 14;   // resolution (tauMax - tauLast) / 2^14 in the rare late-release search
+RetimeResult retimeRelease(const ReleaseState& last, uint64_t atUs, const ReleaseEnvelope& envelope,
+                           double tauLast, double tauMax, ProgressSample sample, const void* context);
 
 } }
 #endif

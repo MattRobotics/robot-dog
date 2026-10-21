@@ -89,7 +89,9 @@ void rejectionTests(){
   CHECK(s.request({},p,0));s.update(o,0);f=s.update(o,0);CHECK(s.assess(syntheticAssessment(f,0),0));o.actual.legs[0].upper+=.04;o.acknowledged=true;o.acknowledgedSequence=f.target.sequence;
   o.stampS=.04;CHECK(s.update(o,.04).reason==FeedbackReason::TRACKING_ERROR);
   o=supported(.125,0);CHECK(s.request({},p,0));s.update(o,0);f=s.update(o,0);o.stampS=.51;CHECK(s.update(o,.51).reason==FeedbackReason::SEGMENT_TIMEOUT);
-  auto limits=p;limits.jointLimits[0][1]={-.2,.2};CHECK(s.request({},limits,0));o=supported(.125,0);CHECK(s.update(o,0).reason==FeedbackReason::JOINT_LIMIT);
+  // Core Motion V6: a MEASURED joint outside the live limits is the executor's RAW-domain refusal (ARM, every snapshot),
+  // not a second comparison here; the planner refuses its first TARGET outside the limits.
+  auto limits=p;limits.jointLimits[0][1]={-.2,.2};CHECK(s.request({},limits,0));o=supported(.125,0);CHECK(s.update(o,0).reason==FeedbackReason::OK);CHECK(s.update(o,0).reason==FeedbackReason::JOINT_LIMIT);
   CHECK(s.request({},p,0));o=supported(.125,0);o.inhibited=true;CHECK(s.update(o,0).reason==FeedbackReason::INHIBITED);
   auto physical=p;physical.mode=FeedbackMode::PHYSICAL_REVIEW;physical.loadedRatesVerified=true;CHECK(s.request({},physical,0));o=supported(.125,0);CHECK(s.update(o,0).reason==FeedbackReason::UNOBSERVABLE_HEIGHT);
   auto rest=researchedPose(0);o=observation(rest->body,rest->joints,0,0,true);CHECK(s.request({},p,0));s.update(o,0);CHECK(s.update(o,0).reason==FeedbackReason::ROUTE_REQUIRED);

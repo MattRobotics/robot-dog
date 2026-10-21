@@ -39,11 +39,9 @@ bool ValidationProfile::card(const char* line){
    uint32_t i;double lo,hi,m;
    if(n!=5||!integer(t[1],i)||i>=12||(joint_mask_&(1<<i))||!number(t[2],lo)||!number(t[3],hi)||!number(t[4],m)||
       lo<-3200000||hi>3200000||lo>=hi||m<=0||m*2>=hi-lo||std::floor(lo)!=lo||std::floor(hi)!=hi||std::floor(m)!=m)return false;
-   const auto* servo=servo::legServoAt((i/3)*3+2-i%3);if(!servo)return false;
-   auto& j=workspace.joint[i];j.joint.leg=static_cast<calibration::Leg>(i/3);j.joint.joint=static_cast<calibration::JointKind>(i%3);
-   std::strncpy(j.joint.physical_unit,servo->physical_unit,sizeof(j.joint.physical_unit)-1);
+   auto& j=workspace.joint[i];if(!actuator::slotIdentity(i,&j.joint))return false;
    j.required_min_urad=static_cast<actuator::MicroRad>(lo);j.required_max_urad=static_cast<actuator::MicroRad>(hi);j.safety_margin_urad=static_cast<actuator::MicroRad>(m);
-   runtime.feedback.jointLimits[i/3][i%3]={(lo+m)*1e-6,(hi-m)*1e-6};joint_mask_|=1<<i;
+   runtime.feedback.jointLimits[i/3][i%3]={actuator::microRadToRadians(static_cast<actuator::MicroRad>(lo+m)),actuator::microRadToRadians(static_cast<actuator::MicroRad>(hi-m))};joint_mask_|=1<<i;
   }else if(!std::strcmp(t[0],"EXEC")){
    if(n!=14||exec_)return false;
    double v,a,e;uint32_t x[10];if(!number(t[1],v)||!number(t[2],a)||!number(t[3],e)||v<=0||a<=0||e<=0)return false;

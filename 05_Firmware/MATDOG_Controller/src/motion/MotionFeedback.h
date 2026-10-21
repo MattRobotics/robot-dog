@@ -69,11 +69,30 @@ struct FeedbackFrame {
   double timeS=0;
   FeedbackReason reason=FeedbackReason::NOT_REQUESTED;
 };
+// First-refusal operands (Core Motion V6 diagnostics): which verifier refused, at which joint slot (0..11, LF hip ..
+// LH lower), the compared value and its bound; for release dynamics the secant operands; for the path box the
+// reconstruction instant and uncertainty. Captured once, at the first refusal of an armed session, and printed once by
+// the Controller's existing first-stop record: no streaming, no extra channel, no work on the frame path.
+struct RefusalRecord {
+  bool valid=false;
+  const char* site="";       // e.g. EXECUTOR_PRE_TX, RETIMER, PLANNER_SEGMENT, PATH_BOX, MONITOR
+  const char* reason="";
+  int8_t joint=-1;
+  uint32_t sequence=0;
+  double value=0, limit=0;                            // compared quantity and its bound
+  double q=0, qLast=0, v=0, vPrev=0, dtS=0, dtPrevS=0; // release secant operands (0 when not applicable)
+  uint64_t atUs=0;                                     // reference instant, or the common instant of the path box
+  uint64_t sampleUs=0; double uncertainty=0;           // path box: binding joint's sample instant and uncertainty
+};
 bool validFeedbackPolicy(const FeedbackPolicy& policy);
+// Observation validity for the planner: freshness, evidence, support, body pose and the joint MODEL (FK). Measured
+// joints are compared with the live hard limits in the RAW domain by the executor (ARM, every snapshot), with the same
+// resolver that admitted them - one authority, no second comparison in a differently rounded domain.
 FeedbackReason checkObservation(const AdaptiveObservation& observation,
                                 const FeedbackPolicy& policy, double nowS);
+// Commanded targets: live limits (inclusive), step continuity and the analytic rates of the path.
 FeedbackReason checkSegment(const LocomotionFrame& candidate, const JointTargetFrame& previous,
-                            const FeedbackPolicy& policy);
+                            const FeedbackPolicy& policy, RefusalRecord* why=nullptr);
 FeedbackReason checkAssessment(const SegmentAssessment& assessment, uint32_t sequence,
                                const FeedbackPolicy& policy, double nowS, bool submitted=false);
 FeedbackReason checkTracking(const AdaptiveObservation& observation, const FeedbackFrame& frame,

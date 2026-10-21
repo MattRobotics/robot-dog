@@ -39,19 +39,22 @@ FeedbackReason checkObservation(const AdaptiveObservation& o,const FeedbackPolic
   if(!evidence(o.supportSource,p.mode)||!o.flatPlaneConfirmed||
     (!o.bellySupported&&!o.externalSupportConfirmed&&o.confirmedFeet==0)||o.confirmedFeet>15)return FeedbackReason::UNOBSERVABLE_SUPPORT;
   if(!o.actual.valid||!validBodyPose(o.body)||o.body.translationM.z<0)return FeedbackReason::INVALID_POSE;
-  for(unsigned i=0;i<4;++i){double q[3];components(o.actual.legs[i],q);
-    if(forwardKinematics(static_cast<LegId>(i),o.actual.legs[i]).status!=KinematicsStatus::OK)return FeedbackReason::JOINT_LIMIT;
-    for(unsigned j=0;j<3;++j)if(q[j]<p.jointLimits[i][j].lower||q[j]>p.jointLimits[i][j].upper)return FeedbackReason::JOINT_LIMIT;}
+  for(unsigned i=0;i<4;++i)if(forwardKinematics(static_cast<LegId>(i),o.actual.legs[i]).status!=KinematicsStatus::OK)return FeedbackReason::JOINT_LIMIT;
   return FeedbackReason::OK;
 }
-FeedbackReason checkSegment(const LocomotionFrame& f,const JointTargetFrame& previous,const FeedbackPolicy& p){
+FeedbackReason checkSegment(const LocomotionFrame& f,const JointTargetFrame& previous,const FeedbackPolicy& p,RefusalRecord* why){
   if(!f.target.valid)return f.status==GaitStatus::BRANCH_CHANGE?FeedbackReason::BRANCH_CHANGE:FeedbackReason::IK_FAILURE;
+  auto refuse=[&](FeedbackReason r,unsigned slot,double q,double old,double value,double limit){
+    if(why){*why=RefusalRecord{};why->valid=true;why->site="PLANNER_SEGMENT";why->reason=feedbackReasonName(r);why->joint=static_cast<int8_t>(slot);
+      why->q=q;why->qLast=old;why->value=value;why->limit=limit;}
+    return r;};
   for(unsigned i=0;i<4;++i){double q[3],old[3],v[3],a[3],vl[3],al[3];components(f.target.legs[i],q);components(previous.legs[i],old);
     components(f.velocityRadS[i],v);components(f.accelerationRadS2[i],a);components(p.maxVelocityRadS[i],vl);components(p.maxAccelerationRadS2[i],al);
-    for(unsigned j=0;j<3;++j){if(!std::isfinite(q[j])||q[j]<p.jointLimits[i][j].lower||q[j]>p.jointLimits[i][j].upper)return FeedbackReason::JOINT_LIMIT;
-      if(std::abs(q[j]-old[j])>p.maxJointStepRad)return FeedbackReason::CONTINUITY;
-      if(!std::isfinite(v[j])||std::abs(v[j])>vl[j])return FeedbackReason::VELOCITY_LIMIT;
-      if(!std::isfinite(a[j])||std::abs(a[j])>al[j])return FeedbackReason::ACCELERATION_LIMIT;}}
+    for(unsigned j=0;j<3;++j){const unsigned slot=i*3+j;const auto& l=p.jointLimits[i][j];
+      if(!std::isfinite(q[j])||q[j]<l.lower||q[j]>l.upper)return refuse(FeedbackReason::JOINT_LIMIT,slot,q[j],old[j],q[j],q[j]<l.lower?l.lower:l.upper);
+      if(std::abs(q[j]-old[j])>p.maxJointStepRad)return refuse(FeedbackReason::CONTINUITY,slot,q[j],old[j],q[j]-old[j],p.maxJointStepRad);
+      if(!std::isfinite(v[j])||std::abs(v[j])>vl[j])return refuse(FeedbackReason::VELOCITY_LIMIT,slot,q[j],old[j],v[j],vl[j]);
+      if(!std::isfinite(a[j])||std::abs(a[j])>al[j])return refuse(FeedbackReason::ACCELERATION_LIMIT,slot,q[j],old[j],a[j],al[j]);}}
   return FeedbackReason::OK;
 }
 FeedbackReason checkAssessment(const SegmentAssessment& a,uint32_t sequence,const FeedbackPolicy& p,double now,bool submitted){

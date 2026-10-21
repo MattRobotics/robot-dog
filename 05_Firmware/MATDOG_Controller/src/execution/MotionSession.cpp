@@ -1,7 +1,6 @@
 #include "MotionSession.h"
 #include "../servo/ServoPopulation.h"
 #include <cmath>
-#include <cstring>
 #include "../motion/TimedStand.h"
 namespace matdog { namespace execution {
 void MotionSession::begin(actuator::SafeActuatorPolicy* p,actuator::ActuatorRuntime* r,MotionExecutor* e,core::ActuatorAuthorityArbiter* a,
@@ -24,35 +23,40 @@ const char* MotionSession::gate(const LocalTrialEvidence& e,const MotionExecutio
  return nullptr;
 }
 bool MotionSession::resolve(unsigned i,double q,actuator::ActuatorCommand& cmd,uint8_t& bus) const {
- if(i>=12||!std::isfinite(q))return false;
- const auto* servo=servo::legServoAt((i/3)*3+2-i%3);if(!servo)return false;
- calibration::JointIdentity id;id.leg=static_cast<calibration::Leg>(i/3);id.joint=static_cast<calibration::JointKind>(i%3);
- std::strncpy(id.physical_unit,servo->physical_unit,sizeof(id.physical_unit)-1);
- const auto* t=policy_->transforms().find(id,geometry_->provenanceTag());const auto* l=policy_->limits().find(id,geometry_->provenanceTag());
- const auto* g=geometry_->findJoint(id);if(!t||!l||!g||g->bus_id!=servo->bus_id)return false;
- const auto urad=static_cast<actuator::MicroRad>(std::llround(q*1e6));uint16_t tick=0;
- if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,urad,&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
- cmd={};cmd.operation=actuator::ActuatorOperation::POSITION_COMMAND;cmd.joint=id;cmd.target_tick=tick;cmd.target_urad=urad;bus=servo->bus_id;return true;
+ ResolvedJoint r;if(!policy_||!geometry_||!provenance_||resolveJoint(*policy_,*geometry_,*provenance_,i,q,&r)!=JointResolve::OK)return false;
+ cmd=r.command;bus=r.bus;return true;
 }
 bool MotionSession::insideTick(unsigned i,double q,uint16_t max_ticks,double& inside,uint8_t& ticks) const {
  // Only a LOWER resting at its FOLDED (URDF-lower) end qualifies; anything
  // else outside its limit is an abnormal pose and stays refused.
  if(i>=12||i%3!=2||!std::isfinite(q)||max_ticks==0)return false;
- const auto* servo=servo::legServoAt((i/3)*3+2-i%3);if(!servo)return false;
- calibration::JointIdentity id;id.leg=static_cast<calibration::Leg>(i/3);id.joint=static_cast<calibration::JointKind>(i%3);
- std::strncpy(id.physical_unit,servo->physical_unit,sizeof(id.physical_unit)-1);
- const auto* t=policy_->transforms().find(id,geometry_->provenanceTag());const auto* l=policy_->limits().find(id,geometry_->provenanceTag());
- if(!t||!l||l->max_tick-l->min_tick<4)return false;
- uint16_t tick=0;if(actuator::resolveUrdfQToRaw(*geometry_,*provenance_,*t,static_cast<actuator::MicroRad>(std::llround(q*1e6)),&tick)!=actuator::TargetResolveStatus::OK)return false;
+ ResolvedJoint r;if(resolveJoint(*policy_,*geometry_,*provenance_,i,q,&r)!=JointResolve::OUTSIDE_LIMITS)return false;
+ const auto* l=r.limit;if(l->max_tick-l->min_tick<4)return false;
+ calibration::JointIdentity id;const auto* t=actuator::slotIdentity(i,&id)?policy_->transforms().find(id,geometry_->provenanceTag()):nullptr;if(!t)return false;
  // kPrimeInwardMarginTicks inside the edge, so a holding deadband cannot
  // place the measured position outside the limit (ACTUAL_OUTSIDE_LIMITS).
- uint16_t target=tick;
- if(tick<l->min_tick)target=l->min_tick+kPrimeInwardMarginTicks;else if(tick>l->max_tick)target=l->max_tick-kPrimeInwardMarginTicks;else return false;
+ const uint16_t tick=r.tick,target=tick<l->min_tick?l->min_tick+kPrimeInwardMarginTicks:l->max_tick-kPrimeInwardMarginTicks;
  const unsigned distance=tick<target?target-tick:tick-target;if(distance>max_ticks)return false;
  actuator::MicroRad urad=0;if(actuator::resolveRawToUrdfQ(*geometry_,*provenance_,*t,target,&urad)!=actuator::TargetResolveStatus::OK)return false;
- // The inward target must move AWAY from the folded stop (q increases).
- if(urad*1e-6<=q)return false;
- inside=urad*1e-6;ticks=static_cast<uint8_t>(distance);return true;
+ // The inward target must move AWAY from the folded stop (q increases); compared on the integer micro-radian grid.
+ actuator::MicroRad rest=0;if(!actuator::radiansToMicroRad(q,&rest)||urad<=rest)return false;
+ inside=actuator::microRadToRadians(urad);ticks=static_cast<uint8_t>(distance);return true;
+}
+const char* MotionSession::planPrime(const double measured[12],TrialScope scope,uint16_t clamp_max_ticks,PrimePlan* out) const {
+ if(!out||!policy_||!geometry_||!provenance_)return "NOT_BOUND";
+ PrimePlan p;
+ for(unsigned i=0;i<12;++i){actuator::ActuatorCommand cmd;uint8_t bus;
+  p.rest_rad[i]=p.hold_rad[i]=measured[i];
+  if(resolve(i,measured[i],cmd,bus))continue;
+  // Commissioning only: a measured rest just outside the hard limit (LOWER
+  // folded at its stop) primes at the nearest inside tick, never beyond the
+  // limit and never further than the evidence allows. The Safe Actuator layer
+  // still checks every target.
+  uint8_t ticks=0;
+  if(scope!=TrialScope::FIXTURE_COMMISSIONING||!clamp_max_ticks||
+     !insideTick(i,measured[i],clamp_max_ticks,p.hold_rad[i],ticks)||!resolve(i,p.hold_rad[i],cmd,bus))return "PRIME_REQUIRES_OFF_AND_LIMITS";
+  p.clamp_mask|=static_cast<uint16_t>(1u<<i);p.clamp_ticks[i]=ticks;}
+ *out=p;return nullptr;
 }
 bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFacts& f,const ExecutionEnvelope& envelope,const JointFeedback& fb,bool image,uint32_t now){
  if(state_!=MotionSessionState::OFF){reason_="SESSION_BUSY";return false;}
@@ -65,20 +69,11 @@ bool MotionSession::request(const LocalTrialEvidence& e,const MotionExecutionFac
     envelope.tracking_tolerance_rad<=0){reason_="ENVELOPE_UNAPPROVED";return false;}
  if(const char* r=gate(e,f,fb,now)){reason_=r;return false;}
  if(fb.pending()){reason_="FEEDBACK_RETRY_PENDING";return false;}
- uint16_t clamp_mask=0;uint8_t clamp_ticks[12]{};double primed[12]{};
- for(unsigned i=0;i<12;++i){actuator::ActuatorCommand cmd;uint8_t bus;
-  primed[i]=fb.actual_rad[i];
-  if(fb.torque_on[i]||!resolve(i,fb.actual_rad[i],cmd,bus)){
-   // Commissioning only: a measured rest just outside the hard limit (LOWER
-   // folded at its stop) primes at the nearest inside tick, never beyond the
-   // limit and never further than the evidence allows. Torque ON is always
-   // refused. The Safe Actuator layer still checks every target.
-   uint8_t ticks=0;
-   if(fb.torque_on[i]||e.scope!=TrialScope::FIXTURE_COMMISSIONING||!e.prime_clamp_max_ticks||
-      !insideTick(i,fb.actual_rad[i],e.prime_clamp_max_ticks,primed[i],ticks)||!resolve(i,primed[i],cmd,bus)){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
-   clamp_mask|=static_cast<uint16_t>(1u<<i);clamp_ticks[i]=ticks;}}
- for(unsigned i=0;i<12;++i){primed_rad_[i]=primed[i];rest_rad_[i]=fb.actual_rad[i];clamp_ticks_[i]=clamp_ticks[i];}
- clamp_mask_=clamp_mask;
+ // PRIME writes goals with torque OFF only; the pose itself goes through the one PRIME plan.
+ for(unsigned i=0;i<12;++i)if(fb.torque_on[i]){reason_="PRIME_REQUIRES_OFF_AND_LIMITS";return false;}
+ PrimePlan plan;if(const char* r=planPrime(fb.actual_rad,e.scope,e.prime_clamp_max_ticks,&plan)){reason_=r;return false;}
+ for(unsigned i=0;i<12;++i){primed_rad_[i]=plan.hold_rad[i];rest_rad_[i]=plan.rest_rad[i];clamp_ticks_[i]=plan.clamp_ticks[i];}
+ clamp_mask_=plan.clamp_mask;
  // The Controller may already hold the MOTION lease idle (READY with
  // authority granted): adopt exactly that lease, never mint a second one.
  if(f.lease.valid()&&f.lease.owner==core::ActuatorAuthority::MOTION&&arbiter_->current()==core::ActuatorAuthority::MOTION&&
@@ -120,7 +115,8 @@ bool MotionSession::requestFixtureMicro(unsigned joint,double delta,double durat
  micro_path_=path;micro_joint_=joint;micro_delta_=delta;micro_duration_=duration;micro_intervals_=static_cast<unsigned>(std::ceil(duration/.05));
  micro_step_=0;micro_sequence_=executor_->status().completed_sequence;micro_issued_at_ms_=now;micro_active_=true;reason_="FIXTURE_MICRO_ACTIVE";return true;
 }
-void MotionSession::revoke(const char* r){micro_active_=false;reason_=r;if(state_!=MotionSessionState::OFF&&state_!=MotionSessionState::SAFE_OFF_REQUIRED)last_revoke_=r;if(state_!=MotionSessionState::OFF){state_=MotionSessionState::SAFE_OFF_REQUIRED;executor_->stop(r);}}
+void MotionSession::revoke(const char* r){micro_active_=false;reason_=r;if(state_!=MotionSessionState::OFF&&state_!=MotionSessionState::SAFE_OFF_REQUIRED)last_revoke_=r;
+ if(state_!=MotionSessionState::OFF){state_=MotionSessionState::SAFE_OFF_REQUIRED;motion::RefusalRecord why;why.site="SESSION";executor_->stop(r,&why);}}
 void MotionSession::confirmSafeOff(){
  if(state_!=MotionSessionState::SAFE_OFF_REQUIRED)return;
  arbiter_->release(lease_);lease_={};state_=MotionSessionState::OFF;reason_="SAFE_OFF_VERIFIED";
@@ -161,7 +157,9 @@ void MotionSession::update(const LocalTrialEvidence& e,const MotionExecutionFact
   if(!fresh)return;
   // Clamped joints must have settled at their inside target before arm.
   for(unsigned i=0;i<12;++i)if(std::abs(fb.actual_rad[i]-primed_rad_[i])>envelope_.tracking_tolerance_rad)return;
-  if(!executor_->arm(f,envelope_,fb,now)){revoke(executor_->status().reason);return;}
+  // The executor holds the PRIME goals (what the servos were commanded), with the expected contact of each clamped LOWER.
+  const ArmHold hold{primed_rad_,rest_rad_,clamp_mask_};
+  if(!executor_->arm(f,envelope_,fb,now,&hold)){revoke(executor_->status().reason);return;}
   state_=MotionSessionState::ARMED;reason_="ARMED";return;
  }
  actuator::ActuatorCommand cmd;uint8_t bus;if(!resolve(next_,primed_rad_[next_],cmd,bus)){revoke("PRIME_MAPPING_OR_LIMITS");return;}

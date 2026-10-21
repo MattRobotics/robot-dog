@@ -13,6 +13,8 @@ LocomotionFrame pairedProneSample(unsigned segment,double u,bool fixtureLimitVar
 // The same polyline point (segment, linear progress 0..1) with a caller-supplied
 // time law: d(progress)/dt and d2(progress)/dt2 (Issue #52 phase-timed STAND).
 LocomotionFrame pairedProneSampleAt(unsigned segment,double progress,double rate,double acceleration,bool fixtureLimitVariant=false);
+// The twelve joint targets of that point (slot order), without body, feet or hull: the release retimer's evaluator.
+bool pairedProneJointsAt(unsigned segment,double progress,bool fixtureLimitVariant,double q[12]);
 // Loaded routes recover verified boundaries. A suspended reviewed tube may
 // admit a measured common progress on a certified segment; never arbitrary Q.
 double canonicalFootPlaneMinimum(LegId,const LegJointAngles&,const BodyPose&);

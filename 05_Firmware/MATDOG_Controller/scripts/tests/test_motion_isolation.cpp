@@ -66,14 +66,16 @@ int main(){
  }
  CHECK(tobe.stood);CHECK(tobe.gap_max<=24.5);
  CHECK(!asis_silent.stood);CHECK(asis_silent.loop_max>=500);   // the library's own 500 ms wait lands inside the Motion loop
- CHECK(!asis.stood);   // the IMU-paced loop's jitter alone already stops the qualified STAND (ACCELERATION_LIMIT, as on the 19/10 hardware run)
+ // V5: the IMU-paced loop's jitter alone stopped the qualified STAND (ACCELERATION_LIMIT, as on the 19/10 hardware run).
+ // Core Motion V6: the same jitter is retimed coherently (MotionLaw retimeRelease) and the STAND completes.
+ CHECK(asis.stood);
  // ---- release jitter that REMAINS in the Motion thread. The qualified STAND profile moves at v=.19 rad/s with a 4 mrad
- // step cap per 20 ms frame (v*T = 3.8 mrad of 4): a frame released later than ~1 ms slows that frame by the step cap and the
- // executor's secant acceleration (release-interval clock) exceeds 2 rad/s^2. That is fail-safe (SAFE_OFF), not hidden, and it
- // is the reason STAND needs a dynamic profile with release-jitter headroom (see MotionLaw / DynamicProfile). ----
+ // step cap per 20 ms frame. V5 (clamp + re-stamped release) stopped at a 6 ms stall. V6 retimes every release against the
+ // committed frame: a late frame decelerates within the step and the return is ramped. A release later than the profile
+ // can decelerate within its step is a true infeasibility, refused before TX (fail-safe, with operands). ----
  for(uint32_t stall_ms:{1u,2u,3u,4u,5u,6u,7u,8u,9u,10u,12u,20u,57u,120u}){char n[64];std::snprintf(n,sizeof(n),"TO_BE qualified profile stall %u ms/500 ms",stall_ms);
   const auto r=runStand(n,tobeDt,3,500,stall_ms*1000);
-  if(stall_ms>=20)CHECK(!r.stood);
+  if(stall_ms<=12)CHECK(r.stood);
   std::printf("STALL_SWEEP stall_ms=%u stood=%d reason=%s\n",stall_ms,r.stood,r.reason.c_str());}
  std::printf("MOTION_ISOLATION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
  return failures?1:0;

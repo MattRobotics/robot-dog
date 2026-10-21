@@ -40,6 +40,17 @@ namespace {
 bool sampleFresh(uint32_t now_ms,uint32_t sampled_at_ms,uint32_t max_age_ms){
   return static_cast<int32_t>(now_ms-sampled_at_ms)<=static_cast<int32_t>(max_age_ms);
 }
+// Core Motion V6: the operands of the first refusal (verifier/site, slot, compared value and bound; release secant
+// operands; path-box instant and uncertainty). One bounded line at the first stop only. Out of line and static so the
+// formatting never adds to the Controller frame that the Motion call chain runs on (16 KB loop stack).
+void __attribute__((noinline)) writeFirstRefusal(const motion::RefusalRecord& why,const char* phase){
+  static char line[352];
+  const int n=snprintf(line,sizeof(line),
+    "MOTION_REFUSAL site=%s reason=%s phase=%s joint=%d seq=%lu value=%.9g limit=%.9g q=%.9f q_last=%.9f v=%.9f v_prev=%.9f dt_ms=%.3f dt_prev_ms=%.3f at_us=%llu sample_us=%llu u_mrad=%.3f\r\n",
+    why.site,why.reason,phase,why.joint,(unsigned long)why.sequence,why.value,why.limit,why.q,why.qLast,why.v,why.vPrev,
+    why.dtS*1000,why.dtPrevS*1000,(unsigned long long)why.atUs,(unsigned long long)why.sampleUs,why.uncertainty*1000);
+  if(n>0&&static_cast<size_t>(n)<sizeof(line))writeAdmissionTrace(Serial,line,static_cast<size_t>(n));
+}
 }  // namespace
 
 namespace {
@@ -479,7 +490,7 @@ calibration::RestoreFacts Controller::gatherRestoreFacts(bool read_live,calibrat
     // Twelve read-only register reads; nothing is written to the bus.
     live->present=true;
     for(unsigned i=0;i<12;++i){
-      const auto* servo=servo::legServoAt((i/3)*3+2-i%3);servo::ServoBus::RuntimeState st;
+      const auto* servo=actuator::slotServo(i);servo::ServoBus::RuntimeState st;
       const bool ok=servo&&servo_bus_.readRuntimeState(servo->bus_id,&st);
       if(ok&&st.torque_enable==0)++f.torque_off;
       live->raw[i]=ok&&st.present_position>=0&&st.present_position<4096?static_cast<uint16_t>(st.present_position):4096;
@@ -1213,17 +1224,14 @@ bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntim
        !motion::validFeedbackPolicy(r.feedback))return false;
   }
   for(unsigned i=0;i<12&&r.scope!=execution::TrialScope::FIXTURE_MICRO;++i){
-    const auto* servo=servo::legServoAt((i/3)*3+2-i%3);calibration::JointIdentity id;
-    id.leg=static_cast<calibration::Leg>(i/3);id.joint=static_cast<calibration::JointKind>(i%3);
-    strncpy(id.physical_unit,servo->physical_unit,sizeof(id.physical_unit)-1);
+    calibration::JointIdentity id;if(!actuator::slotIdentity(i,&id))return false;
     const auto* t=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());
     const auto* l=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());
     if(!t||!l)return false;
     const auto& bound=r.feedback.jointLimits[i/3][i%3];
     const double endpoints[]={bound.lower,bound.upper};
     for(double q:endpoints){uint16_t tick=0;
-      if(actuator::resolveUrdfQToRaw(geometry_profile_,actuator::geometry_data::kProvenance,*t,
-         static_cast<actuator::MicroRad>(std::llround(q*1e6)),&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
+      if(actuator::resolveRadiansToRaw(geometry_profile_,actuator::geometry_data::kProvenance,*t,q,&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
     }
   }
   if(r.scope!=execution::TrialScope::FIXTURE_MICRO){static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;route.pairedProne=true;   // off the loop stack
@@ -1236,7 +1244,7 @@ bool Controller::requestLocalMotionTrial(const execution::LocalTrialEvidence& e,
   const uint32_t now=millis();
   if(!reviewed_motion_bound_||!execution::runtimeModeAllowsScope(runtime_mode_,e.scope)||e.scope!=reviewed_motion_.scope||!generation||static_cast<int32_t>(now-expires)>=0)return false;
   if(e.scope!=execution::TrialScope::FIXTURE_MICRO&&
-     (motion::checkObservation(local_motion_observation_,reviewed_motion_.feedback,motion_clock_.now()/1e6)!=motion::FeedbackReason::OK||
+     (motion::checkObservation(local_motion_observation_,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))!=motion::FeedbackReason::OK||
       motion::pairedProneMatch(local_motion_observation_,reviewed_motion_.feedback)<0))return false;
   operational_facts_.operator_permit=true;operational_facts_.permit_generation=generation;operational_facts_.permit_expires_at_ms=expires;
   local_trial_evidence_=e;
@@ -1254,8 +1262,8 @@ bool Controller::publishLocalMotionObservation(const motion::AdaptiveObservation
   const uint32_t now=millis();const auto fb=operational_producer_.snapshot(now,reviewed_motion_.execution.feedback_max_age_ms);
   for(unsigned i=0;i<12;++i)if(!fb.read_ok[i])return false;
   for(unsigned i=0;i<4;++i)o.actual.legs[i]={fb.actual_rad[i*3],fb.actual_rad[i*3+1],fb.actual_rad[i*3+2]};
-  {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];o.stampS=oldest/1e6;}
-  if(motion::checkObservation(o,reviewed_motion_.feedback,motion_clock_.now()/1e6)!=motion::FeedbackReason::OK)return false;
+  {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];o.stampS=motion::secondsFromMicros(oldest);}
+  if(motion::checkObservation(o,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))!=motion::FeedbackReason::OK)return false;
   local_motion_observation_=o;motion_coordinator_.observe(o);return true;
 }
 bool Controller::publishLocalMotionAssessment(const motion::SegmentAssessment& a) {
@@ -1320,7 +1328,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       emergencyTorqueOffBurst();break;
     }
     const unsigned slot=operational_poll_next_;
-    const auto* joint=servo::legServoAt((slot/3)*3+(2-slot%3));
+    const auto* joint=actuator::slotServo(slot);
     execution::RawJointObservation r=operational_producer_.raw(slot);
     const uint32_t read_started=millis();
     const uint32_t control_period=motion_coordinator_.streamingWalk()?100:20;
@@ -1470,14 +1478,14 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // Encoder timestamp remains the oldest real sample. The operational route
   // uses model support assumptions, never a presence heartbeat as measurement.
   {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(operational_feedback_.sampled_at_us[i]<oldest)oldest=operational_feedback_.sampled_at_us[i];
-   observation.stampS=observation.actual.valid&&oldest!=UINT64_MAX?oldest/1e6:0;
+   observation.stampS=observation.actual.valid&&oldest!=UINT64_MAX?motion::secondsFromMicros(oldest):0;
    observation.externalSupportConfirmed=local_motion_observation_.externalSupportConfirmed&&(commissioning_bound_&&runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL?operatorPresent(now_ms):true);}
   // Diagnostic fixture declarations remain local to diagnostics. Operational
   // geometry uses its configured support model and live joint limits.
   ready.support_observable=commissioning_bound_?
     ((runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||operatorPresent(now_ms))&&local_motion_observation_.externalSupportConfirmed):
     reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
-    motion::checkObservation(observation,reviewed_motion_.feedback,motion_clock_.now()/1e6)==motion::FeedbackReason::OK;
+    motion::checkObservation(observation,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))==motion::FeedbackReason::OK;
   ready.local_fixture_session=operational_session_.state()==execution::MotionSessionState::ARMED&&
     operational_session_.scope()==execution::TrialScope::FIXTURE_MICRO;
   motion_coordinator_.observe(observation);
@@ -1536,7 +1544,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
      operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
     const auto& frame=motion_coordinator_.frame();
     if(frame.target.valid&&!frame.executable){
-      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=motion_clock_.now()/1e6;
+      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=motion::secondsFromMicros(motion_clock_.now());
       a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;a.geometryIdentityVerified=true;
       a.sweptCollisionClear=a.continuousBoundsConfirmed=a.supportCompatible=true;
       a.fixtureTrialEnvelopeReviewed=reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;
@@ -1559,6 +1567,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       (unsigned long)millis(),operational_session_.stateName(),motion_executor_.status().reason,
       (unsigned long)motion_executor_.status().tx_sequence);
     if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
+    writeFirstRefusal(motion_executor_.refusal(),phase_before_work);
   }
   if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
     char budget[384];const int n=snprintf(budget,sizeof(budget),

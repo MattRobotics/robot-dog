@@ -67,15 +67,20 @@ bool buildPhaseTimedRoute(bool variant, double v, double a, double dt, PhaseTime
   out->velocityRadS = v; out->accelerationRadS2 = a; out->frameS = dt; out->valid = true;
   return true;
 }
-LocomotionFrame phaseTimedSample(const PhaseTimedRoute& r, unsigned phase, double t, bool variant, unsigned* segment) {
-  if (!r.valid || phase >= 5 || !std::isfinite(t) || t < 0) return {};
+namespace {
+// Segment, linear progress and its time derivatives of phase `phase` at t (clamped to the phase duration).
+struct RoutePoint { bool valid = false; unsigned segment = 0; double progress = 0, rate = 0, acceleration = 0; };
+RoutePoint locate(const PhaseTimedRoute& r, unsigned phase, double t) {
+  RoutePoint p;
+  if (!r.valid || phase >= 5 || !std::isfinite(t) || t < 0) return p;
   const unsigned begin = r.first[phase], end = r.first[phase + 1];
-  if (begin >= end) return {};
+  if (begin >= end) return p;
   if (t > r.durationS[phase]) t = r.durationS[phase];
   // Last segment whose start is <= t (zero-length segments occupy no time).
   unsigned i = begin;
   for (unsigned k = begin; k < end; ++k) if (r.length[k] > 0 && r.startS[k] <= t) i = k;
-  if (r.length[i] <= 0) { if (segment) *segment = end - 1; return pairedProneSampleAt(end - 1, 1, 0, 0, variant); }
+  p.valid = true;
+  if (r.length[i] <= 0) { p.segment = end - 1; p.progress = 1; return p; }
   const Trap tr = trap(r.length[i], r.entrySpeed[i], r.entrySpeed[i + 1], r.accelerationRadS2, r.velocityRadS);
   double tau = t - r.startS[i], s = 0, sd = 0, sdd = 0;
   const double a = r.accelerationRadS2;
@@ -83,8 +88,19 @@ LocomotionFrame phaseTimedSample(const PhaseTimedRoute& r, unsigned phase, doubl
   else if (tau <= tr.ta + tr.tc) { const double u = tau - tr.ta; s = (tr.vp * tr.vp - tr.v0 * tr.v0) / (2 * a) + tr.vp * u; sd = tr.vp; sdd = 0; }
   else { const double u = std::fmin(tau - tr.ta - tr.tc, tr.td);
     s = (tr.vp * tr.vp - tr.v0 * tr.v0) / (2 * a) + tr.vp * tr.tc + tr.vp * u - .5 * a * u * u; sd = tr.vp - a * u; sdd = u < tr.td ? -a : 0; }
-  if (segment) *segment = i;
   const double L = r.length[i];
-  return pairedProneSampleAt(i, std::fmin(1.0, std::fmax(0.0, s / L)), sd / L, sdd / L, variant);
+  p.segment = i; p.progress = std::fmin(1.0, std::fmax(0.0, s / L)); p.rate = sd / L; p.acceleration = sdd / L;
+  return p;
+}
+}
+LocomotionFrame phaseTimedSample(const PhaseTimedRoute& r, unsigned phase, double t, bool variant, unsigned* segment) {
+  const RoutePoint p = locate(r, phase, t);
+  if (!p.valid) return {};
+  if (segment) *segment = p.segment;
+  return pairedProneSampleAt(p.segment, p.progress, p.rate, p.acceleration, variant);
+}
+bool phaseTimedJoints(const PhaseTimedRoute& r, unsigned phase, double t, bool variant, double q[12]) {
+  const RoutePoint p = locate(r, phase, t);
+  return p.valid && pairedProneJointsAt(p.segment, p.progress, variant, q);
 }
 } }

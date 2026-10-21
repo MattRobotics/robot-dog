@@ -20,6 +20,16 @@ struct LocalTrialEvidence {
 };
 constexpr uint16_t kPrimeInwardMarginTicks=2;
 enum class MotionSessionState : uint8_t { OFF, PRIMING, ENERGIZING, ARMING, ARMED, SAFE_OFF_REQUIRED };
+// The ONE description of the PRIME start (Core Motion V6): from the measured pose, the goal each joint will hold (its
+// exact readback tick, or - FIXTURE_COMMISSIONING only - for a folded LOWER resting just past its hard limit the
+// nearest inside tick, moving away from the stop) and which joints were primed off an expected contact. Recognition,
+// PRIME, the ARM hold and the ENTRY seed all read it; nobody reconstructs it.
+struct PrimePlan {
+ double hold_rad[12]{};   // commanded hold (RAW-quantized, inside the limits)
+ double rest_rad[12]{};   // measured rest the plan was made from
+ uint16_t clamp_mask=0;   // primed off an expected folded contact
+ uint8_t clamp_ticks[12]{};
+};
 // LOCAL Controller lifecycle, no HTTP binding. A separate operator permit and
 // scoped evidence are required. Prime writes PRESENT targets while torque is
 // OFF; torque then comes through the same SafeActuatorRuntime. One bus op/tick.
@@ -29,6 +39,8 @@ class MotionSession {
             core::ActuatorAuthorityArbiter*,const actuator::CalibrationGeometryProfile*,const actuator::GeometryProvenance*);
  bool request(const LocalTrialEvidence&,const MotionExecutionFacts&,const ExecutionEnvelope&,
               const JointFeedback&,bool approved_image,uint32_t now_ms);
+ // Pure: the PRIME plan request() would admit for this measured pose (nullptr), or why it would refuse.
+ const char* planPrime(const double measured_rad[12],TrialScope scope,uint16_t clamp_max_ticks,PrimePlan* out) const;
  const diagnostics::PrimeRejectionLog& primeDiagnostics() const {return prime_diagnostics_;}
  void update(const LocalTrialEvidence&,const MotionExecutionFacts&,const JointFeedback&,uint32_t now_ms);
  bool requestFixtureMicro(unsigned joint,double delta_rad,double duration_s,const FrameValidation& path,

@@ -26,15 +26,27 @@ LocomotionFrame pairedProneSample(unsigned i,double u,bool variant,double beginP
  const auto law=quinticTimeLaw(u,pairedProneDuration(i));if(!law.valid)return {};
  return pairedProneSampleAt(i,beginProgress+(1-beginProgress)*law.progress,(1-beginProgress)*law.velocity,(1-beginProgress)*law.acceleration,variant);
 }
-LocomotionFrame pairedProneSampleAt(unsigned i,double progress,double rate,double acceleration,bool variant){
- LocomotionFrame f;
- if(i>=kPairedProneSegments||!std::isfinite(progress)||progress<0||progress>1||!std::isfinite(rate)||!std::isfinite(acceleration))return f;
- double p[8],v[8],a[8];
+namespace {
+// Knot parameters of one polyline point and their time derivatives (the fixture variant floors the LOWER knots).
+void routeParameters(unsigned i,double progress,double rate,double acceleration,bool variant,double p[8],double v[8],double a[8]){
  for(unsigned j=0;j<8;++j){const double floor=j==3?-88.5*3.14159265358979323846/180:-89.0*3.14159265358979323846/180;
   const bool constrained=variant&&(j==1||j==3);
   const double start=constrained?std::fmax(floor,paired_data::kKnots[i].p[j]):paired_data::kKnots[i].p[j];
   const double end=constrained?std::fmax(floor,paired_data::kKnots[i+1].p[j]):paired_data::kKnots[i+1].p[j],delta=end-start;
   p[j]=start+delta*progress;v[j]=delta*rate;a[j]=delta*acceleration;}
+}
+}
+bool pairedProneJointsAt(unsigned i,double progress,bool variant,double q[12]){
+ if(!q||i>=kPairedProneSegments||!std::isfinite(progress)||progress<0||progress>1)return false;
+ double p[8],v[8],a[8];routeParameters(i,progress,0,0,variant,p,v,a);
+ for(unsigned leg=0;leg<4;++leg){const double sign=(leg==0||leg==3)?-1:1;
+  q[leg*3]=sign*p[7];q[leg*3+1]=leg<2?p[2]:p[0];q[leg*3+2]=leg<2?p[3]:p[1];}
+ return true;
+}
+LocomotionFrame pairedProneSampleAt(unsigned i,double progress,double rate,double acceleration,bool variant){
+ LocomotionFrame f;
+ if(i>=kPairedProneSegments||!std::isfinite(progress)||progress<0||progress>1||!std::isfinite(rate)||!std::isfinite(acceleration))return f;
+ double p[8],v[8],a[8];routeParameters(i,progress,rate,acceleration,variant,p,v,a);
  auto& body=f.cartesian.body;body.translationM={p[5],0,p[6]};
  const double c=std::cos(p[4]),s=std::sin(p[4]);
  body.rotation[0][0]=c;body.rotation[0][2]=s;body.rotation[2][0]=-s;body.rotation[2][2]=c;

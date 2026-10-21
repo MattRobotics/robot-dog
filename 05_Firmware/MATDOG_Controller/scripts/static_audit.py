@@ -6645,8 +6645,9 @@ def check_stand_release_scope(files):
 def check_operational_session_boundaries(files):
     by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
     session=by_name.get("MotionSession.cpp",(None,""))[1]
+    # Core Motion V6: request() refuses torque ON itself and admits limits only through the shared planPrime().
     for token in ('if(!image)', 'gate(e,input,fb,now)', 'policy_->plan(', 'runtime_->execute(',
-                  'fb.torque_on[i]||!resolve(', 'executor_->arm(', 'policy_->epoch()!=epoch_',
+                  'if(fb.torque_on[i])', 'planPrime(fb.actual_rad', 'executor_->arm(', 'policy_->epoch()!=epoch_',
                   'e.scope==TrialScope::FIXTURE_MICRO', 'AUTONOMOUS_SUPPORT_LOAD_REQUIRED', 'WALK_DYNAMICS_REQUIRED'):
         if token not in session:fail("MotionSession operational invariant missing: "+token)
     config=by_name.get("BuildConfig.h",(None,""))[1]

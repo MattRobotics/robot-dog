@@ -20,11 +20,7 @@ namespace {
 bool uintArg(const char* s,uint32_t& v){char* e=nullptr;errno=0;const unsigned long x=strtoul(s,&e,10);if(!*s||*e||*s=='-'||errno==ERANGE||x>UINT32_MAX)return false;v=x;return true;}
 bool intArg(const char* s,long& v){char* e=nullptr;errno=0;v=strtol(s,&e,10);return *s&&!*e&&errno!=ERANGE;}
 bool hex64(const char* s){if(!s||strlen(s)!=64)return false;bool any=false;for(unsigned i=0;i<64;++i){const char c=s[i];if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')))return false;any|=c!='0';}return any;}
-calibration::JointIdentity slotIdentity(unsigned i){
- calibration::JointIdentity id;const auto* servo=servo::legServoAt((i/3)*3+2-i%3);id.leg=static_cast<calibration::Leg>(i/3);id.joint=static_cast<calibration::JointKind>(i%3);
- if(servo)strncpy(id.physical_unit,servo->physical_unit,sizeof(id.physical_unit)-1);return id;
-}
-double& slot(motion::JointTargetFrame& f,unsigned i){auto& q=f.legs[i/3];return i%3==0?q.hip:i%3==1?q.upper:q.lower;}
+calibration::JointIdentity slotIdentity(unsigned i){calibration::JointIdentity id;actuator::slotIdentity(i,&id);return id;}
 const char* entryName(const execution::MotionCoordinator& c){
  const auto& s=c.stand();if(!s.entryActive())return "NONE";
  if(!s.entryPending())return "DONE";return s.entryStage()==0?"E0":"E1";
@@ -62,7 +58,7 @@ void Controller::emitTelemetry(uint32_t now){
  auto add=[&](const char* format,auto... args){if(used>=sizeof(buffer))return;const int n=snprintf(buffer+used,sizeof(buffer)-used,format,args...);if(n>0)used+=static_cast<size_t>(n)<sizeof(buffer)-used?n:sizeof(buffer)-used-1;};
  const auto imu=imu_.orientationSnapshot();
  add(",\"tel\":1,\"boot_nonce\":%lu,\"tel_seq\":%lu,\"imu\":{\"valid\":%s,\"stamp_ms\":%lu},\"servos\":[",(unsigned long)boot_nonce_,(unsigned long)++telemetry_seq_,imu.valid?"true":"false",(unsigned long)imu.sampled_at_ms);
- for(unsigned i=0;i<12;++i){const auto& r=operational_producer_.raw(i);const auto* servo=servo::legServoAt((i/3)*3+2-i%3);
+ for(unsigned i=0;i<12;++i){const auto& r=operational_producer_.raw(i);const auto* servo=actuator::slotServo(i);
   add("%s{\"slot\":%u,\"id\":%u,\"raw\":%u,\"mapped\":%s,\"energized\":%d,\"speed\":%d,\"goal\":%d,\"temp\":%d,\"volt_dv\":%d,\"status\":%d,\"age_ms\":%lu}",i?",":"",i,servo?servo->bus_id:0,r.position,operational_feedback_.read_ok[i]?"true":"false",
    r.torque,r.speed,r.goal_position,r.temperature,r.voltage,r.status,(unsigned long)(now-r.sampled_at_ms));}
  add("],\"runtime\":{\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu}}\r\n",
@@ -94,11 +90,12 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
   const auto admission=runtime_restore_.qualifyCommissioningLimits(geometry_profile_,actuator::geometry_data::kProvenance,commissioning_params_.inset_ticks,facts,actuator_policy_.transforms(),actuator_policy_.limits());
   if(admission!=calibration::OperationalAdmissionStatus::APPROVED){reason=calibration::toString(admission);commissioning_reason_=reason;return false;}
   double limits[12][2];
-  for(unsigned i=0;i<12;++i){const auto id=slotIdentity(i);const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());actuator::MicroRad lo,hi;
-   if(!tr||!lim||actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||
-      actuator::resolveRawToUrdfQ(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
+  for(unsigned i=0;i<12;++i){const auto id=slotIdentity(i);const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());double lo,hi;
+   // The live hard limits in radians come from the SAME RAW -> radians conversion as every encoder sample.
+   if(!tr||!lim||actuator::resolveRawToRadians(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->min_tick,&lo)!=actuator::TargetResolveStatus::OK||
+      actuator::resolveRawToRadians(geometry_profile_,actuator::geometry_data::kProvenance,*tr,lim->max_tick,&hi)!=actuator::TargetResolveStatus::OK){
     unbindCommissioning("LIMIT_TRANSFORM_FAILED");reason=commissioning_reason_;return false;}
-   limits[i][0]=std::fmin(lo,hi)*1e-6;limits[i][1]=std::fmax(lo,hi)*1e-6;}
+   limits[i][0]=std::fmin(lo,hi);limits[i][1]=std::fmax(lo,hi);}
   // Operational (2026-10-15): the continuous fixture WALK profile is bound as a
   // SPECIFICATION when its certified target union (+ tracking tube) fits the
   // live gen-1 limits; motion still needs a verified STAND and an explicit
@@ -137,7 +134,7 @@ bool Controller::admitRuntimePolicy(bool operational,uint32_t issued,uint32_t no
    // compiled region proof covers every recognized start (+/-10 deg) and
    // both stages with the wider CAD tube; actual raw/URDF limits still apply.
    // Physical mounting/cover uncertainty remains a fixture qualification.
-   cc.measuredStart=true;cc.pathMarginRad=.001;cc.keepoutCount=1;
+   cc.measuredStart=true;cc.pathMarginRad=.001;cc.keepoutCount=1;cc.primeClampMaxTicks=commissioning_params_.prime_clamp_ticks;
    auto& k=cc.keepouts[0];k.id="LF_UPPER_LOWER_CONTACT";k.a=k.b=2;k.ca=1;k.cb=0;k.bound=-92.070442*3.14159265358979323846/180.0;
   }
   cc.proneMaxDeviationRad=commissioning_params_.prone_max_deviation_rad;cc.proneMaxRmsRad=commissioning_params_.prone_max_rms_rad;
@@ -233,9 +230,9 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
   if(runtime_mode_!=execution::RuntimeTestMode::FIXTURE_COMMISSIONING){reason="FIXTURE_COMMISSIONING_MODE_REQUIRED";return reply();}
   if(!idle){reason="SAFE_IDLE_REQUIRED";return reply();}
   motion::FixtureEntryCertificate c;c.present=true;c.start.valid=true;
-  for(unsigned i=0;i<12;++i){long u;if(!intArg(t[i+1],u)||u<-3200000||u>3200000){reason="ENTRY_START_URAD";return reply();}slot(c.start,i)=u*1e-6;}
+  for(unsigned i=0;i<12;++i){long u;if(!intArg(t[i+1],u)||u<-3200000||u>3200000){reason="ENTRY_START_URAD";return reply();}motion::jointSlot(c.start,i)=actuator::microRadToRadians(static_cast<actuator::MicroRad>(u));}
   uint32_t tube;if(!uintArg(t[13],tube)||tube==0||tube>20000||!hex64(t[14])){reason="ENTRY_TUBE_OR_DIGEST";return reply();}
-  c.tubeRad=tube*1e-6;strcpy(c.sha256,t[14]);c.goal=motion::pairedProneSample(0,0,true).target;
+  c.tubeRad=actuator::microRadToRadians(static_cast<actuator::MicroRad>(tube));strcpy(c.sha256,t[14]);c.goal=motion::pairedProneSample(0,0,true).target;
   if(!c.goal.valid){reason="ROUTE_HEAD_INVALID";return reply();}
   unbindCommissioning("ENTRY_CERTIFICATE_LOADED_READMIT_REQUIRED");commissioning_entry_=c;ok=true;reason="ENTRY_CERTIFICATE_RAM_ONLY";return reply();
  }
@@ -261,7 +258,7 @@ bool Controller::commissioningCommand(const char* line,uint32_t now,char* out,si
   // operator must name that explicitly. Nothing else is ever re-aligned.
   bool inward=false;
   for(unsigned i=2;i<12;i+=3){const auto id=slotIdentity(i);const auto* tr=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());const auto* lim=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());
-   uint16_t tick=0;if(tr&&lim&&operational_feedback_.read_ok[i]&&actuator::resolveUrdfQToRaw(geometry_profile_,actuator::geometry_data::kProvenance,*tr,static_cast<actuator::MicroRad>(std::llround(operational_feedback_.actual_rad[i]*1e6)),&tick)==actuator::TargetResolveStatus::OK)
+   uint16_t tick=0;if(tr&&lim&&operational_feedback_.read_ok[i]&&actuator::resolveRadiansToRaw(geometry_profile_,actuator::geometry_data::kProvenance,*tr,operational_feedback_.actual_rad[i],&tick)==actuator::TargetResolveStatus::OK)
     inward=inward||!lim->contains(tick);}
   if(strcmp(t[3],inward?"CONFIRM_FIXTURE_PRIME_HOLD_LOWER_INWARD":"CONFIRM_FIXTURE_PRIME_HOLD")){reason=inward?"LOWER_INWARD_PRIME_CONFIRMATION_REQUIRED":"PRIME_CONFIRMATION_REQUIRED";return reply();}
   execution::LocalTrialEvidence e;e.scope=execution::TrialScope::FIXTURE_COMMISSIONING;e.generation=++validation_sequence_;e.expires_at_ms=issued+ttl;

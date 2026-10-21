@@ -11,6 +11,10 @@
 // poll releases ONCE (no catch-up, no backlog of old instants): every release
 // instant that already passed beyond the current one is counted as skipped,
 // never replayed. Overruns and lateness are counters, never hidden.
+// start(now, period, early): a poll within `early` before the next instant serves
+// it now (Core Motion V6, every Motion stream). A Controller tick ending just
+// before a deadline would otherwise wait one more whole tick (deadline aliasing:
+// release intervals up to period + tick). The served instant stays on the grid.
 #include <stdint.h>
 namespace matdog { namespace core {
 
@@ -41,19 +45,21 @@ struct SchedulerCounters {
   uint64_t max_lateness_us = 0;
 };
 
+// Release window of the Motion streams: a quarter period (MotionCoordinator).
+constexpr uint32_t kStreamReleaseWindowDivisor = 4;
 class PeriodicScheduler {
  public:
-  bool start(uint64_t now_us, uint32_t period_us) {
-    if (period_us == 0) return false;
-    period_us_ = period_us; next_us_ = now_us; running_ = true; sequence_ = 0; counters_ = {};
+  bool start(uint64_t now_us, uint32_t period_us, uint32_t early_us = 0) {
+    if (period_us == 0 || early_us >= period_us) return false;
+    period_us_ = period_us; early_us_ = early_us; next_us_ = now_us; running_ = true; sequence_ = 0; counters_ = {};
     return true;
   }
   void stop() { running_ = false; }
   bool running() const { return running_; }
   SchedulerRelease poll(uint64_t now_us) {
     SchedulerRelease r;
-    if (!running_ || now_us < next_us_) return r;
-    r.release = true; r.deadline_us = next_us_; r.lateness_us = now_us - next_us_;
+    if (!running_ || now_us + early_us_ < next_us_) return r;
+    r.release = true; r.deadline_us = next_us_; r.lateness_us = now_us >= next_us_ ? now_us - next_us_ : 0;
     r.sequence = ++sequence_;
     const uint64_t missed = r.lateness_us / period_us_;  // whole periods already gone
     if (missed) { r.skipped = static_cast<uint32_t>(missed); ++counters_.overruns; counters_.skipped += r.skipped; }
@@ -67,7 +73,7 @@ class PeriodicScheduler {
   const SchedulerCounters& counters() const { return counters_; }
  private:
   bool running_ = false;
-  uint32_t period_us_ = 0, sequence_ = 0;
+  uint32_t period_us_ = 0, early_us_ = 0, sequence_ = 0;
   uint64_t next_us_ = 0;
   SchedulerCounters counters_{};
 };

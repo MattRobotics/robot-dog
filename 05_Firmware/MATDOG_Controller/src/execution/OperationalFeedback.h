@@ -40,6 +40,7 @@ class OperationalFeedback {
  RawJointObservation raw_[12]{};
  JointFeedback last_valid_{};
  JointFeedback feedback_{};
+ uint64_t previous_at_us_[12]{};double previous_rad_[12]{};
 };
 } }
 #endif

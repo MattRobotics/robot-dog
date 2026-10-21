@@ -60,6 +60,7 @@ struct Operational {
     CommissioningStandConfig cc;cc.enabled=true;cc.measuredStart=true;cc.minStageDurationS=b.params.entry_min_stage_s;
     cc.proneMaxDeviationRad=b.params.prone_max_deviation_rad;cc.proneMaxRmsRad=b.params.prone_max_rms_rad;
     cc.keepoutCount=1;auto& k=cc.keepouts[0];k.id="LF_UPPER_LOWER_CONTACT";k.a=k.b=2;k.ca=keepout_sign;k.cb=0;k.bound=keepout_sign*keepout_deg*kDeg;
+    cc.primeClampMaxTicks=b.params.prime_clamp_ticks;   // as Commissioning.cpp: the pre-arm dry run uses the session's PRIME plan
     CHECK(b.coordinator.configureCommissioning(cc));   // no certificate needed
     b.service.begin(&b.r.executor,&b.coordinator);refresh();
   }
@@ -238,6 +239,9 @@ struct StreamModel {
   uint32_t loop_us=2000,read_us=420,tx_us=1100,jitter_us=0;unsigned reads_per_tick=2;
   double tau_s=.03,speed_rad_s=1000*2*kPi/4096,acc_rad_s2=50*100*2*kPi/4096;
   uint32_t hb_period_ms=1000,stall_every_ms=0,stall_us=0;unsigned stop_short_ticks=0;
+  // Controller cost between the first coordinator call (frame materialized) and the second (assessed frame sent): a
+  // fixed part plus a pseudo-random part (RCA phase 1: the old driver used one instant for both calls).
+  uint32_t assess_delay_us=0,assess_jitter_us=0;
 };
 struct Dist {
   std::vector<double> v;void add(double x){v.push_back(x);}
@@ -248,7 +252,7 @@ struct Dist {
 struct StreamDriver {
   Operational& op;StreamModel m;core::MonotonicClock64 clock;uint64_t now_us=0,last_hb_us=0;uint32_t lcg=12345;
   double q[12]{},v[12]{},goal[12]{};std::deque<std::pair<uint64_t,std::array<double,12>>> inflight;size_t seen_writes=0;
-  unsigned rr=0;uint64_t sample_us[12]{};double sample_q[12]{},sample_v[12]{};bool heartbeat=true,feedback_ok=true,stuck[12]{};
+  unsigned rr=0;uint64_t sample_us[12]{},prev_us[12]{};double sample_q[12]{},sample_v[12]{},prev_q[12]{};bool heartbeat=true,feedback_ok=true,stuck[12]{};
   Dist monitor[12],lead[12],tick_us;std::vector<double> cycle_t;int last_cycle=-1;uint64_t next_stall_us=0;
   unsigned frames_seen=0;uint32_t last_tx_seq=0;bool trace_refs=false;double ref_lo[12],ref_hi[12];
   StreamDriver(Operational& o,StreamModel mm):op(o),m(mm){
@@ -268,7 +272,7 @@ struct StreamDriver {
         double vd=residual/m.tau_s;vd=std::max(-m.speed_rad_s,std::min(m.speed_rad_s,vd));
         const double dv=std::max(-m.acc_rad_s2*dt,std::min(m.acc_rad_s2*dt,vd-v[i]));v[i]+=dv;q[i]+=v[i]*dt;}}
   }
-  void read(unsigned j){auto& r=op.b.r;sample_q[j]=qOf(r,j,tickOf(r,j,q[j]));sample_us[j]=now_us;
+  void read(unsigned j){auto& r=op.b.r;prev_q[j]=sample_q[j];prev_us[j]=sample_us[j];sample_q[j]=qOf(r,j,tickOf(r,j,q[j]));sample_us[j]=now_us;
     const double steps=std::round(v[j]*4096/(2*kPi));sample_v[j]=steps*2*kPi/4096;}
   bool failed(){auto& b=op.b;return b.r.executor.status().state==ExecutorState::SAFE_OFF_REQUIRED||b.r.executor.status().state==ExecutorState::FAULT||
     !std::strcmp(b.coordinator.state(),"REJECTED")||b.session.safeOffRequired();}
@@ -286,6 +290,7 @@ struct StreamDriver {
     for(unsigned k=0;k<m.reads_per_tick;++k){physics(std::max(now_us,reads_from+(k+1)*m.read_us));if(feedback_ok)read(rr);rr=(rr+1)%12;}
     physics(end);b.now=static_cast<uint32_t>(now_us/1000);clock.extend(static_cast<uint32_t>(now_us));
     for(unsigned i=0;i<12;++i){b.r.feedback.actual_rad[i]=sample_q[i];b.r.feedback.sampled_at_us[i]=sample_us[i];b.r.feedback.sampled_at_ms[i]=static_cast<uint32_t>(sample_us[i]/1000);
+      b.r.feedback.previous_at_us[i]=prev_us[i];b.r.feedback.previous_rad[i]=prev_q[i];
       b.r.feedback.speed_rad_s[i]=sample_v[i];b.r.feedback.read_ok[i]=true;b.r.feedback.torque_on[i]=true;}
     // 1 Hz authenticated heartbeat = presence (3 s window), as Controller::operatorPresent.
     if(heartbeat&&now_us-last_hb_us>=m.hb_period_ms*1000ull)last_hb_us=now_us;
@@ -303,7 +308,11 @@ struct StreamDriver {
     {const auto& frame=b.coordinator.frame();
      if(frame.target.valid&&!frame.executable&&!b.coordinator.walking()){motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=now_us/1e6;a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
       a.geometryIdentityVerified=a.sweptCollisionClear=a.supportCompatible=a.continuousBoundsConfirmed=a.fixtureTrialEnvelopeReviewed=true;
-      if(b.coordinator.assess(a,b.now))b.coordinator.update(b.r.facts,b.r.feedback,b.now,now_us);}}
+      if(b.coordinator.assess(a,b.now)){
+       if(m.assess_jitter_us){lcg=lcg*1103515245u+12345u;}
+       const uint32_t delay=m.assess_delay_us+(m.assess_jitter_us?(lcg>>8)%m.assess_jitter_us:0);
+       if(delay){physics(now_us+delay);clock.extend(static_cast<uint32_t>(now_us));b.now=static_cast<uint32_t>(now_us/1000);b.r.backend.frame_clock_us=static_cast<uint32_t>(now_us);}
+       b.coordinator.update(b.r.facts,b.r.feedback,b.now,now_us);}}}
     op.refresh();b.r.executor.update(b.r.facts,b.r.feedback,b.now,now_us);
     // Writes transmitted this tick (a 12-joint frame or single legacy writes)
     // reach their servos after the UART delay.

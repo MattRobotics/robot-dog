@@ -1,7 +1,5 @@
 #include "OperationalFeedback.h"
-#include "../servo/ServoPopulation.h"
 #include "../motion/OperationalTolerance.h"
-#include <cstring>
 namespace matdog { namespace execution {
 void OperationalFeedback::ingest(unsigned i,const RawJointObservation& sample,const actuator::CalibrationGeometryProfile& geometry,
  const actuator::GeometryProvenance& provenance,const actuator::JointTransformTable& transforms){
@@ -11,26 +9,29 @@ void OperationalFeedback::ingest(unsigned i,const RawJointObservation& sample,co
  feedback_.sampled_at_us[i]=sample.sampled_at_us;feedback_.speed_rad_s[i]=0;
  if(!sample.read_ok||sample.position>=4096||sample.torque<0||sample.torque>1||sample.status!=0||
     sample.temperature<0||sample.temperature>70||sample.voltage<=0)return;
- const auto* servo=servo::legServoAt((i/3)*3+(2-i%3));if(!servo)return;
- calibration::JointIdentity identity;identity.leg=static_cast<calibration::Leg>(i/3);
- identity.joint=static_cast<calibration::JointKind>(i%3);
- std::strncpy(identity.physical_unit,servo->physical_unit,sizeof(identity.physical_unit)-1);
+ const auto* servo=actuator::slotServo(i);calibration::JointIdentity identity;
+ if(!servo||!actuator::slotIdentity(i,&identity))return;
  const auto* t=transforms.find(identity,geometry.provenanceTag());
  const auto* g=geometry.findJoint(identity);
  if(!t||!g||g->bus_id!=servo->bus_id)return;
- actuator::MicroRad q=0;
- if(actuator::resolveRawToUrdfQ(geometry,provenance,*t,sample.position,&q)!=actuator::TargetResolveStatus::OK)return;
- feedback_.actual_rad[i]=q/1e6;feedback_.read_ok[i]=true;
+ // The canonical RAW -> radians conversion: the same radians a RAW limit end on this tick produces.
+ double q=0;
+ if(actuator::resolveRawToRadians(geometry,provenance,*t,sample.position,&q)!=actuator::TargetResolveStatus::OK)return;
+ feedback_.actual_rad[i]=q;feedback_.read_ok[i]=true;
  // Speed in the joint frame: q = sign * (raw - q0) scale, same direction as the position map.
  // A register step/s is a velocity quantum, not the finite difference of
  // two rounded micro-radian positions (which alternates 1533/1534 urad).
  feedback_.speed_rad_s[i]=sample.speed_signed*actuator::jointDirection(geometry,identity)*motion::tolerance::kTickRad;
+ // The previous valid sample travels with the latest one (common-instant reconstruction of the path box).
+ if(last_valid_.read_ok[i]&&last_valid_.sampled_at_us[i]&&last_valid_.sampled_at_us[i]<feedback_.sampled_at_us[i]){
+  previous_at_us_[i]=last_valid_.sampled_at_us[i];previous_rad_[i]=last_valid_.actual_rad[i];}
  last_valid_.read_ok[i]=true;last_valid_.sampled_at_ms[i]=feedback_.sampled_at_ms[i];
  last_valid_.sampled_at_us[i]=feedback_.sampled_at_us[i];last_valid_.actual_rad[i]=feedback_.actual_rad[i];
  last_valid_.torque_on[i]=feedback_.torque_on[i];last_valid_.speed_rad_s[i]=feedback_.speed_rad_s[i];
 }
 JointFeedback OperationalFeedback::snapshot(uint32_t now,uint32_t age) const {
  auto f=feedback_;
+ for(unsigned i=0;i<12;++i){f.previous_at_us[i]=previous_at_us_[i];f.previous_rad[i]=previous_rad_[i];}
  for(unsigned i=0;i<12;++i){
   // Failed transport / malformed position: retry within the ORIGINAL age
   // limit, keeping the last valid timestamp and explicitly invalid feedback.

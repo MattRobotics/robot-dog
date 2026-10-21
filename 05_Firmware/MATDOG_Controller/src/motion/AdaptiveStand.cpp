@@ -41,7 +41,10 @@ bool restGroundAcquisitionCandidate(AcquisitionRoute& route){
 }
 bool AdaptiveStand::prepareTimedRoute(const AcquisitionRoute& r,const FeedbackPolicy& p){
   if(!r.pairedProne||!r.phaseTimed)return true;
-  const double v=.999*r.phaseVelocityRadS,a=.999*r.phaseAccelerationRadS2/2;
+  // Cruise derived from the common stream lateness contract (the executor's full acceleration envelope decelerates a
+  // late frame within its step); the trapezoid keeps half of it for the corners.
+  const double v=std::fmin(.999*r.phaseVelocityRadS,velocityForLateness(r.phaseVelocityRadS,r.phaseAccelerationRadS2,p.samplePeriodS,p.maxJointStepRad,kStreamLatenessToleranceS)),
+               a=.999*r.phaseAccelerationRadS2/2;
   if(timed_.valid&&timedVariant_==p.fixtureLimitVariant&&timed_.velocityRadS==v&&
      timed_.accelerationRadS2==a&&timed_.frameS==p.samplePeriodS)return true;
   timedVariant_=p.fixtureLimitVariant;
@@ -53,7 +56,7 @@ bool AdaptiveStand::request(const AdaptiveStandRequest& r,const FeedbackPolicy& 
   entry_progress_=0;approvedSegment_=entry_knot_=UINT16_MAX;for(auto& q:entry_offset_)q={};
   entry_=FixtureEntryPlan{};prone_=FixturePoseClassification{};entryActive_=false;entryStage_=0;entryApproved_=UINT8_MAX;approvedThrough_=UINT16_MAX;
   route_.count=0;route_.pairedProne=false;pairedSegment_=0;routeIndex_=0;segmentIndex_=segmentIntervals_=0;
-  policy_=p;request_=r;lastNow_=now;verifySince_=now;sequence_=r.firstSequence;
+  policy_=p;request_=r;lastNow_=now;verifySince_=now;sequence_=r.firstSequence;refusal_={};pendingAtUs_=0;
   if(!validFeedbackPolicy(p)){reject(FeedbackReason::INVALID_POLICY);return false;}
   if(!std::isfinite(now)||!std::isfinite(r.targetHeightM)||r.targetHeightM<=0||r.targetHeightM>.150||
     !std::isfinite(r.riseDurationS)||r.riseDurationS<=0||r.firstSequence==0){reject(FeedbackReason::INVALID_COMMAND);return false;}
@@ -105,11 +108,11 @@ bool AdaptiveStand::requestHeightAdjust(double h,uint32_t firstSequence,double n
    if(vmax>0&&amax>0&&riseDefinition(previous_,h,&d,&ascending)){
      // Reference velocity: the largest <= the envelope whose release-lateness tolerance stays >= 12 ms
      // (loop granularity + one short service stall); the planner uses half the acceleration envelope.
-     const double v=velocityForLateness(vmax,amax,policy_.samplePeriodS,policy_.maxJointStepRad,kHeightLatenessToleranceS);
+     const double v=velocityForLateness(vmax,amax,policy_.samplePeriodS,policy_.maxJointStepRad,kStreamLatenessToleranceS);
      if(v>0&&planStandHeightLaw(d,previous_.target.legs,v,0.5*amax,kHeightAccelRampS,2*policy_.samplePeriodS,&riseLaw_)){
        riseLawValid_=true;request_.riseDurationS=riseLaw_.durationS;}}}
   route_.count=0;route_.pairedProne=false;timedActive_=false;entryActive_=false;adjust_=true;
-  pendingValid_=assessed_=submitted_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;
+  pendingValid_=assessed_=submitted_=physicalReady_=false;sequence_=firstSequence;lastNow_=now;verifySince_=now;refusal_={};pendingAtUs_=0;
   state_=AdaptiveStandState::OBSERVE;reason_=FeedbackReason::OK;return true;
 }
 FeedbackFrame AdaptiveStand::reject(FeedbackReason r){state_=AdaptiveStandState::REJECTED;reason_=r;pendingValid_=false;physicalReady_=false;FeedbackFrame f;f.reason=r;return f;}
@@ -127,12 +130,15 @@ bool AdaptiveStand::beginSegment(const AcquisitionWaypoint& e){
     !std::isfinite(e.durationS)||e.durationS<=0||e.requiredFeet>15||
     (!e.bellySupportRequired&&!e.externalSupportRequired&&e.requiredFeet==0))return false;
   const double n=std::ceil(e.durationS/policy_.samplePeriodS);if(n<2||n>1000000)return false;
-  endpoint_=e;segmentStart_=previous_;segmentIndex_=0;segmentIntervals_=static_cast<uint32_t>(n);referenceAtS_=lastNow_;referenceTimeS_=0;return true;
+  endpoint_=e;segmentStart_=previous_;segmentIndex_=0;segmentIntervals_=static_cast<uint32_t>(n);referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginRise(){
   AcquisitionWaypoint e;e.body=previous_.cartesian.body;e.body.translationM.z=request_.targetHeightM;
   for(unsigned i=0;i<4;++i)e.feetWorldM[i]=previous_.cartesian.feet[i];
-  e.requiredFeet=15;e.durationS=request_.riseDurationS;state_=AdaptiveStandState::RISE;return beginSegment(e);
+  e.requiredFeet=15;e.durationS=request_.riseDurationS;state_=AdaptiveStandState::RISE;
+  // The fixed-contact path is fixed for the whole segment (contacts held): define it once, for frames and retimer.
+  riseValid_=riseDefinition(previous_,request_.targetHeightM,&riseDef_,&riseAscending_);
+  return beginSegment(e);
 }
 bool AdaptiveStand::beginEntryStage(){
   if(entryStage_>=kFixtureEntryStages)return false;
@@ -140,7 +146,7 @@ bool AdaptiveStand::beginEntryStage(){
   endpoint_.durationS=entry_.durationS[entryStage_];
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS-1e-9);
   if(!std::isfinite(n)||n<2||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginTimedPhase(){
   if(timedPhase_>=5)return false;
@@ -150,7 +156,7 @@ bool AdaptiveStand::beginTimedPhase(){
   endpoint_.durationS=timed_.durationS[timedPhase_];
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS-1e-9);
   if(!std::isfinite(n)||n<1||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceTimeS_=0;return true;
 }
 bool AdaptiveStand::beginPairedSegment(){
   if(timedActive_)return beginTimedPhase();
@@ -162,61 +168,44 @@ bool AdaptiveStand::beginPairedSegment(){
   if(!std::isfinite(route_.timeScale)||route_.timeScale<1)return false;
   const double n=std::ceil(endpoint_.durationS/policy_.samplePeriodS);
   if(n<1||n>1000000)return false;
-  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceAtS_=lastNow_;referenceTimeS_=0;return true;
+  segmentIntervals_=static_cast<uint32_t>(n);segmentIndex_=0;referenceTimeS_=0;return true;
 }
-FeedbackFrame AdaptiveStand::generate(double now){
-  // Advance by elapsed monotonic time, bounded by the approved step/rate
-  // budget on a late release. Dropped time slows this SAME path; no catch-up
-  // burst or future jump is emitted. The executor checks actual TX intervals.
-  double vmax=0;
-  for(const auto& v:policy_.maxVelocityRadS)vmax=std::fmax(vmax,std::fmax(std::abs(v.hip),std::fmax(std::abs(v.upper),std::abs(v.lower))));
-  const double advance=std::fmin(std::fmax(0.,now-referenceAtS_),policy_.maxJointStepRad/vmax);
-  pendingTimeS_=timeDriven_?std::fmin(endpoint_.durationS,referenceTimeS_+advance):
-    endpoint_.durationS*(segmentIndex_+1)/segmentIntervals_;
-  const double u=pendingTimeS_/endpoint_.durationS;
-  if(entryPending()){
-    auto f=fixtureEntrySample(entry_,entryStage_,u,previous_.cartesian.body);
-    if(!f.target.valid)return reject(FeedbackReason::INVALID_COMMAND);
-    auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
-    if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
-    pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
-    pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;
-    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
+// The phase reference at tau seconds into the current stage / phase / segment: the ONE geometry evaluation, shared by
+// the frame and (through jointsAt) by the release retimer. Pure; returned by value and built in the caller's frame.
+LocomotionFrame AdaptiveStand::sampleAt(double tau,unsigned* segment) const {
+  const double u=std::fmin(1.,std::fmax(0.,tau/endpoint_.durationS));
+  if(entryPending())return fixtureEntrySample(entry_,entryStage_,u,previous_.cartesian.body);
+  if(route_.pairedProne&&timedActive_)return phaseTimedSample(timed_,timedPhase_,tau,policy_.fixtureLimitVariant,segment);
+  if(route_.pairedProne)return samplePaired(u);
+  return sampleSegment(tau,u);
+}
+LocomotionFrame AdaptiveStand::samplePaired(double u) const {
+  auto f=pairedProneSample(pairedSegment_,u,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
+  for(unsigned i=0;i<4;++i){auto& v=f.velocityRadS[i];v={v.hip/route_.timeScale,v.upper/route_.timeScale,v.lower/route_.timeScale};auto& a=f.accelerationRadS2[i];const double s=route_.timeScale*route_.timeScale;a={a.hip/s,a.upper/s,a.lower/s};}
+  if(policy_.mode==FeedbackMode::FIXTURE_REVIEW&&pairedSegment_==entry_knot_){
+    const auto law=quinticTimeLaw(u,endpoint_.durationS);
+    for(unsigned i=0;i<4;++i){const auto d=entry_offset_[i];auto& q=f.target.legs[i];auto& v=f.velocityRadS[i];auto& a=f.accelerationRadS2[i];
+      q={q.hip+d.hip*(1-law.progress),q.upper+d.upper*(1-law.progress),q.lower+d.lower*(1-law.progress)};
+      v={v.hip-d.hip*law.velocity,v.upper-d.upper*law.velocity,v.lower-d.lower*law.velocity};
+      a={a.hip-d.hip*law.acceleration,a.upper-d.upper*law.acceleration,a.lower-d.lower*law.acceleration};}
   }
-  if(route_.pairedProne&&timedActive_){
-    unsigned segment=0;
-    auto f=phaseTimedSample(timed_,timedPhase_,pendingTimeS_,policy_.fixtureLimitVariant,&segment);
-    if(!f.target.valid)return reject(FeedbackReason::IK_FAILURE);
-    pairedSegment_=static_cast<uint16_t>(segment);
-    auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
-    if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
-    pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
-    pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;
-    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
-  }
-  if(route_.pairedProne){
-    auto f=pairedProneSample(pairedSegment_,u,policy_.fixtureLimitVariant,pairedSegment_==entry_knot_?entry_progress_:0);
-    for(unsigned i=0;i<4;++i){auto& v=f.velocityRadS[i];v={v.hip/route_.timeScale,v.upper/route_.timeScale,v.lower/route_.timeScale};auto& a=f.accelerationRadS2[i];const double s=route_.timeScale*route_.timeScale;a={a.hip/s,a.upper/s,a.lower/s};}
-    if(policy_.mode==FeedbackMode::FIXTURE_REVIEW&&pairedSegment_==entry_knot_){
-      const auto law=quinticTimeLaw(u,endpoint_.durationS);
-      for(unsigned i=0;i<4;++i){const auto d=entry_offset_[i];auto& q=f.target.legs[i];auto& v=f.velocityRadS[i];auto& a=f.accelerationRadS2[i];
-        q={q.hip+d.hip*(1-law.progress),q.upper+d.upper*(1-law.progress),q.lower+d.lower*(1-law.progress)};
-        v={v.hip-d.hip*law.velocity,v.upper-d.upper*law.velocity,v.lower-d.lower*law.velocity};
-        a={a.hip-d.hip*law.acceleration,a.upper-d.upper*law.acceleration,a.lower-d.lower*law.acceleration};}
-    }
-    auto r=checkSegment(f,previous_.target,policy_);if(r!=FeedbackReason::OK)return reject(r);
-    if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
-    pendingSolution_=f;pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
-    pending_.bellySupportRequired=static_cast<unsigned>(pairedPronePhase(pairedSegment_))<3;
-    if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
-    pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;return pending_;
-  }
+  return f;
+}
+// The fixed-contact rise component of a RISE segment (C4-C), from the definition fixed at beginRise(): the same path
+// for the frame and for the retimer. Height transitions follow the common S-curve law; descending runs it backwards.
+TimeLawSample AdaptiveStand::riseLawAt(double tau,double u) const {
+  if(!(adjust_&&riseLawValid_))return quinticTimeLaw(riseAscending_?u:1-u,endpoint_.durationS);
+  // Signed clock along the path coordinate: descending runs the same path backwards (p = 1-s, p' = -s', p'' = -s'').
+  TimeLawSample path=riseLaw_.at(tau);if(!riseAscending_){path.progress=1-path.progress;path.velocity=-path.velocity;path.acceleration=-path.acceleration;}
+  return path;
+}
+TimedStandSample AdaptiveStand::riseSample(double tau,double u) const {
+  return evaluateStandWithLaw(riseDef_,riseLawAt(tau,u),previous_.target.legs);
+}
+LocomotionFrame AdaptiveStand::sampleSegment(double tau,double u) const {
   // Height transitions use the common S-curve law planned at request time; every other segment keeps its quintic.
   const bool lawRise=adjust_&&riseLawValid_&&state_==AdaptiveStandState::RISE;
-  TimeLawSample law;
-  if(lawRise)law=riseLaw_.at(pendingTimeS_);
-  else law=quinticTimeLaw(u,endpoint_.durationS);
-  if(!law.valid)return reject(FeedbackReason::INVALID_COMMAND);
+  const TimeLawSample law=lawRise?riseLaw_.at(tau):quinticTimeLaw(u,endpoint_.durationS);
   CartesianSample c;c.body=endpoint_.body;c.body.translationM=mix(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.progress);
   c.bodyVelocity=rate(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.velocity);
   c.bodyAcceleration=rate(segmentStart_.cartesian.body.translationM,endpoint_.body.translationM,law.acceleration);
@@ -226,54 +215,105 @@ FeedbackFrame AdaptiveStand::generate(double now){
   c.valid=true;GaitParameters p;p.heightM=request_.targetHeightM;
   // Height adjust: the retained entry pose is a tabulated solution, not a solveGait branch; the
   // timed stand below is seeded with it and checkSegment bounds every step from it.
-  auto f=solveGait(p,c,adjust_?nullptr:&previous_);
-  if(!f.target.valid)return reject(f.status==GaitStatus::BRANCH_CHANGE?FeedbackReason::BRANCH_CHANGE:FeedbackReason::IK_FAILURE);
+  LocomotionFrame f=solveGait(p,c,adjust_?nullptr:&previous_);
+  if(!law.valid){f.target.valid=false;f.status=GaitStatus::INVALID_PARAMETER;return f;}
   // Reuse the C4-C fixed-contact rise component at any positive observed height.
-  // Yaw/translation are factored out; descending adjustments reverse its clock.
-  if(state_==AdaptiveStandState::RISE&&segmentStart_.cartesian.body.translationM.z>0&&
-     segmentStart_.cartesian.body.translationM.z!=endpoint_.body.translationM.z){
-    StandDefinition d=canonicalStandDefinition();BodyPose origin=segmentStart_.cartesian.body;origin.translationM.z=0;
-    for(unsigned i=0;i<4;++i){Vector3 local;if(!pointToBase(origin,c.feet[i],local))return reject(FeedbackReason::IK_FAILURE);
-      d.contactsWorldM[i]=local;d.contactsWorldM[i].z=0;d.standSeed[i]=segmentStart_.target.legs[i];}
-    const bool ascending=endpoint_.body.translationM.z>segmentStart_.cartesian.body.translationM.z;
-    d.lowBodyHeightM=ascending?segmentStart_.cartesian.body.translationM.z:endpoint_.body.translationM.z;
-    d.standBodyHeightM=ascending?endpoint_.body.translationM.z:segmentStart_.cartesian.body.translationM.z;
-    if(lawRise){
-      // Signed clock along the path coordinate: descending runs the same path backwards (p = 1-s, p' = -s', p'' = -s'').
-      TimeLawSample path=law;if(!ascending){path.progress=1-law.progress;path.velocity=-law.velocity;path.acceleration=-law.acceleration;}
-      const auto timed=evaluateStandWithLaw(d,path,previous_.target.legs);
-      if(timed.status!=TimedStatus::OK)return reject(FeedbackReason::IK_FAILURE);
-      f.target=timed.geometry.target;
-      for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];}
-    }else{
-      const auto timed=evaluateTimedStand(d,ascending?u:1-u,endpoint_.durationS,previous_.target.legs);
-      if(timed.status!=TimedStatus::OK)return reject(FeedbackReason::IK_FAILURE);
-      f.target=timed.geometry.target;
-      for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];
-        if(!ascending){auto& v=f.velocityRadS[i];v={-v.hip,-v.upper,-v.lower};}}
-    }
+  if(f.target.valid&&state_==AdaptiveStandState::RISE&&riseValid_){
+    const auto timed=riseSample(tau,u);
+    if(timed.status!=TimedStatus::OK){f.target.valid=false;f.status=GaitStatus::IK_UNREACHABLE;return f;}
+    f.target=timed.geometry.target;
+    for(unsigned i=0;i<4;++i){f.velocityRadS[i]=timed.velocityRadS[i];f.accelerationRadS2[i]=timed.accelerationRadS2[i];
+      if(!lawRise&&!riseAscending_){auto& v=f.velocityRadS[i];v={-v.hip,-v.upper,-v.lower};}}
   }
-  if(adjust_&&!heightTargetInRegion(f.target))return reject(FeedbackReason::OUTSIDE_CERTIFIED_REGION);
-  auto r=checkSegment(f,previous_.target,policy_);
-  if(r!=FeedbackReason::OK)return reject(r);
-  if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
-  pending_=feedbackFrame(f,sequence_++);pending_.bellySupportRequired=endpoint_.bellySupportRequired;
-  pending_.externalSupportRequired=endpoint_.externalSupportRequired;pending_.timeS=now;
-  if(adjust_){pendingSolution_=f;pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
-  // The solve is retained only after matching operational feedback acknowledges it.
-  pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;reason_=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;
+  return f;
 }
-FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,bool timedReference){
+// Joints only, for the retimer's search: closed forms for the entry and the timed route, the rise path for a height
+// transition, the full sample for any other segment. Each case keeps its working storage in its own leaf frame, so
+// the search adds no more stack than the frame it chooses.
+bool AdaptiveStand::jointsAt(const void* context,double tau,double q[12]){
+  const auto& s=*static_cast<const AdaptiveStand*>(context);
+  const double u=std::fmin(1.,std::fmax(0.,tau/s.endpoint_.durationS));
+  if(s.entryPending())return fixtureEntryJoints(s.entry_,s.entryStage_,u,q);
+  if(s.route_.pairedProne&&s.timedActive_)return phaseTimedJoints(s.timed_,s.timedPhase_,tau,s.policy_.fixtureLimitVariant,q);
+  if(!s.route_.pairedProne&&s.state_==AdaptiveStandState::RISE&&s.riseValid_)return s.riseJoints(tau,u,q);
+  return s.sampledJoints(tau,q);
+}
+// The rise component's geometry at the rise law's progress: the target riseSample() returns, without its derivatives.
+__attribute__((noinline)) bool AdaptiveStand::riseJoints(double tau,double u,double q[12]) const {
+  const TimeLawSample law=riseLawAt(tau,u);
+  if(!law.valid||!std::isfinite(law.progress)||law.progress<0||law.progress>1)return false;
+  const StandSample g=sampleStandPath(riseDef_,law.progress,previous_.target.legs);if(!g.target.valid)return false;
+  for(unsigned i=0;i<12;++i)q[i]=jointSlot(g.target,i);
+  return true;
+}
+__attribute__((noinline)) bool AdaptiveStand::sampledJoints(double tau,double q[12]) const {
+  unsigned segment=pairedSegment_;const LocomotionFrame f=sampleAt(tau,&segment);if(!f.target.valid)return false;
+  for(unsigned i=0;i<12;++i)q[i]=jointSlot(f.target,i);
+  return true;
+}
+void AdaptiveStand::noteRefusal(const char* site,const ReleaseCheck& c,uint64_t atUs){
+  refusal_=RefusalRecord{};refusal_.valid=true;refusal_.site=site;refusal_.reason=releaseVerdictName(c.verdict);
+  refusal_.joint=c.joint<12?static_cast<int8_t>(c.joint):-1;refusal_.sequence=sequence_;refusal_.value=c.value;refusal_.limit=c.limit;
+  refusal_.q=c.q;refusal_.qLast=c.qLast;refusal_.v=c.v;refusal_.vPrev=c.vPrev;refusal_.dtS=c.dtS;refusal_.dtPrevS=c.dtPrevS;refusal_.atUs=atUs;
+}
+// Streamed STAND (Core Motion V6): the progress of THIS release is chosen from the executor's committed frame by the
+// common release rule (MotionLaw retimeRelease). It replaces the isolated min(elapsed, step/vmax) clamp: lateness,
+// corners and the return to speed stay inside the same step/velocity/acceleration bounds the executor checks.
+// Called by update() before generate(), so the search does not stack on the frame generate() builds.
+__attribute__((noinline)) FeedbackReason AdaptiveStand::retime(const StreamRelease& stream){
+  if(stream.atUs<=stream.committed.atUs){ReleaseCheck clock;clock.verdict=ReleaseVerdict::CLOCK;noteRefusal("RETIMER",clock,stream.atUs);return FeedbackReason::CONTINUITY;}
+  const double tauMax=std::fmin(endpoint_.durationS,referenceTimeS_+secondsFromMicros(stream.atUs-stream.committed.atUs));
+  const auto r=retimeRelease(stream.committed,stream.atUs,stream.envelope,referenceTimeS_,tauMax,&AdaptiveStand::jointsAt,this);
+  lastRetimeEvaluations_=r.evaluations;
+  if(!r.found){
+    if(r.sampleFailed)return FeedbackReason::IK_FAILURE;
+    noteRefusal("RETIMER",r.check,stream.atUs);
+    return r.check.verdict==ReleaseVerdict::ACCELERATION?FeedbackReason::ACCELERATION_LIMIT:
+           r.check.verdict==ReleaseVerdict::VELOCITY?FeedbackReason::VELOCITY_LIMIT:FeedbackReason::CONTINUITY;
+  }
+  pendingTimeS_=r.tau;return FeedbackReason::OK;
+}
+// The frame at pendingTimeS_ (set by retime() for a streamed release, by the segment clock otherwise).
+FeedbackFrame AdaptiveStand::generate(double now,const StreamRelease* stream){
+  unsigned segment=pairedSegment_;
+  const LocomotionFrame f=sampleAt(pendingTimeS_,&segment);
+  const bool entry=entryPending(),timed=route_.pairedProne&&timedActive_&&!entry,paired=route_.pairedProne&&!timed&&!entry;
+  if(!f.target.valid)return reject(entry||f.status==GaitStatus::INVALID_PARAMETER?FeedbackReason::INVALID_COMMAND:
+                                   f.status==GaitStatus::BRANCH_CHANGE?FeedbackReason::BRANCH_CHANGE:FeedbackReason::IK_FAILURE);
+  if(timed)pairedSegment_=static_cast<uint16_t>(segment);
+  if(adjust_&&!entry&&!route_.pairedProne&&!heightTargetInRegion(f.target))return reject(FeedbackReason::OUTSIDE_CERTIFIED_REGION);
+  RefusalRecord fault;
+  const auto r=checkSegment(f,previous_.target,policy_,&fault);
+  if(r!=FeedbackReason::OK){refusal_=fault;refusal_.sequence=sequence_;refusal_.atUs=stream?stream->atUs:0;return reject(r);}
+  pending_=feedbackFrame(f,sequence_++);pending_.timeS=now;
+  if(entry||timed){pendingSolution_=f;pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
+  else if(paired){
+    pendingSolution_=f;pending_.bellySupportRequired=static_cast<unsigned>(pairedPronePhase(pairedSegment_))<3;
+    if(policy_.mode==FeedbackMode::FIXTURE_REVIEW){pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
+  }else{
+    pending_.bellySupportRequired=endpoint_.bellySupportRequired;pending_.externalSupportRequired=endpoint_.externalSupportRequired;
+    if(adjust_){pendingSolution_=f;pending_.requiredFeet=0;pending_.bellySupportRequired=false;pending_.externalSupportRequired=true;}
+    // The solve is retained only after matching operational feedback acknowledges it.
+    reason_=FeedbackReason::ASSESSMENT_REQUIRED;
+  }
+  pendingValid_=true;assessed_=submitted_=false;pendingSince_=now;pendingAtUs_=stream?stream->atUs:0;return pending_;
+}
+FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,const StreamRelease* stream){
   if(state_==AdaptiveStandState::IDLE||state_==AdaptiveStandState::REJECTED||state_==AdaptiveStandState::STOPPED){FeedbackFrame f;f.reason=reason_;return f;}
   if(now<lastNow_)return reject(FeedbackReason::STALE_OBSERVATION);
-  lastNow_=now;timeDriven_=timedReference;
+  lastNow_=now;timeDriven_=stream!=nullptr;
   auto r=checkObservation(o,policy_,now);if(r!=FeedbackReason::OK)return reject(r);
+  // A streamed candidate belongs to the release it was materialized for. If it was not transmitted before the next
+  // release it is stale: discard it and materialize this release from the committed frame (never re-stamp it).
+  if(pendingValid_&&timeDriven_&&!submitted_){
+    if(stream->atUs)pendingValid_=false;
+    else {pending_.reason=assessed_?FeedbackReason::OK:FeedbackReason::ASSESSMENT_REQUIRED;return pending_;}
+  }
   if(pendingValid_){
     r=checkHeldSupport(o,previous_,pending_);if(r!=FeedbackReason::OK)return reject(r);
     if(now-pendingSince_>policy_.segmentTimeoutS)return reject(FeedbackReason::SEGMENT_TIMEOUT);
     if(!assessed_){pending_.reason=FeedbackReason::ASSESSMENT_REQUIRED;return pending_;}
     r=checkAssessment(assessment_,pending_.target.sequence,policy_,now,submitted_);if(r!=FeedbackReason::OK)return reject(r);
-    if(timeDriven_&&!submitted_)return pending_;
     // TX acceptance only for intermediate references. Structural endpoints
     // consume the executor's measured, post-TX HOLD settlement.
     // For the certified fixture stream, arrival/quiet/post-TX are already
@@ -285,7 +325,7 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,bool
     if(r!=FeedbackReason::OK)return reject(r);
     if(!timeDriven_&&now-pendingSince_+1e-9<endpoint_.durationS/segmentIntervals_){pending_.reason=FeedbackReason::FEEDBACK_PENDING;return pending_;}
     const bool endpoint=pendingFinal();
-    referenceTimeS_=pendingTimeS_;referenceAtS_=pendingSince_;
+    referenceTimeS_=pendingTimeS_;
     previous_=route_.pairedProne||adjust_?pendingSolution_:observedSolution(o);if(!previous_.target.valid)return reject(FeedbackReason::IK_FAILURE);
     pendingValid_=false;physicalReady_=pending_.physicalReadiness;++segmentIndex_;
     if(endpoint){
@@ -388,7 +428,11 @@ FeedbackFrame AdaptiveStand::update(const AdaptiveObservation& o,double now,bool
   if(entryPending()&&route_.supervisedSegments&&entryApproved_!=entryStage_){FeedbackFrame f;f.reason=FeedbackReason::ASSESSMENT_REQUIRED;return f;}
   if(!entryPending()&&route_.pairedProne&&route_.supervisedSegments&&approvedSegment_!=pairedSegment_&&
      !(approvedThrough_!=UINT16_MAX&&pairedSegment_<=approvedThrough_)){FeedbackFrame f;f.reason=FeedbackReason::ASSESSMENT_REQUIRED;return f;}
-  return generate(now);
+  if(stream&&!stream->atUs){FeedbackFrame f;f.reason=FeedbackReason::OK;return f;}   // between releases: nothing to materialize
+  if(sequence_==0||sequence_==UINT32_MAX)return reject(FeedbackReason::SEQUENCE_REPLAY);
+  if(stream){const FeedbackReason why=retime(*stream);if(why!=FeedbackReason::OK)return reject(why);}
+  else pendingTimeS_=endpoint_.durationS*(segmentIndex_+1)/segmentIntervals_;
+  return generate(now,stream);
 }
 bool standHeightReachable(double h,const FeedbackPolicy& p){
   if(!std::isfinite(h)||h<=0||h>.150)return false;

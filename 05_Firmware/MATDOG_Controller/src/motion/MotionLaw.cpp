@@ -89,7 +89,10 @@ double accelSafeLatenessS(double v, double a, double period, double step, double
   if (!pos(v) || !pos(a) || !pos(period) || !pos(step) || !pos(maxLatenessS) || v * period > step * (1 + 1e-9)) return 0;
   auto accel = [&](double late) {
     const double dt = period + late;
-    const double advance = std::fmin(dt, step / v);          // generator: path time per frame, capped by the step budget
+    // Generator: path time per frame, capped by the step budget as retimeRelease REALIZES it. Its bisection over the
+    // elapsed interval lands on the admissible window once that window spans the last-but-one bracket, so a capped frame
+    // advances step/v less dt/2^(kRetimeIterations-1); the exact bound itself is a knife edge no bisection reaches.
+    const double advance = dt <= step / v ? dt : step / v - dt / static_cast<double>(1u << (kRetimeIterations - 1));
     const double vLate = v * advance / dt;
     return std::fabs(vLate - v) / (0.5 * (dt + period));     // executor rule: secant acceleration over release intervals
   };
@@ -118,6 +121,81 @@ double velocityForLateness(double vCap, double a, double period, double step, do
   double lo = 0;
   for (unsigned i = 0; i < 60; ++i) { const double mid = 0.5 * (lo + hi); (ok(mid) ? lo : hi) = mid; }
   return lo;
+}
+
+uint64_t microsFromSeconds(double s) {
+  if (!(s > 0) || !std::isfinite(s) || s > 1e9) return 0;
+  return static_cast<uint64_t>(std::llround(s * 1e6));
+}
+
+const char* releaseVerdictName(ReleaseVerdict v) {
+  switch (v) {
+    case ReleaseVerdict::OK: return "OK";
+    case ReleaseVerdict::CLOCK: return "CLOCK";
+    case ReleaseVerdict::STEP: return "PATH_STEP_LIMIT";
+    case ReleaseVerdict::VELOCITY: return "RATE_LIMIT";
+    case ReleaseVerdict::ACCELERATION: return "ACCELERATION_LIMIT";
+  }
+  return "UNKNOWN";
+}
+
+ReleaseCheck checkRelease(const ReleaseState& last, const double q[12], uint64_t atUs, const ReleaseEnvelope& e) {
+  ReleaseCheck r;
+  if (!last.q || !last.v || !q || atUs <= last.atUs) return r;
+  // Both secants belong to the reference release clock (V2): delivery and UART duration never enter the denominator.
+  const double dt = secondsFromMicros(atUs - last.atUs), dtPrev = secondsFromMicros(last.intervalUs);
+  r.verdict = ReleaseVerdict::OK; r.dtS = dt; r.dtPrevS = dtPrev;
+  auto fail = [&](ReleaseVerdict v, unsigned j, double vel, double value, double limit) {
+    if (r.verdict != ReleaseVerdict::OK) return;
+    r.verdict = v; r.joint = j; r.q = q[j]; r.qLast = last.q[j]; r.v = vel; r.vPrev = last.v[j]; r.value = value; r.limit = limit;
+  };
+  for (unsigned j = 0; j < 12; ++j) {
+    const double d = q[j] - last.q[j], vel = d / dt;
+    if (!std::isfinite(vel)) { fail(ReleaseVerdict::VELOCITY, j, vel, vel, e.velocityRadS); r.tooFast = true; continue; }
+    if (e.stepRad > 0 && std::fabs(d) > e.stepRad) { fail(ReleaseVerdict::STEP, j, vel, d, e.stepRad); r.tooFast = true; }
+    if (std::fabs(vel) > e.velocityRadS + 1e-9) { fail(ReleaseVerdict::VELOCITY, j, vel, vel, e.velocityRadS); r.tooFast = true; }
+    if (dtPrev > 0) {
+      const double change = vel - last.v[j], acc = change / (.5 * (dt + dtPrev));
+      if (std::fabs(acc) > e.accelerationRadS2 + 1e-9) {
+        fail(ReleaseVerdict::ACCELERATION, j, vel, acc, e.accelerationRadS2);
+        // Overshooting in the direction of motion is cured by less progress; a deceleration beyond the envelope
+        // (including being unable to stop at all) only by more.
+        if ((d > 0 && change > 0) || (d < 0 && change < 0)) r.tooFast = true; else r.tooSlow = true;
+      }
+    }
+  }
+  return r;
+}
+
+RetimeResult retimeRelease(const ReleaseState& last, uint64_t atUs, const ReleaseEnvelope& e,
+                           double tauLast, double tauMax, ProgressSample sample, const void* context) {
+  RetimeResult r;
+  if (!sample || !std::isfinite(tauLast) || !std::isfinite(tauMax) || tauMax < tauLast) return r;
+  double q[12];
+  auto eval = [&](double tau, ReleaseCheck* c) {
+    ++r.evaluations;
+    if (!sample(context, tau, q)) return false;
+    *c = checkRelease(last, q, atUs, e);
+    return true;
+  };
+  ReleaseCheck c;
+  if (!eval(tauMax, &c)) { r.sampleFailed = true; return r; }
+  r.check = c;
+  if (c.verdict == ReleaseVerdict::OK) { r.found = true; r.tau = tauMax; return r; }
+  if (c.verdict == ReleaseVerdict::CLOCK || !c.tooFast) return r;   // too slow even at the latest admissible progress
+  // Too fast at tauMax: the largest admissible progress lies below it. Bisection on "too fast" (monotone in the
+  // progress of each joint over one frame); a too-slow point raises the lower end without being admissible.
+  double lo = tauLast, hi = tauMax;
+  bool have = false;
+  for (unsigned k = 0; k < kRetimeIterations; ++k) {
+    const double mid = .5 * (lo + hi);
+    if (!eval(mid, &c)) { r.found = false; r.sampleFailed = true; return r; }
+    if (c.verdict == ReleaseVerdict::OK) { lo = mid; r.tau = mid; r.check = c; have = true; }
+    else if (c.tooFast) hi = mid;
+    else { lo = mid; if (!have) r.check = c; }
+  }
+  r.found = have;
+  return r;
 }
 
 DynamicAnalysis analyzeDynamicProfile(const DynamicProfile& p) {

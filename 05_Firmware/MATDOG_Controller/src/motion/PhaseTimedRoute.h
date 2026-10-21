@@ -30,5 +30,7 @@ bool buildPhaseTimedRoute(bool fixtureLimitVariant, double velocityRadS, double 
 // Sample of phase `phase` at t seconds into it (clamped to its duration).
 LocomotionFrame phaseTimedSample(const PhaseTimedRoute& route, unsigned phase, double t, bool fixtureLimitVariant,
                                  unsigned* segment = nullptr);
+// The same twelve joint targets (slot order) without body/feet: the release retimer's evaluator.
+bool phaseTimedJoints(const PhaseTimedRoute& route, unsigned phase, double t, bool fixtureLimitVariant, double q[12]);
 } }
 #endif

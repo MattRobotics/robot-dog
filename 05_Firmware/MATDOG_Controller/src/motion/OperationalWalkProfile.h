@@ -100,6 +100,10 @@ extern const WalkProfile* const kProfiles[kProfileCount];
 struct StandProfile { double velocityRadS, accelerationRadS2, samplePeriodS, maxStepRad, minEntryStageS; DriveProfile drive; };
 constexpr StandProfile kStandProfile{0.19, 2.0, 0.020, tolerance::kMaxStepRad, 0.040, {300, 20}};
 static_assert(kStandProfile.velocityRadS * kStandProfile.samplePeriodS <= kStandProfile.maxStepRad, "STAND frame step must stay inside the tube");
+// The STAND drive pair's ACC register in rad/s^2 (written and verified by readback for every STAND frame): the joint
+// acceleration bound the executor's path box assumes BETWEEN two samples of one joint. HYPOTHESIS - servo profile
+// behaviour at nominal SDK scale, not a metrological bound; the per-joint tracking monitor does not depend on it.
+constexpr double kStandDriveAccelerationRadS2 = kStandProfile.drive.acceleration * 100.0 * tolerance::kTickRad;
 
 // Executor/planner ceilings must cover every profile (checked in MotionCoordinator.cpp).
 constexpr double kMaxProfileVelocityRadS = kFastMaxVelocityRadS, kMaxProfileAccelerationRadS2 = kFastMaxAccelerationRadS2;
