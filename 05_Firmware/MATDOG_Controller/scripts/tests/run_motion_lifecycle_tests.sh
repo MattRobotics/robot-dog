@@ -10,6 +10,7 @@ CXX="${CXX:-g++}"
   -o "$OUT/test_motion_lifecycle" "$SCRIPT_DIR/test_motion_lifecycle.cpp" \
   "$SKETCH_DIR/src/core/MotionService.cpp" "$SKETCH_DIR/src/motion/MotionContract.cpp" \
   "$SKETCH_DIR/src/execution/MotionExecutor.cpp" \
+  "$SKETCH_DIR/src/motion/MotionLaw.cpp" \
   "$SKETCH_DIR/src/actuator/ActuatorRuntime.cpp" "$SKETCH_DIR/src/actuator/ActuatorWritePolicy.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationGeometryProfile.cpp" "$SKETCH_DIR/src/actuator/CalibrationTargetResolver.cpp" \
   "$SKETCH_DIR/src/actuator/CalibrationSequencePlan.cpp" "$SKETCH_DIR/src/calibration/StartupRecoveryReference.cpp" \

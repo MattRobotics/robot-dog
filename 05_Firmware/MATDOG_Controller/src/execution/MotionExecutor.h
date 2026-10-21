@@ -85,10 +85,12 @@ struct StreamConfig {
   // independent of timestamp-aligned per-joint tracking. No WALK lag allowance.
   bool local_path_box=false;
   double max_step_rad=0;
-  // Path box reconstruction: physical joint acceleration bound between two samples of a joint (rad/s^2). HYPOTHESIS:
-  // the ST3215 ACC register of the STAND drive pair, verified by readback; not a metrological bound. 0 = only joints
-  // sampled exactly at the common instant can be placed there.
-  double sample_acceleration_bound_rad_s2=0;
+  // Acceleration ASSUMED by reconstruction between two real samples, rad/s^2.
+  // Operationally derived from the ST3215 ACC register: NOT a qualified
+  // physical bound. Consistency with this model is not proof of an unobserved
+  // configuration. Real samples must independently remain inside the path tube
+  // at their own times; interpolation cannot hide a measured excursion.
+  double reconstruction_acceleration_rad_s2=0;
   uint32_t feedback_max_age_us=0, hold_timeout_us=0, max_frame_gap_us=0;
   uint8_t persist_samples=0;
   const double* region_min_rad=nullptr; const double* region_max_rad=nullptr;
@@ -179,8 +181,9 @@ class MotionExecutor {
   // streaming state
   bool frameTx(const double target[12],const MotionExecutionFacts&,uint64_t now_us,const char** why);
   double referenceRange(unsigned joint,uint64_t from_us,uint64_t to_us,double* lo,double* hi) const;
-  // Path box at a common instant: PASS, FAIL (outside beyond its uncertainty) or UNKNOWN (not certifiable).
-  enum class BoxVerdict : uint8_t { PASS, FAIL, UNKNOWN };
+  // Measured tube plus common-instant reconstruction: CONSISTENT with the
+  // declared model, FAIL or UNKNOWN. No physical-bound qualification is implied.
+  enum class BoxVerdict : uint8_t { CONSISTENT, FAIL, UNKNOWN };
   BoxVerdict pathBox(const JointFeedback&,uint64_t* instant,motion::RefusalRecord* why) const;
   bool observeStandQuiet(const JointFeedback&,uint64_t now_us);
   bool stand_quiet_=false;

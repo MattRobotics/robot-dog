@@ -89,10 +89,9 @@ double accelSafeLatenessS(double v, double a, double period, double step, double
   if (!pos(v) || !pos(a) || !pos(period) || !pos(step) || !pos(maxLatenessS) || v * period > step * (1 + 1e-9)) return 0;
   auto accel = [&](double late) {
     const double dt = period + late;
-    // Generator: path time per frame, capped by the step budget as retimeRelease REALIZES it. Its bisection over the
-    // elapsed interval lands on the admissible window once that window spans the last-but-one bracket, so a capped frame
-    // advances step/v less dt/2^(kRetimeIterations-1); the exact bound itself is a knife edge no bisection reaches.
-    const double advance = dt <= step / v ? dt : step / v - dt / static_cast<double>(1u << (kRetimeIterations - 1));
+    // Profile feasibility depends on the actual step envelope, not the number
+    // of iterations a numerical search happens to use.
+    const double advance = dt <= step / v ? dt : step / v;
     const double vLate = v * advance / dt;
     return std::fabs(vLate - v) / (0.5 * (dt + period));     // executor rule: secant acceleration over release intervals
   };
@@ -187,8 +186,13 @@ RetimeResult retimeRelease(const ReleaseState& last, uint64_t atUs, const Releas
   // progress of each joint over one frame); a too-slow point raises the lower end without being admissible.
   double lo = tauLast, hi = tauMax;
   bool have = false;
-  for (unsigned k = 0; k < kRetimeIterations; ++k) {
+  // Usually fourteen evaluations are enough. If no admissible point was
+  // found, refine the SAME bracket to double precision before declaring it
+  // infeasible: a narrow nonempty step/acceleration intersection must not be
+  // mistaken for a physical violation. This adds no cost to ordinary frames.
+  for (unsigned k = 0; k < 48 && (k < kRetimeIterations || !have); ++k) {
     const double mid = .5 * (lo + hi);
+    if (mid == lo || mid == hi) break;
     if (!eval(mid, &c)) { r.found = false; r.sampleFailed = true; return r; }
     if (c.verdict == ReleaseVerdict::OK) { lo = mid; r.tau = mid; r.check = c; have = true; }
     else if (c.tooFast) hi = mid;

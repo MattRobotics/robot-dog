@@ -7,12 +7,12 @@
 namespace {
 struct StreamRig {
  Rig r;double lo[12],hi[12];
- StreamRig(uint64_t seed_us=100000){
+ StreamRig(uint64_t seed_us=100000,bool path_box=true){
   r.envelope.frame_writes=r.envelope.timed_segments=true;
   r.envelope.max_velocity_rad_s=.19;r.envelope.max_acceleration_rad_s2=2;
   r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;r.envelope.tracking_timeout_ms=4000;
   for(unsigned i=0;i<12;++i){lo[i]=-.1;hi[i]=.1;r.feedback.sampled_at_us[i]=100000;}
-  CHECK(r.arm());StreamConfig c;c.tube_rad=.020;c.local_path_box=true;c.max_step_rad=.004;c.sample_acceleration_bound_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
+  CHECK(r.arm());StreamConfig c;c.tube_rad=.020;c.local_path_box=path_box;c.max_lag_s=path_box?0:.001;c.max_step_rad=.004;c.reconstruction_acceleration_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
   c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
   c.region_min_rad=lo;c.region_max_rad=hi;for(unsigned i=0;i<12;++i){r.feedback.sampled_at_us[i]=seed_us;r.feedback.sampled_at_ms[i]=seed_us/1000;}
   CHECK(r.executor.beginStream(c,r.feedback,seed_us));
@@ -61,7 +61,7 @@ void residualGeometry(bool fixed){
   lo[i]=b.limits[i][0];hi[i]=b.limits[i][1];}
  r.envelope.frame_writes=r.envelope.timed_segments=true;r.envelope.max_velocity_rad_s=.19;r.envelope.max_acceleration_rad_s2=2;
  r.envelope.tracking_tolerance_rad=.020;r.envelope.arrival_tolerance_rad=motion::tolerance::kArrivalRad;CHECK(r.arm());
- StreamConfig c;c.local_path_box=true;c.max_step_rad=.004;c.tube_rad=.020;c.settle_speed_rad_s=0;c.sample_acceleration_bound_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
+ StreamConfig c;c.local_path_box=true;c.max_step_rad=.004;c.tube_rad=.020;c.settle_speed_rad_s=0;c.reconstruction_acceleration_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
  c.feedback_max_age_us=c.max_frame_gap_us=100000;c.hold_timeout_us=4000000;c.persist_samples=3;c.region_min_rad=lo;c.region_max_rad=hi;
  CHECK(r.executor.beginStream(c,r.feedback,100000));
  std::vector<std::pair<uint64_t,motion::JointTargetFrame>> sent{{100000,start}};
@@ -106,7 +106,7 @@ void pathBoxCases(){
  // (2) Truly simultaneous configuration: outside the tube refused at once, inside admitted (tube unchanged).
  for(double q:{.019,.021}){StreamRig s;s.fresh(120000,q);s.monitor(120000);
   std::printf("PATH_BOX_SYNCHRONOUS q=%.3f tube=.020 reason=%s\n",q,s.r.executor.status().reason);
-  if(q>.020){REASON(s.r.executor.status().reason,"OUTSIDE_PATH_BOX");CHECK(s.r.executor.refusal().joint==0&&std::strcmp(s.r.executor.refusal().site,"PATH_BOX")==0);}
+  if(q>.020){REASON(s.r.executor.status().reason,"OUTSIDE_PATH_BOX");CHECK(s.r.executor.refusal().joint==0&&std::strcmp(s.r.executor.refusal().site,"PATH_SAMPLE")==0);}
   else CHECK(!s.r.executor.status().safe_off_required);}
  // (3) Common delay without skew: twelve samples 70 ms old are judged against the endpoint active THEN.
  {StreamRig s;for(unsigned k=1;k<=6;++k){const uint64_t t=100000+k*20000;s.fresh(t-70000>100000?t-70000:100000,.0038*(k>4?k-4:0));CHECK(s.send(k,.0038*k,t));}
@@ -116,7 +116,7 @@ void pathBoxCases(){
  {StreamRig s;CHECK(s.send(1,.003,120000));s.fresh(140000,.003);
   s.r.feedback.previous_at_us[3]=139000;s.r.feedback.previous_rad[3]=.003+.026;s.r.feedback.sampled_at_us[3]=141000;s.r.feedback.actual_rad[3]=.003+.026;
   s.monitor(141000);REASON(s.r.executor.status().reason,"OUTSIDE_PATH_BOX");
-  const auto& w=s.r.executor.refusal();CHECK(w.joint==3&&w.atUs==140000&&w.uncertainty<.0001);
+  const auto& w=s.r.executor.refusal();CHECK(w.joint==3&&w.atUs==141000&&w.uncertainty==0);
   std::printf("PATH_BOX_PROVEN_OUTSIDE joint=%d error_mrad=%.3f uncertainty_mrad=%.4f instant_us=%llu\n",w.joint,w.value*1000,w.uncertainty*1000,(unsigned long long)w.atUs);}
  // (5) Not certifiable: 19 mrad at the instant inside a 135 ms bracket (uncertainty ~6 mrad) - no immediate stop, and
  // an unchanged snapshot is no new evidence; three DISTINCT unprovable instants stop.
@@ -131,6 +131,20 @@ void pathBoxCases(){
   double lo[12],hi[12];for(unsigned i=0;i<12;++i){lo[i]=-.1;hi[i]=.1;r.feedback.sampled_at_us[i]=100000;}
   StreamConfig c;c.tube_rad=.020;c.local_path_box=true;c.max_step_rad=.004;c.feedback_max_age_us=100000;c.hold_timeout_us=4000000;c.max_frame_gap_us=100000;c.persist_samples=3;
   c.region_min_rad=lo;c.region_max_rad=hi;CHECK(!r.executor.beginStream(c,r.feedback,100000));}
+ // (7) Interpolation alone hides an actual excursion: the midpoint is 3 mrad,
+ // perfectly at the reference, but the later real sample is 26 mrad away.
+ {StreamRig s;CHECK(s.send(1,.003,120000));s.fresh(140000,.003);
+  s.r.feedback.previous_at_us[3]=139000;s.r.feedback.previous_rad[3]=.003-.026;
+  s.r.feedback.sampled_at_us[3]=141000;s.r.feedback.actual_rad[3]=.003+.026;
+  s.monitor(141000);REASON(s.r.executor.status().reason,"OUTSIDE_PATH_BOX");
+  CHECK(std::strcmp(s.r.executor.refusal().site,"PATH_SAMPLE")==0&&s.r.executor.refusal().atUs==141000);
+  std::puts("PATH_SAMPLE actual excursion cannot be hidden by nominal interpolation: PASS");}
+ // (8) A malformed previous sample is unknown, never silently consistent
+ // through NaN comparison semantics. Three distinct unknown instants stop.
+ {StreamRig s;for(unsigned n=0;n<3;++n){const uint64_t t=110000+n*1000;s.fresh(t,0);
+   s.r.feedback.previous_at_us[3]=t-1000;s.r.feedback.previous_rad[3]=NAN;
+   s.r.feedback.sampled_at_us[3]=t+1000;s.monitor(t+1000);}
+  REASON(s.r.executor.status().reason,"OUTSIDE_PATH_BOX");}
  std::puts("PATH_BOX PASS: asynchronous RCA vector at a common instant, synchronous outside refused, common delay, proven outside, uncertifiable persistence, bound required");
 }
 void residualHold(bool fixed){
@@ -181,11 +195,12 @@ void temporalContracts(){
   s.fresh(224000,-.014);s.monitor(224000);CHECK(s.r.executor.status().settled_sequence==0);
   s.fresh(225000,.003);s.monitor(225000);CHECK(!s.r.executor.endStream());
   s.fresh(325000,.003);s.monitor(325000);CHECK(s.r.executor.endStream());CHECK(s.r.executor.status().completed_sequence==1);}
- // Three NEW divergent samples stop tracking even inside the independent
- // historical geometric box. Old snapshots cannot count as extra samples.
- {StreamRig s;CHECK(s.send(1,.003,120000));CHECK(s.send(2,.006,140000));CHECK(s.send(3,.009,160000));
-  for(unsigned k=0;k<3;++k){s.r.feedback.sampled_at_us[0]=162000+k*1000;s.r.feedback.actual_rad[0]=-.014;
-   s.monitor(162000+k*1000);if(k<2){CHECK(!s.r.executor.status().safe_off_required);s.monitor(162000+k*1000);CHECK(!s.r.executor.status().safe_off_required);}}
+ // WALK tracking persistence: three NEW divergent samples beyond the lag
+ // window. Old snapshots cannot count as extra samples. STAND's immediate
+ // path-sample geometry is tested separately above.
+ {StreamRig s(100000,false);CHECK(s.send(1,.003,120000));CHECK(s.send(2,.006,140000));CHECK(s.send(3,.009,160000));
+  for(unsigned k=0;k<3;++k){s.r.feedback.sampled_at_us[0]=163000+k*1000;s.r.feedback.actual_rad[0]=-.014;
+   s.monitor(163000+k*1000);if(k<2){CHECK(!s.r.executor.status().safe_off_required);s.monitor(163000+k*1000);CHECK(!s.r.executor.status().safe_off_required);}}
   REASON(s.r.executor.status().reason,"TRACKING_LAG_PERSISTENT");}
  std::puts("TEMPORAL_CONTRACTS PASS: no future-target gate, post-TX all-12 arrival, quiet speed, new-sample persistence");
 }
@@ -277,7 +292,7 @@ void safetyFaults(){
  {StreamRig s;CHECK(s.send(1,.003,120000));s.fresh(126000,.003);CHECK(!s.send(2,.006,126000));REASON(s.r.executor.status().reason,"RATE_LIMIT");}
  {StreamRig s;CHECK(s.send(1,.001,120000));s.fresh(170000,.001);CHECK(s.send(2,.001,170000));s.fresh(190000,.001);CHECK(!s.send(3,.004,190000));REASON(s.r.executor.status().reason,"ACCELERATION_LIMIT");}
  // STOP delivered between any two reads in the existing fast batch.
- for(unsigned stop_slot=0;stop_slot<3;++stop_slot){StreamRig s;unsigned reads=0;
+ for(unsigned stop_slot=0;stop_slot<execution::kOperationalFastReads;++stop_slot){StreamRig s;unsigned reads=0;
   for(unsigned k=0;execution::operationalPollReadAllowed(true,k,true);++k){
    if(k==stop_slot){s.r.executor.stop("MID_BATCH_STOP");break;}++reads;}
   CHECK(reads==stop_slot);CHECK(!s.send(1,.003,120000)&&s.r.backend.frames==0);
@@ -551,6 +566,18 @@ void releaseRetiming(){
  {Line ramp{.15};double q[12],v[12];for(unsigned i=0;i<12;++i){q[i]=.15*.2;v[i]=.15;}motion::ReleaseState st{q,v,200000,20000};
   const auto r=motion::retimeRelease(st,230453,env,.2,.230453,linePath,&ramp);CHECK(r.found);
   std::printf("RETIME_RAMP v=0.15 late_ms=30.453 found=%d tau_ms=%.3f hardware=false\n",r.found,r.tau*1000);}
+ // A real but very narrow feasible interval: at 32 ms, .177 rad/s can
+ // decelerate to .125 exactly at the 4 mrad step cap. Fourteen bisections
+ // miss it; this must not become ACCELERATION_LIMIT because of resolution.
+ {Line cruise{.177};double q[12]{},v[12];for(double& x:v)x=cruise.v;
+  motion::ReleaseState st{q,v,200000,20000};
+  const auto r=motion::retimeRelease(st,232000,env,0,.032,linePath,&cruise);
+  CHECK(r.found);double target[12];linePath(&cruise,r.tau,target);
+  CHECK(motion::checkRelease(st,target,232000,env).verdict==motion::ReleaseVerdict::OK);
+  const auto impossible=motion::retimeRelease(st,233000,env,0,.033,linePath,&cruise);
+  CHECK(!impossible.found&&impossible.check.verdict==motion::ReleaseVerdict::ACCELERATION);
+  std::printf("RETIME_BOUNDARY dt32_found=%d evaluations=%u dt33_found=%d a_min_dt33=%.9f limit=2\n",
+   r.found,r.evaluations,impossible.found,(.177-.004/.033)/(.5*(.033+.020)));}
  // On time: one evaluation, the law itself.
  {double q[12],v[12];for(unsigned i=0;i<12;++i){q[i]=vlaw*.2;v[i]=vlaw;}motion::ReleaseState st{q,v,200000,20000};
   const auto r=motion::retimeRelease(st,220000,env,.2,.22,linePath,&line);CHECK(r.found&&r.evaluations==1&&r.tau==.22);}
@@ -559,8 +586,8 @@ void releaseRetiming(){
   const auto c=motion::checkRelease(st,[]{static double t[12];for(double& x:t)x=.0038;return t;}(),220000,env);CHECK(c.verdict==motion::ReleaseVerdict::ACCELERATION);}
 }
 // Release window (MotionClock): a tick that ends just before a deadline serves it then instead of one whole tick later.
-// For ticks steadily shorter than the period the grid still drifts into a skip (worst case period + tick unchanged); for
-// jittery ticks the maximum release interval drops (19..31 ms ticks: 48.6 -> 31.0 ms).
+// Serving early moves the next deadline too: steady 19 ms ticks must never
+// accumulate phase error and manufacture a 38 ms gap.
 void releaseWindow(){
  auto run=[](uint32_t early,uint32_t tick_lo,uint32_t tick_span,unsigned* skips){core::PeriodicScheduler s;CHECK(s.start(20000,20000,early));
   uint64_t last=0;double worst=0;uint32_t lcg=7;*skips=0;
@@ -568,7 +595,7 @@ void releaseWindow(){
    if(s.poll(now).release){if(last){worst=std::max(worst,(now-last)/1000.);if(now-last>30000)++*skips;}last=now;}}
   return worst;};
  for(uint32_t tick:{19000u,17000u,12000u,4000u}){unsigned a=0,b=0;const double w0=run(0,tick,0,&a),w1=run(20000/core::kStreamReleaseWindowDivisor,tick,0,&b);
-  std::printf("RELEASE_WINDOW tick_ms=%.0f max_ms without=%.1f with=%.1f long_intervals without=%u with=%u hardware=false\n",tick/1000.,w0,w1,a,b);CHECK(w1<=w0);}
+  std::printf("RELEASE_WINDOW tick_ms=%.0f max_ms without=%.1f with=%.1f long_intervals without=%u with=%u hardware=false\n",tick/1000.,w0,w1,a,b);CHECK(w1<=w0);if(tick>=15000)CHECK(w1==tick/1000.&&b==0);}
  {unsigned a=0,b=0;const double w0=run(0,19000,12000,&a),w1=run(20000/core::kStreamReleaseWindowDivisor,19000,12000,&b);
   std::printf("RELEASE_WINDOW tick_ms=19..31 max_ms without=%.1f with=%.1f intervals_over_30ms without=%u with=%u hardware=false\n",w0,w1,a,b);CHECK(w1<w0&&b<a);}
  {core::PeriodicScheduler s;CHECK(!s.start(0,20000,20000));}   // a window must stay inside the period
@@ -576,28 +603,57 @@ void releaseWindow(){
 // C2 end to end: the Controller's cost between the first and the second coordinator call (frame materialized ->
 // assessed frame transmitted). Phase 1: 9 ms there stopped the STAND with ACCELERATION_LIMIT (zero analytic a).
 void generationReleaseDelay(){
- for(unsigned mode=0;mode<4;++mode){
+ for(unsigned mode=0;mode<6;++mode){
   Operational op(2.);auto& b=op.b;CHECK(op.stand().outcome==motion::CommandOutcome::ACCEPTED);
   for(unsigned k=0;k<40&&b.coordinator.arming();++k)op.tickArming();
   StreamModel m;m.loop_us=4000;m.reads_per_tick=3;m.ideal=mode==0;
   if(mode==0)m.assess_delay_us=9000;else if(mode==1)m.assess_jitter_us=9000;else if(mode==2){m.assess_delay_us=2000;m.assess_jitter_us=12000;m.jitter_us=4000;}
   // Hardware-like (stand150 log 21/10: poll ~3 ms, planner 9-11 ms, ticks 21-30 ms): 19-31 ms ticks, 9 ms between calls.
   else{m.loop_us=10000;m.jitter_us=12000;m.assess_delay_us=9000;}
-  StreamDriver d(op,m);bool ok=true;unsigned searched=0;const uint64_t t0=d.now_us;Dist interval;uint64_t last=0;
+  // Charge the additional three reads on TOP of the old measured cadence;
+  // they are not free time hidden inside the old loop. The cost is a model.
+  if(mode>=4){if(mode==5)m.read_us=1500;m.reads_per_tick=execution::kOperationalFastReads;m.loop_us+=(m.reads_per_tick-3)*m.read_us;}
+  StreamDriver d(op,m);bool ok=true;unsigned searched=0;const uint64_t t0=d.now_us;Dist interval;uint64_t last=0,max_age=0;
   while(ok&&std::strcmp(b.coordinator.state(),"STAND")&&d.now_us-t0<90000000){ok=d.tick();if(b.coordinator.stand().lastRetimeEvaluations()>1)++searched;
+   for(unsigned i=0;i<12;++i)max_age=std::max(max_age,d.now_us-d.sample_us[i]);
    const auto at=b.r.executor.releaseState().atUs;if(at!=last){if(last&&at-last<60000)interval.add((at-last)/1000.);last=at;}}
   std::printf("GEN_RELEASE_DELAY mode=%s ok=%d state=%s frames=%u elapsed_s=%.3f release_interval_ms_p50=%.3f p99=%.3f max=%.3f retime_searches=%u reason=%s refusal_site=%s hardware=false\n",
-   mode==0?"CONST_9MS":mode==1?"JITTER_0_9MS":mode==2?"LOOP4+JITTER_2_14MS":"HW_LIKE_19_31MS",ok,b.coordinator.state(),d.frames_seen,(d.now_us-t0)/1e6,
+   mode==0?"CONST_9MS":mode==1?"JITTER_0_9MS":mode==2?"LOOP4+JITTER_2_14MS":mode==3?"OLD_POLL_19_31MS":mode==4?"HALF_SWEEP_19_31MS":"HALF_SWEEP_READ_1P5MS",ok,b.coordinator.state(),d.frames_seen,(d.now_us-t0)/1e6,
    interval.pct(.5),interval.pct(.99),interval.max(),searched,b.r.executor.status().reason,b.r.executor.refusal().site);
-  if(mode<3)CHECK(ok&&!std::strcmp(b.coordinator.state(),"STAND")&&writesInsideLimits(b));
-  else{CHECK(writesInsideLimits(b)&&interval.max()<=33);
-   // Not a V6 pass criterion: a hardware-like loop (19-31 ms ticks, 3 reads per tick) reaches the 100 ms per-joint
-   // feedback-age protection (sample ages 84-99 ms were logged on 21/10). Whatever stops it does so fail-safe, with operands.
+  std::printf("FEEDBACK_ACQUISITION reads=%u read_us=%u max_age_ms=%.3f limit_ms=100\n",m.reads_per_tick,m.read_us,max_age/1000.);
+  if(mode!=3)CHECK(ok&&!std::strcmp(b.coordinator.state(),"STAND")&&writesInsideLimits(b));
+  else{CHECK(writesInsideLimits(b));
+   // Negative control: the old acquisition quota still reaches the unchanged
+   // freshness limit. Startup/HOLD-to-stream intervals are not cruise gaps;
+   // assert the actual cause and operands, not an incidental cadence maximum.
+   CHECK(!ok&&max_age>100000);REASON(b.r.executor.status().reason,"STREAM_FEEDBACK_STALE");
    const auto& w=b.r.executor.refusal();
    if(!ok)std::printf("GEN_RELEASE_DELAY_REFUSAL site=%s reason=%s joint=%d q=%.9f q_last=%.9f v=%.6f v_prev=%.6f dt_ms=%.3f dt_prev_ms=%.3f value=%.6f limit=%.6f hardware=false\n",
     w.site,w.reason,w.joint,w.q,w.qLast,w.v,w.vPrev,w.dtS*1000,w.dtPrevS*1000,w.value,w.limit);
    if(!ok)CHECK(w.valid&&*w.site&&w.joint>=0);}
  }
+}
+// Production quota and genuine loss, isolated from trajectory dynamics. A
+// successful read gets a new timestamp; an absent reply keeps the old one.
+void feedbackCadence(){
+ for(bool lost:{false,true}){StreamRig s;CHECK(s.send(1,0,120000,true));
+  uint64_t now=120000,max_age=0;unsigned rr=0,reads=0;uint32_t random=7;
+  for(unsigned turn=0;turn<100&&!s.r.executor.status().safe_off_required;++turn){
+   random=random*1103515245u+12345u;now+=19000+(random>>8)%12000;
+   bool ok=true;for(unsigned k=0;execution::operationalPollReadAllowed(true,k,ok);++k){
+    now+=1500;ok=!(lost&&rr==5);if(!ok)break;
+    sampleJoint(s.r.feedback,rr,now,0);rr=(rr+1)%12;++reads;
+   }
+   now+=9000; // planning/other work after the samples; no free or restamped time
+   for(unsigned i=0;i<12;++i)max_age=std::max(max_age,now-s.r.feedback.sampled_at_us[i]);
+   s.monitor(now);
+  }
+  if(lost){REASON(s.r.executor.status().reason,"STREAM_FEEDBACK_STALE");CHECK(s.r.executor.refusal().sampleUs==100000);}
+  else CHECK(!s.r.executor.status().safe_off_required&&max_age<=100000);
+  std::printf("FEEDBACK_CADENCE lost=%d reads=%u max_age_ms=%.3f reason=%s hardware=false\n",lost,reads,max_age/1000.,s.r.executor.status().reason);
+ }
+ CHECK(!execution::operationalPollReadAllowed(true,1,false));
+ CHECK(execution::operationalPollReadAllowed(false,0,true)&&!execution::operationalPollReadAllowed(false,1,true));
 }
 // No state advances on a failed TX: the executor's committed release and the stand's committed reference stay put.
 void txFailureNoAdvance(){
@@ -636,7 +692,7 @@ int main(){
  std::setvbuf(stdout,nullptr,_IONBF,0);
  if(std::getenv("MATDOG_EXPLORE_ONLY")){StreamModel m;m.name="EXPLORE";m.loop_us=std::getenv("MATDOG_EXPLORE_LOOP_US")?std::atoi(std::getenv("MATDOG_EXPLORE_LOOP_US")):2000;m.reads_per_tick=3;m.ideal=std::getenv("MATDOG_EXPLORE_REAL")==nullptr;m.stop_short_ticks=5;if(const char* e=std::getenv("MATDOG_EXPLORE_STALL")){unsigned every=0,us=0;std::sscanf(e,"%u,%u",&every,&us);m.stall_every_ms=every;m.stall_us=us;}standReplay(m,false,false,true);return failures?1:0;}
  if(std::getenv("MATDOG_TX_CLOCK_ONLY")){backendClockArrival();return failures?1:0;}
- if(std::getenv("MATDOG_V6_ONLY")){numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();txFailureNoAdvance();pathBoxCases();return failures?1:0;}
+ if(std::getenv("MATDOG_V6_ONLY")){numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();pathBoxCases();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_SURVEY_ONLY")){heightTimingSurvey();return failures?1:0;}
  if(std::getenv("MATDOG_HEIGHT_CHAIN_ONLY")){heightReplay();heightReplay(true);return failures?1:0;}
  backendClockArrival();dynamicProfiles();
@@ -644,7 +700,7 @@ int main(){
  residualGeometry(fixed);pathBoxCases();residualHold(fixed);if(fixed)residualSpeedUnits();
  if(std::getenv("MATDOG_RESIDUAL_ONLY"))return failures?1:0;
  temporalContracts();proneStatus();recoveryAndImu();releaseClockRates();safetyFaults();
- numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();txFailureNoAdvance();
+ numericContract();rawEdgeEndToEnd();contactExit();releaseRetiming();releaseWindow();generationReleaseDelay();feedbackCadence();txFailureNoAdvance();
  heightTimingSurvey();heightReplay();heightReplay(true);
  StreamModel m;m.name="NOMINAL_4MS";m.loop_us=4000;m.reads_per_tick=3;m.stop_short_ticks=5;standReplay(m,true);
  m.name="JITTER_0_1P2MS";m.jitter_us=1200;standReplay(m);

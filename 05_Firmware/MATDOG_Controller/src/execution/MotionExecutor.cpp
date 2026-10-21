@@ -190,7 +190,7 @@ bool MotionExecutor::beginStream(const StreamConfig& c,const JointFeedback& fb,u
     !std::isfinite(c.settle_speed_rad_s)||c.settle_speed_rad_s<0||!c.feedback_max_age_us||c.feedback_max_age_us>500000||!c.hold_timeout_us||
     !c.max_frame_gap_us||c.max_frame_gap_us>500000||!c.persist_samples||c.persist_samples>20||!c.region_min_rad||!c.region_max_rad)return false;
  if(c.local_path_box&&(!std::isfinite(c.max_step_rad)||c.max_step_rad<=0||c.max_step_rad>motion::tolerance::kMaxStepRad||
-    !std::isfinite(c.sample_acceleration_bound_rad_s2)||!(c.sample_acceleration_bound_rad_s2>0)||
+    !std::isfinite(c.reconstruction_acceleration_rad_s2)||!(c.reconstruction_acceleration_rad_s2>0)||
     c.tube_rad>motion::tolerance::kTrackingRad||c.max_lag_s!=0||
     c.feedback_max_age_us>kTimedFeedbackMaxAgeMs*1000))return false;
  for(unsigned i=0;i<12;i++)if(!fb.read_ok[i]||!fb.torque_on[i])return false;
@@ -299,27 +299,41 @@ MotionExecutor::BoxVerdict MotionExecutor::pathBox(const JointFeedback& fb,uint6
  // complete at or before t, or the held seed for samples before the first TX.
  const Sent* active=nullptr;
  for(unsigned k=0;k<history_count_;++k){const Sent& h=history_[(history_head_+k)%kHistory];if(h.at_us<=t||(k==0&&h.held_seed))active=&h;else break;}
- BoxVerdict verdict=BoxVerdict::PASS;
+ BoxVerdict verdict=BoxVerdict::CONSISTENT;
  auto note=[&](BoxVerdict v,unsigned i,double x,double e,double u){
-  if(v==BoxVerdict::FAIL?verdict==BoxVerdict::FAIL:verdict!=BoxVerdict::PASS)return;
+  if(v==BoxVerdict::FAIL?verdict==BoxVerdict::FAIL:verdict!=BoxVerdict::CONSISTENT)return;
   verdict=v;*why=record("PATH_BOX",static_cast<int>(i),e,stream_.tube_rad);why->q=x;why->qLast=active?active->q[i]:0;
   why->sequence=active?active->sequence:0;why->atUs=t;why->sampleUs=fb.sampled_at_us[i];why->uncertainty=u;};
  if(!active){note(BoxVerdict::UNKNOWN,0,0,0,0);return verdict;}
+ // First constrain every REAL sample at its OWN TX-history instant. A
+ // nominal interpolation must never cancel a measured exit from the tube.
+ // This is the geometric tube (immediate), distinct from tracking persistence.
+ for(unsigned i=0;i<12;++i){
+  double lo=0,hi=0;const uint64_t ti=fb.sampled_at_us[i];
+  if(referenceRange(i,ti,ti,&lo,&hi)<0){note(BoxVerdict::UNKNOWN,i,fb.actual_rad[i],0,0);continue;}
+  const double x=fb.actual_rad[i],e=x<lo?lo-x:x>hi?x-hi:0;
+  if(e>stream_.tube_rad){
+   *why=record("PATH_SAMPLE",i,e,stream_.tube_rad);why->q=x;why->qLast=x<lo?lo:hi;why->atUs=why->sampleUs=ti;
+   return BoxVerdict::FAIL;
+  }
+ }
  for(unsigned i=0;i<12;++i){
   double x=fb.actual_rad[i],u=0;const uint64_t ti=fb.sampled_at_us[i];
   if(ti!=t){
    // Linear interpolation between the joint's previous and latest samples. Its
-   // error is bounded by A/2*(t-tp)*(ti-t) for |q''| <= A: an explicit,
-   // reported uncertainty charged INSIDE the tube, never added to it.
+   // error would be bounded by A/2*(t-tp)*(ti-t) IF |q''| <= A. The operational
+   // ACC-derived A is a model assumption, not a qualified physical bound.
+   // Charge its uncertainty INSIDE the tube; a consistent result does not
+   // establish that the unobserved physical configuration was inside.
    const uint64_t tp=fb.previous_at_us[i];
-   if(!tp||tp>t||ti<=tp||!(stream_.sample_acceleration_bound_rad_s2>0)){note(BoxVerdict::UNKNOWN,i,x,0,0);continue;}
+   if(!tp||tp>t||ti<=tp||!std::isfinite(fb.previous_rad[i])||!(stream_.reconstruction_acceleration_rad_s2>0)){note(BoxVerdict::UNKNOWN,i,x,0,0);continue;}
    const double a=motion::secondsFromMicros(t-tp),b=motion::secondsFromMicros(ti-t);
    x=fb.previous_rad[i]+(fb.actual_rad[i]-fb.previous_rad[i])*(a/(a+b));
-   u=.5*stream_.sample_acceleration_bound_rad_s2*a*b;
+   u=.5*stream_.reconstruction_acceleration_rad_s2*a*b;
   }
   const double e=std::fabs(x-active->q[i]);
-  if(e-u>stream_.tube_rad)note(BoxVerdict::FAIL,i,x,e,u);          // outside even at the most favourable position
-  else if(e+u>stream_.tube_rad)note(BoxVerdict::UNKNOWN,i,x,e,u);  // inside not provable at this instant
+  if(e-u>stream_.tube_rad)note(BoxVerdict::FAIL,i,x,e,u);          // outside under the stated reconstruction model
+  else if(e+u>stream_.tube_rad)note(BoxVerdict::UNKNOWN,i,x,e,u);  // not even contained under that model
  }
  return verdict;
 }
@@ -379,7 +393,7 @@ void MotionExecutor::monitor(const MotionExecutionFacts& f,const JointFeedback& 
   settled=settled&&std::fabs(fb.actual_rad[i]-target_[i])<=settle_tolerance&&std::isfinite(fb.speed_rad_s[i])&&std::fabs(fb.speed_rad_s[i])<=stream_.settle_speed_rad_s;
  }
  if(stream_.local_path_box){
-  // A proven exit stops at once; a configuration that cannot be certified at
+  // A measured or model-indicated exit stops at once; an inconclusive model at
   // persist_samples consecutive DISTINCT common instants stops too (an unchanged
   // snapshot is no new evidence). Per-joint tracking above stays independent.
   uint64_t instant=0;motion::RefusalRecord why;const auto box=pathBox(fb,&instant,&why);

@@ -76,7 +76,7 @@ DynamicAnalysis analyzeDynamicProfile(const DynamicProfile& profile);
 // maxStep, so its secant drops to min(v, maxStep/(period+L)); that deceleration must stay <= aMax over the mean
 // interval. The return to speed afterwards is ramped by retimeRelease and never adds a violation. Beyond L no target on
 // the path satisfies both the step and the acceleration bound (a true infeasibility of the profile, refused before TX).
-// The capped step is the one retimeRelease realizes (its bisection resolution), so L is a lateness it actually absorbs.
+// Feasibility uses the exact step cap; search resolution never changes this contract.
 // Searched up to maxLatenessS; the result is the FIRST violating lateness (the deceleration is not monotone in L).
 double accelSafeLatenessS(double velocityRadS, double accelerationRadS2, double periodS, double maxStepRad, double maxLatenessS);
 // Largest reference velocity v <= vCap whose lateness tolerance (above) is at least targetLatenessS (0 if none; vCap if it already is).
@@ -127,7 +127,7 @@ ReleaseCheck checkRelease(const ReleaseState& last, const double q[12], uint64_t
 // `check` then carries the binding operands. `sample` evaluates the SAME path the frame is built from.
 using ProgressSample = bool (*)(const void* context, double tau, double q[12]);
 struct RetimeResult { bool found = false, sampleFailed = false; double tau = 0; ReleaseCheck check{}; unsigned evaluations = 0; };
-constexpr unsigned kRetimeIterations = 14;   // resolution (tauMax - tauLast) / 2^14 in the rare late-release search
+constexpr unsigned kRetimeIterations = 14;   // normal search; an empty result is refined to floating-point precision
 RetimeResult retimeRelease(const ReleaseState& last, uint64_t atUs, const ReleaseEnvelope& envelope,
                            double tauLast, double tauMax, ProgressSample sample, const void* context);
 

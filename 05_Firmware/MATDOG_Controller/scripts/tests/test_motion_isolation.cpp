@@ -51,7 +51,7 @@ int main(){
  CHECK(resets>=1);
  // ---- TO-BE: IMU in its own task; Motion loop period set by the poll gate only ----
  auto tobeDt=[](uint64_t)->uint32_t{return 4000;};
- auto tobe=runStand("TO_BE motion loop, imu in task",tobeDt,3);
+ auto tobe=runStand("V6 motion loop, imu in task",tobeDt,execution::kOperationalFastReads);
  // IMU task advanced alongside (1 ms passes) over the same time axis, with the same 700 ms silence
  {imu_model::Hub hub(1,3);hub.mute_from_us=5000000;hub.mute_until_us=5700000;matdog::imu::ImuFeed feed;uint64_t task_t=0,last_rv=0,stale_at=0,max_age=0;
   auto hook=[&](uint64_t now){for(;task_t<=now;task_t+=1000){hub.advance(task_t);const float q[4]={1,0,0,0};
@@ -59,7 +59,7 @@ int main(){
        [&]{return static_cast<uint32_t>(task_t);},8,3000);
      const uint64_t age=last_rv?task_t-last_rv:0;max_age=std::max(max_age,age);if(age>600000&&!stale_at)stale_at=task_t;}};
   Hub dummy(1,0);(void)dummy;
-  auto tobe_silent=runStand("TO_BE + sensor silent 700 ms @5 s",tobeDt,3,0,0,hook);
+  auto tobe_silent=runStand("V6 + sensor silent 700 ms @5 s",tobeDt,execution::kOperationalFastReads,0,0,hook);
   std::printf("ISOLATION_IMU to_be_max_rv_age_ms=%.1f imu_stale_declared_at_ms=%.1f (real silence still reaches the 600 ms IMU_STALE gate)\n",max_age/1000.,stale_at/1000.);
   CHECK(stale_at>5000000&&stale_at<5700000+1000);CHECK(max_age>=600000);
   CHECK(tobe_silent.stood);   // Motion cadence is not touched by the sensor outage (the Controller still reaches SAFE_OFF through the IMU_STALE gate)
@@ -73,10 +73,12 @@ int main(){
  // step cap per 20 ms frame. V5 (clamp + re-stamped release) stopped at a 6 ms stall. V6 retimes every release against the
  // committed frame: a late frame decelerates within the step and the return is ramped. A release later than the profile
  // can decelerate within its step is a true infeasibility, refused before TX (fail-safe, with operands). ----
- for(uint32_t stall_ms:{1u,2u,3u,4u,5u,6u,7u,8u,9u,10u,12u,20u,57u,120u}){char n[64];std::snprintf(n,sizeof(n),"TO_BE qualified profile stall %u ms/500 ms",stall_ms);
-  const auto r=runStand(n,tobeDt,3,500,stall_ms*1000);
+ for(uint32_t stall_ms:{1u,2u,3u,4u,5u,6u,7u,8u,9u,10u,12u,13u,20u,57u,120u}){char n[64];std::snprintf(n,sizeof(n),"V6 software profile stall %u ms/500 ms",stall_ms);
+  const auto r=runStand(n,tobeDt,execution::kOperationalFastReads,500,stall_ms*1000);
   if(stall_ms<=12)CHECK(r.stood);
   std::printf("STALL_SWEEP stall_ms=%u stood=%d reason=%s\n",stall_ms,r.stood,r.reason.c_str());}
+ const auto paced=runStand("V6 steady 19 ms loop",[](uint64_t){return 19000u;},execution::kOperationalFastReads);
+ CHECK(paced.stood&&paced.gap_max<=19.5);
  std::printf("MOTION_ISOLATION %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
  return failures?1:0;
 }

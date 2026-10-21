@@ -21,11 +21,16 @@ inline bool controlReadDue(bool fast,unsigned slot,unsigned next,uint32_t now,
                            uint32_t sampled_control,uint32_t max_age){
  return !fast||(slot==next&&now-last_control>=period)||now-sampled_control>=max_age;
 }
-// A successful fast batch services three distinct slots before planner work.
+// A successful fast batch renews half the population before planner work.
+// With the observed 19..31 ms loop, three reads need four turns (up to
+// 124 ms per joint, beyond the unchanged 100 ms stream age budget). Six need
+// two turns and leave room for polling and planning. This is a quota, not a
+// promise about bus WCET: a lost reply still ends the batch and ages normally.
 // Do not truncate this quota with a 2 ms wall slice: a valid synchronous read
 // can consume that slice by itself. An error ends the batch for supervision.
+constexpr unsigned kOperationalFastReads = servo::kLegServoCount / 2;
 inline bool operationalPollReadAllowed(bool fast,unsigned completed,bool previous_ok){
- return previous_ok&&completed<(fast?3u:1u);
+ return previous_ok&&completed<(fast?kOperationalFastReads:1u);
 }
 // Pure read producer boundary. Failure replaces the slot; never replay a last
 // successful value as fresh. No q0 constants, target substitution or support.

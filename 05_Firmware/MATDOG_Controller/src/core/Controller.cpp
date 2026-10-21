@@ -1302,9 +1302,9 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
   // A pending SAFE_OFF goes out before any poll of this tick (Issue #52).
   emergencyTorqueOffBurst();
   // Same cooperative Controller owns every ServoBus operation. Read only when
-  // no calibration/discovery producer is using the bus; at most one ID/tick.
-  // SAFE_OFF always precedes polling. 100 ms x two reads is still an OPEN WCET
-  // gate: this code cannot qualify the sequential bus by executing it.
+  // no calibration/discovery producer is using the bus. SAFE_OFF precedes
+  // polling; STOP can interrupt each reply. Successful Motion polling renews
+  // half the population per turn, idle polling one ID (OperationalFeedback.h).
   const uint32_t poll_started_us=micros();
   if(build::kServoPowerAvailable && !motion_executor_.status().safe_off_required && !operational_session_.safeOffRequired() &&
      (authority_.current()==ActuatorAuthority::NONE||authority_.current()==ActuatorAuthority::MOTION) &&
@@ -1314,7 +1314,7 @@ void Controller::updateOperationalMotion(uint32_t now_ms) {
       startup_qualification_.phase()==calibration::StartupQualificationPhase::REFUSED||
       startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(profileActive()?2u:20u)){
     const uint32_t transaction_ms=validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:commissioning_bound_?commissioning_params_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs;
-    // ARMING, timed STAND and streaming WALK: three round-robin fast reads
+    // ARMING, timed STAND and streaming WALK: six round-robin fast reads
     // per successful tick, stamped individually at completion. Control 40..49
     // rotates at 20 ms (finite) / 100 ms (streaming), with expired-cache retry.
     // Idle, PRIME and ENERGIZE retain one combined read per tick.

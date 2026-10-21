@@ -271,7 +271,7 @@ void MotionCoordinator::streamStand(const MotionExecutionFacts& facts,const Join
   for(unsigned i=0;i<12;++i){stand_min_[i]=feedback_policy_.jointLimits[i/3][i%3].lower;stand_max_[i]=feedback_policy_.jointLimits[i/3][i%3].upper;}
   StreamConfig c;c.tube_rad=feedback_policy_.maxTrackingErrorRad;c.max_lag_s=0;c.settle_speed_rad_s=motion::operational_walk::kStreamSettleSpeedRadS;
   c.local_path_box=true;c.max_step_rad=feedback_policy_.maxJointStepRad;
-  c.sample_acceleration_bound_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
+  c.reconstruction_acceleration_rad_s2=motion::operational_walk::kStandDriveAccelerationRadS2;
   c.feedback_max_age_us=MotionExecutor::kTimedFeedbackMaxAgeMs*1000;
   c.hold_timeout_us=executor_->trackingTimeoutUs();c.max_frame_gap_us=MotionExecutor::kTimedMaxFrameGapMs*1000;c.persist_samples=3;
   c.region_min_rad=stand_min_;c.region_max_rad=stand_max_;
