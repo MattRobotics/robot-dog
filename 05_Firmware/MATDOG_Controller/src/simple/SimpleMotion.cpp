@@ -233,8 +233,8 @@ void SimpleMotion::generateStand(uint64_t now){
     if(phase_==Phase::ROUTE&&routeCell_){const unsigned c=routeCell_-1;edge=collision::kCellEdge[c];const double a=c&&collision::kCellEdge[c-1]==edge?collision::kCellEnd[c-1]:0;alpha=a+law.progress*(collision::kCellEnd[c]-a);}
     const auto* a=paired_data::kKnots[collision::kPhaseKnots[edge]].p;
     const auto* b=paired_data::kKnots[collision::kPhaseKnots[edge+1]].p;
-    const double pitch=a[4]+alpha*(b[4]-a[4]);
-    f.cartesian.body=bodyPoseFromRollPitch({a[5]+alpha*(b[5]-a[5]),0,a[6]+alpha*(b[6]-a[6])},0,pitch);
+    const double pitch=phase_==Phase::WALK_HOLD?0:a[4]+alpha*(b[4]-a[4]);
+    f.cartesian.body=phase_==Phase::WALK_HOLD?BodyPose{}:bodyPoseFromRollPitch({a[5]+alpha*(b[5]-a[5]),0,a[6]+alpha*(b[6]-a[6])},0,pitch);
     const Vector3 normal{-std::sin(pitch),0,std::cos(pitch)};
     for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
       if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
@@ -309,7 +309,12 @@ void SimpleMotion::generateWalk(uint64_t now){
   if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(!send(f.target,kWalkDrive,now))return;
-  if(walkStopping_&&t>=stopClock_+2*kPeriodS){phase_=Phase::WALK_HOLD;state_=State::MOVING;reason_="WALK_SETTLING";}
+  if(walkStopping_&&t>=stopClock_+2*kPeriodS){
+    phase_=Phase::WALK_HOLD;state_=State::MOVING;reason_="WALK_SETTLING";
+    // The gait clock has finished, but native settling still needs live IMU
+    // correction and a fixed completion deadline. Reuse the same generator.
+    beginStandSegment(walkPrevious_.target,collision::kWalk,now,true);
+  }
 }
 void SimpleMotion::update(uint64_t now){
   nowUs_=now;
