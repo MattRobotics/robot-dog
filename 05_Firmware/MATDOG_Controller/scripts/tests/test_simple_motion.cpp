@@ -13,6 +13,9 @@ extern "C" int64_t esp_timer_get_time(){return test_clock_us;}
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <iterator>
+#include <string>
+#include <vector>
 using namespace matdog;
 struct ScriptedObservationPort: simple::ServoPort {
   uint64_t now=1000000;simple::Feedback observed[12]{};
@@ -55,20 +58,45 @@ struct Rig {
   bool reachStand(){for(unsigned i=0;i<3000;++i){tick();if(m.state()==simple::State::STANDING)return true;if(m.state()==simple::State::FAULT){std::printf("fault=%s phase=%s frames=%u\n",m.reason(),m.phase(),p.frames);return false;}}return false;}
 };
 int main(){
-  // Exercise actual gait + IK across stance/swing joins, including the
-  // terminal touchdown rule. Geometry is unchanged when timing is 6 s.
-  motion::GaitParameters continuity;continuity.advanceXM=.04;continuity.liftM=.015;
-  for(int terminal : {-1,4})for(unsigned leg=0;leg<4;++leg)for(unsigned cycle=1;cycle<4;++cycle)for(double event : {0.,.8}){
-    const double c=cycle-motion::gaitOffset(motion::GaitType::WALK,static_cast<motion::LegId>(leg))+event;
-    auto a=motion::solveGait(continuity,motion::gaitCartesian(continuity,c-1e-7,1./simple::kWalkPeriodS,0,terminal));
-    auto b=motion::solveGait(continuity,motion::gaitCartesian(continuity,c+1e-7,1./simple::kWalkPeriodS,0,terminal));
-    assert(a.target.valid&&b.target.valid);
-    for(unsigned l=0;l<4;++l){
-      const auto av=a.velocityRadS[l],bv=b.velocityRadS[l],aa=a.accelerationRadS2[l],ba=b.accelerationRadS2[l];
-      assert(std::abs(av.hip-bv.hip)<1e-4&&std::abs(av.upper-bv.upper)<1e-4&&std::abs(av.lower-bv.lower)<1e-4);
-      assert(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002);
+  // Exercise the production gait + IK across every join: swing lift-off and
+  // touchdown, four-contact sway windows, end of the start ramp, decel start,
+  // terminal touchdown and recentring end, for each stride and quarter stop.
+  for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
+    motion::GaitParameters g;g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
+    g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=simple::kWalkStartCycles;g.stopCycles=simple::kWalkStopCycles;
+    const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
+    for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
+      const double c=base+event;if(c<=1e-6||c>=terminal+w-1e-6)continue;
+      const double term=c>stop?terminal:-1;
+      auto a=motion::solveGait(g,motion::gaitCartesian(g,c-1e-7,1./simple::kWalkPeriodS,0,term));
+      auto b=motion::solveGait(g,motion::gaitCartesian(g,c+1e-7,1./simple::kWalkPeriodS,0,term));
+      assert(a.target.valid&&b.target.valid);
+      for(unsigned l=0;l<4;++l){
+        const auto av=a.velocityRadS[l],bv=b.velocityRadS[l],aa=a.accelerationRadS2[l],ba=b.accelerationRadS2[l];
+        assert(std::abs(av.hip-bv.hip)<1e-4&&std::abs(av.upper-bv.upper)<1e-4&&std::abs(av.lower-bv.lower)<1e-4);
+        assert(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002);
+      }
+      for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(a.target,i)-motion::jointSlot(b.target,i))<1e-5);
     }
-    for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(a.target,i)-motion::jointSlot(b.target,i))<1e-5);
+    // Rest at both ends: zero joint velocity/acceleration in the gait clock.
+    for(double c : {0.,terminal+w}){auto f=motion::solveGait(g,motion::gaitCartesian(g,c,1./simple::kWalkPeriodS,0,c>0?terminal:-1));assert(f.target.valid);
+      for(unsigned l=0;l<4;++l){const auto v=f.velocityRadS[l],a=f.accelerationRadS2[l];
+        assert(std::abs(v.hip)+std::abs(v.upper)+std::abs(v.lower)<1e-9&&std::abs(a.hip)+std::abs(a.upper)+std::abs(a.lower)<1e-9);}}
+  }
+  // STAND reference: certified route vias, analytic ceilings and per-joint range.
+  for(int group=0;group<2;++group){simple::ViaPlan plan;
+    for(unsigned k:group?std::vector<unsigned>(std::begin(simple::collision::kLiftKnots),std::end(simple::collision::kLiftKnots)):
+                         std::vector<unsigned>(std::begin(simple::collision::kDeployKnots),std::end(simple::collision::kDeployKnots))){
+      const double* p=motion::paired_data::kKnots[k].p;double x[simple::ViaPlan::kDim];
+      for(unsigned l=0;l<4;++l){x[l*3]=((l==0||l==3)?-1:1)*p[7];x[l*3+1]=p[l<2?2:0];x[l*3+2]=std::fmax((l<2?-88.5:-89.)*3.14159265358979323846/180,p[l<2?3:1]);}
+      x[12]=p[4];x[13]=p[5];x[14]=p[6];assert(plan.add(x));}
+    assert(plan.plan(simple::kStandSpeedRadS,simple::kStandAccelerationRadS2)&&plan.iterations<16);
+    double previous[simple::ViaPlan::kDim]{};
+    for(double t=0;t<=plan.duration+1e-9;t+=.001){double q[simple::ViaPlan::kDim],v[simple::ViaPlan::kDim],a[simple::ViaPlan::kDim];plan.sample(t,q,v,a);
+      for(unsigned i=0;i<12;++i){double lo=1e9,hi=-1e9;for(unsigned k=0;k<plan.n;++k){lo=std::fmin(lo,plan.p[k][i]);hi=std::fmax(hi,plan.p[k][i]);}
+        assert(q[i]>=lo-1e-12&&q[i]<=hi+1e-12&&std::abs(v[i])<=simple::kStandSpeedRadS+1e-9&&std::abs(a[i])<=simple::kStandAccelerationRadS2+1e-9);
+        if(t>0)assert(std::abs(q[i]-previous[i])<=simple::kStandSpeedRadS*.001+1e-9);previous[i]=q[i];}}
+    std::printf("STAND %s reference: %u vias, %.3f s, no intermediate arrival\n",group?"LIFT":"DEPLOY",plan.n,plan.duration);
   }
   Rig r;assert(r.m.state()==simple::State::READY);
   assert(r.m.stand(0,r.p.now));assert(r.p.enables==0&&r.p.frames==0);
@@ -92,6 +120,14 @@ int main(){
   for(unsigned i=0;i<400&&interrupted.p.frames<25;++i)interrupted.tick();
   interrupted.m.stop();for(unsigned i=0;i<15;++i)interrupted.tick(false);assert(interrupted.m.offVerified());
   assert(!interrupted.m.stand(.15,interrupted.p.now));assert(interrupted.reachStand());
+  // STOP inside STAND_LIFT: restart resumes the certified LIFT group from the measured pose.
+  Rig liftStop;assert(!liftStop.m.stand(.15,liftStop.p.now));
+  for(unsigned i=0;i<1000&&strcmp(liftStop.m.phase(),"STAND_LIFT");++i)liftStop.tick();
+  for(unsigned i=0;i<60;++i)liftStop.tick();assert(!strcmp(liftStop.m.phase(),"STAND_LIFT"));
+  liftStop.m.stop();for(unsigned i=0;i<15;++i)liftStop.tick(false);assert(liftStop.m.offVerified());
+  assert(!liftStop.m.stand(.15,liftStop.p.now));const char* resumed="";
+  for(unsigned i=0;i<200&&(!strcmp(resumed,"")||!strcmp(resumed,"ACQUIRE")||!strcmp(resumed,"REFERENCE")||!strcmp(resumed,"ENABLE")||!strcmp(resumed,"IDLE"));++i){liftStop.tick();resumed=liftStop.m.phase();}
+  assert(!strcmp(resumed,"STAND_LIFT"));assert(liftStop.reachStand());
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
   for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<15;++i)gaitRestart.tick(false);
@@ -164,5 +200,26 @@ int main(){
   Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()!=simple::State::FAULT;++i)unsafe.tick(false);
   assert(unsafe.m.state()==simple::State::FAULT&&unsafe.p.enables==0);
   Rig off;off.p.verify=false;off.m.stop();for(unsigned i=0;i<30;++i)off.tick(false);assert(!off.m.offVerified()&&off.m.stopping());
+  // PRONE -> STAND50: one DEPLOY and one LIFT reference, no HEIGHT move and
+  // so no STAND150 detour. The rig IMU stays level while the route nominal is
+  // pitched up to 0.18 rad, so a bounded correction is active during the rise;
+  // with level nominal and level IMU in HOLD it must decay to the exact stand.
+  Rig low;assert(!low.m.stand(.05,low.p.now));std::string lowPhases;const char* lowPhase="";
+  for(unsigned k=0;k<3000&&low.m.state()!=simple::State::STANDING;++k){low.tick();assert(low.m.state()!=simple::State::FAULT);
+    if(strcmp(lowPhase,low.m.phase())){lowPhase=low.m.phase();lowPhases+=std::string(lowPhase)+" ";}}
+  assert(low.m.state()==simple::State::STANDING&&lowPhases=="ACQUIRE REFERENCE ENABLE DISENGAGE ALIGN STAND_DEPLOY STAND_LIFT HOLD ");
+  const double lowSeconds=(low.p.now-1300000)/1e6;
+  for(unsigned k=0;k<100;++k)low.tick();  // 2 s: correction slew 20 mrad/s
+  {auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=.025;d.standBodyHeightM=.05;const auto s=motion::generateStandTarget(d).target;
+   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(low.m.target(),i)-motion::jointSlot(s,i))<1e-9);}
+  std::printf("PRONE->STAND50: %s(%.2f s replay)\n",lowPhases.c_str(),lowSeconds);
+  // WALK STOP ends recentred on the canonical 150 mm stand.
+  Rig centred;assert(!centred.m.walk(2,centred.p.now));
+  for(unsigned k=0;k<3000&&centred.m.state()!=simple::State::WALKING;++k)centred.tick();
+  for(unsigned k=0;k<500;++k)centred.tick();centred.m.walkStop();
+  for(unsigned k=0;k<2000&&strcmp(centred.m.phase(),"WALK_SETTLE");++k)centred.tick();assert(!strcmp(centred.m.phase(),"WALK_SETTLE"));
+  {auto d=motion::canonicalStandDefinition();const auto s=motion::generateStandTarget(d).target;  // last gait sample
+   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(centred.m.target(),i)-motion::jointSlot(s,i))<1e-6);}
+  assert(centred.reachStand());
   std::puts("PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION");
 }

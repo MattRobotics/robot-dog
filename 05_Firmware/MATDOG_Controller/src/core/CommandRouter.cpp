@@ -233,7 +233,7 @@ void CommandRouter::handleLine(String line) {
     if(upper.startsWith("@MOTION STAND ")){char* end=nullptr;const char* value=upper.c_str()+14;
       const double mm=strtod(value,&end);if(end==value||*end||!std::isfinite(mm)){Serial.println("MOTION=REJECTED REASON=INVALID_HEIGHT_MM");return;}
       c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
-    }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=.030/simple::kWalkPeriodS;}
+    }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=simple::kStrideM[1]/simple::kWalkPeriodS;}
     else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
   }

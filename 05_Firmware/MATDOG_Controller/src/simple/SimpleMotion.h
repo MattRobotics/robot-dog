@@ -4,12 +4,20 @@
 #include "../motion/MotionContract.h"
 #include "../motion/Gait.h"
 #include "CollisionData.h"
+#include "ViaPlan.h"
 
 namespace matdog { namespace simple {
 constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
-constexpr double kWalkPeriodS=6, kWalkRampS=6;
-constexpr double kStrideM[]={.020,.030,.040};
+// WALK STANDARD: one gait law, three strides per cycle. Constant clock; C2
+// geometric stride ramps over one cycle at start and at WALK STOP; fore/aft
+// and lateral body offsets change only with four feet down.
+constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
+constexpr double kWalkSwayXM=.010, kWalkSwayYM=.0035, kWalkStartCycles=1, kWalkStopCycles=1;
+constexpr double kStrideM[]={.030,.045,.060};
 constexpr double kMinStandM=.050;
+// STAND reference ceilings, below the STAND RAM profile 300/8 (0.460 rad/s,
+// 1.227 rad/s^2) with room for the IMU correction.
+constexpr double kStandSpeedRadS=.35, kStandAccelerationRadS2=.70;
 constexpr double kTickRad=6.28318530717958647692/4096;
 struct Drive { uint16_t speed; uint8_t acc; };
 // STAND retains the hardware-proven calibration acceleration, with the existing
@@ -75,8 +83,8 @@ class SimpleMotion {
   bool stabilizationLimited() const { return imuLimited_; }
   uint64_t nextReleaseUs() const { return nextUs_; }
  private:
-  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, ROUTE, HEIGHT, HOLD, WALK, WALK_HOLD };
-  enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, ROUTE };
+  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD };
+  enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool planInitialReference();
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
@@ -85,7 +93,15 @@ class SimpleMotion {
   bool heightTarget(double,motion::JointTargetFrame&) const;
   void measureHeight();
   void nextStand(uint64_t);
-  void beginStandSegment(const motion::JointTargetFrame&,const collision::Box&,uint64_t,bool native=false);
+  void beginNative(Phase,const motion::JointTargetFrame&,const collision::Box&,uint64_t,double pitch=0,double x=0,double z=0);
+  bool via(const motion::JointTargetFrame&,double pitch,double x,double z);
+  bool knotVia(unsigned knot);
+  bool heightVias(double from,double to);
+  void beginPlan(Phase,const collision::Box&,uint64_t);
+  void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
+  void beginLift(const motion::JointTargetFrame* measured,uint64_t);
+  void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);
+  motion::JointTargetFrame measured() const;
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
@@ -109,20 +125,23 @@ class SimpleMotion {
   uint32_t releases_=0,missed_=0;
   unsigned pollNext_=0,controlNext_=0,acquire_=0,enable_=0;
   motion::JointTargetFrame goal_{},reference_{},pendingGoal_{};
-  motion::JointTargetFrame segmentFrom_{},segmentTo_{};
+  motion::JointTargetFrame segmentTo_{};
   const collision::Box* segmentBox_=nullptr;
+  ViaPlan plan_{};
+  bool planned_=false;
+  double nativePitch_=0,nativeX_=0,nativeZ_=0,plannedHeight_=0;
   uint64_t segmentStartUs_=0,segmentDurationUs_=0,settleUs_=0,segmentDeadlineUs_=0;
-  uint64_t imuStartUs_=0;
+  uint64_t imuStartUs_=0,compensatedUs_=0;
   bool pendingGoalValid_=false;
   uint16_t commandedRaw_[12]{};
   Drive commandedDrive_=kStandDrive;
   double requestedHeight_=.15,actualHeight_=0;
   bool heightValid_=false,walkRequested_=false;
-  unsigned stride_=1,routeCell_=0,initialCell_=0;
+  unsigned stride_=1;
   InitialRoute initialRoute_=InitialRoute::ENTRY;
   motion::LocomotionFrame walkPrevious_{};
   uint64_t walkStartUs_=0;
-  double cycles_=0,stopCycle_=-1,stopClock_=0;
+  double cycles_=0,stopCycle_=-1;
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0;
 };

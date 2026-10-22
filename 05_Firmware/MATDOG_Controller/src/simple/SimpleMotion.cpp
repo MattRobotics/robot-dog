@@ -10,7 +10,6 @@ namespace matdog { namespace simple {
 using namespace motion;
 namespace {
 constexpr double kArrivalRad=12*kTickRad; // V25 native positioning allowance
-constexpr double kPeriodS=kWalkPeriodS,kRampS=kWalkRampS;
 int magnitude(int x){return x&0x7fff;}
 bool contains(const collision::Box& b,const JointTargetFrame& q,double extra=0){
   if(!q.valid)return false;
@@ -23,16 +22,26 @@ JointTargetFrame routePoint(unsigned knot){
   for(unsigned l=0;l<4;++l){q.legs[l]={((l==0||l==3)?-1:1)*p[7],p[l<2?2:0],std::fmax((l<2?-88.5:-89.)*3.14159265358979323846/180,p[l<2?3:1])};}
   q.valid=true;return q;
 }
-JointTargetFrame cellEnd(unsigned cell){
-  const unsigned e=collision::kCellEdge[cell];const double a=collision::kCellEnd[cell];
-  auto q=routePoint(collision::kPhaseKnots[e]);auto to=routePoint(collision::kPhaseKnots[e+1]);
-  for(unsigned i=0;i<12;++i)jointSlot(q,i)+=a*(jointSlot(to,i)-jointSlot(q,i));
-  return q;
+double knotHeight(unsigned knot){return paired_data::kKnots[knot].p[6];}
+// Nearest frozen route knot of a group (infinity norm): restart after STOP
+// resumes the same certified group from the measured pose.
+template<unsigned N> unsigned nearestVia(const unsigned (&knots)[N],const JointTargetFrame& q){
+  unsigned best=0;double distance=INFINITY;
+  for(unsigned k=knots[0];k<=knots[N-1];++k){const auto r=routePoint(k);double d=0;
+    for(unsigned i=0;i<12;++i)d=std::fmax(d,std::abs(jointSlot(r,i)-jointSlot(q,i)));
+    if(d<distance){distance=d;best=k;}}
+  return best;
+}
+constexpr unsigned kDeployEnd=collision::kDeployKnots[sizeof(collision::kDeployKnots)/sizeof(collision::kDeployKnots[0])-1];
+static_assert(kDeployEnd==collision::kLiftKnots[0],"DEPLOY ends where LIFT starts");
+GaitParameters walkGait(unsigned stride){
+  GaitParameters g;g.heightM=.15;g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
+  g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;return g;
 }
 }
 const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";}return "FAULT";}
 const char* SimpleMotion::phase() const {
-  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_ROUTE","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE"};
+  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE"};
   return p[static_cast<unsigned>(phase_)];
 }
 void SimpleMotion::stop(const char* reason) { stopReason_.store(reason);stop_.store(true,std::memory_order_release); }
@@ -40,7 +49,7 @@ void SimpleMotion::fault(const char* r){enterOff(true,r);}
 void SimpleMotion::enterOff(bool fault,const char* r){
   state_=fault?State::FAULT:State::STOPPED;faultLatched_=fault;reason_=r;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
-  segmentBox_=nullptr;segmentTo_.valid=false;settleUs_=0;imuStartUs_=0;
+  segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;offSent_=false;offMask_=0;offNext_=0;
   walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=0;
 }
@@ -63,9 +72,8 @@ bool SimpleMotion::fresh(uint64_t now) const {
 bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
   if(!q.valid)return false;
   for(unsigned i=0;i<12;++i){const double v=jointSlot(q,i);if(!std::isfinite(v)||v<input_.minRad[i]||v>input_.maxRad[i])return false;}
-  if(contains(collision::kEntry,q)||contains(collision::kWalk,q)||contains(collision::kHeight,q))return true;
-  for(const auto& b:collision::kStandCells)if(contains(b,q))return true;
-  return false;
+  return contains(collision::kEntry,q)||contains(collision::kWalk,q)||contains(collision::kHeight,q)||
+         contains(collision::kDeploy,q)||contains(collision::kLift,q);
 }
 bool SimpleMotion::planInitialReference(){
   // Restart after STOP/boot from any already proved configuration region.
@@ -74,9 +82,8 @@ bool SimpleMotion::planInitialReference(){
   if(contains(collision::kEntry,reference_)){initialRoute_=InitialRoute::ENTRY;return true;}
   if(!pointSafe(reference_))return false;
   if(contains(collision::kWalk,reference_)){initialRoute_=InitialRoute::WALK;return true;}
-  for(unsigned c=collision::kStandCellCount;c>0;--c)if(contains(collision::kStandCells[c-1],reference_)){
-    initialRoute_=InitialRoute::ROUTE;initialCell_=c-1;return true;
-  }
+  if(contains(collision::kLift,reference_)){initialRoute_=InitialRoute::LIFT;return true;}
+  if(contains(collision::kDeploy,reference_)){initialRoute_=InitialRoute::DEPLOY;return true;}
   return false;
 }
 bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFrame& b,const collision::Box& box) const {
@@ -116,8 +123,9 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
 void SimpleMotion::walkStop(){
   walkRequested_=false;
   if(state_==State::WALKING&&!walkStopping_){
-    stopCycle_=std::fmax(1.,std::ceil(cycles_-1e-12));
-    stopClock_=stopCycle_*kPeriodS+.5*kRampS;walkStopping_=true;
+    // Decelerate from the next touchdown (quarter cycle) after the start
+    // ramp. Feet already planted or in flight keep their targets.
+    stopCycle_=std::fmax(kWalkStartCycles,std::ceil(cycles_*4)/4);walkStopping_=true;
     reason_="WALK_STOPPING";
   }
 }
@@ -163,87 +171,116 @@ void SimpleMotion::measureHeight(){
   }
   actualHeight_=sum/4; heightValid_=hi-lo<.015&&(phase_==Phase::HOLD||phase_==Phase::HEIGHT);
 }
-void SimpleMotion::nextStand(uint64_t now){
-  JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
-  if(phase_==Phase::LOWER){
-    auto q=reference_,head=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=head.legs[l].lower;
-    if(!transitionSafe(actual,q,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
-    phase_=Phase::ALIGN;beginStandSegment(q,collision::kEntry,now,true);return;
-  }
-  if(phase_==Phase::ALIGN){
-    auto q=routePoint(0);if(!transitionSafe(actual,q,collision::kEntry)){fault("ALIGN_PATH_NOT_CLEAR");return;}
-    phase_=Phase::ROUTE;routeCell_=0;beginStandSegment(q,collision::kEntry,now,true);return;
-  }
-  if(phase_==Phase::ROUTE&&routeCell_<collision::kStandCellCount){
-    const unsigned c=routeCell_++;auto q=cellEnd(c);
-    if(!transitionSafe(actual,q,collision::kStandCells[c])){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
-    beginStandSegment(q,collision::kStandCells[c],now);return;
-  }
-  if(phase_==Phase::ROUTE){
-    JointTargetFrame q;if(!heightTarget(requestedHeight_,q)||!transitionSafe(actual,q,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-    double delta=0;for(unsigned i=0;i<12;++i)delta=std::fmax(delta,std::abs(jointSlot(segmentTo_,i)-jointSlot(q,i)));
-    phase_=Phase::HEIGHT;
-    if(delta>1e-5){beginStandSegment(q,collision::kHeight,now);return;}
-    // The route already ends at C4/STAND150; no duplicate final waypoint.
-  }
-  if(phase_==Phase::HEIGHT||phase_==Phase::WALK_HOLD){
-    segmentBox_=nullptr;
-    phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
-    measureHeight();
-    if(walkRequested_)startWalk(now);
-  }
+JointTargetFrame SimpleMotion::measured() const {
+  JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=fb_[i].q;return q;
 }
-void SimpleMotion::beginStandSegment(const JointTargetFrame& to,const collision::Box& box,uint64_t now,bool native){
-  // Only contact/phase boundaries settle; CAD cells are not waypoints.
-  // Preserve the preceding NOMINAL endpoint; feeding an already compensated
-  // encoder pose back as a new nominal would apply the IMU correction twice.
-  segmentFrom_=segmentTo_;segmentFrom_.valid=true;double distance=0;
-  for(unsigned i=0;i<12;++i){if(!segmentTo_.valid)jointSlot(segmentFrom_,i)=fb_[i].q;distance=std::fmax(distance,std::abs(jointSlot(to,i)-jointSlot(segmentFrom_,i)));}
-  segmentTo_=to;segmentBox_=&box;segmentStartUs_=now;
-  // Quintic endpoint v=a=0, below native 300/8 (0.460/1.227 SI).
-  // Folded entry stays a native position move: its observed start may be
-  // outside URDF, so it must never become an interpolated command.
-  const double duration=native?0:std::fmax(.20,std::fmax(1.875*distance/.30,std::sqrt(5.773503*distance/.60)));
-  segmentDurationUs_=static_cast<uint64_t>(std::ceil(duration*1e6));settleUs_=now+segmentDurationUs_;
+bool SimpleMotion::via(const JointTargetFrame& q,double pitch,double x,double z){
+  if(!q.valid)return false;double p[ViaPlan::kDim];
+  for(unsigned i=0;i<12;++i)p[i]=jointSlot(q,i);p[12]=pitch;p[13]=x;p[14]=z;return plan_.add(p);
+}
+bool SimpleMotion::knotVia(unsigned knot){const double* p=paired_data::kKnots[knot].p;return via(routePoint(knot),p[4],p[5],p[6]);}
+bool SimpleMotion::heightVias(double from,double to){
+  // Level stands between the two heights are frozen route knots (identical
+  // to the canonical contact IK); the requested height is solved exactly.
+  constexpr unsigned n=sizeof(collision::kLiftKnots)/sizeof(collision::kLiftKnots[0]);
+  for(unsigned j=0;j<n;++j){const unsigned k=collision::kLiftKnots[from<to?j:n-1-j];const double z=knotHeight(k);
+    if(k>=160&&std::fmin(from,to)+1e-6<z&&z<std::fmax(from,to)-1e-6&&!knotVia(k))return false;}
+  JointTargetFrame q;return heightTarget(to,q)&&via(q,0,0,to);
+}
+void SimpleMotion::beginPlan(Phase next,const collision::Box& box,uint64_t now){
+  // The whole time-continuous group lies in one certified box: each joint
+  // stays within the range of its via points, which are all checked here.
+  if(plan_.n<1||!plan_.plan(kStandSpeedRadS,kStandAccelerationRadS2)){fault("STAND_PLAN_UNAVAILABLE");return;}
+  double distance=0;
+  for(unsigned k=0;k<plan_.n;++k){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[k][i];
+    if(!contains(box,q)||!pointSafe(q)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
+    for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(plan_.p[k][i]-plan_.p[0][i]));
+    segmentTo_=q;}
+  phase_=next;planned_=true;segmentBox_=&box;segmentStartUs_=now;
+  segmentDurationUs_=static_cast<uint64_t>(std::ceil(plan_.duration*1e6));settleUs_=now+segmentDurationUs_;
   segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
   generateStand(now);
 }
+void SimpleMotion::beginNative(Phase next,const JointTargetFrame& to,const collision::Box& box,uint64_t now,double pitch,double x,double z){
+  // Folded entry and the final WALK settle stay native position moves: their
+  // observed start may be outside URDF, never an interpolated command.
+  double distance=0;for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(jointSlot(to,i)-fb_[i].q));
+  phase_=next;planned_=false;segmentTo_=to;segmentBox_=&box;segmentStartUs_=now;segmentDurationUs_=0;settleUs_=now;
+  nativePitch_=pitch;nativeX_=x;nativeZ_=z;
+  segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
+  generateStand(now);
+}
+void SimpleMotion::beginDeploy(const JointTargetFrame* start,uint64_t now){
+  // PRONE, possible ventral support: PRE_ALIGN, REAR_DEPLOY, FRONT_DEPLOY and
+  // LOAD_TRANSFER follow the frozen route knots without intermediate stops.
+  plan_.clear();unsigned first=0;
+  if(start){first=nearestVia(collision::kDeployKnots,*start);const double* p=paired_data::kKnots[first].p;
+    if(!via(*start,p[4],p[5],p[6])){fault("STAND_PLAN_UNAVAILABLE");return;}}
+  for(unsigned k:collision::kDeployKnots)if((!start||k>first||k==kDeployEnd)&&!knotVia(k)){fault("STAND_PLAN_UNAVAILABLE");return;}
+  beginPlan(Phase::DEPLOY,collision::kDeploy,now);
+}
+void SimpleMotion::beginLift(const JointTargetFrame* start,uint64_t now){
+  // Body disengagement, foot contacts, contact-locked rise and levelling, then
+  // straight up to the requested height in the same continuous reference: no
+  // detour through STAND150. Above the certified lift top a HEIGHT move follows.
+  const double top=knotHeight(collision::kLiftTopKnot),h=std::fmin(requestedHeight_,top);
+  plan_.clear();unsigned first=collision::kLiftKnots[0];
+  if(start){first=nearestVia(collision::kLiftKnots,*start);const double* p=paired_data::kKnots[first].p;
+    if(!via(*start,p[4],p[5],p[6])){fault("STAND_PLAN_UNAVAILABLE");return;}}
+  for(unsigned k:collision::kLiftKnots)
+    if((!start||k>first)&&knotHeight(k)<h-1e-6&&!knotVia(k)){fault("STAND_PLAN_UNAVAILABLE");return;}
+  JointTargetFrame q;if(!heightTarget(h,q)||!via(q,0,0,h)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+  plannedHeight_=h;beginPlan(Phase::LIFT,collision::kLift,now);
+}
+void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,const collision::Box& box,uint64_t now){
+  plan_.clear();
+  if(!via(from,0,0,fromHeight)||!heightVias(fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+  plannedHeight_=requestedHeight_;beginPlan(Phase::HEIGHT,box,now);
+}
+void SimpleMotion::nextStand(uint64_t now){
+  const JointTargetFrame actual=measured();
+  const double* head=paired_data::kKnots[0].p;
+  switch(phase_){
+    case Phase::ENABLE:{  // folded entry: lower joints to the route head first
+      auto q=reference_,h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
+      if(!transitionSafe(actual,q,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
+      beginNative(Phase::LOWER,q,collision::kEntry,now,head[4],head[5],head[6]);return;}
+    case Phase::LOWER:{
+      auto q=routePoint(0);if(!transitionSafe(actual,q,collision::kEntry)){fault("ALIGN_PATH_NOT_CLEAR");return;}
+      beginNative(Phase::ALIGN,q,collision::kEntry,now,head[4],head[5],head[6]);return;}
+    case Phase::ALIGN:beginDeploy(nullptr,now);return;
+    // The single settled checkpoint inside the route: four feet placed under
+    // the body, before its weight leaves a possible ventral support.
+    case Phase::DEPLOY:beginLift(nullptr,now);return;
+    case Phase::LIFT:case Phase::HEIGHT:
+      if(std::abs(plannedHeight_-requestedHeight_)>1e-9){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
+      [[fallthrough]];
+    case Phase::WALK_HOLD:
+      segmentBox_=nullptr;planned_=false;
+      phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
+      measureHeight();
+      if(walkRequested_)startWalk(now);
+      return;
+    default:return;
+  }
+}
 void SimpleMotion::generateStand(uint64_t now){
   if(!segmentBox_)return;
-  const double u=segmentDurationUs_?std::fmin(1.,double(now-segmentStartUs_)/segmentDurationUs_):1;
-  const auto law=quinticTimeLaw(u,segmentDurationUs_?segmentDurationUs_/1e6:1);
-  LocomotionFrame f;f.target=segmentTo_;f.cartesian.valid=true;
-  if(segmentDurationUs_)for(unsigned i=0;i<12;++i)jointSlot(f.target,i)=jointSlot(segmentFrom_,i)+law.progress*(jointSlot(segmentTo_,i)-jointSlot(segmentFrom_,i));
-  if(phase_==Phase::HEIGHT&&segmentDurationUs_){
-    // Same contact IK for the complete height trajectory, including small
-    // encoder rounding at its initial reference. No joint-space foot drag.
-    double fromHeight=0;ContactResult from[4];
-    for(unsigned l=0;l<4;++l){from[l]=contactForwardKinematics(static_cast<LegId>(l),segmentFrom_.legs[l]);if(from[l].status!=ContactStatus::OK){fault("STAND_CONTACT_IK");return;}fromHeight-=from[l].referenceM.z/4;}
-    f.cartesian.body.translationM.z=fromHeight+law.progress*(requestedHeight_-fromHeight);
-    for(unsigned l=0;l<4;++l){const auto a=from[l].referenceM,b=canonicalStandDefinition().contactsWorldM[l];
-      f.cartesian.feet[l]={a.x+law.progress*(b.x-a.x),a.y+law.progress*(b.y-a.y),(a.z+fromHeight)*(1-law.progress)};
-      TiltedIkOptions opt;opt.seed=f.target.legs[l];opt.maxIterations=8;opt.requireNominalStrip=false;
-      const auto ik=worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],f.cartesian.body,opt);
-      if(ik.status!=TiltedIkResult::Status::OK){fault("STAND_CONTACT_IK");return;}f.target.legs[l]=ik.base.joints;
-    }
-  }else{
-    // Entry has intentional body pitch. Retain that reference when applying
-    // the measured tilt error; do not try to flatten the folded robot.
-    unsigned edge=0;double alpha=0;
-    if(phase_==Phase::ROUTE&&routeCell_){const unsigned c=routeCell_-1;edge=collision::kCellEdge[c];const double a=c&&collision::kCellEdge[c-1]==edge?collision::kCellEnd[c-1]:0;alpha=a+law.progress*(collision::kCellEnd[c]-a);}
-    const auto* a=paired_data::kKnots[collision::kPhaseKnots[edge]].p;
-    const auto* b=paired_data::kKnots[collision::kPhaseKnots[edge+1]].p;
-    const double pitch=phase_==Phase::WALK_HOLD?0:a[4]+alpha*(b[4]-a[4]);
-    f.cartesian.body=phase_==Phase::WALK_HOLD?BodyPose{}:bodyPoseFromRollPitch({a[5]+alpha*(b[5]-a[5]),0,a[6]+alpha*(b[6]-a[6])},0,pitch);
-    const Vector3 normal{-std::sin(pitch),0,std::cos(pitch)};
-    for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
-      if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
-  }
+  LocomotionFrame f;f.cartesian.valid=true;double pitch=nativePitch_,x=nativeX_,z=nativeZ_;
+  if(planned_){double s[ViaPlan::kDim];plan_.sample((now-segmentStartUs_)/1e6,s);f.target.valid=true;
+    for(unsigned i=0;i<12;++i)jointSlot(f.target,i)=s[i];pitch=s[12];x=s[13];z=s[14];}
+  else f.target=segmentTo_;
+  // Nominal route body pose (intentional pitch preserved); the measured tilt
+  // error is corrected around it by the same contact IK, never flattened.
+  f.cartesian.body=bodyPoseFromRollPitch({x,0,z},0,pitch);
+  const Vector3 normal{-std::sin(pitch),0,std::cos(pitch)};
+  for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
+    if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
   if(!pointSafe(f.target)||!contains(*segmentBox_,f.target)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
   compensate(f,now);send(f.target,kStandDrive,now);
 }
 void SimpleMotion::startWalk(uint64_t now){
-  GaitParameters g;g.heightM=.15;g.liftM=.015;g.duty=.8;g.advanceXM=kStrideM[stride_];
+  const auto g=walkGait(stride_);plannedHeight_=.150;
   walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0));
   if(!pointSafe(walkPrevious_.target)||!contains(collision::kWalk,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=false;stopCycle_=-1;cycles_=0;
@@ -255,7 +292,10 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
      !tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a)){imuLimited_=true;return;}
   // A small proportional BODY correction, slew limited, no servo PID or
   // integral loop. The same target generator owns nominal + correction.
-  auto step=[](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);constexpr double step=.020*kPeriodUs/1e6;return old+std::clamp(desired-old,-step,step);};
+  // One slew step per Motion release: a group boundary regenerates the
+  // reference in the same release and must not advance the correction twice.
+  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
+  auto step=[slew](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);return old+std::clamp(desired-old,-slew,slew);};
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
   const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
   if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=0;return;}
@@ -296,24 +336,22 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   rollCorrection_=pitchCorrection_=0;imuLimited_=true;
 }
 void SimpleMotion::generateWalk(uint64_t now){
-  const double t=(now-walkStartUs_)/1e6;double rate=0,acc=0;
-  if(walkStopping_&&t>=stopClock_){
-    const double u=std::fmin(1.,(t-stopClock_)/(2*kPeriodS)),s=1-u;const auto law=quinticTimeLaw(u,2*kPeriodS);
-    cycles_=stopCycle_+1-s*s*s*s*(5-6*s+2*s*s);rate=law.valid?(1-law.progress)/kPeriodS:0;acc=-law.velocity/kPeriodS;
-  }else if(t<kRampS){const double u=t/kRampS;const auto law=quinticTimeLaw(u,kRampS);
-    cycles_=kRampS/kPeriodS*(2.5*std::pow(u,4)-3*std::pow(u,5)+std::pow(u,6));rate=law.progress/kPeriodS;acc=law.velocity/kPeriodS;
-  }else{cycles_=(t-.5*kRampS)/kPeriodS;rate=1/kPeriodS;}
-  GaitParameters g;g.heightM=.15;g.liftM=.015;g.duty=.8;g.advanceXM=kStrideM[stride_];
-  auto cart=gaitCartesian(g,cycles_,rate,acc,walkStopping_&&t>=stopClock_?stopCycle_+1:-1);
-  auto f=solveGait(g,cart,&walkPrevious_);
+  // One constant gait clock. Start and WALK STOP are geometric C2 stride
+  // ramps inside the gait law, so the body leaves and reaches rest with zero
+  // velocity and acceleration; the last window recentres with four feet down.
+  const auto g=walkGait(stride_);
+  const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
+  cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
+  const bool done=walkStopping_&&cycles_>=end;if(done)cycles_=end;
+  auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_);
   if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(!send(f.target,kWalkDrive,now))return;
-  if(walkStopping_&&t>=stopClock_+2*kPeriodS){
-    phase_=Phase::WALK_HOLD;state_=State::MOVING;reason_="WALK_SETTLING";
+  if(done){
+    state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
     // correction and a fixed completion deadline. Reuse the same generator.
-    beginStandSegment(walkPrevious_.target,collision::kWalk,now,true);
+    beginNative(Phase::WALK_HOLD,walkPrevious_.target,collision::kWalk,now,0,0,.15);
   }
 }
 void SimpleMotion::update(uint64_t now){
@@ -374,17 +412,22 @@ void SimpleMotion::update(uint64_t now){
     const bool enabled=port_->enable(enable_);if(serviceStop())return;
     if(!enabled){fault("TORQUE_ENABLE_UNCERTAIN");return;}
     if(++enable_==12){
-      imuStartUs_=now;
-      if(initialRoute_==InitialRoute::ENTRY){phase_=Phase::LOWER;nextStand(now);}
-      else if(initialRoute_==InitialRoute::ROUTE){phase_=Phase::ROUTE;routeCell_=initialCell_;nextStand(now);}
-      else if(initialRoute_==InitialRoute::HEIGHT){phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;nextStand(now);}
-      else {
-        // A stopped gait returns through the proved whole WALK region to
-        // 150 mm, then the ordinary height branch reaches the requested Q.
-        JointTargetFrame q,actual;actual.valid=true;
-        for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
-        if(!heightTarget(.150,q)||!transitionSafe(actual,q,collision::kWalk)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-        phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;beginStandSegment(q,collision::kWalk,now);
+      imuStartUs_=now;const auto actual=measured();
+      switch(initialRoute_){
+        case InitialRoute::ENTRY:nextStand(now);break;  // phase_==ENABLE: DISENGAGE first
+        case InitialRoute::DEPLOY:beginDeploy(&actual,now);break;
+        case InitialRoute::LIFT:beginLift(&actual,now);break;
+        case InitialRoute::HEIGHT:{
+          // Level stance: same contact FK as the height estimate, flat ground.
+          double h=0;for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),actual.legs[l]);
+            if(c.status!=ContactStatus::OK){fault("STAND_CONTACT_IK");return;}h-=c.referenceM.z/4;}
+          beginHeight(actual,std::fmin(.150,std::fmax(kMinStandM,h)),collision::kHeight,now);break;}
+        case InitialRoute::WALK:{
+          // A stopped gait returns through the proved whole WALK region to
+          // 150 mm, then the ordinary height move reaches the requested Q.
+          JointTargetFrame q;plan_.clear();
+          if(!heightTarget(.150,q)||!transitionSafe(actual,q,collision::kWalk)||!via(actual,0,0,.15)||!via(q,0,0,.15)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+          plannedHeight_=.150;beginPlan(Phase::HEIGHT,collision::kWalk,now);break;}
       }
     }
     return;
@@ -404,7 +447,9 @@ void SimpleMotion::update(uint64_t now){
     pendingGoalValid_=false;JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-    beginStandSegment(pendingGoal_,collision::kHeight,now);return;
+    // Start from the preceding NOMINAL stand: an already compensated encoder
+    // pose fed back as nominal would apply the IMU correction twice.
+    beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){

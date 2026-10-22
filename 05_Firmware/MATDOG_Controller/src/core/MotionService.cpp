@@ -47,7 +47,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.1f,\"lift_m\":0.015,\"strides_m\":[0.020,0.030,0.040]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"STOP\"],\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS);
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"STOP\"],\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {

@@ -56,7 +56,7 @@ namespace build {
 constexpr const char* kFirmwareName    = "MATDOG Controller";
 
 // This is a software development candidate, with hardware gates still held.
-constexpr const char* kFirmwareVersion = "1.0.0-rc.2";
+constexpr const char* kFirmwareVersion = "1.0.0-rc.3";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

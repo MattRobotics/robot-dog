@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """Recover KISS runtime geometry bounds from existing continuous CAD/FCL proofs.
+With --trajectory-root the WALK box is the V2 proof and the STAND route uses the
+whole-group DEPLOY/LIFT proofs plus the decimated route vias (no per-cell stops).
 Offline file conversion only. Does not operate a robot or create a certificate.
 """
 import argparse
@@ -11,6 +13,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--evidence-root", type=Path, required=True,
                     help="existing TOLERANCE_V1_20261018 evidence directory")
 parser.add_argument("--optimization-root", type=Path, help="SIMPLE_OPT_20261022 continuous box proofs")
+parser.add_argument("--trajectory-root", type=Path, help="SIMPLE_TRAJ_V2_20261022 WALK/DEPLOY/LIFT box proofs and route vias")
 parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "src/simple/CollisionData.h")
 args = parser.parse_args()
 keys = [leg + "_" + joint + "_joint" for leg in ("lf", "rf", "rh", "lh")
@@ -31,6 +34,21 @@ if args.optimization_root:
     proofs[2], proofs[3] = height, route
     raw[2], raw[3] = height_raw, route_raw
 
+trajectory = None
+if args.trajectory_root:
+    walk_raw = (args.trajectory_root / "walk_v2_certificate.json").read_bytes()
+    deploy_raw = (args.trajectory_root / "DEPLOY_0_107_certificate.json").read_bytes()
+    lift_name = "LIFT_107_251_certificate.json"
+    if not (args.trajectory_root / lift_name).exists() or not json.loads((args.trajectory_root / lift_name).read_bytes())["all_pass"]:
+        lift_name = "LIFT_107_160_certificate.json"  # whole rise not proved: lift to 50 mm only
+    lift_raw = (args.trajectory_root / lift_name).read_bytes()
+    vias = json.loads((args.trajectory_root / "stand_vias.json").read_bytes())
+    walk, deploy, lift = (json.loads(x) for x in (walk_raw, deploy_raw, lift_raw))
+    if not (walk["all_pass"] and deploy["all_pass"] and lift["all_pass"]):
+        raise SystemExit("cannot recover a failed SIMPLE trajectory proof")
+    proofs[1], raw[1] = walk, walk_raw
+    trajectory = (deploy, deploy_raw, lift, lift_raw, vias, 251 if lift_name.startswith("LIFT_107_251") else 160)
+
 def array(values):
     return "{" + ",".join(format(value, ".17g") for value in values) + "}"
 
@@ -45,6 +63,18 @@ struct Box { double lo[12], hi[12]; };
 """
 for name, proof in zip(("kEntry", "kWalk", "kHeight"), proofs):
     text += "constexpr Box " + name + "=" + box(proof["box_rad"]) + ";\n"
+if trajectory:
+    deploy, deploy_raw, lift, lift_raw, vias, top = trajectory
+    text += "constexpr Box kDeploy=" + box(deploy["box_rad"]) + ";\n"
+    text += "constexpr Box kLift=" + box(lift["box_rad"]) + ";\n"
+    text += "constexpr unsigned kDeployKnots[]={" + ",".join(map(str, vias["deploy"])) + "};\n"
+    text += "constexpr unsigned kLiftKnots[]={" + ",".join(str(k) for k in vias["lift"] if k <= top) + "};\n"
+    text += "constexpr unsigned kLiftTopKnot=" + str(top) + ";\n"
+    for name, data in zip(("kEntryProof", "kWalkProof", "kHeightProof", "kDeployProof", "kLiftProof"),
+                          (raw[0], raw[1], raw[2], deploy_raw, lift_raw)):
+        text += 'constexpr char ' + name + '[]="' + hashlib.sha256(data).hexdigest() + '";\n'
+    args.output.write_text(text + "} } }\n")
+    raise SystemExit(0)
 cells = proofs[3]["cells"]
 text += "constexpr Box kStandCells[]={\n" + ",\n".join(box(cell["box_rad"]) for cell in cells) + "\n};\n"
 text += "constexpr unsigned kStandCellCount=sizeof(kStandCells)/sizeof(kStandCells[0]);\n"
