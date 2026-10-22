@@ -1,4 +1,5 @@
 #include "MotionService.h"
+#include "../actuator/CalibrationTargetResolver.h"
 #include <esp_timer.h>
 #include <cmath>
 #include <cstdio>
@@ -57,7 +58,7 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
  add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":40000,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
  (unsigned long)now,simple::name(motion_->state()),motion_->phase(),boolean(ready_),motion_->reason(),reason_,boolean(!fresh),boolean(motion_->state()==simple::State::FAULT),boolean(motion_->offVerified()),motion_->offMask(),boolean(motion_->energized()),boolean(motion_->heightValid()),motion_->requestedHeightM()*1000,motion_->heightM()*1000,motion_->walkCycles(),boolean(motion_->stabilizationLimited()),boolean(motion_->imuValid()),(unsigned long long)(us>=motion_->imuStampUs()?(us-motion_->imuStampUs())/1000:0),(unsigned long)motion_->releases(),(unsigned long)motion_->missed(),(unsigned long long)motion_->maxGapUs(),motion::toString(activeAck_.outcome),activeAck_.reason);
- for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];add("%s{\"slot\":%u,\"valid\":%s,\"raw\":%u,\"rad\":%.6f,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,boolean(f.valid),f.raw,f.q,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
+ for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"rad\":%.6f,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.q,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]}");return ok;
 }
 } }

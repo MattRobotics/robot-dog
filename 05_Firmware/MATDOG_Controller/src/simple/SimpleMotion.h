@@ -73,6 +73,8 @@ class SimpleMotion {
   uint64_t nextReleaseUs() const { return nextUs_; }
  private:
   enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, ROUTE, HEIGHT, HOLD, WALK, WALK_HOLD };
+  enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, ROUTE };
+  bool planInitialReference();
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
@@ -105,7 +107,8 @@ class SimpleMotion {
   Drive commandedDrive_=kStandDrive;
   double requestedHeight_=.15,actualHeight_=0;
   bool heightValid_=false,walkRequested_=false;
-  unsigned stride_=1,routeCell_=0;
+  unsigned stride_=1,routeCell_=0,initialCell_=0;
+  InitialRoute initialRoute_=InitialRoute::ENTRY;
   motion::LocomotionFrame walkPrevious_{};
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1,stopClock_=0;

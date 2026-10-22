@@ -11,7 +11,7 @@ La quota nominale accetta l'intervallo di comando 0–150 mm; il workspace MATDO
 ## Catena e riuso
 
 `Dashboard → MotionService → SimpleMotion → gait/IK → ServoBus → ST3215`.
-`SimpleMotion` possiede l'unico stato operativo: READY, MOVING, STANDING, WALKING, STOPPED, FAULT. Il Controller mantiene l'unico proprietario UART1 e l'arbitro già esistente per escludere la manutenzione concorrente. Nessun comando PRIME/ARM, permesso Motion o sessione operativa aggiuntivi.
+`SimpleMotion` possiede l'unico stato operativo: READY, MOVING, STANDING, WALKING, STOPPED, FAULT. Il Controller mantiene l'unico proprietario UART1 e l'arbitro già esistente per escludere la manutenzione concorrente. Nessun comando PRIME/ARM, permesso Motion o sessione operativa aggiuntivi. Dopo STOP, STAND riacquisisce anche pose erette, intermedie o WALK contenute nelle regioni geometriche verificate; non impone il ritorno manuale in PRONE.
 
 Recuperati: SCServo 1.0.2 e protocollo C018; `ServoBus`, `ValidatedServoRead`, `BusTransaction`, `ServoPacket`; conversioni e popolazione canonica; Geometry V5/URDF; `Gait`, `solveGait`, IK analitica e contact IK; estrazione tilt/IK inclinata; driver BNO085 e task acquisizione; DALY; LED, Wi-Fi, autenticazione e mailbox HTTP. Restano integri `CalibrationExecutionEngine → ActuatorRuntime → ServoBus::writeGoalPosition → WritePosEx`, Full Calibration, certificati, restore e manutenzione NVS.
 

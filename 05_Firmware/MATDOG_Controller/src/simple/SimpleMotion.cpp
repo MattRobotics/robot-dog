@@ -63,6 +63,18 @@ bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
   for(const auto& b:collision::kStandCells)if(contains(b,q))return true;
   return false;
 }
+bool SimpleMotion::planInitialReference(){
+  // Restart after STOP/boot from any already proved configuration region.
+  // This is physical path selection from measured Q, never route tracking.
+  if(pointSafe(reference_)&&contains(collision::kHeight,reference_)){initialRoute_=InitialRoute::HEIGHT;return true;}
+  if(contains(collision::kEntry,reference_)){initialRoute_=InitialRoute::ENTRY;return true;}
+  if(!pointSafe(reference_))return false;
+  if(contains(collision::kWalk,reference_)){initialRoute_=InitialRoute::WALK;return true;}
+  for(unsigned c=collision::kStandCellCount;c>0;--c)if(contains(collision::kStandCells[c-1],reference_)){
+    initialRoute_=InitialRoute::ROUTE;initialCell_=c-1;return true;
+  }
+  return false;
+}
 bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFrame& b,const collision::Box& box) const {
   // All independent joint progress between two endpoints is enclosed. No
   // assumption that twelve motors have the same instantaneous response.
@@ -244,7 +256,7 @@ void SimpleMotion::update(uint64_t now){
     if(f.torque!=0||f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");return;}
     if(++acquire_==12){
       reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-      if(!fresh(now)||!contains(collision::kEntry,reference_)){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+      if(!fresh(now)||!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
       phase_=Phase::REFERENCE;
     }
     return;
@@ -252,16 +264,29 @@ void SimpleMotion::update(uint64_t now){
   if(phase_==Phase::REFERENCE){
     // Write the real measured reference with torque OFF before enabling.
     reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-    if(!contains(collision::kEntry,reference_)||!send(reference_,kStandDrive,now,true))return;
+    if(!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+    if(!send(reference_,kStandDrive,now,true))return;
     phase_=Phase::ENABLE;enable_=0;return;
   }
   if(phase_==Phase::ENABLE){
     // Verify each exact GoalPosition/RAM profile BEFORE enabling that servo.
     Feedback f;
-    if(!port_->read(enable_,true,f)||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc||f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>4*kTickRad){fault("REFERENCE_CHANGED_BEFORE_ENABLE");return;}
+    if(!port_->read(enable_,true,f)||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc||f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>kArrivalRad){fault("REFERENCE_CHANGED_BEFORE_ENABLE");return;}
     energized_=true;offMask_=0; // even a failed enable may have applied; SAFE_OFF required
     if(!port_->enable(enable_)){fault("TORQUE_ENABLE_UNCERTAIN");return;}
-    if(++enable_==12){phase_=Phase::LOWER;nextStand(now);}
+    if(++enable_==12){
+      if(initialRoute_==InitialRoute::ENTRY){phase_=Phase::LOWER;nextStand(now);}
+      else if(initialRoute_==InitialRoute::ROUTE){phase_=Phase::ROUTE;routeCell_=initialCell_;nextStand(now);}
+      else if(initialRoute_==InitialRoute::HEIGHT){phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;nextStand(now);}
+      else {
+        // A stopped gait returns through the proved whole WALK region to
+        // 150 mm, then the ordinary height branch reaches the requested Q.
+        JointTargetFrame q,actual;actual.valid=true;
+        for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
+        if(!heightTarget(.150,q)||!transitionSafe(actual,q,collision::kWalk)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+        phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;send(q,kStandDrive,now);
+      }
+    }
     return;
   }
   if(releases_%3==0){

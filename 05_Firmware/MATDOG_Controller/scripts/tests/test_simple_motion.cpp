@@ -69,6 +69,16 @@ int main(){
   std::printf("WALK STANDARD production gait/IK: max target step %.6f rad, host mean %.1f us/frame (not ESP timing)\n",maxStep,elapsed/1200);
   const auto frames=r.p.frames;r.m.stop();r.tick(false);assert(r.p.frames==frames);assert(r.m.stopping());
   for(unsigned i=0;i<14;++i)r.tick(false);assert(r.m.offVerified());assert(r.m.state()==simple::State::STOPPED);
+  // STOP must not impose a manual return to PRONE before another STAND.
+  assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(r.p.enables==24);
+  Rig interrupted;assert(!interrupted.m.stand(.15,interrupted.p.now));
+  for(unsigned i=0;i<400&&interrupted.p.frames<25;++i)interrupted.tick();
+  interrupted.m.stop();for(unsigned i=0;i<15;++i)interrupted.tick(false);assert(interrupted.m.offVerified());
+  assert(!interrupted.m.stand(.15,interrupted.p.now));assert(interrupted.reachStand());
+  Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
+  for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
+  for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<15;++i)gaitRestart.tick(false);
+  assert(gaitRestart.m.offVerified());assert(!gaitRestart.m.stand(.06,gaitRestart.p.now));assert(gaitRestart.reachStand());
   Rig native;assert(!native.m.stand(.15,native.p.now));native.p.holdObservation=true;
   for(unsigned i=0;i<3000&&native.m.state()!=simple::State::FAULT;++i)native.tick(false);
   assert(native.m.state()==simple::State::FAULT);assert(!strcmp(native.m.reason(),"NATIVE_TARGET_NOT_REACHED"));
