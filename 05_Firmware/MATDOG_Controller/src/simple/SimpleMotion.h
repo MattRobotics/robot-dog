@@ -102,7 +102,8 @@ class SimpleMotion {
   uint64_t maxGapUs_=0;
   uint32_t releases_=0,missed_=0;
   unsigned pollNext_=0,controlNext_=0,acquire_=0,enable_=0;
-  motion::JointTargetFrame goal_{},reference_{};
+  motion::JointTargetFrame goal_{},reference_{},pendingGoal_{};
+  bool pendingGoalValid_=false;
   uint16_t commandedRaw_[12]{};
   Drive commandedDrive_=kStandDrive;
   double requestedHeight_=.15,actualHeight_=0;

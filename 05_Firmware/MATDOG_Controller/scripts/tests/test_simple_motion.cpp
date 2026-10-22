@@ -57,7 +57,7 @@ int main(){
   assert(r.m.stand(0,r.p.now));assert(r.p.enables==0&&r.p.frames==0);
   assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(r.p.enables==12);assert(r.m.heightValid());
   std::printf("STAND sequence: %u coordinated pose writes; scripted observation only\n",r.p.frames);
-  assert(!r.m.stand(.06,r.p.now));assert(r.reachStand());assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+  const auto beforeHeight=r.p.frames;assert(!r.m.stand(.06,r.p.now));assert(r.p.frames==beforeHeight);assert(r.reachStand());assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
   assert(!r.m.walk(1,r.p.now));
   for(unsigned i=0;i<2000&&r.m.state()!=simple::State::WALKING;++i)r.tick();assert(r.m.state()==simple::State::WALKING);
   double maxStep=0,prev[12]{};for(unsigned i=0;i<12;++i)prev[i]=motion::jointSlot(r.m.target(),i);

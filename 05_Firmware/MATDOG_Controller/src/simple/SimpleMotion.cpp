@@ -42,7 +42,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   state_=fault?State::FAULT:State::STOPPED;faultLatched_=fault;reason_=r;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   phase_=Phase::IDLE;offPending_=true;offSent_=false;offMask_=0;offNext_=0;
-  walkRequested_=false;walkStopping_=false;rollCorrection_=pitchCorrection_=0;
+  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=0;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -98,7 +98,7 @@ const char* SimpleMotion::stand(double h,uint64_t now){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!fresh(now)||!transitionSafe(actual,q,collision::kHeight))return "HEIGHT_PATH_NOT_CLEAR";
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
-    if(!send(q,kStandDrive,now))return reason_;
+    pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
   }else{state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";}
   return nullptr;
 }
@@ -298,6 +298,12 @@ void SimpleMotion::update(uint64_t now){
   }
   if(energized_&&!fresh(now)){fault("SERVO_FEEDBACK_STALE");return;}
   measureHeight();
+  if(pendingGoalValid_){
+    pendingGoalValid_=false;JointTargetFrame actual;actual.valid=true;
+    for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
+    if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+    send(pendingGoal_,kStandDrive,now);return;
+  }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
     if(arrived(now)){nextStand(now);return;}
