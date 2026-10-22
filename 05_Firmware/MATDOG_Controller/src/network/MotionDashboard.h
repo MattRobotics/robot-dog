@@ -16,7 +16,7 @@ card.innerHTML=`<h2>MATDOG SIMPLE <span id="simple-state" data-state="STOPPED">C
 <div class="controls"><label>Quota nominale (mm)<input id="simple-height" type="number" min="0" max="150" step="5" value="150"></label>
 <button id="simple-stand" disabled>STAND</button><label>WALK STANDARD<select id="simple-stride"><option value="0">20 mm / ciclo</option><option value="1" selected>30 mm / ciclo</option><option value="2">40 mm / ciclo</option></select></label>
 <button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div>
-<dl id="simple-values"></dl><p class="note">STAND abilita automaticamente i servo. Il workspace STAND a contatti fissi consente 60–150 mm: una quota non raggiungibile viene rifiutata. WALK raggiunge prima 150 mm, poi usa il ciclo STANDARD di 7 s. WALK STOP conclude il passo e mantiene STAND. STOP toglie coppia; la perdita del collegamento operatore per 3 s avvia SAFE_OFF.</p>
+<dl id="simple-values"></dl><p class="note">STAND abilita automaticamente i servo. Il workspace STAND a contatti fissi consente 50–150 mm: una quota non raggiungibile viene rifiutata. WALK raggiunge prima 150 mm, poi usa il ciclo STANDARD di 6 s. WALK STOP conclude il passo e mantiene STAND. STOP toglie coppia; la perdita del collegamento operatore per 3 s avvia SAFE_OFF.</p>
 <p class="note">La quota è una stima da encoder e IMU con ipotesi di piano di appoggio. Sulla fixture non misura la distanza dal pavimento.</p>
 <details><summary>Feedback servo e manutenzione</summary><pre id="simple-detail"></pre><p>Calibrazione, generazioni NVS e certificati: scheda Diagnostics e comandi Calibration &amp; Maintenance esistenti via USB.</p></details>`;
 by('dashboard').prepend(card);
@@ -49,7 +49,7 @@ try{const r=await fetch('/api/motion/status',{cache:'no-store',headers:csrf?{'X-
 catch(e){if(status&&performance.now()-received>1500){by('simple-state').textContent='COLLEGAMENTO PERSO';by('simple-stand').disabled=true;by('simple-walk').disabled=true}}
 finally{clearTimeout(timer);polling=false}}
 by('simple-stand').onclick=()=>command('STAND',{target_height_m:Number(by('simple-height').value)/1000});
-by('simple-walk').onclick=()=>command('BASE_VELOCITY',{vx:[.020,.030,.040][Number(by('simple-stride').value)]/7,vy:0,yaw_rate:0});
+by('simple-walk').onclick=()=>command('BASE_VELOCITY',{vx:[.020,.030,.040][Number(by('simple-stride').value)]/6,vy:0,yaw_rate:0});
 by('simple-walk-stop').onclick=()=>command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true);
 stop.onclick=()=>command('STOP',{},true);
 window.addEventListener('keydown',e=>{if(e.key==='Escape')command('STOP',{},true)});

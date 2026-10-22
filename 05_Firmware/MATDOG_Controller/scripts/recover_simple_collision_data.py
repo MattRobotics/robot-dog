@@ -10,6 +10,7 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--evidence-root", type=Path, required=True,
                     help="existing TOLERANCE_V1_20261018 evidence directory")
+parser.add_argument("--optimization-root", type=Path, help="SIMPLE_OPT_20261022 continuous box proofs")
 parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "src/simple/CollisionData.h")
 args = parser.parse_args()
 keys = [leg + "_" + joint + "_joint" for leg in ("lf", "rf", "rh", "lh")
@@ -20,6 +21,15 @@ raw = [(args.evidence_root / name).read_bytes() for name in files]
 proofs = [json.loads(data) for data in raw]
 if not all(proof["all_pass"] for proof in proofs):
     raise SystemExit("cannot recover a failed geometry proof")
+
+if args.optimization_root:
+    height_raw = (args.optimization_root / "height50-certificate.json").read_bytes()
+    route_raw = (args.optimization_root / "stand-segments-certificate.json").read_bytes()
+    height, route = json.loads(height_raw), json.loads(route_raw)
+    if not height["all_pass"] or not route["all_pass"]:
+        raise SystemExit("cannot recover a failed SIMPLE optimization proof")
+    proofs[2], proofs[3] = height, route
+    raw[2], raw[3] = height_raw, route_raw
 
 def array(values):
     return "{" + ",".join(format(value, ".17g") for value in values) + "}"

@@ -6,7 +6,10 @@
 #include "CollisionData.h"
 
 namespace matdog { namespace simple {
-constexpr uint32_t kPeriodUs=40000, kReadTimeoutMs=2;
+constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
+constexpr double kWalkPeriodS=6, kWalkRampS=6;
+constexpr double kStrideM[]={.020,.030,.040};
+constexpr double kMinStandM=.050;
 constexpr double kTickRad=6.28318530717958647692/4096;
 struct Drive { uint16_t speed; uint8_t acc; };
 // STAND retains the hardware-proven calibration acceleration, with the existing
@@ -82,10 +85,13 @@ class SimpleMotion {
   bool heightTarget(double,motion::JointTargetFrame&) const;
   void measureHeight();
   void nextStand(uint64_t);
+  void beginStandSegment(const motion::JointTargetFrame&,const collision::Box&,uint64_t,bool native=false);
+  void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
   void startWalk(uint64_t);
   void serviceOff();
+  bool serviceStop();
   void enterOff(bool fault,const char*);
   ServoPort* port_=nullptr;
   Inputs input_{};
@@ -103,6 +109,10 @@ class SimpleMotion {
   uint32_t releases_=0,missed_=0;
   unsigned pollNext_=0,controlNext_=0,acquire_=0,enable_=0;
   motion::JointTargetFrame goal_{},reference_{},pendingGoal_{};
+  motion::JointTargetFrame segmentFrom_{},segmentTo_{};
+  const collision::Box* segmentBox_=nullptr;
+  uint64_t segmentStartUs_=0,segmentDurationUs_=0,settleUs_=0,segmentDeadlineUs_=0;
+  uint64_t imuStartUs_=0;
   bool pendingGoalValid_=false;
   uint16_t commandedRaw_[12]{};
   Drive commandedDrive_=kStandDrive;

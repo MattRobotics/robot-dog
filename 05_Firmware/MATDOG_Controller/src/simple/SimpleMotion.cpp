@@ -10,8 +10,7 @@ namespace matdog { namespace simple {
 using namespace motion;
 namespace {
 constexpr double kArrivalRad=12*kTickRad; // V25 native positioning allowance
-constexpr double kStrideM[]={.020,.030,.040};
-constexpr double kPeriodS=7,kRampS=7;
+constexpr double kPeriodS=kWalkPeriodS,kRampS=kWalkRampS;
 int magnitude(int x){return x&0x7fff;}
 bool contains(const collision::Box& b,const JointTargetFrame& q,double extra=0){
   if(!q.valid)return false;
@@ -41,6 +40,7 @@ void SimpleMotion::fault(const char* r){enterOff(true,r);}
 void SimpleMotion::enterOff(bool fault,const char* r){
   state_=fault?State::FAULT:State::STOPPED;faultLatched_=fault;reason_=r;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
+  segmentBox_=nullptr;segmentTo_.valid=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;offSent_=false;offMask_=0;offNext_=0;
   walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=0;
 }
@@ -51,6 +51,10 @@ void SimpleMotion::serviceOff(){
   else {offMask_&=~(1u<<offNext_);offSent_=false;}
   offNext_=(offNext_+1)%13;
   if(offMask_==0x1fff){energized_=false;offPending_=false;}
+}
+bool SimpleMotion::serviceStop(){
+  if(!stop_.exchange(false,std::memory_order_acq_rel))return false;
+  enterOff(false,stopReason_.load());serviceOff();return true;
 }
 bool SimpleMotion::fresh(uint64_t now) const {
   for(const auto& f:fb_)if(!f.valid||(now>=f.stampUs&&now-f.stampUs>250000)||(f.stampUs>now&&f.stampUs-now>15000))return false;
@@ -81,7 +85,7 @@ bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFra
   return contains(box,a)&&contains(box,b)&&pointSafe(b);
 }
 bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
-  if(!std::isfinite(h)||h<.060||h>.150)return false; // effective C4 workspace
+  if(!std::isfinite(h)||h<kMinStandM||h>.150)return false; // effective C4 workspace
   auto d=canonicalStandDefinition();d.lowBodyHeightM=h/2;d.standBodyHeightM=h;
   const auto s=generateStandTarget(d);q=s.target;return s.status==StandStatus::OK&&pointSafe(q)&&contains(collision::kHeight,q);
 }
@@ -93,13 +97,13 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   if(!input_.imuValid)return "IMU_UNAVAILABLE";
   if(state_==State::MOVING||state_==State::WALKING)return "MOTION_BUSY";
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
-  requestedHeight_=h;walkRequested_=false;heartbeat(now);
   if(state_==State::STANDING){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!fresh(now)||!transitionSafe(actual,q,collision::kHeight))return "HEIGHT_PATH_NOT_CLEAR";
+    requestedHeight_=h;walkRequested_=false;heartbeat(now);
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
-  }else{state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";}
+  }else{requestedHeight_=h;walkRequested_=false;heartbeat(now);state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";}
   return nullptr;
 }
 const char* SimpleMotion::walk(unsigned stride,uint64_t now){
@@ -125,8 +129,13 @@ bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool 
     else if(!port_->resolve(i,jointSlot(q,i),raw[i])){fault("TARGET_CONVERSION_FAILED");return false;}
     distance=std::fmax(distance,std::abs(jointSlot(q,i)-fb_[i].q));
   }
-  if(stop_.load())return false;
-  if(!port_->frame(raw,drive)){fault("SYNC_WRITE_FAILED");return false;}
+  if(serviceStop())return false;
+  // Identical RAM goals need no retransmission, especially in HOLD. Always
+  // write the measured reference with torque OFF before enabling.
+  if(!holdReference&&goal_.valid&&drive.speed==commandedDrive_.speed&&drive.acc==commandedDrive_.acc&&
+     std::equal(raw,raw+12,commandedRaw_)){goal_=q;return true;}
+  if(!port_->frame(raw,drive)){if(!serviceStop())fault("SYNC_WRITE_FAILED");return false;}
+  if(serviceStop())return false; // STOP latched while the atomic UART burst drained
   commandedDrive_=drive;goal_=q;for(unsigned i=0;i<12;++i)commandedRaw_[i]=raw[i];goalSentUs_=now;
   // Native speed/acceleration transit estimate, conservative 2x + V25's
   // 12 s positioning timeout. This is a completion deadline, not a lag test.
@@ -135,8 +144,9 @@ bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool 
   return true;
 }
 bool SimpleMotion::arrived(uint64_t now) const {
-  if(!fresh(now)||now-goalSentUs_<100000)return false;
-  for(unsigned i=0;i<12;++i)if(fb_[i].stampUs<=goalSentUs_||std::abs(fb_[i].q-jointSlot(goal_,i))>kArrivalRad||magnitude(fb_[i].speed)>50)return false;
+  const auto terminal=segmentBox_?settleUs_:goalSentUs_;
+  if(!terminal||now<terminal||!fresh(now)||now-terminal<100000)return false;
+  for(unsigned i=0;i<12;++i)if(fb_[i].stampUs<=terminal||std::abs(fb_[i].q-jointSlot(goal_,i))>kArrivalRad||magnitude(fb_[i].speed)>50)return false;
   return true;
 }
 void SimpleMotion::measureHeight(){
@@ -158,25 +168,79 @@ void SimpleMotion::nextStand(uint64_t now){
   if(phase_==Phase::LOWER){
     auto q=reference_,head=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=head.legs[l].lower;
     if(!transitionSafe(actual,q,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
-    phase_=Phase::ALIGN;send(q,kStandDrive,now);return;
+    phase_=Phase::ALIGN;beginStandSegment(q,collision::kEntry,now,true);return;
   }
   if(phase_==Phase::ALIGN){
     auto q=routePoint(0);if(!transitionSafe(actual,q,collision::kEntry)){fault("ALIGN_PATH_NOT_CLEAR");return;}
-    phase_=Phase::ROUTE;routeCell_=0;send(q,kStandDrive,now);return;
+    phase_=Phase::ROUTE;routeCell_=0;beginStandSegment(q,collision::kEntry,now,true);return;
   }
   if(phase_==Phase::ROUTE&&routeCell_<collision::kStandCellCount){
     const unsigned c=routeCell_++;auto q=cellEnd(c);
     if(!transitionSafe(actual,q,collision::kStandCells[c])){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
-    send(q,kStandDrive,now);return;
+    beginStandSegment(q,collision::kStandCells[c],now);return;
   }
   if(phase_==Phase::ROUTE){
     JointTargetFrame q;if(!heightTarget(requestedHeight_,q)||!transitionSafe(actual,q,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-    phase_=Phase::HEIGHT;send(q,kStandDrive,now);return;
+    double delta=0;for(unsigned i=0;i<12;++i)delta=std::fmax(delta,std::abs(jointSlot(segmentTo_,i)-jointSlot(q,i)));
+    phase_=Phase::HEIGHT;
+    if(delta>1e-5){beginStandSegment(q,collision::kHeight,now);return;}
+    // The route already ends at C4/STAND150; no duplicate final waypoint.
   }
   if(phase_==Phase::HEIGHT||phase_==Phase::WALK_HOLD){
+    segmentBox_=nullptr;
     phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
+    measureHeight();
     if(walkRequested_)startWalk(now);
   }
+}
+void SimpleMotion::beginStandSegment(const JointTargetFrame& to,const collision::Box& box,uint64_t now,bool native){
+  // Only contact/phase boundaries settle; CAD cells are not waypoints.
+  // Preserve the preceding NOMINAL endpoint; feeding an already compensated
+  // encoder pose back as a new nominal would apply the IMU correction twice.
+  segmentFrom_=segmentTo_;segmentFrom_.valid=true;double distance=0;
+  for(unsigned i=0;i<12;++i){if(!segmentTo_.valid)jointSlot(segmentFrom_,i)=fb_[i].q;distance=std::fmax(distance,std::abs(jointSlot(to,i)-jointSlot(segmentFrom_,i)));}
+  segmentTo_=to;segmentBox_=&box;segmentStartUs_=now;
+  // Quintic endpoint v=a=0, below native 300/8 (0.460/1.227 SI).
+  // Folded entry stays a native position move: its observed start may be
+  // outside URDF, so it must never become an interpolated command.
+  const double duration=native?0:std::fmax(.20,std::fmax(1.875*distance/.30,std::sqrt(5.773503*distance/.60)));
+  segmentDurationUs_=static_cast<uint64_t>(std::ceil(duration*1e6));settleUs_=now+segmentDurationUs_;
+  segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
+  generateStand(now);
+}
+void SimpleMotion::generateStand(uint64_t now){
+  if(!segmentBox_)return;
+  const double u=segmentDurationUs_?std::fmin(1.,double(now-segmentStartUs_)/segmentDurationUs_):1;
+  const auto law=quinticTimeLaw(u,segmentDurationUs_?segmentDurationUs_/1e6:1);
+  LocomotionFrame f;f.target=segmentTo_;f.cartesian.valid=true;
+  if(segmentDurationUs_)for(unsigned i=0;i<12;++i)jointSlot(f.target,i)=jointSlot(segmentFrom_,i)+law.progress*(jointSlot(segmentTo_,i)-jointSlot(segmentFrom_,i));
+  if(phase_==Phase::HEIGHT&&segmentDurationUs_){
+    // Same contact IK for the complete height trajectory, including small
+    // encoder rounding at its initial reference. No joint-space foot drag.
+    double fromHeight=0;ContactResult from[4];
+    for(unsigned l=0;l<4;++l){from[l]=contactForwardKinematics(static_cast<LegId>(l),segmentFrom_.legs[l]);if(from[l].status!=ContactStatus::OK){fault("STAND_CONTACT_IK");return;}fromHeight-=from[l].referenceM.z/4;}
+    f.cartesian.body.translationM.z=fromHeight+law.progress*(requestedHeight_-fromHeight);
+    for(unsigned l=0;l<4;++l){const auto a=from[l].referenceM,b=canonicalStandDefinition().contactsWorldM[l];
+      f.cartesian.feet[l]={a.x+law.progress*(b.x-a.x),a.y+law.progress*(b.y-a.y),(a.z+fromHeight)*(1-law.progress)};
+      TiltedIkOptions opt;opt.seed=f.target.legs[l];opt.maxIterations=8;opt.requireNominalStrip=false;
+      const auto ik=worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],f.cartesian.body,opt);
+      if(ik.status!=TiltedIkResult::Status::OK){fault("STAND_CONTACT_IK");return;}f.target.legs[l]=ik.base.joints;
+    }
+  }else{
+    // Entry has intentional body pitch. Retain that reference when applying
+    // the measured tilt error; do not try to flatten the folded robot.
+    unsigned edge=0;double alpha=0;
+    if(phase_==Phase::ROUTE&&routeCell_){const unsigned c=routeCell_-1;edge=collision::kCellEdge[c];const double a=c&&collision::kCellEdge[c-1]==edge?collision::kCellEnd[c-1]:0;alpha=a+law.progress*(collision::kCellEnd[c]-a);}
+    const auto* a=paired_data::kKnots[collision::kPhaseKnots[edge]].p;
+    const auto* b=paired_data::kKnots[collision::kPhaseKnots[edge+1]].p;
+    const double pitch=a[4]+alpha*(b[4]-a[4]);
+    f.cartesian.body=bodyPoseFromRollPitch({a[5]+alpha*(b[5]-a[5]),0,a[6]+alpha*(b[6]-a[6])},0,pitch);
+    const Vector3 normal{-std::sin(pitch),0,std::cos(pitch)};
+    for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
+      if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
+  }
+  if(!pointSafe(f.target)||!contains(*segmentBox_,f.target)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
+  compensate(f,now);send(f.target,kStandDrive,now);
 }
 void SimpleMotion::startWalk(uint64_t now){
   GaitParameters g;g.heightM=.15;g.liftM=.015;g.duty=.8;g.advanceXM=kStrideM[stride_];
@@ -191,16 +255,42 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
      !tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a)){imuLimited_=true;return;}
   // A small proportional BODY correction, slew limited, no servo PID or
   // integral loop. The same target generator owns nominal + correction.
-  auto step=[](double old,double tilt){const double desired=std::abs(tilt)<.005?0:std::clamp(-.5*tilt,-.020,.020);return old+std::clamp(desired-old,-.0008,.0008);};
-  const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad);
-  for(unsigned trial=0;trial<5;++trial){const double scale=std::ldexp(1.,-static_cast<int>(trial));
-    auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,pitch*scale);
+  auto step=[](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);constexpr double step=.020*kPeriodUs/1e6;return old+std::clamp(desired-old,-step,step);};
+  const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
+  const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
+  if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=0;return;}
+  const auto& box=phase_==Phase::WALK?collision::kWalk:segmentBox_?*segmentBox_:collision::kHeight;
+  auto solve=[&](double scale){
+    auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);
     JointTargetFrame q;q.valid=true;
     for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=f.target.legs[l];opt.maxIterations=8;opt.requireNominalStrip=false;
       const auto ik=worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],b,opt);
       if(ik.status!=TiltedIkResult::Status::OK){q.valid=false;break;}q.legs[l]=ik.base.joints;}
-    const auto& box=phase_==Phase::WALK?collision::kWalk:collision::kHeight;
-    if(pointSafe(q)&&contains(box,q)){f.target=q;rollCorrection_=roll*scale;pitchCorrection_=pitch*scale;imuLimited_=trial!=0;return;}
+    return q;
+  };
+  // Smooth geometric attenuation before the hard workspace boundary. A small
+  // IK perturbation measures local joint sensitivity; reserve half the joint
+  // room. This avoids normal corrections jumping from full to half amplitude
+  // as the nominal trajectory approaches a limit. No encoder tracking loop.
+  constexpr double probeScale=1./32;
+  const auto probe=solve(probeScale);double sum=0;
+  if(probe.valid)for(unsigned i=0;i<12;++i){const auto& lim=legModel(static_cast<LegId>(i/3))->limits[i%3];
+    const double q=jointSlot(f.target,i),delta=(jointSlot(probe,i)-q)/probeScale;
+    const double lo=std::fmax(box.lo[i],std::fmax(input_.minRad[i],lim.lower));
+    const double hi=std::fmin(box.hi[i],std::fmin(input_.maxRad[i],lim.upper));
+    // The smallest recovered CAD reserve is 25 mrad. A fixed symmetric
+    // local allowance also keeps attenuation continuous across adjacent
+    // segment boxes instead of changing gain at every phase boundary.
+    const double room=std::fmin(.025,std::fmin(hi-q,q-lo));
+    if(room<=0){sum=INFINITY;break;}const double ratio=delta/room;sum+=ratio*ratio;
+  }
+  // C2 engagement of stabilization after automatic torque enable. Uses the
+  // same Motion epoch, not a second timer or a servo acceleration controller.
+  const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
+  const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
+  for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
+    const auto q=solve(scale);
+    if(pointSafe(q)&&contains(box,q)){f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999||trial!=0;return;}
   }
   // If no in-workspace correction exists, the nominal safe target survives.
   rollCorrection_=pitchCorrection_=0;imuLimited_=true;
@@ -223,7 +313,7 @@ void SimpleMotion::generateWalk(uint64_t now){
 }
 void SimpleMotion::update(uint64_t now){
   nowUs_=now;
-  if(stop_.exchange(false,std::memory_order_acq_rel))enterOff(false,stopReason_.load());
+  if(serviceStop())return;
   if(offPending_){serviceOff();return;}
   if(!engaged()&&state_==State::READY&&(!input_.ready||!input_.powerOk||!input_.imuValid)){state_=State::STOPPED;reason_=input_.refusal;}
   if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_="READY";}
@@ -237,9 +327,9 @@ void SimpleMotion::update(uint64_t now){
   if(engaged()&&(!input_.ready||!input_.powerOk||!input_.authorityOk)){fault(input_.refusal);serviceOff();return;}
   if(engaged()&&(!heartbeatUs_||now-heartbeatUs_>3000000)){fault("OPERATOR_LINK_LOST");serviceOff();return;}
   if(energized_&&(!input_.imuValid||now-input_.imuStampUs>600000)){fault("IMU_STALE");serviceOff();return;}
-  // Four single-block reads per 40 ms: whole population every 120 ms, at
-  // most 8 ms wait. One 2-block control read each 120 ms adds <=4 ms.
-  for(unsigned n=0;n<4;++n){const unsigned i=pollNext_++%12;Feedback f;
+  // Two single-block reads per 20 ms: whole population every 120 ms, at
+  // most 4 ms wait. One 2-block control read each 120 ms adds <=4 ms.
+  for(unsigned n=0;n<2;++n){const unsigned i=pollNext_++%12;Feedback f;
     if(port_->read(i,false,f)){
       f.torque=fb_[i].torque;f.goal=fb_[i].goal;f.goalSpeed=fb_[i].goalSpeed;f.acc=fb_[i].acc;f.controlStampUs=fb_[i].controlStampUs;fb_[i]=f;failures_[i]=0;
       if(energized_&&(f.status||f.temp>=70||f.voltage<40||f.voltage>140)){fault("SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT");break;}
@@ -249,9 +339,11 @@ void SimpleMotion::update(uint64_t now){
     }else if(++failures_[i]>=3&&energized_){fault("SERVO_COMMUNICATION_LOST");break;}
     if(stop_.load())break;
   }
-  if(offPending_||stop_.load()){if(stop_.exchange(false))enterOff(false,stopReason_.load());serviceOff();return;}
+  if(serviceStop())return;
+  if(offPending_){serviceOff();return;}
   if(phase_==Phase::ACQUIRE){
-    Feedback f;if(!port_->read(acquire_,true,f)){fault("INITIAL_SERVO_READ_FAILED");return;}
+    Feedback f;const bool read=port_->read(acquire_,true,f);if(serviceStop())return;
+    if(!read){fault("INITIAL_SERVO_READ_FAILED");return;}
     fb_[acquire_]=f;
     if(f.torque!=0||f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");return;}
     if(++acquire_==12){
@@ -271,10 +363,13 @@ void SimpleMotion::update(uint64_t now){
   if(phase_==Phase::ENABLE){
     // Verify each exact GoalPosition/RAM profile BEFORE enabling that servo.
     Feedback f;
-    if(!port_->read(enable_,true,f)||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc||f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>kArrivalRad){fault("REFERENCE_CHANGED_BEFORE_ENABLE");return;}
+    const bool read=port_->read(enable_,true,f);if(serviceStop())return;
+    if(!read||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc||f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>kArrivalRad){fault("REFERENCE_CHANGED_BEFORE_ENABLE");return;}
     energized_=true;offMask_=0; // even a failed enable may have applied; SAFE_OFF required
-    if(!port_->enable(enable_)){fault("TORQUE_ENABLE_UNCERTAIN");return;}
+    const bool enabled=port_->enable(enable_);if(serviceStop())return;
+    if(!enabled){fault("TORQUE_ENABLE_UNCERTAIN");return;}
     if(++enable_==12){
+      imuStartUs_=now;
       if(initialRoute_==InitialRoute::ENTRY){phase_=Phase::LOWER;nextStand(now);}
       else if(initialRoute_==InitialRoute::ROUTE){phase_=Phase::ROUTE;routeCell_=initialCell_;nextStand(now);}
       else if(initialRoute_==InitialRoute::HEIGHT){phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;nextStand(now);}
@@ -284,32 +379,36 @@ void SimpleMotion::update(uint64_t now){
         JointTargetFrame q,actual;actual.valid=true;
         for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
         if(!heightTarget(.150,q)||!transitionSafe(actual,q,collision::kWalk)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-        phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;send(q,kStandDrive,now);
+        phase_=Phase::ROUTE;routeCell_=collision::kStandCellCount;beginStandSegment(q,collision::kWalk,now);
       }
     }
     return;
   }
-  if(releases_%3==0){
+  if(releases_%6==0){
     const unsigned i=controlNext_++%12;Feedback f;
-    if(port_->read(i,true,f)){
+    const bool read=port_->read(i,true,f);if(serviceStop())return;
+    if(read){
       fb_[i]=f;controlFailures_[i]=0;
       if(energized_&&(f.torque!=1||f.goal!=commandedRaw_[i]||f.goalSpeed!=commandedDrive_.speed||f.acc!=commandedDrive_.acc)){fault("SERVO_TORQUE_OR_GOAL_LOST");return;}
     }else if(energized_&&++controlFailures_[i]>=3){fault("SERVO_CONTROL_READ_LOST");return;}
   }
+  if(serviceStop())return;
   if(energized_&&!fresh(now)){fault("SERVO_FEEDBACK_STALE");return;}
   measureHeight();
   if(pendingGoalValid_){
     pendingGoalValid_=false;JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-    send(pendingGoal_,kStandDrive,now);return;
+    beginStandSegment(pendingGoal_,collision::kHeight,now);return;
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
+    if(segmentBox_)generateStand(now);
+    if(offPending_||stop_.load())return;
     if(arrived(now)){nextStand(now);return;}
-    if(goalDeadlineUs_&&now>goalDeadlineUs_){fault("NATIVE_TARGET_NOT_REACHED");return;}
+    if(now>(segmentBox_?segmentDeadlineUs_:goalDeadlineUs_)){fault("NATIVE_TARGET_NOT_REACHED");return;}
   }
-  if(phase_==Phase::HOLD&&releases_%3==0){
+  if(phase_==Phase::HOLD){
     GaitParameters g;g.heightM=requestedHeight_;auto f=solveGait(g,gaitHold(g,0,requestedHeight_,0));
     if(f.target.valid){compensate(f,now);send(f.target,kStandDrive,now);}
   }
