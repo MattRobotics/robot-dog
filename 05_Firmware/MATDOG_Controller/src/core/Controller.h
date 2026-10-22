@@ -2,6 +2,8 @@
 #define MATDOG_CORE_CONTROLLER_H
 
 #include <Arduino.h>
+#include "../simple/SimpleMotion.h"
+#include "MotionService.h"
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
@@ -12,16 +14,6 @@
 #include "../calibration/CalibrationPersistenceService.h"
 #include "../calibration/CalibrationRuntimeRestore.h"
 #include "../calibration/RestoreAttestationPolicy.h"
-#include "OperationalReadiness.h"
-#include "MotionClock.h"
-#include "../execution/MotionCoordinator.h"
-#include "../execution/OperationalFeedback.h"
-#include "../execution/MotionSession.h"
-#include "../execution/ValidationProfile.h"
-#include "../execution/ReviewedMotionRuntime.h"
-#include "../execution/CommissioningPolicy.h"
-#include "../motion/FixturePoseClassifier.h"
-#include "../motion/OperationalWalkProfile.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -57,13 +49,6 @@ class Controller {
  public:
   void begin();
   void update(uint32_t now_ms);
-  // Local C++ operator-adapter boundary; never registered with HTTP. Binding
-  // consumes approvals, it does not grant limits, permit or image authority.
-  bool bindReviewedMotionRuntime(const execution::ReviewedMotionRuntime&);
-  bool requestLocalMotionTrial(const execution::LocalTrialEvidence&,uint32_t permit_generation,uint32_t permit_expires_at_ms);
-  bool publishLocalMotionObservation(const motion::AdaptiveObservation&);
-  bool publishLocalMotionAssessment(const motion::SegmentAssessment&);
-  bool requestLocalFixtureMicro(unsigned joint,double delta_rad,double duration_s,const execution::FrameValidation&);
   // Issue #48: the ONE RAM-only RESTORE entry for boot (automatic) and
   // operator (USB / authenticated Dashboard) triggers. Never writes NVS,
   // EEPROM or a servo register, never approves limits, authority or permit.
@@ -72,67 +57,24 @@ class Controller {
 
  private:
   void printBootBanner();
-  void updateOperationalMotion(uint32_t now_ms);
-  bool localValidationCommand(const char*,uint32_t,char*,size_t);
-  // Runtime test policy (RAM-only). @MOTION COMMISSIONING / @MOTION TELEMETRY.
-  bool commissioningCommand(const char*,uint32_t,char*,size_t);
-  void unbindCommissioning(const char* reason);
-  void updateLivePose();
-  void emitTelemetry(uint32_t now_ms);
-  // Operator directive 2026-10-14: boot -> census -> preflight -> RESTORE ->
-  // feedback -> operational admission -> RUN -> MOTION authority (dynamic).
-  void updateOperationalReadiness(uint32_t now_ms);
-  bool admitRuntimePolicy(bool operational,uint32_t issued_ms,uint32_t now_ms,const char** reason);
-  bool operatorPresent(uint32_t now_ms) const;
-  uint32_t presenceWindowMs() const { return runtime_mode_==execution::RuntimeTestMode::OPERATIONAL?kOperationalHeartbeatMs:1000; }
-  const char* armOperationalSession(uint32_t now_ms);
-  static constexpr uint32_t kOperationalHeartbeatMs=3000;
-  bool operational_walk_bound_=false;const char* operational_walk_reason_="WALK_NOT_BOUND";
-  bool walk_drive_latched_=false;
-  motion::operational_walk::DriveProfile walk_drive_{};
-  core::OperationalReadiness readiness_core_{};
-  core::ReadinessAction last_readiness_action_=core::ReadinessAction::NONE;
-  AuthorityLease motion_authority_lease_{};
-  bool restore_refused_permanent_=false,restore_refused_transient_=false;
-  const char* restore_refusal_reason_="";
-  bool admit_failed_=false;const char* admit_reason_="";
-  bool installation_live_verified_=false;
-  bool auto_restore_suspended_=false;
-  struct OperationalArmer : execution::SessionArmer {
-    Controller* owner=nullptr;
-    const char* armForCommand(uint32_t now_ms) override { return owner?owner->armOperationalSession(now_ms):"NOT_BOUND"; }
-  } operational_armer_{};
+  void updateSimpleMotion(uint64_t now_us);
+  const char* prepareSimpleMotion();
   struct HeartbeatHook : OperatorHeartbeatHook {
     Controller* owner=nullptr;
-    void heartbeat(uint32_t now_ms) override;
+    void heartbeat(uint32_t) override;
   } heartbeat_hook_{};
   struct RestoreHook : CalibrationRestoreHook {
     Controller* owner=nullptr;
     bool restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) override;
   } restore_hook_{};
-  // Read-only facts for the restore policy. live/torque come from 12 fresh
-  // read-only ST3215 reads when read_live is true (never a write).
-  calibration::RestoreFacts gatherRestoreFacts(bool read_live,calibration::RecordInspection*,calibration::LivePositionEvidence*);
+  calibration::RestoreFacts gatherRestoreFacts(bool,calibration::RecordInspection*,calibration::LivePositionEvidence*);
   calibration::RestoreVerdict last_restore_verdict_{};
   const char* last_restore_trigger_="NONE";
   uint64_t last_restore_fingerprint_=0;
   uint32_t last_restore_generation_=0;
-  bool profileActive() const { return validation_profile_.sealed()||commissioning_bound_; }
-  execution::RuntimeTestMode runtime_mode_=execution::RuntimeTestMode::DIAGNOSTIC;
-  execution::CommissioningParameters commissioning_params_{};
-  motion::FixtureEntryCertificate commissioning_entry_{};
-  motion::FixturePoseClassification live_pose_{};
-  bool live_pose_valid_=false,commissioning_bound_=false;
-  const char* commissioning_reason_="DIAGNOSTIC_NO_ACTUATION";
-  uint32_t telemetry_period_ms_=0,telemetry_last_ms_=0,telemetry_seq_=0,boot_nonce_=0;
-  execution::ValidationProfile validation_profile_{};
- calibration::CalibrationRecord validation_record_{};uint8_t validation_record_bytes_[calibration::kCalibrationRecordV1EncodedBytes]{};
-  uint32_t validation_radio_generation_=0;
-  uint32_t validation_nonce_=0,validation_presence_ms_=0,validation_sequence_=0;
-  bool validation_walk_admitted_=false,validation_walk_started_=false;
-  bool validation_present_=false,boot_safe_off_pending_=true;
-  uint32_t boot_safe_off_mask_=0;
-  uint8_t boot_safe_off_next_=0;
+  bool installation_live_verified_=false,auto_restore_suspended_=false;
+  bool restore_refused_permanent_=false,restore_refused_transient_=false;
+  const char* restore_refusal_reason_="";
   void updateQ0Capture();
   void updateStartupQualification();
   // Every tick, before any command is processed: rebuilds
@@ -254,36 +196,21 @@ class Controller {
   actuator::ActuatorRuntime actuator_runtime_;
   calibration::CalibrationExecutionEngine calibration_execution_;
   calibration::CalibrationRuntimeRestore runtime_restore_;
-  execution::MotionExecutor motion_executor_;
-  execution::MotionCoordinator motion_coordinator_;
+  simple::SimpleMotion simple_motion_;
+  simple::Inputs simple_inputs_{};
   MotionService motion_service_;
-  execution::MotionExecutionFacts operational_facts_{};
-  execution::MotionSession operational_session_{};
-  execution::LocalTrialEvidence local_trial_evidence_{};
-  execution::ReviewedMotionRuntime reviewed_motion_{};
-  bool reviewed_motion_bound_=false;
-  motion::AdaptiveObservation local_motion_observation_{};
-  execution::JointFeedback operational_feedback_{};
-  execution::OperationalFeedback operational_producer_{};
-  uint8_t operational_poll_next_=0;
-  uint32_t operational_poll_at_ms_=0;
-  uint16_t motion_safe_off_mask_=0;
-  // Issue #52 (2026-10-15): ONE monotonic 64-bit clock for Motion (encoder
-  // stamps, planner, scheduler); slow control-block reads rotate separately;
-  // SAFE_OFF starts with one SYNC TorqueEnable=0 to the twelve leg ids, then
-  // per-id readback verification (no VERIFIED_OFF from a TX). Metrics are
-  // offline budgets to qualify, never hardware measurements.
-  core::MonotonicClock64 motion_clock_;
-  uint8_t canonical_leg_ids_[12]{};
-  uint8_t operational_control_next_=0;uint32_t operational_control_at_ms_=0;
-  bool safe_off_burst_sent_=false;
-  uint32_t operational_work_max_us_=0; // coordinator work since latest ARM, diagnosis only
-  // Current cooperative cycle, read-only first-STOP evidence; no deadline gate.
-  struct MotionCycleTiming { uint32_t started_us=0,gap_us=0,imu_us=0,bms_us=0,poll_us=0,before_motion_us=0; } motion_cycle_{};
-  struct StopMetrics { uint64_t latched_us=0,last_target_tx_us=0,off_tx_start_us=0,off_tx_done_us=0,all_off_verified_us=0;uint16_t off_bytes=0;uint8_t verify_rounds=0; } stop_metrics_{};
-  void emergencyTorqueOffBurst();
-  uint8_t motion_safe_off_next_=0;
-
+  AuthorityLease motion_authority_lease_{};
+  calibration::RecordInspection simple_record_{};
+  bool simple_limits_ready_=false,preflight_started_=false;
+  struct SimpleServoPort : simple::ServoPort {
+    Controller* owner=nullptr;
+    bool read(unsigned,bool,simple::Feedback&) override;
+    bool resolve(unsigned,double,uint16_t&) override;
+    bool frame(const uint16_t[12],simple::Drive) override;
+    bool enable(unsigned) override;
+    bool off() override;
+    bool verifyOff(unsigned) override;
+  } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false
   // throughout (CalibrationManager.h). Reset at boot.

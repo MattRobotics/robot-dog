@@ -262,6 +262,11 @@ class ServoBus {
     const bool walk=(speed==kWalkDriveSpeed&&acceleration==kWalkDriveAcceleration)||(speed==kFastWalkDriveSpeed&&acceleration==kFastWalkDriveAcceleration)||
                     (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
     validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
+  // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
+  bool setOperationalDrive(uint16_t speed,uint8_t acc) {
+    if(!((speed==300&&acc==8)||(speed==1000&&acc==50)))return false;
+    validation_speed_=speed;validation_acceleration_=acc;return true;
+  }
   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
 
   // ---- Issue #52 streaming primitives (2026-10-15) -------------------------

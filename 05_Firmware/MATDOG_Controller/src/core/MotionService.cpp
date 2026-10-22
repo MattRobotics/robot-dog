@@ -1,225 +1,63 @@
 #include "MotionService.h"
-#include "../motion/FixturePoseClassifier.h"
-#include "../motion/OperationalWalkProfile.h"
-#include <cstring>
+#include <esp_timer.h>
 #include <cmath>
 #include <cstdio>
-#include <cstdarg>
+#include <cstring>
 namespace matdog { namespace core {
 namespace {
-struct JsonWriter {
- char* out;size_t cap,used=0;bool ok=true;
- void add(const char* format,...) { if(!ok||used>=cap){ok=false;return;}va_list args;va_start(args,format);const int n=vsnprintf(out+used,cap-used,format,args);va_end(args);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;out[cap-1]=0;return;}used+=n; }
-};
-bool sameCommand(const motion::MotionCommand& a,const motion::MotionCommand& b) {
- return a.version==b.version&&!strcmp(a.id,b.id)&&a.sequence==b.sequence&&a.issued_at_ms==b.issued_at_ms&&a.ttl_ms==b.ttl_ms&&a.owner==b.owner&&a.intent==b.intent&&a.target_height_m==b.target_height_m&&a.vx==b.vx&&a.vy==b.vy&&a.yaw_rate==b.yaw_rate&&a.x==b.x&&a.y==b.y&&a.z==b.z&&a.roll==b.roll&&a.pitch==b.pitch&&a.yaw==b.yaw&&!strcmp(a.gait,b.gait)&&!strcmp(a.action_id,b.action_id);
+const char* boolean(bool b){return b?"true":"false";}
 }
+void MotionService::update(){
+ if(!active_||!motion_)return;
+ if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
+ if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ activeAck_.executor_state=simple::name(motion_->state());
 }
-void MotionService::begin(execution::MotionExecutor* e,SemanticMotionPlanner* p) { executor_=e;planner_=p;readiness_=MotionReadiness{};last_ack_=active_ack_=motion::MotionAck{};active_intent_=motion::Intent::UNKNOWN;active_command_=active_zero_velocity_=false;arming_seen_=false;telemetry_=MotionTelemetry{};for(auto& r:replay_)r=Replay{};command_owner_=motion::ClientOwner::UNKNOWN;teleop_deadline_ms_=active_arm_generation_=0; }
-const char* MotionService::refusal() const {
- if(readiness_.fault)return "FAULT";
- if(readiness_.inhibited)return "INHIBITED";
- if(!readiness_.calibration_restored)return "RESTORE_REQUIRED";
- if(!readiness_.calibration_accepted)return "CALIBRATION_NOT_ACCEPTED";
- if(!readiness_.limits_approved)return "OPERATIONAL_LIMITS_REQUIRED";
- if(!readiness_.hardware_approved)return readiness_.hardware_reason;
- if(readiness_.local_fixture_session)return "LOCAL_FIXTURE_MICRO_ONLY";
- if(!readiness_.support_observable)return "SUPPORT_UNOBSERVABLE";
- if(!readiness_.power_ok||!readiness_.bms_ok)return "POWER_OR_BMS";
- if(readiness_.mode!=OperatingMode::RUN)return "MODE_RUN_REQUIRED";
- if(!readiness_.authority_live)return "MOTION_AUTHORITY_REQUIRED";
- if(!executor_||!planner_)return "EXECUTOR_NOT_BOUND";
- return nullptr;
-}
-bool MotionService::available(const motion::MotionAction& a) const { return a.implemented&&((!readiness_.local_operator_owns_session&&(command_owner_!=motion::ClientOwner::LOCAL||!active_command_))||a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)&&(a.intent!=motion::Intent::BASE_VELOCITY||readiness_.walk_qualified)&&(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS||!refusal()); }
-void MotionService::finishActive(motion::CommandOutcome outcome,const char* reason) {
- if(!active_command_)return;
- active_ack_.outcome=outcome;active_ack_.reason=reason;
- active_ack_.executor_state=executor_?execution::toString(executor_->status().state):"OFF";
- if(static_cast<unsigned>(active_ack_.owner)<3){
-  auto& row=replay_[static_cast<unsigned>(active_ack_.owner)];
-  if(row.sequence==active_ack_.sequence&&!strcmp(row.ack.id,active_ack_.id))row.ack=active_ack_;
- }
- if(last_ack_.owner==active_ack_.owner&&last_ack_.sequence==active_ack_.sequence&&!strcmp(last_ack_.id,active_ack_.id))last_ack_=active_ack_;
- active_command_=false;command_owner_=motion::ClientOwner::UNKNOWN;teleop_deadline_ms_=0;
-}
-void MotionService::refresh(const MotionReadiness& r,uint32_t now) {
- readiness_=r;
- // An accepted operational STAND arms its own session: adopt that arm
- // generation once, at the hand-over, instead of reading it as a change.
- if(planner_&&planner_->arming()){if(executor_)active_arm_generation_=executor_->status().arm_generation;arming_seen_=true;}
- else if(arming_seen_){arming_seen_=false;if(active_command_&&executor_&&executor_->active())active_arm_generation_=executor_->status().arm_generation;}
- // A failed torque sequence (PRIME/ENERGIZE/ARM) ends the accepted command
- // with its own cause, before the permit drop it causes is read as a gate.
- if(active_command_&&planner_&&!planner_->arming()&&planner_->armingFailure())
-  finishActive(motion::CommandOutcome::ABORTED,planner_->armingFailure());
- // Preserve a physical/executor stop before the consequent permit drop is
- // interpreted as a new admission failure (OPERATOR_GO_REQUIRED).
- if(active_command_&&active_intent_!=motion::Intent::STOP&&executor_&&executor_->status().safe_off_required)
-  finishActive(motion::CommandOutcome::ABORTED,executor_->status().reason);
- if(active_command_&&executor_&&active_arm_generation_!=executor_->status().arm_generation)
-  finishActive(motion::CommandOutcome::ABORTED,"SESSION_CHANGED");
- const char* gate=refusal();
- if((gate&&((executor_&&executor_->active()&&!r.local_fixture_session)||active_command_))||
-    (teleop_deadline_ms_&&static_cast<int32_t>(now-teleop_deadline_ms_)>=0))disconnected(now);
- if(!active_command_)return;
- const auto state=executor_?executor_->status().state:execution::ExecutorState::OFF;
- const bool standing=planner_&&!strcmp(planner_->state(),"STAND")&&state==execution::ExecutorState::READY;
- if(active_intent_==motion::Intent::STOP){
-  if(executor_&&state==execution::ExecutorState::OFF&&!executor_->status().safe_off_required)
-   finishActive(motion::CommandOutcome::COMPLETED,"SAFE_OFF_VERIFIED");
-  else if(standing)finishActive(motion::CommandOutcome::COMPLETED,"COORDINATED_STOP_VERIFIED");
- } else if(planner_&&planner_->arming()){
-  // Operational STAND waiting for its controlled torque sequence (session).
- } else if(executor_&&(!executor_->active()||executor_->status().safe_off_required)){
-  finishActive(motion::CommandOutcome::ABORTED,executor_->status().reason);
- } else if(!gate&&standing&&active_intent_==motion::Intent::STAND){
-  finishActive(motion::CommandOutcome::COMPLETED,"STAND_VERIFIED");
- } else if(!gate&&standing&&active_intent_==motion::Intent::BASE_VELOCITY&&(active_zero_velocity_||readiness_.first_stride_only)){
-  finishActive(motion::CommandOutcome::COMPLETED,"ZERO_VELOCITY_VERIFIED");
- }
-}
-void MotionService::disconnected(uint32_t now) {
- const char* gate=refusal();
- if(planner_)planner_->stop(now);
- // Only a live executor is stopped here: an idle one keeps the reason of the
- // fault that already stopped it (it is never relabelled as input loss).
- if(executor_&&executor_->active()&&(gate||!planner_||!planner_->coordinatedStopping()))executor_->stop("INPUT_LOST_OR_EXPIRED");
- // STOP must retain its acknowledgement until SAFE_OFF or the all-foot stop
- // is independently verified. Other accepted work is explicitly aborted.
- if(active_intent_!=motion::Intent::STOP)finishActive(motion::CommandOutcome::ABORTED,gate?gate:"INPUT_LOST_OR_EXPIRED");
- teleop_deadline_ms_=0;command_owner_=motion::ClientOwner::UNKNOWN;
-}
-motion::MotionAck MotionService::command(const motion::MotionCommand& incoming,uint32_t now) {
- motion::MotionAck ack;std::memcpy(ack.id,incoming.id,sizeof(ack.id));ack.id[sizeof(ack.id)-1]=0;ack.sequence=incoming.sequence;ack.owner=incoming.owner;ack.executor_state=executor_?execution::toString(executor_->status().state):"OFF";
- const char* why=nullptr;if(!motion::validCommand(incoming,now,&why)){ack.reason=why;last_ack_=ack;return ack;}
- why=nullptr;
- auto& r=replay_[static_cast<unsigned>(incoming.owner)];
- if(incoming.intent!=motion::Intent::STOP) {
-  if(incoming.sequence==r.sequence){if(sameCommand(incoming,r.command))return r.ack;ack.reason="COMMAND_REPLAY_MISMATCH";last_ack_=ack;return ack;}
-  if(static_cast<int32_t>(incoming.sequence-r.sequence)<=0){ack.reason="SEQUENCE_REPLAY";last_ack_=ack;return ack;}
-  if(r.sequence&&!strcmp(incoming.id,r.command.id)){ack.reason="COMMAND_ID_REUSED";last_ack_=ack;return ack;}
- }
- motion::MotionCommand c=incoming;
- if(c.intent==motion::Intent::ACTION_EXECUTE) {
-  const auto* a=motion::findAction(c.action_id);
-  if(!a)why="UNKNOWN_ACTION";else if(!a->implemented)why="ACTION_NOT_VALIDATED";else {c.intent=a->intent;if(!strcmp(a->id,"gait.walk"))std::strcpy(c.gait,"WALK");}
- }
- if(!why&&readiness_.local_operator_owns_session&&c.owner!=motion::ClientOwner::LOCAL&&c.intent!=motion::Intent::STOP&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES)why="LOCAL_OPERATOR_CONTROLS_SESSION";
- if(!why)switch(c.intent) {
-  case motion::Intent::STOP:
-   finishActive(motion::CommandOutcome::ABORTED,"STOP_REQUESTED");
-   if(planner_)planner_->stop(now);
-   if(executor_&&(!planner_||!planner_->coordinatedStopping()))executor_->stop("OPERATOR_STOP");
-   teleop_deadline_ms_=0;command_owner_=motion::ClientOwner::UNKNOWN;ack.outcome=(planner_&&planner_->coordinatedStopping())||(executor_&&executor_->status().safe_off_required)?motion::CommandOutcome::ACCEPTED:motion::CommandOutcome::COMPLETED;break;
-  case motion::Intent::STATUS:case motion::Intent::CAPABILITIES:ack.outcome=motion::CommandOutcome::COMPLETED;break;
-  case motion::Intent::LIE_DOWN:case motion::Intent::BODY_POSE:case motion::Intent::ACTION_EXECUTE:why="ACTION_NOT_VALIDATED";break;
-  case motion::Intent::STAND:
-   if(c.target_height_m<0||c.target_height_m>.150)why="HEIGHT_OUTSIDE_SOFTWARE_ENVELOPE";
-   else why=refusal();
-   break;
-  case motion::Intent::GAIT_SELECT:
-   if(strcmp(c.gait,"WALK"))why="GAIT_NOT_VALIDATED";else why=refusal();
-   break;
-  case motion::Intent::BASE_VELOCITY:
-   if(std::fabs(c.vx)>.03||std::fabs(c.vy)>.02||std::fabs(c.yaw_rate)>.15)why="VELOCITY_OUTSIDE_SOFTWARE_ENVELOPE";else if((why=refusal())){}else if(!readiness_.walk_qualified)why="WALK_PROFILE_UNAVAILABLE";else if(std::fabs(c.vx)>readiness_.max_vx||std::fabs(c.vy)>readiness_.max_vy||std::fabs(c.yaw_rate)>readiness_.max_yaw_rate)why="VELOCITY_OUTSIDE_REVIEWED_SCOPE";
-   break;
-  default:why="INTENT";break;
- }
- if(!why&&c.intent!=motion::Intent::STOP&&ack.outcome!=motion::CommandOutcome::COMPLETED) {
-  if(command_owner_!=motion::ClientOwner::UNKNOWN&&command_owner_!=c.owner)why="COMMAND_OWNER_BUSY";
-  else if(active_command_&&(active_intent_!=motion::Intent::BASE_VELOCITY||c.intent!=motion::Intent::BASE_VELOCITY))why="COMMAND_IN_PROGRESS";
-  else {
-   why=planner_->accept(c,now);
-   if(!why){
-    if(c.intent==motion::Intent::GAIT_SELECT)ack.outcome=motion::CommandOutcome::COMPLETED;
-    else {finishActive(motion::CommandOutcome::ABORTED,"SUPERSEDED");ack.outcome=motion::CommandOutcome::ACCEPTED;command_owner_=c.owner;}
-    if(c.intent==motion::Intent::BASE_VELOCITY)teleop_deadline_ms_=c.issued_at_ms+c.ttl_ms;
-   }
-  }
- }
- ack.reason=why?why:(c.intent==motion::Intent::GAIT_SELECT?"GAIT_SELECTED":"OK");ack.executor_state=executor_?execution::toString(executor_->status().state):"OFF";
- if(static_cast<int32_t>(incoming.sequence-r.sequence)>0){r.sequence=incoming.sequence;r.command=incoming;r.ack=ack;}
- if(ack.outcome==motion::CommandOutcome::ACCEPTED){active_ack_=ack;active_arm_generation_=executor_?executor_->status().arm_generation:0;active_intent_=c.intent;active_command_=true;arming_seen_=planner_&&planner_->arming();active_zero_velocity_=c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0;}
- last_ack_=ack;return ack;
+motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t now){
+ motion::MotionAck a;a.sequence=c.sequence;a.owner=c.owner;
+ const char* why=nullptr;
+ if(!motion::validCommand(c,now,&why)){a.reason=why;return a;}
+ memcpy(a.id,c.id,sizeof(a.id));
+ if(!motion_){a.reason="NOT_INITIALIZED";return a;}
+ a.executor_state=simple::name(motion_->state());
+ if(c.intent==motion::Intent::STOP){motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason="SAFE_OFF_REQUESTED";return last_=a;}
+ const unsigned owner=static_cast<unsigned>(c.owner);
+ if(owner>=3){a.reason="INVALID_OWNER";return last_=a;}
+ auto& replay=replay_[owner];
+ // IDs include the browser instance; a page reload may restart sequence at 1.
+ if(replay.sequence&&!strcmp(c.id,replay.id)){if(c.sequence==replay.sequence)return replay.ack;a.reason="COMMAND_ID_REUSED";return last_=a;}
+ auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
+   replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;}return a;};
+ const uint64_t us=esp_timer_get_time();
+ if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
+ if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){motion_->walkStop();return result(nullptr);}
+ if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY)return result("COMMAND_NOT_IN_SIMPLE_V1");
+ if(!ready_)return result(reason_);
+ if(prepare_&&(why=prepare_(context_)))return result(why);
+ if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
+ if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
+ constexpr double strides[]={.020,.030,.040};
+ for(unsigned i=0;i<3;++i)if(std::abs(c.vx-strides[i]/7)<1e-10)return result(motion_->walk(i,us));
+ return result("STANDARD_STRIDE_REQUIRED");
 }
 bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) const {
- if(!out||!cap)return false;
- JsonWriter w{out,cap};
- // IDs were validated as ASCII tokens. Invalid envelope IDs are never echoed.
- char id[49]{};for(unsigned i=0;i<48&&a.id[i];i++){const char c=a.id[i];id[i]=((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='.'||c=='_'||c=='-')?c:'_';}
- w.add("{\"version\":1,\"id\":\"%s\",\"sequence\":%lu,\"ack\":true,\"outcome\":\"%s\",\"reason\":\"%s\",\"owner\":\"%s\",\"executor_state\":\"%s\"}",id,(unsigned long)a.sequence,motion::toString(a.outcome),a.reason,motion::toString(a.owner),a.executor_state);return w.ok;
+ char id[49]{};for(unsigned i=0;i<48&&a.id[i];++i){char c=a.id[i];id[i]=((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='.'||c=='_'||c=='-')?c:'_';}
+ const int n=snprintf(out,cap,"{\"version\":1,\"ack\":true,\"id\":\"%s\",\"sequence\":%lu,\"owner\":\"%s\",\"outcome\":\"%s\",\"reason\":\"%s\",\"executor_state\":\"%s\"}",id,(unsigned long)a.sequence,motion::toString(a.owner),motion::toString(a.outcome),a.reason,a.executor_state);
+ return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- if(!out||!cap)return false;
- JsonWriter w{out,cap};const auto* refusal_reason=refusal();
- w.add("{\"version\":1,\"walk\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"strides_m\":[%.17g,%.17g,%.17g],\"fast\":{\"period_s\":%.17g,\"lift_m\":%.17g,\"stride_m\":%.17g,\"experimental\":true}},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"fast\":false},\"first_stride_only\":%s,\"hardware_approved\":%s,\"teleoperation\":%s,\"limits\":{\"vx_m_s\":%.17g,\"vy_m_s\":%.17g,\"yaw_rate_rad_s\":%.17g},\"gaits\":[\"WALK\"],\"actions\":[",motion::operational_walk::kPeriodS,motion::operational_walk::kLiftM,motion::operational_walk::kStrideM[0],motion::operational_walk::kStrideM[1],motion::operational_walk::kStrideM[2],motion::operational_walk::kFastPeriodS,motion::operational_walk::kFastLiftM,motion::operational_walk::kFastStrideM[0],readiness_.first_stride_only?"true":"false",readiness_.hardware_approved?"true":"false",(refusal_reason||!readiness_.walk_qualified||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"false":"true",readiness_.walk_qualified?readiness_.max_vx:0,readiness_.walk_qualified?readiness_.max_vy:0,readiness_.walk_qualified?readiness_.max_yaw_rate:0);
- for(size_t i=0;i<motion::kMotionActionCount;i++){const auto& a=motion::actionCatalog()[i];w.add("%s{\"id\":\"%s\",\"category\":\"%s\",\"label\":\"%s\",\"parameters\":\"%s\",\"prerequisites\":\"%s\",\"capability\":\"%s\",\"implemented\":%s,\"implementation\":\"%s\",\"available\":%s,\"reason\":\"%s\"}",i?",":"",a.id,a.category,a.label,a.parameters,(a.intent==motion::Intent::STOP||a.intent==motion::Intent::STATUS)?"none":a.prerequisites,a.capability,a.implemented?"true":"false",a.implemented?"software_tested":"planned",available(a)?"true":"false",available(a)?"OK":a.implemented?(refusal_reason?refusal_reason:(readiness_.local_operator_owns_session||(command_owner_==motion::ClientOwner::LOCAL&&active_command_))?"LOCAL_OPERATOR_CONTROLS_SESSION":a.intent==motion::Intent::BASE_VELOCITY&&!readiness_.walk_qualified?"WALK_PROFILE_UNAVAILABLE":"UNAVAILABLE"):"ACTION_NOT_VALIDATED");}
- w.add("]}");return w.ok;
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":60,\"workspace_max_mm\":150},\"walk\":{\"period_s\":7,\"lift_m\":0.015,\"strides_m\":[0.020,0.030,0.040]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"STOP\"],\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_);
+ return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
- if(!out||!cap)return false;
- JsonWriter w{out,cap};const bool stale=!telemetry_.joints_valid||static_cast<int32_t>(now-telemetry_.sampled_at_ms)<0||now-telemetry_.sampled_at_ms>telemetry_.feedback_max_age_ms;
- const auto* s=executor_?&executor_->status():nullptr;const char* r=refusal();
- w.add("{\"version\":1,\"now_ms\":%lu,\"last_sequence\":%lu,\"owner\":\"%s\",\"executor_state\":\"%s\",\"stand_state\":\"%s\",\"fault\":%s,\"reason\":\"%s\",\"stale\":%s,\"tracking_error_rad\":%.6f,\"completed_sequence\":%lu,\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)now,(unsigned long)last_ack_.sequence,motion::toString(command_owner_),s?execution::toString(s->state):"OFF",planner_?planner_->state():"OBSERVE",readiness_.fault?"true":"false",r?r:(s?s->reason:"OFF"),stale?"true":"false",s?s->max_tracking_error_rad:0,(unsigned long)(s?s->completed_sequence:0),(unsigned long)telemetry_.sampled_at_ms);
- if(telemetry_.joints_valid){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);w.add("]");}else w.add("null");
- w.add(",\"recovering\":%s",telemetry_.feedback_recovering?"true":"false");
- // Per-joint measured angles: null where unmapped/unhealthy, never a zero.
- w.add(",\"actual_rad_by_joint\":[");for(unsigned i=0;i<12;++i){if(telemetry_.joint_mapped[i])w.add("%s%.8f",i?",":"",telemetry_.actual_rad[i]);else w.add("%snull",i?",":"");}w.add("]");
- w.add(",\"joint_at_ms\":[");for(unsigned i=0;i<12;++i)w.add("%s%lu",i?",":"",static_cast<unsigned long>(telemetry_.joint_at_ms[i]));w.add("]");
- w.add(",\"raw_ticks\":");if(telemetry_.raw_valid){w.add("[");for(unsigned i=0;i<12;++i)w.add("%s%u",i?",":"",telemetry_.raw_ticks[i]);w.add("]");}else w.add("null");
- w.add(",\"target_rad\":");if(s&&s->accepted_sequence){w.add("[");for(unsigned i=0;i<12;i++)w.add("%s%.8f",i?",":"",executor_->targetRadians()[i]);w.add("]");}else w.add("null");
- w.add(",\"quaternion\":");if(telemetry_.quaternion_valid&&now-telemetry_.quaternion_at_ms<=500){w.add("[%.8f,%.8f,%.8f,%.8f]",telemetry_.quaternion[0],telemetry_.quaternion[1],telemetry_.quaternion[2],telemetry_.quaternion[3]);}else w.add("null");
- w.add(",\"base_height_m\":");if(telemetry_.height_valid)w.add("%.6f",telemetry_.base_height_m);else w.add("null");
- w.add(",\"source\":\"%s\",\"feet\":null},\"stale_scope\":\"MOTION_JOINT_FEEDBACK\"",telemetry_.source);
- {unsigned mapped=0,raw=0;uint32_t raw_age=0;uint16_t mask=0;
-  for(unsigned i=0;i<12;++i){if(telemetry_.joint_mapped[i]){++mapped;mask|=static_cast<uint16_t>(1u<<i);}
-   if(telemetry_.raw_ok[i]&&static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0&&now-telemetry_.joint_at_ms[i]<=telemetry_.feedback_max_age_ms){++raw;const uint32_t a=now-telemetry_.joint_at_ms[i];if(a>raw_age)raw_age=a;}}
-  const bool imu=telemetry_.quaternion_valid&&static_cast<int32_t>(now-telemetry_.quaternion_at_ms)>=0;
-  w.add(",\"channels\":{\"imu\":{\"valid\":%s,\"age_ms\":",imu?"true":"false");
-  if(imu)w.add("%lu",static_cast<unsigned long>(now-telemetry_.quaternion_at_ms));else w.add("null");
-  w.add("},\"raw\":{\"count\":%u,\"max_age_ms\":",raw);if(raw)w.add("%lu",static_cast<unsigned long>(raw_age));else w.add("null");
-  w.add("},\"mapped\":{\"count\":%u,\"mask\":%u},\"target\":{\"valid\":%s},\"motion_feedback_stale\":%s}",
-   mapped,mask,s&&s->accepted_sequence?"true":"false",stale?"true":"false");}
- w.add(",\"restore\":{\"decision\":\"%s\",\"reason\":\"%s\",\"trigger\":\"%s\",\"generation\":%lu,\"fingerprint\":\"%016llx\"}",
-  telemetry_.restore_decision,telemetry_.restore_reason,telemetry_.restore_trigger,(unsigned long)telemetry_.restore_generation,(unsigned long long)telemetry_.restore_fingerprint);
- w.add(",\"operational\":{\"system_health\":\"%s\",\"calibration\":\"%s\",\"joint_feedback\":\"%s\",\"motion_authority\":\"%s\",\"phase\":\"%s\",\"reason\":\"%s\",\"mode\":\"%s\",\"entry_reason\":\"%s\",\"operator_present\":%s,\"walk\":\"%s\",\"walk_cycles\":%.3f,\"walk_drive\":%s}",
-  telemetry_.system_health,telemetry_.calibration_state,telemetry_.joint_feedback,telemetry_.motion_authority,telemetry_.readiness_phase,
-  telemetry_.readiness_reason,telemetry_.operating_mode,telemetry_.entry_reason,telemetry_.operator_present?"true":"false",telemetry_.walk,telemetry_.walk_cycles,telemetry_.walk_drive?"true":"false");
- // Evaluate at serialization time: a cached green must expire with any one
- // of the twelve samples. This is the existing ENTRY recognizer, not admission.
- {bool valid=telemetry_.prone_reference_valid&&!telemetry_.feedback_recovering;
-  unsigned count=0,worst=0;double error=0;
-  for(unsigned i=0;i<12;++i){
-   valid=valid&&telemetry_.joint_mapped[i]&&telemetry_.raw_ok[i]&&telemetry_.joint_at_ms[i]!=0&&
-    static_cast<int32_t>(now-telemetry_.joint_at_ms[i])>=0&&now-telemetry_.joint_at_ms[i]<=telemetry_.feedback_max_age_ms&&
-    std::isfinite(telemetry_.actual_rad[i])&&std::isfinite(telemetry_.prone_nominal_rad[i]);
-   const double e=std::abs(telemetry_.actual_rad[i]-telemetry_.prone_nominal_rad[i]);
-   if(e>error){error=e;worst=i;}if(e<=telemetry_.prone_max_deviation_rad&&motion::fixtureProneJointReason(i,telemetry_.actual_rad[i])==motion::FixturePoseReason::OK)++count;
-  }
-  const auto pose=motion::classifyFixtureProne(telemetry_.actual_rad,telemetry_.prone_nominal_rad,
-    telemetry_.prone_reference_valid,telemetry_.prone_stationary,telemetry_.prone_max_deviation_rad,telemetry_.prone_max_rms_rad);
-  const bool known=valid&&telemetry_.prone_stationary&&pose.reason!=motion::FixturePoseReason::INVALID_THRESHOLDS&&pose.reason!=motion::FixturePoseReason::NONFINITE;
-  const char* state=!known?"UNKNOWN":pose.kind==motion::FixturePoseKind::PRONE_COMPATIBLE?"IN_PRONE":"OUT_OF_PRONE";
-  w.add(",\"prone\":{\"state\":\"%s\",\"reference\":\"ENTRY_RECOGNITION_WINDOW\",\"reason\":\"%s\",\"in_window\":",state,
-    !valid?"REFERENCE_OR_FEEDBACK_UNAVAILABLE":motion::fixturePoseReasonName(pose.reason));
-  if(valid)w.add("%u,\"worst_joint\":%u,\"worst_offset_rad\":%.6f",count,worst,telemetry_.actual_rad[worst]-telemetry_.prone_nominal_rad[worst]);
-  else w.add("null,\"worst_joint\":null,\"worst_offset_rad\":null");
-  w.add("}");}
- w.add(",\"active_command\":");
- char active[512]{};if(active_ack_.sequence&&ackJson(active_ack_,active,sizeof(active)))w.add("%s",active);else w.add("null");
- w.add(",\"motion_timing\":{\"frames_tx\":%lu,\"last_tx_complete_us\":%llu,\"last_interval_us\":%lu,\"max_interval_us\":%lu}",(unsigned long)(s?s->frames_tx:0),(unsigned long long)(s?s->last_tx_complete_us:0),(unsigned long)(s?s->last_frame_interval_us:0),(unsigned long)(s?s->max_frame_interval_us:0));
- w.add(",\"readiness\":{\"restore\":%s,\"calibration_accepted\":%s,\"limits_approved\":%s,\"permit\":%s,\"support_observable\":%s,\"hardware_approved\":%s}",
- readiness_.calibration_restored?"true":"false",readiness_.calibration_accepted?"true":"false",readiness_.limits_approved?"true":"false",readiness_.operational_permit?"true":"false",readiness_.support_observable?"true":"false",readiness_.hardware_approved?"true":"false");
- w.add(",\"local_session\":{\"state\":\"%s\",\"reason\":\"%s\",\"last_revoke\":\"%s\",\"failure\":\"%s\",\"failed_joint\":%d}",telemetry_.session_state,telemetry_.session_reason,
-  telemetry_.session_last_revoke,telemetry_.session_failure,telemetry_.session_failed_joint);
- w.add(",\"validation\":{\"capable\":%s,\"scope\":\"%s\",\"segment\":%u,\"profile_sha256\":\"%s\",\"foot_load_proven\":%s}",telemetry_.validation_capable?"true":"false",telemetry_.fixture_scope?"SUSPENDED_FIXTURE":telemetry_.load_scope?"EXTERNAL_LOAD_REVIEW":"UNQUALIFIED",telemetry_.supervised_segment,telemetry_.session_profile_sha256,telemetry_.foot_load_proven?"true":"false");
- w.add(",\"commissioning\":{\"mode\":\"%s\",\"limits\":\"%s\",\"approved_joints\":%u,\"commissioning_joints\":%u,\"restore\":\"%s\",\"pose\":\"%s\",\"pose_reason\":\"%s\",\"pose_joint\":%d,\"pose_max_dev_rad\":",
-  telemetry_.runtime_mode,telemetry_.limits_scope,telemetry_.approved_joints,telemetry_.commissioning_joints,telemetry_.restore,telemetry_.pose_class,telemetry_.pose_reason,telemetry_.pose_joint);
- if(telemetry_.pose_max_dev_rad>=0)w.add("%.6f",telemetry_.pose_max_dev_rad);else w.add("null");
- w.add(",\"pose_rms_dev_rad\":");if(telemetry_.pose_rms_dev_rad>=0)w.add("%.6f",telemetry_.pose_rms_dev_rad);else w.add("null");
- w.add(",\"entry\":\"%s\",\"phase\":\"%s\",\"segment\":%u,\"session\":\"%s\",\"fixture\":\"%s\",\"prime_clamp_mask\":%u,\"reason\":\"%s\"}",
-  telemetry_.entry,telemetry_.phase,telemetry_.supervised_segment,telemetry_.session_state,telemetry_.fixture_declared?"OPERATOR_DECLARED":"NONE",telemetry_.prime_clamp_mask,telemetry_.commissioning_reason);
- w.add("}");return w.ok;
+ if(!motion_||!out||!cap)return false;
+ const uint64_t us=esp_timer_get_time();const bool fresh=motion_->fresh(us);
+ size_t used=0;bool ok=true;
+ auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
+ add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":40000,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
+ (unsigned long)now,simple::name(motion_->state()),motion_->phase(),boolean(ready_),motion_->reason(),reason_,boolean(!fresh),boolean(motion_->state()==simple::State::FAULT),boolean(motion_->offVerified()),motion_->offMask(),boolean(motion_->energized()),boolean(motion_->heightValid()),motion_->requestedHeightM()*1000,motion_->heightM()*1000,motion_->walkCycles(),boolean(motion_->stabilizationLimited()),boolean(motion_->imuValid()),(unsigned long long)(us>=motion_->imuStampUs()?(us-motion_->imuStampUs())/1000:0),(unsigned long)motion_->releases(),(unsigned long)motion_->missed(),(unsigned long long)motion_->maxGapUs(),motion::toString(activeAck_.outcome),activeAck_.reason);
+ for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];add("%s{\"slot\":%u,\"valid\":%s,\"raw\":%u,\"rad\":%.6f,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,boolean(f.valid),f.raw,f.q,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
+ add("%s","]}");return ok;
 }
 } }

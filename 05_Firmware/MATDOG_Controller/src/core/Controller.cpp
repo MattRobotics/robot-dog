@@ -1,22 +1,10 @@
-#include "AdmissionDiagnostics.h"
 #include "Controller.h"
-#include <esp_random.h>
-
+#include <esp_timer.h>
+#include <esp_task_wdt.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
-#include <string.h>
+#include <cstring>
 #include <cmath>
-#include "../motion/PairedProneRoute.h"
-#include "../motion/OperationalWalkProfile.h"
-#include "../servo/ServoBus.h"
-static_assert(matdog::motion::operational_walk::kStandardDrive.goalSpeed==matdog::servo::ServoBus::kWalkDriveSpeed&&
-              matdog::motion::operational_walk::kStandardDrive.acceleration==matdog::servo::ServoBus::kWalkDriveAcceleration&&
-              matdog::motion::operational_walk::kFastDrive.goalSpeed==matdog::servo::ServoBus::kFastWalkDriveSpeed&&
-              matdog::motion::operational_walk::kFastDrive.acceleration==matdog::servo::ServoBus::kFastWalkDriveAcceleration,
-              "the ServoBus accepts exactly the walk profile table's drive pairs");
-static_assert(matdog::motion::operational_walk::kStandProfile.drive.goalSpeed==matdog::servo::ServoBus::kStandDriveSpeed&&
-              matdog::motion::operational_walk::kStandProfile.drive.acceleration==matdog::servo::ServoBus::kStandDriveAcceleration,"STAND drive pair");
-
 #include "../config/BuildConfig.h"
 #include "../config/InstallationAttestation.h"
 #include "../config/OtaCredentials.h"
@@ -34,25 +22,6 @@ static_assert(matdog::motion::operational_walk::kStandProfile.drive.goalSpeed==m
 
 namespace matdog {
 namespace core {
-namespace {
-// Age of a sample against a loop-start timestamp: a sample taken later in the
-// same loop (negative age) is fresh, never 'stale by underflow'.
-bool sampleFresh(uint32_t now_ms,uint32_t sampled_at_ms,uint32_t max_age_ms){
-  return static_cast<int32_t>(now_ms-sampled_at_ms)<=static_cast<int32_t>(max_age_ms);
-}
-// Core Motion V6: the operands of the first refusal (verifier/site, slot, compared value and bound; release secant
-// operands; path-box instant and uncertainty). One bounded line at the first stop only. Out of line and static so the
-// formatting never adds to the Controller frame that the Motion call chain runs on (16 KB loop stack).
-void __attribute__((noinline)) writeFirstRefusal(const motion::RefusalRecord& why,const char* phase){
-  static char line[352];
-  const int n=snprintf(line,sizeof(line),
-    "MOTION_REFUSAL site=%s reason=%s phase=%s joint=%d seq=%lu value=%.9g limit=%.9g q=%.9f q_last=%.9f v=%.9f v_prev=%.9f dt_ms=%.3f dt_prev_ms=%.3f at_us=%llu sample_us=%llu u_mrad=%.3f\r\n",
-    why.site,why.reason,phase,why.joint,(unsigned long)why.sequence,why.value,why.limit,why.q,why.qLast,why.v,why.vPrev,
-    why.dtS*1000,why.dtPrevS*1000,(unsigned long long)why.atUs,(unsigned long long)why.sampleUs,why.uncertainty*1000);
-  if(n>0&&static_cast<size_t>(n)<sizeof(line))writeAdmissionTrace(Serial,line,static_cast<size_t>(n));
-}
-}  // namespace
-
 namespace {
 const char* resetReasonName(esp_reset_reason_t reason) {
   switch (reason) {
@@ -83,6 +52,13 @@ void Controller::begin() {
   Serial.setTxBufferSize(build::kUsbTxRingBytes);
   Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs);
   Serial.begin(build::kUsbSerialBaud);
+  // De-escalate before USB enumeration, NVS, SPI or network initialization.
+  // In particular a watchdog reboot must not wait for those services to
+  // command torque OFF. Readback verification continues in the main loop.
+  servo_bus_.begin();
+  simple_port_.owner=this;
+  simple_motion_.begin(&simple_port_,build::kServoPowerAvailable);
+  if(build::kServoPowerAvailable)simple_motion_.update(esp_timer_get_time());
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
   system_state_.beginBoot(millis());
@@ -135,18 +111,7 @@ void Controller::begin() {
   // model; binding it authorises nothing without a live session + permit.
   actuator_policy_.bindSequencePlan(&actuator::sequence_plan_data::kPlan);
   actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
-  motion_executor_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
-                         &actuator::geometry_data::kProvenance, &authority_);
-  motion_coordinator_.begin(&motion_executor_, &actuator_policy_);
-  for(unsigned k=0;k<12;++k)canonical_leg_ids_[k]=servo::legServoAt(k)->bus_id;
-  actuator_runtime_.bindCanonicalBusIds(canonical_leg_ids_,12);
-  motion_coordinator_.bindClock(&motion_clock_);
-  operational_session_.begin(&actuator_policy_,&actuator_runtime_,&motion_executor_,&authority_,
-                              &geometry_profile_,&actuator::geometry_data::kProvenance);
-  motion_coordinator_.bindSession(&operational_session_);
-  operational_armer_.owner=this;motion_coordinator_.bindArmer(&operational_armer_);
-  motion_service_.begin(&motion_executor_, &motion_coordinator_);
-  // No boot restore, planner approval, authority request, torque or permit.
+  motion_service_.begin(&simple_motion_,[](void* context){return static_cast<Controller*>(context)->prepareSimpleMotion();},this);
 
   calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
                                &actuator::geometry_data::kProvenance);
@@ -208,7 +173,6 @@ void Controller::begin() {
   // Init order: transports that cannot interfere with each other first.
   // No module's begin() may command motion, enable torque, or write
   // EEPROM/DCD/BMS config (handoff sections 5/10/28).
-  servo_bus_.begin();
   servo_bus_.setStopPreempt(&Controller::stopPreempt,this);
   system_state_.setServoHealth(servo_bus_.health());
 
@@ -221,19 +185,8 @@ void Controller::begin() {
   servo_preflight_.begin(&servo_bus_);
 
   if (build::kServoPowerAvailable) {
-    startup_servo_census_pending_ = servo_census_.start();
-    if (startup_servo_census_pending_) {
-      system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
-      Serial.printf("STARTUP_SERVO_CENSUS=RUNNING canonical=%u expected_now=%u range=%d..%d\n",
-                    (unsigned)servo::canonicalAllocatedCount(),
-                    (unsigned)servo::expectedNowCount(),
-                    servo::kCanonicalScanLo, servo::kCanonicalScanHi);
-    } else {
-      // A powered robot that cannot even start its required population
-      // self-test must fail closed rather than remain BOOTING forever.
-      system_state_.setServoHealth(ModuleHealth::FAULT);
-      Serial.println("STARTUP_SERVO_CENSUS=START_FAILED");
-    }
+    startup_servo_census_pending_=true;
+    system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
   }
 
   imu_.begin();
@@ -282,15 +235,6 @@ void Controller::begin() {
       &startup_qualification_,
       &runtime_restore_,
   };
-  validation_nonce_=esp_random();if(!validation_nonce_)validation_nonce_=1;
-  modules.validation_context=this;
-  modules.validation_command=[](void* context,const char* line,uint32_t now,char* out,size_t size){
-    return static_cast<Controller*>(context)->localValidationCommand(line,now,out,size);
-  };
-  modules.commissioning_command=[](void* context,const char* line,uint32_t now,char* out,size_t size){
-    return static_cast<Controller*>(context)->commissioningCommand(line,now,out,size);
-  };
-  boot_nonce_=esp_random();if(!boot_nonce_)boot_nonce_=1;
   service_.begin(modules);
   service_.bindMotionService(&motion_service_);
   restore_hook_.owner=this;service_.bindCalibrationRestore(&restore_hook_);
@@ -316,6 +260,7 @@ void Controller::begin() {
   // the OTA first-boot self-check requires, and it must mean "begin() ran to
   // completion", not "begin() started".
   initialized_ = true;
+  esp_task_wdt_add(nullptr);
 }
 
 void Controller::updateQ0Capture() {
@@ -472,9 +417,8 @@ calibration::RestoreFacts Controller::gatherRestoreFacts(bool read_live,calibrat
                                                          calibration::LivePositionEvidence* live) {
   calibration::RestoreFacts f;
   f.maintenance=operating_mode_.mode()==OperatingMode::MAINTENANCE;
-  f.runtime_idle=authority_.current()==ActuatorAuthority::NONE&&!motion_executor_.active()&&
-    !motion_executor_.status().safe_off_required&&operational_session_.state()==execution::MotionSessionState::OFF&&
-    !motion_service_.busy()&&!calibration_.sessionLive()&&!operational_facts_.operator_permit&&!boot_safe_off_pending_;
+  f.runtime_idle=authority_.current()==ActuatorAuthority::NONE&&!simple_motion_.engaged()&&
+    !calibration_.sessionLive()&&simple_motion_.offVerified();
   f.nvs_ready=persistence_.snapshot().nvs==calibration::NvsInitStatus::READY;
   f.write_outcome_uncertain=persistence_.writesBlocked();
   f.record_valid_acknowledged=persistence_.calibrationAvailable()&&persistence_.snapshot().assessment.acknowledged_record_intact;
@@ -502,6 +446,9 @@ calibration::RestoreFacts Controller::gatherRestoreFacts(bool read_live,calibrat
 }
 
 calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibration::RestoreRequestFacts& q) {
+  if(simple_motion_.engaged()||calibration_.sessionLive()||q0_capture_.active()||first_motion_.active()||full_leg_calibration_.active()){
+    calibration::RestoreVerdict v;v.decision=calibration::RestoreDecision::REFUSED;v.reason=calibration::RestoreReason::RUNTIME_NOT_IDLE;return v;
+  }
   const bool manual=q.trigger==calibration::RestoreTrigger::OPERATOR_MANUAL;
   const auto attestation=config::installationAttestation(auto_restore_suspended_);
   calibration::RecordInspection in;calibration::LivePositionEvidence live;
@@ -514,7 +461,7 @@ calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibrat
     request.expected_generation=facts.record_generation;
     request.current_installation_confirmed=true;  // live evidence (boot) or present operator, decided above
     request.executor_idle=facts.runtime_idle;request.torque_off_confirmed=facts.torque_off==12;
-    request.motion_permit_revoked=!operational_facts_.operator_permit;
+    request.motion_permit_revoked=!simple_motion_.engaged();
     const auto result=runtime_restore_.restore(persistence_,geometry_profile_,actuator::geometry_data::kProvenance,
         request,actuator_policy_.transforms(),actuator_policy_.limits(),&live);
     installation_live_verified_=result==calibration::RuntimeRestoreStatus::RESTORED;
@@ -543,124 +490,8 @@ calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibrat
   return verdict;
 }
 
-void Controller::updateOperationalReadiness(uint32_t now_ms) {
-  core::ReadinessFacts f;
-  f.now_ms=now_ms;
-  f.health_fault=system_state_.systemHealth()==SystemHealth::FAULT;
-  f.health_ready=system_state_.systemHealth()==SystemHealth::READY;
-  f.boot_safe_off_done=!boot_safe_off_pending_;
-  f.census_complete=servo_census_.state()==servo::ServoCensus::State::COMPLETE;
-  f.census_pass=f.census_complete&&servo_census_.result().verdict==servo::CensusVerdict::PASS;
-  f.preflight_running=servo_preflight_.state()==servo::ServoPreflight::State::RUNNING;
-  f.preflight_complete=servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE;
-  f.preflight_pass=f.preflight_complete&&servo_preflight_.result().allPass();
-  f.persistence_loaded=persistence_.snapshot().load_count>0;
-  f.restored=runtime_restore_.snapshot().restored;
-  f.restore_refused_permanent=restore_refused_permanent_;f.restore_refused_transient=restore_refused_transient_;
-  f.restore_reason=restore_refusal_reason_;
-  f.raw_fresh=operational_producer_.rawFresh(now_ms,1000);
-  {const auto fb=operational_producer_.snapshot(now_ms,1000);bool all=true;for(unsigned i=0;i<12;++i)all=all&&(fb.read_ok[i]||(operational_session_.state()!=execution::MotionSessionState::OFF&&fb.recovering[i]));f.mapped_fresh=all;if(fb.pending()&&all)f.raw_fresh=true;}
-  f.operational_bound=runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_;
-  f.admit_failed=admit_failed_;f.admit_reason=admit_reason_;
-  // now_ms is the loop START; a BMS/IMU sample completed later in this same
-  // loop is newer than now_ms. Unsigned now-sampled then underflowed to 'stale'
-  // and the Motion Authority flapped GRANTED/REVOKED reason=BMS every 2 s DALY
-  // poll (seen on hardware 2026-10-16). Signed age: newer = fresh.
-  {const auto imu=imu_.orientationSnapshot();f.imu_fresh=imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,600);
-   // Evidence for the next hardware log: on each fresh->stale edge, say WHICH of the two causes it is
-   // (no sample vs an old stamp) and how many snapshot reads have failed so far.
-   static bool was_stale=false;
-   if(!f.imu_fresh&&!was_stale)Serial.printf("IMU_STALE_DETAIL snapshot_valid=%u age_ms=%ld rv_count=%lu snapshot_read_failures=%lu\n",imu.valid?1u:0u,
-     imu.valid?static_cast<long>(static_cast<int32_t>(now_ms-imu.sampled_at_ms)):-1L,(unsigned long)imu_.rvCount(),(unsigned long)imu_.snapshotReadFailures());
-   was_stale=!f.imu_fresh;}
-  {const auto& b=daly_.sample();f.bms_ok=b.valid&&sampleFresh(now_ms,b.sampled_at_ms,3000);for(unsigned i=0;i<4;++i)f.bms_ok=f.bms_ok&&b.alarms[i]==0;}
-  f.power_ok=power_state_.state()==PowerState::RUN;
-  f.inhibited=authority_.inhibited();
-  f.mode=operating_mode_.mode();
-  f.operator_maintenance_hold=operating_mode_.operatorMaintenanceHold();
-  f.authority_motion=authority_.current()==ActuatorAuthority::MOTION;
-  f.authority_other=authority_.current()!=ActuatorAuthority::NONE&&!f.authority_motion;
-  f.session_active=operational_session_.state()!=execution::MotionSessionState::OFF;
-  if(!f.authority_motion)motion_authority_lease_={};
-  // The operator chose a supervised runtime test mode over USB: no automatic
-  // operational admission until reboot or MODE OPERATIONAL.
-  const bool operator_runtime_mode=runtime_mode_!=execution::RuntimeTestMode::DIAGNOSTIC&&runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL;
-  if(operator_runtime_mode){f.admit_failed=true;f.admit_reason="OPERATOR_SELECTED_RUNTIME_MODE";}
-  const auto action=readiness_core_.step(f);
-  switch(action){
-    case core::ReadinessAction::NONE:break;
-    case core::ReadinessAction::START_PREFLIGHT:servo_preflight_.start();break;
-    case core::ReadinessAction::RESTORE:{
-      calibration::RestoreRequestFacts boot;boot.trigger=calibration::RestoreTrigger::BOOT_AUTOMATIC;
-      requestCalibrationRestore(boot);break;}
-    case core::ReadinessAction::ADMIT_OPERATIONAL:
-      if(operator_runtime_mode||motion_service_.busy()||operational_session_.state()!=execution::MotionSessionState::OFF)break;
-      admit_failed_=!admitRuntimePolicy(true,now_ms,now_ms,&admit_reason_);
-      Serial.printf("OPERATIONAL_ADMISSION=%s reason=%s\n",admit_failed_?"REFUSED":"BOUND",admit_reason_);
-      break;
-    case core::ReadinessAction::ENTER_RUN:
-      operating_mode_.enterRunAutomatic();authority_.onOperatingModeChanged(OperatingMode::RUN);
-      Serial.println("OPERATING_MODE=RUN source=OPERATIONAL_READINESS radio_role=UNCHANGED");break;
-    case core::ReadinessAction::GRANT_AUTHORITY:
-      if(authority_.request(ActuatorAuthority::MOTION,operating_mode_.mode(),&motion_authority_lease_)!=AuthorityResult::GRANTED)motion_authority_lease_={};
-      else Serial.printf("MOTION_AUTHORITY=GRANTED generation=%lu torque=OFF motion=NONE_UNTIL_COMMAND\n",(unsigned long)motion_authority_lease_.generation);
-      break;
-    case core::ReadinessAction::RELEASE_AUTHORITY:
-      authority_.release(motion_authority_lease_);motion_authority_lease_={};
-      Serial.printf("MOTION_AUTHORITY=REVOKED reason=%s\n",readiness_core_.status().reason);break;
-    case core::ReadinessAction::REVOKE_SESSION:
-      // STOP procedure: SAFE_OFF of every joint, then the lease is released.
-      motion_service_.disconnected(now_ms);operational_session_.revoke(readiness_core_.status().reason);
-      motion_executor_.stop(readiness_core_.status().reason);operational_facts_.operator_permit=false;
-      Serial.printf("MOTION_AUTHORITY=REVOKED reason=%s action=SAFE_OFF\n",readiness_core_.status().reason);break;
-  }
-  if(action!=core::ReadinessAction::NONE)last_readiness_action_=action;
-  const auto& st=readiness_core_.status();
-  ControllerService::ReadinessView view;view.system_health=st.system_health;view.calibration=st.calibration;
-  view.joint_feedback=st.joint_feedback;view.motion_authority=st.motion_authority;view.phase=core::toString(st.phase);view.reason=st.reason;
-  service_.setReadinessView(view);
-}
-
-bool Controller::operatorPresent(uint32_t now_ms) const {
-  return validation_present_&&static_cast<int32_t>(now_ms-validation_presence_ms_)>=0&&now_ms-validation_presence_ms_<=presenceWindowMs();
-}
-
-void Controller::HeartbeatHook::heartbeat(uint32_t now_ms) {
-  // Only meaningful in OPERATIONAL mode: the USB commissioning deadman keeps
-  // its own explicit PRESENT command.
-  if(!owner||owner->runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL||!owner->commissioning_bound_)return;
-  owner->validation_present_=true;owner->validation_presence_ms_=now_ms;
-}
-
-const char* Controller::armOperationalSession(uint32_t now) {
-  // preArmCheck may do substantial geometry work. Re-evaluate the SAME
-  // producer at admission time; never relax future/stale feedback checks.
-  now=millis();
-  operational_feedback_=operational_producer_.snapshot(now,reviewed_motion_.execution.feedback_max_age_ms);
-  if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL||!commissioning_bound_)return "OPERATIONAL_MODE_REQUIRED";
-  if(authority_.current()!=ActuatorAuthority::MOTION||!motion_authority_lease_.valid())return "MOTION_AUTHORITY_REQUIRED";
-  if(operational_session_.state()!=execution::MotionSessionState::OFF)return "SESSION_BUSY";
-  for(unsigned i=0;i<12;++i)if(operational_producer_.raw(i).speed!=0||operational_producer_.raw(i).torque!=0)return "STATIONARY_TORQUE_OFF_REQUIRED_FOR_PRIME";
-  // Legacy diagnostic container carries only the route variant and live
-  // hardware observation here. No fixture/operator/test attestation is minted.
-  execution::LocalTrialEvidence e;e.scope=execution::TrialScope::FIXTURE_COMMISSIONING;e.generation=++validation_sequence_;
-  e.imu_fresh=operational_facts_.hardware_qualified;
-  e.prime_clamp_max_ticks=commissioning_params_.prime_clamp_ticks;
-  operational_facts_.operator_permit=true;operational_facts_.permit_generation=e.generation;operational_facts_.permit_expires_at_ms=e.expires_at_ms;
-  operational_facts_.lease=motion_authority_lease_;
-  local_trial_evidence_=e;
-  // Runtime-governed: no compile-time motion flag is consulted on this path.
-  const bool admitted=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,true,now);
-  // One trace per admission, after the decision, never before the gate. These
-  // are the actual inputs, not a later USB telemetry snapshot.
-  char trace[kAdmissionTraceBytes];
-  const size_t trace_bytes=formatAdmissionTrace(trace,sizeof(trace),now,actuator_policy_.epoch(),
-    e.generation,motion_authority_lease_.generation,admitted?"PASS":operational_session_.reason(),operational_feedback_);
-  writeAdmissionTrace(Serial,trace,trace_bytes);
-  if(!admitted){operational_facts_.operator_permit=false;return operational_session_.reason();}
-  const int n=snprintf(trace,sizeof(trace),"OPERATIONAL_SESSION=PRIMING generation=%lu (prime at measured pose -> energize -> arm)\r\n",(unsigned long)e.generation);
-  if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,static_cast<size_t>(n));
-  return nullptr;
+void Controller::HeartbeatHook::heartbeat(uint32_t) {
+  if(owner)owner->simple_motion_.heartbeat(esp_timer_get_time());
 }
 
 bool Controller::RestoreHook::restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) {
@@ -1210,530 +1041,16 @@ void Controller::printBootBanner() {
   Serial.println();
 }
 
-bool Controller::bindReviewedMotionRuntime(const execution::ReviewedMotionRuntime& r) {
-  const auto& c=runtime_restore_.snapshot();
-  if(motion_executor_.active()||authority_.current()!=ActuatorAuthority::NONE||!c.calibration_accepted||
-     !c.operational_limits_approved||r.calibration_generation!=c.restored_generation||r.policy_epoch!=actuator_policy_.epoch()||
-     !r.execution.approved||!r.max_imu_age_ms||r.max_imu_age_ms>3000||
-     r.max_servo_temperature_c<=0||r.max_servo_temperature_c>70||r.min_servo_voltage_dv<=0||
-     r.max_servo_voltage_dv<=r.min_servo_voltage_dv)return false;
-  if(r.scope!=execution::TrialScope::FIXTURE_MICRO){
-    const bool fixture=r.scope==execution::TrialScope::SUPERVISED_FIXTURE_STAND||r.scope==execution::TrialScope::SUPERVISED_FIXTURE_WALK;
-    if((!fixture&&r.scope!=execution::TrialScope::AUTONOMOUS_STAND&&r.scope!=execution::TrialScope::AUTONOMOUS_WALK)||
-       memcmp(r.route_sha256,motion::pairedProneDigest(r.feedback.fixtureLimitVariant),65)!=0||r.feedback.mode!=(fixture?motion::FeedbackMode::FIXTURE_REVIEW:motion::FeedbackMode::PHYSICAL_REVIEW)||
-       !motion::validFeedbackPolicy(r.feedback))return false;
-  }
-  for(unsigned i=0;i<12&&r.scope!=execution::TrialScope::FIXTURE_MICRO;++i){
-    calibration::JointIdentity id;if(!actuator::slotIdentity(i,&id))return false;
-    const auto* t=actuator_policy_.transforms().find(id,geometry_profile_.provenanceTag());
-    const auto* l=actuator_policy_.limits().find(id,geometry_profile_.provenanceTag());
-    if(!t||!l)return false;
-    const auto& bound=r.feedback.jointLimits[i/3][i%3];
-    const double endpoints[]={bound.lower,bound.upper};
-    for(double q:endpoints){uint16_t tick=0;
-      if(actuator::resolveRadiansToRaw(geometry_profile_,actuator::geometry_data::kProvenance,*t,q,&tick)!=actuator::TargetResolveStatus::OK||!l->contains(tick))return false;
-    }
-  }
-  if(r.scope!=execution::TrialScope::FIXTURE_MICRO){static motion::AcquisitionRoute route;static const motion::AcquisitionRoute kEmptyRoute{};route=kEmptyRoute;route.pairedProne=true;   // off the loop stack
-    route.supervisedSegments=true;route.timeScale=r.stand_time_scale;
-    route.geometryIdentityVerified=true;route.source=motion::EvidenceSource::OFFLINE_CERTIFIED;
-    if(!motion_coordinator_.configure(r.feedback,r.walk,&route))return false;}
-  reviewed_motion_=r;reviewed_motion_bound_=true;return true;
-}
-bool Controller::requestLocalMotionTrial(const execution::LocalTrialEvidence& e,uint32_t generation,uint32_t expires) {
-  const uint32_t now=millis();
-  if(!reviewed_motion_bound_||!execution::runtimeModeAllowsScope(runtime_mode_,e.scope)||e.scope!=reviewed_motion_.scope||!generation||static_cast<int32_t>(now-expires)>=0)return false;
-  if(e.scope!=execution::TrialScope::FIXTURE_MICRO&&
-     (motion::checkObservation(local_motion_observation_,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))!=motion::FeedbackReason::OK||
-      motion::pairedProneMatch(local_motion_observation_,reviewed_motion_.feedback)<0))return false;
-  operational_facts_.operator_permit=true;operational_facts_.permit_generation=generation;operational_facts_.permit_expires_at_ms=expires;
-  local_trial_evidence_=e;
-  const bool bus=(e.scope==execution::TrialScope::FIXTURE_MICRO||e.scope==execution::TrialScope::SUPERVISED_FIXTURE_STAND||e.scope==execution::TrialScope::SUPERVISED_FIXTURE_WALK)?reviewed_motion_.fixture_bus_timing_qualified:reviewed_motion_.autonomous_bus_timing_qualified;
-  operational_facts_.hardware_qualified=operational_facts_.hardware_qualified&&bus;
-  operational_facts_.sequential_bus_qualified=operational_facts_.hardware_qualified;
-  const bool ok=operational_session_.request(e,operational_facts_,reviewed_motion_.execution,operational_feedback_,(build::kOperationalMotionAuthorized||(build::kSupervisedValidationCapable&&validation_profile_.sealed()&&validation_present_&&now-validation_presence_ms_<=1000&&e.scope==validation_profile_.runtime.scope)),now);
-  if(!ok)operational_facts_.operator_permit=false;
-  return ok;
-}
-bool Controller::publishLocalMotionObservation(const motion::AdaptiveObservation& input) {
-  if(!reviewed_motion_bound_||reviewed_motion_.scope==execution::TrialScope::FIXTURE_MICRO||
-     (operational_session_.state()!=execution::MotionSessionState::ARMED&&operational_session_.state()!=execution::MotionSessionState::OFF))return false;
-  auto o=input;o.actual={};o.actual.valid=true;
-  const uint32_t now=millis();const auto fb=operational_producer_.snapshot(now,reviewed_motion_.execution.feedback_max_age_ms);
-  for(unsigned i=0;i<12;++i)if(!fb.read_ok[i])return false;
-  for(unsigned i=0;i<4;++i)o.actual.legs[i]={fb.actual_rad[i*3],fb.actual_rad[i*3+1],fb.actual_rad[i*3+2]};
-  {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(fb.sampled_at_us[i]<oldest)oldest=fb.sampled_at_us[i];o.stampS=motion::secondsFromMicros(oldest);}
-  if(motion::checkObservation(o,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))!=motion::FeedbackReason::OK)return false;
-  local_motion_observation_=o;motion_coordinator_.observe(o);return true;
-}
-bool Controller::publishLocalMotionAssessment(const motion::SegmentAssessment& a) {
-  return reviewed_motion_bound_&&operational_session_.state()==execution::MotionSessionState::ARMED&&motion_coordinator_.assess(a,millis());
-}
-bool Controller::requestLocalFixtureMicro(unsigned joint,double delta,double duration,const execution::FrameValidation& path) {
-  return operational_session_.requestFixtureMicro(joint,delta,duration,path,operational_facts_,operational_feedback_,millis());
-}
-void Controller::updateOperationalMotion(uint32_t now_ms) {
-  // Boot de-escalation covers every installed servo including the auxiliary.
-  // Never prime/energize before all OFF readbacks have succeeded. Retry failures.
-  if(build::kServoPowerAvailable&&boot_safe_off_pending_){
-    const auto* s=&servo::kCanonicalServos[boot_safe_off_next_];
-    if(s->current_config!=servo::CurrentConfig::INSTALLED){boot_safe_off_mask_|=1u<<boot_safe_off_next_;}
-    if(s->current_config==servo::CurrentConfig::INSTALLED&&servo_bus_.safeOff(s->bus_id)==servo::SafeOffResult::VERIFIED_OFF)boot_safe_off_mask_|=1u<<boot_safe_off_next_;
-    boot_safe_off_next_=(boot_safe_off_next_+1)%servo::kCanonicalServoCount;
-    if(boot_safe_off_mask_==((1u<<servo::kCanonicalServoCount)-1))boot_safe_off_pending_=false;
-    return;
-  }
-  if(runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL&&validation_present_&&now_ms-validation_presence_ms_>presenceWindowMs()){
-    validation_present_=false;validation_walk_admitted_=false;local_trial_evidence_.local_operator_present=false;
-    operational_facts_.operator_permit=false;
-    if(operational_session_.state()!=execution::MotionSessionState::OFF)
-      operational_session_.revoke("LOCAL_PRESENCE_DEADMAN_EXPIRED");
-  }
-  // Only continuous teleoperation depends on live transport. STAND is a finite
-  // controller command; AP polling is not proof of presence or support.
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&motion_service_.busy()&&operatorPresent(now_ms))
-    motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));
-  const auto& radio=wifi_.adminAccess();const uint32_t generation=radio.generation();
-  if((validation_radio_generation_&&validation_radio_generation_!=generation)||radio.closing.load()||radio.radio_fault.load()){
-    if(operational_session_.state()!=execution::MotionSessionState::OFF)operational_session_.revoke("RADIO_TRANSITION_REVOKED_LOCAL_SESSION");
-    operational_facts_.operator_permit=false;
-  }
-  validation_radio_generation_=generation;
-  // A pending SAFE_OFF goes out before any poll of this tick (Issue #52).
-  emergencyTorqueOffBurst();
-  // Same cooperative Controller owns every ServoBus operation. Read only when
-  // no calibration/discovery producer is using the bus. SAFE_OFF precedes
-  // polling; STOP can interrupt each reply. Successful Motion polling renews
-  // half the population per turn, idle polling one ID (OperationalFeedback.h).
-  const uint32_t poll_started_us=micros();
-  if(build::kServoPowerAvailable && !motion_executor_.status().safe_off_required && !operational_session_.safeOffRequired() &&
-     (authority_.current()==ActuatorAuthority::NONE||authority_.current()==ActuatorAuthority::MOTION) &&
-     servo_bus_.scanState()!=servo::ScanState::RUNNING && servo_preflight_.state()!=servo::ServoPreflight::State::RUNNING && !q0_capture_.active() &&
-     (startup_qualification_.phase()==calibration::StartupQualificationPhase::IDLE||
-      startup_qualification_.phase()==calibration::StartupQualificationPhase::COMPLETE||
-      startup_qualification_.phase()==calibration::StartupQualificationPhase::REFUSED||
-      startup_qualification_.phase()==calibration::StartupQualificationPhase::READY) && now_ms-operational_poll_at_ms_>=(profileActive()?2u:20u)){
-    const uint32_t transaction_ms=validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:commissioning_bound_?commissioning_params_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs;
-    // ARMING, timed STAND and streaming WALK: six round-robin fast reads
-    // per successful tick, stamped individually at completion. Control 40..49
-    // rotates at 20 ms (finite) / 100 ms (streaming), with expired-cache retry.
-    // Idle, PRIME and ENERGIZE retain one combined read per tick.
-    const bool fast=motion_executor_.streaming()||motion_executor_.timedSegmentsActive()||operational_session_.state()==execution::MotionSessionState::ARMING;
-    bool poll_ok=true;
-    for(unsigned k=0;execution::operationalPollReadAllowed(fast,k,poll_ok);++k){
-    // A pending STOP may preempt between synchronous reads, never after a
-    // whole new batch. Each individual read keeps its existing IO timeout.
-    if(http_transport_.stopPending()&&http_transport_.serviceStopLane(millis())){
-      stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
-      emergencyTorqueOffBurst();break;
-    }
-    const unsigned slot=operational_poll_next_;
-    const auto* joint=actuator::slotServo(slot);
-    execution::RawJointObservation r=operational_producer_.raw(slot);
-    const uint32_t read_started=millis();
-    const uint32_t control_period=motion_coordinator_.streamingWalk()?100:20;
-    const uint32_t control_max_age=motion_coordinator_.streamingWalk()?1500:reviewed_motion_.execution.feedback_max_age_ms;
-    const bool control_due=!r.read_ok||execution::controlReadDue(fast,slot,operational_control_next_,millis(),
-      operational_control_at_ms_,control_period,r.control_at_ms,control_max_age);
-    if(control_due){
-      servo::ServoBus::ControlFeedbackSnapshot t{};
-      r.read_ok=joint&&servo_bus_.readControlFeedbackBudgeted(joint->bus_id,&t,transaction_ms);
-      r.torque_limit=t.torque_limit;r.goal_position=t.goal_position;r.goal_speed=t.goal_speed;r.goal_acceleration=t.goal_acceleration;r.torque=t.torque_enable;
-      r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.speed_signed=t.present_speed<0?0:((t.present_speed&0x8000)?-(t.present_speed&0x7fff):t.present_speed&0x7fff);
-      r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
-      r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;r.control_at_ms=millis();
-      if(fast&&r.read_ok&&slot==operational_control_next_){operational_control_at_ms_=r.control_at_ms;operational_control_next_=static_cast<uint8_t>((operational_control_next_+1)%12);}
-    } else {
-      servo::ServoBus::FastFeedback t{};
-      r.read_ok=joint&&servo_bus_.readFastFeedback(joint->bus_id,&t,transaction_ms);
-      r.speed=t.present_speed<0?-1:t.present_speed&0x7fff;r.speed_signed=t.present_speed<0?0:((t.present_speed&0x8000)?-(t.present_speed&0x7fff):t.present_speed&0x7fff);
-      r.position=t.present_position>=0?static_cast<uint16_t>(t.present_position):4096;
-      r.temperature=t.present_temperature;r.voltage=t.present_voltage;r.status=t.status;r.load=t.present_load;r.current=t.present_current;
-      // Torque state from the slow block, valid only while recent (monitor, not per sample).
-      if(millis()-r.control_at_ms>control_max_age)r.read_ok=false;
-    }
-    if(servo_bus_.lastBusOutcome()==servo::BusOutcome::ABORTED_STOP||
-       servo_bus_.lastBusOutcome()==servo::BusOutcome::CANCELLED_STOP){
-      // The bus hook already authenticated AND applied STOP on this same
-      // Controller thread. Preserve the previous sample's original timestamp.
-      emergencyTorqueOffBurst();
-      poll_ok=false;break;
-    }
-    r.transaction_ms=millis()-read_started;
-    // The encoder sample instant is the block's completion, before any confirmation read.
-    r.sampled_at_ms=millis();r.sampled_at_us=motion_clock_.extend(micros());
-    if(profileActive()&&r.transaction_ms>2*transaction_ms+2)r.read_ok=false;
-    // dev.3 thermal artifact (2026-10-06 hardware evidence): a MOVING servo can
-    // return a spurious >70 C byte inside a valid 56..70 block frame. Confirm a
-    // block over-temperature (after the bus budget check of the block
-    // itself) with ONE direct register read (the value dev.3
-    // decides on); a confirmed over-temperature still invalidates the joint.
-    if(r.read_ok&&joint&&r.temperature>70){int direct=-1;
-      r.temperature=servo_bus_.readPresentTemperatureDirect(joint->bus_id,&direct,transaction_ms)?direct:r.temperature;}
-    operational_producer_.ingest(slot,r,geometry_profile_,actuator::geometry_data::kProvenance,actuator_policy_.transforms());
-    poll_ok=r.read_ok&&r.position<4096;
-    operational_poll_next_=poll_ok?static_cast<uint8_t>((slot+1)%12):slot;operational_poll_at_ms_=r.sampled_at_ms;
-    }
-  }
-  motion_cycle_.poll_us=static_cast<uint32_t>(micros()-poll_started_us);
-  now_ms=millis(); // freshness uses completion time, never the pre-read clock
-  operational_feedback_=operational_producer_.snapshot(now_ms,reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500);
-  const auto& calibration = runtime_restore_.snapshot();
-  MotionReadiness ready;
-  // In OPERATIONAL mode the session belongs to the authenticated Dashboard command.
-  ready.local_operator_owns_session=reviewed_motion_bound_&&operational_session_.state()!=execution::MotionSessionState::OFF&&
-                                    runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL;
-  ready.calibration_restored=calibration.restored;
-  ready.calibration_accepted=calibration.calibration_accepted;
-  ready.limits_approved=calibration.operational_limits_approved||(commissioning_bound_&&calibration.commissioning_limits_active);
-  // Offline integration does not qualify physical loaded tracking, contact
-  // observation, prime/torque startup or bounded sequential bus timing.
-  const auto imu=imu_.orientationSnapshot();
-  bool scoped=reviewed_motion_bound_&&execution::runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope)&&reviewed_motion_.calibration_generation==calibration.restored_generation&&
-      reviewed_motion_.policy_epoch==actuator_policy_.epoch()&&!radio.closing.load()&&!radio.radio_fault.load()&&imu.valid&&sampleFresh(now_ms,imu.sampled_at_ms,reviewed_motion_.max_imu_age_ms);
-  bool prime_profiles=true;
-  // Reviewed cards or the commissioning policy: the same drive-profile checks.
-  // Commissioning reduces no output ceiling (ST3215 default 1000 = no claim).
-  // OPERATIONAL fixture WALK (2026-10-15): the reviewed walk drive pair is
-  // latched from the first walk frame until the session ends; while servos are
-  // rewritten, either reviewed pair is accepted per joint (registers only
-  // change on a write), never any other value.
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_){
-    // Once ARMED (prime/energize used the commissioning pair) the motion pair of
-    // the OperationalWalkProfile.h table is latched: the STAND pair, or the
-    // running walk profile's pair while walking.
-    if(operational_session_.state()==execution::MotionSessionState::ARMED){walk_drive_latched_=true;
-      const auto* profile=motion_coordinator_.walkProfile();walk_drive_=profile?profile->drive:motion::operational_walk::kStandProfile.drive;}
-    if(operational_session_.state()==execution::MotionSessionState::OFF)walk_drive_latched_=false;
-    servo_bus_.setValidationDrive(walk_drive_latched_?walk_drive_.goalSpeed:commissioning_params_.drive_speed,
-                                  walk_drive_latched_?walk_drive_.acceleration:commissioning_params_.drive_acceleration);
-  } else walk_drive_latched_=false;
-  const uint16_t drive_speed=validation_profile_.sealed()?validation_profile_.drive_speed:walk_drive_latched_?walk_drive_.goalSpeed:commissioning_params_.drive_speed;
-  const uint8_t drive_acceleration=validation_profile_.sealed()?validation_profile_.drive_acceleration:walk_drive_latched_?walk_drive_.acceleration:commissioning_params_.drive_acceleration;
-  // While latched, a joint may still hold any OTHER reviewed pair of the table
-  // until its next frame rewrites it (registers change only on a write).
-  auto reviewedPair=[&](uint16_t speed,uint8_t acceleration){
-    if(speed==drive_speed&&acceleration==drive_acceleration)return true;
-    if(!walk_drive_latched_)return false;
-    if(speed==commissioning_params_.drive_speed&&acceleration==commissioning_params_.drive_acceleration)return true;
-    for(const auto* p:motion::operational_walk::kProfiles)if(speed==p->drive.goalSpeed&&acceleration==p->drive.acceleration)return true;
-    if(speed==motion::operational_walk::kStandProfile.drive.goalSpeed&&acceleration==motion::operational_walk::kStandProfile.drive.acceleration)return true;
-    return false;};
-  const int output_ceiling=validation_profile_.sealed()?validation_profile_.output_ceiling:1000;
-  for(unsigned i=0;i<12;++i){const auto& raw=operational_producer_.raw(i);
-    if(operational_feedback_.recovering[i]){prime_profiles=false;continue;}
-    scoped=scoped&&raw.read_ok&&raw.temperature<=reviewed_motion_.max_servo_temperature_c&&
-      raw.voltage>=reviewed_motion_.min_servo_voltage_dv&&raw.voltage<=reviewed_motion_.max_servo_voltage_dv;
-    if(profileActive()){
-      scoped=scoped&&raw.torque_limit>=0&&raw.torque_limit<=output_ceiling&&raw.speed>=0&&raw.speed<=drive_speed;
-      prime_profiles=prime_profiles&&raw.goal_speed==drive_speed&&raw.goal_acceleration==drive_acceleration;
-      if(operational_session_.state()==execution::MotionSessionState::ARMED)
-        scoped=scoped&&reviewedPair(raw.goal_speed,raw.goal_acceleration);
-    }
-  }
-  operational_facts_.prime_profiles_verified=profileActive()&&prime_profiles;
-  // Diagnosis only (no new condition): which part of the hardware scope was lost. First field attempt (17/10)
-  // was revoked 150 ms after ENERGIZE with one aggregate reason while two clamped LOWERs were moving 4 counts
-  // inward - the gate cannot tell a speed above the prime drive profile from a stale IMU or a failed read.
-  const char* scope_loss=nullptr;
-  if(!scoped){
-    if(!reviewed_motion_bound_)scope_loss="SCOPE_REVIEWED_MOTION_NOT_BOUND";
-    else if(!execution::runtimeModeAllowsScope(runtime_mode_,reviewed_motion_.scope))scope_loss="SCOPE_RUNTIME_MODE";
-    else if(reviewed_motion_.calibration_generation!=calibration.restored_generation)scope_loss="SCOPE_CALIBRATION_GENERATION_CHANGED";
-    else if(reviewed_motion_.policy_epoch!=actuator_policy_.epoch())scope_loss="SCOPE_POLICY_EPOCH_CHANGED";
-    else if(radio.closing.load()||radio.radio_fault.load())scope_loss="SCOPE_RADIO_TRANSITION";
-    else if(!imu.valid)scope_loss="SCOPE_IMU_INVALID";
-    else if(!sampleFresh(now_ms,imu.sampled_at_ms,reviewed_motion_.max_imu_age_ms))scope_loss="SCOPE_IMU_STALE";
-    else for(unsigned i=0;i<12&&!scope_loss;++i){const auto& raw=operational_producer_.raw(i);
-      if(!raw.read_ok)scope_loss="SCOPE_SERVO_READ_FAILED";
-      else if(raw.temperature>reviewed_motion_.max_servo_temperature_c)scope_loss="SCOPE_SERVO_OVER_TEMPERATURE";
-      else if(raw.voltage<reviewed_motion_.min_servo_voltage_dv||raw.voltage>reviewed_motion_.max_servo_voltage_dv)scope_loss="SCOPE_SERVO_VOLTAGE_WINDOW";
-      else if(profileActive()){
-        if(!(raw.torque_limit>=0&&raw.torque_limit<=output_ceiling))scope_loss="SCOPE_SERVO_TORQUE_LIMIT";
-        else if(!(raw.speed>=0&&raw.speed<=drive_speed))scope_loss="SCOPE_SERVO_SPEED_ABOVE_DRIVE_PROFILE";
-        else if(operational_session_.state()==execution::MotionSessionState::ARMED&&!reviewedPair(raw.goal_speed,raw.goal_acceleration))scope_loss="SCOPE_SERVO_DRIVE_PAIR";
-      }
-    }
-  }
-  ready.hardware_approved=scoped;
-  ready.hardware_reason=scope_loss?scope_loss:"HARDWARE_UNAVAILABLE";
-  if(validation_walk_admitted_){
-    const char* state=motion_coordinator_.state();
-    if(!strcmp(state,"WALK_STARTING")||!strcmp(state,"WALK")||!strcmp(state,"STOPPING"))validation_walk_started_=true;
-    else if(validation_walk_started_){validation_walk_admitted_=false;validation_walk_started_=false;}
-  }
-  ready.walk_qualified=reviewed_motion_bound_&&validation_walk_admitted_;
-  // WALK availability depends on its executable profile and live limits.
-  // The Coordinator owns the automatic transition through STAND.
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_){
-    ready.walk_qualified=operational_walk_bound_&&reviewed_motion_bound_;
-  }
-  ready.first_stride_only=reviewed_motion_bound_&&reviewed_motion_.walk.firstStrideOnly;
-  ready.max_vx=reviewed_motion_.walk.maxVxMps;ready.max_vy=reviewed_motion_.walk.maxVyMps;ready.max_yaw_rate=reviewed_motion_.walk.maxYawRateRadS;
-  ready.operational_permit=operational_facts_.operator_permit;
-  auto observation=local_motion_observation_;observation.actual={};observation.actual.valid=true;
-  for(unsigned i=0;i<12;++i)observation.actual.valid=observation.actual.valid&&operational_feedback_.read_ok[i];
-  for(unsigned i=0;i<4;++i)observation.actual.legs[i]={operational_feedback_.actual_rad[i*3],operational_feedback_.actual_rad[i*3+1],operational_feedback_.actual_rad[i*3+2]};
-  for(unsigned i=0;i<12;++i)observation.stationary=observation.stationary&&operational_producer_.raw(i).speed==0;
-  // Encoder timestamp remains the oldest real sample. The operational route
-  // uses model support assumptions, never a presence heartbeat as measurement.
-  {uint64_t oldest=UINT64_MAX;for(unsigned i=0;i<12;++i)if(operational_feedback_.sampled_at_us[i]<oldest)oldest=operational_feedback_.sampled_at_us[i];
-   observation.stampS=observation.actual.valid&&oldest!=UINT64_MAX?motion::secondsFromMicros(oldest):0;
-   observation.externalSupportConfirmed=local_motion_observation_.externalSupportConfirmed&&(commissioning_bound_&&runtime_mode_!=execution::RuntimeTestMode::OPERATIONAL?operatorPresent(now_ms):true);}
-  // Diagnostic fixture declarations remain local to diagnostics. Operational
-  // geometry uses its configured support model and live joint limits.
-  ready.support_observable=commissioning_bound_?
-    ((runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||operatorPresent(now_ms))&&local_motion_observation_.externalSupportConfirmed):
-    reviewed_motion_bound_&&reviewed_motion_.scope!=execution::TrialScope::FIXTURE_MICRO&&
-    motion::checkObservation(observation,reviewed_motion_.feedback,motion::secondsFromMicros(motion_clock_.now()))==motion::FeedbackReason::OK;
-  ready.local_fixture_session=operational_session_.state()==execution::MotionSessionState::ARMED&&
-    operational_session_.scope()==execution::TrialScope::FIXTURE_MICRO;
-  motion_coordinator_.observe(observation);
-  ready.mode=operating_mode_.mode();
-  ready.authority_live=authority_.current()==ActuatorAuthority::MOTION;
-  ready.inhibited=authority_.inhibited();
-  ready.fault=system_state_.systemHealth()==SystemHealth::FAULT;
-  ready.power_ok=power_state_.state()==PowerState::RUN;
-  const auto& battery=daly_.sample();
-  ready.bms_ok=battery.valid && sampleFresh(now_ms,battery.sampled_at_ms,3000);
-  for(unsigned i=0;i<4;i++)ready.bms_ok=ready.bms_ok && battery.alarms[i]==0;
-  operational_facts_.mode=ready.mode;
-  operational_facts_.calibration_accepted=ready.calibration_accepted;
-  operational_facts_.envelopes_approved=ready.limits_approved;
-  operational_facts_.hardware_qualified=ready.hardware_approved;
-  operational_facts_.sequential_bus_qualified=ready.hardware_approved;
-  local_trial_evidence_.imu_fresh=scoped;
-  local_trial_evidence_.scope_loss=scope_loss;
-  local_trial_evidence_.local_operator_present=operatorPresent(now_ms);
-  local_trial_evidence_.support_load_observable=reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW&&ready.support_observable;
-  if(reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW){
-    local_trial_evidence_.local_operator_present=operatorPresent(now_ms);
-    local_trial_evidence_.fixture_support_verified=ready.support_observable;
-  }
-  operational_facts_.bms_ok=ready.bms_ok;
-  operational_facts_.power_ok=ready.power_ok;
-  operational_facts_.fault=ready.fault;
-  // Validate measured support/pose before the next actuator step. A revoked
-  // fixture or lost held contact must stop WRITING without waiting for its ACK.
-  const auto session_before=operational_session_.state();
-  const bool executor_stopped_before=motion_executor_.status().safe_off_required;
-  operational_session_.update(local_trial_evidence_,operational_facts_,operational_feedback_,now_ms);
-  if(session_before!=operational_session_.state()&&operational_session_.state()==execution::MotionSessionState::SAFE_OFF_REQUIRED&&
-     (session_before==execution::MotionSessionState::PRIMING||session_before==execution::MotionSessionState::ENERGIZING||session_before==execution::MotionSessionState::ARMING)){
-    static char line[160];   // static: this loop function is on the stack-budgeted WALK chain
-    const int n=snprintf(line,sizeof(line),"OPERATIONAL_SESSION=REVOKED reason=%s joint=%d detail=%s\r\n",operational_session_.lastRevoke(),
-                         operational_session_.failedJoint(),operational_session_.failureDetail());
-    if(n>0&&static_cast<size_t>(n)<sizeof(line))writeAdmissionTrace(Serial,line,static_cast<size_t>(n));
-  }
-  if(session_before!=operational_session_.state()){
-    char trace[160];const int n=snprintf(trace,sizeof(trace),"MOTION_PHASE now_ms=%lu state=%s reason=%s\r\n",
-      (unsigned long)millis(),operational_session_.stateName(),operational_session_.reason());
-    if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
-  }
-  if(operational_session_.state()==execution::MotionSessionState::ARMED)operational_facts_.lease=operational_session_.lease();
-  // The stride's internal TTL lives only as long as the operator heartbeat.
-  // During the coordinated stop too: losing the heartbeat at any phase = SAFE_OFF.
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&motion_coordinator_.walking()&&operatorPresent(now_ms)){
-    motion_coordinator_.renewWalk(now_ms);motion_service_.renewTeleop(now_ms,static_cast<uint32_t>(reviewed_motion_.walk.maxCommandTtlS*1000));}
-  if(session_before!=execution::MotionSessionState::ARMED&&operational_session_.state()==execution::MotionSessionState::ARMED)
-    operational_work_max_us_=0;
-  const uint32_t work_started_us=micros();
-  const char* const phase_before_work=motion_coordinator_.state();
-  motion_coordinator_.update(operational_facts_,operational_feedback_,now_ms,motion_clock_.extend(micros()));
-  if(profileActive()&&(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL||validation_present_)&&
-     operational_session_.state()==execution::MotionSessionState::ARMED&&ready.support_observable){
-    const auto& frame=motion_coordinator_.frame();
-    if(frame.target.valid&&!frame.executable){
-      motion::SegmentAssessment a;a.sequence=frame.target.sequence;a.stampS=motion::secondsFromMicros(motion_clock_.now());
-      a.source=motion::EvidenceSource::OFFLINE_CERTIFIED;a.geometryIdentityVerified=true;
-      a.sweptCollisionClear=a.continuousBoundsConfirmed=a.supportCompatible=true;
-      a.fixtureTrialEnvelopeReviewed=reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;
-      a.loadedTrackingQualified=reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW;
-      a.dynamicStabilityQualified=reviewed_motion_.scope==execution::TrialScope::AUTONOMOUS_WALK&&local_trial_evidence_.loaded_dynamics_qualified;
-      // These assertions consume the sealed, externally reviewed tube proof,
-      // not an encoder/IMU inference. No profile is distributed pre-approved.
-      if(publishLocalMotionAssessment(a))
-        motion_coordinator_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
-    }
-  }
-  const uint32_t planner_us=static_cast<uint32_t>(micros()-work_started_us);
-  operational_work_max_us_=std::max(operational_work_max_us_,planner_us);
-  const uint32_t executor_started_us=micros();
-  motion_executor_.update(operational_facts_,operational_feedback_,millis(),motion_clock_.extend(micros()));
-  const uint32_t executor_us=static_cast<uint32_t>(micros()-executor_started_us);
-  emergencyTorqueOffBurst(); // physical stop precedes diagnostics and telemetry
-  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
-    char trace[192];const int n=snprintf(trace,sizeof(trace),"MOTION_FIRST_STOP now_ms=%lu session=%s reason=%s tx_sequence=%lu\r\n",
-      (unsigned long)millis(),operational_session_.stateName(),motion_executor_.status().reason,
-      (unsigned long)motion_executor_.status().tx_sequence);
-    if(n>0&&static_cast<size_t>(n)<sizeof(trace))writeAdmissionTrace(Serial,trace,n);
-    writeFirstRefusal(motion_executor_.refusal(),phase_before_work);
-  }
-  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
-    char budget[384];const int n=snprintf(budget,sizeof(budget),
-      "MOTION_SERVICE_BUDGET phase=%s gap_us=%lu before_motion_us=%lu imu_us=%lu bms_us=%lu poll_us=%lu planner_us=%lu executor_us=%lu\r\n",
-      phase_before_work,(unsigned long)motion_cycle_.gap_us,(unsigned long)motion_cycle_.before_motion_us,
-      (unsigned long)motion_cycle_.imu_us,(unsigned long)motion_cycle_.bms_us,(unsigned long)motion_cycle_.poll_us,
-      (unsigned long)planner_us,(unsigned long)executor_us);
-    if(n>0&&static_cast<size_t>(n)<sizeof(budget))writeAdmissionTrace(Serial,budget,n);
-    // IMU service evidence (own task): arrival spacing and age of the Rotation Vector the
-    // Motion gate judged, and whether the sensor was ever left with data pending.
-    const auto& is=imu_.serviceStats();const auto io=imu_.orientationSnapshot();
-    const int n2=snprintf(budget,sizeof(budget),
-      "MOTION_IMU_SERVICE task=%u rv=%lu rv_age_ms=%ld rv_gap_last_us=%lu rv_gap_max_us=%lu sensor_age_us=%ld service_max_us=%lu service_gap_max_us=%lu budget_stops=%lu backlog_stops=%lu resets=%lu\r\n",
-      imu_.taskRunning()?1u:0u,(unsigned long)is.rv,io.valid?static_cast<long>(static_cast<int32_t>(millis()-io.sampled_at_ms)):-1L,
-      (unsigned long)is.rv_gap_last_us,(unsigned long)is.rv_gap_max_us,(long)io.sensor_age_us,(unsigned long)is.max_service_us,
-      (unsigned long)is.max_gap_us,(unsigned long)is.budget_stops,(unsigned long)is.backlog_stops,(unsigned long)is.resets);
-    if(n2>0&&static_cast<size_t>(n2)<sizeof(budget))writeAdmissionTrace(Serial,budget,n2);
-  }
-  // One bounded record at the first stop only; samples retain their real age.
-  if(!executor_stopped_before&&motion_executor_.status().safe_off_required){
-    const uint32_t at=millis();unsigned oldest=0;
-    for(unsigned i=1;i<12;++i)if(at-operational_feedback_.sampled_at_ms[i]>at-operational_feedback_.sampled_at_ms[oldest])oldest=i;
-    const auto& failure=motion_executor_.status();
-    if(failure.feedback_failed_joint>=0)oldest=static_cast<unsigned>(failure.feedback_failed_joint);
-    const auto& raw=operational_producer_.raw(oldest);
-    char detail[384];const int n=snprintf(detail,sizeof(detail),
-      "MOTION_FEEDBACK_STOP checker=%s checked_ms=%lu budget_ms=%lu joint=%u sample_ms=%lu age_ms=%lu read_ok=%u recovering=%u raw_ok=%u control_ms=%lu poll_next=%u poll_ms=%lu transaction_ms=%lu executor_age_ms=%lu session_age_ms=%lu frames_tx=%lu work_max_us=%lu\r\n",
-      failure.feedback_failed_joint>=0?"EXECUTOR":"SESSION_OR_COORDINATOR",(unsigned long)failure.feedback_checked_ms,
-      (unsigned long)failure.feedback_budget_ms,oldest,(unsigned long)operational_feedback_.sampled_at_ms[oldest],(unsigned long)(at-operational_feedback_.sampled_at_ms[oldest]),
-      operational_feedback_.read_ok[oldest],operational_feedback_.recovering[oldest],raw.read_ok,(unsigned long)raw.control_at_ms,
-      operational_poll_next_,(unsigned long)operational_poll_at_ms_,(unsigned long)raw.transaction_ms,
-      (unsigned long)std::min(reviewed_motion_.execution.feedback_max_age_ms,execution::MotionExecutor::kTimedFeedbackMaxAgeMs),
-      (unsigned long)reviewed_motion_.execution.feedback_max_age_ms,(unsigned long)motion_executor_.status().frames_tx,(unsigned long)operational_work_max_us_);
-    if(n>0&&static_cast<size_t>(n)<sizeof(detail))writeAdmissionTrace(Serial,detail,n);
-  }
-  ready.operational_permit=operational_facts_.operator_permit&&operational_session_.state()==execution::MotionSessionState::ARMED;
-  // Compatibility telemetry only: operational availability is determined by
-  // live hardware/authority; no operator permit is consumed by MotionService.
-  if(runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_&&
-     authority_.current()==ActuatorAuthority::MOTION&&
-     operational_session_.state()!=execution::MotionSessionState::SAFE_OFF_REQUIRED)ready.operational_permit=true;
-  // Terminal service results must use this tick's validated planner/executor.
-  motion_service_.refresh(ready,now_ms);
-  MotionTelemetry telemetry;telemetry.validation_capable=build::kSupervisedValidationCapable;telemetry.fixture_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::FIXTURE_REVIEW;telemetry.load_scope=reviewed_motion_bound_&&reviewed_motion_.feedback.mode==motion::FeedbackMode::PHYSICAL_REVIEW;telemetry.foot_load_proven=telemetry.load_scope&&ready.support_observable&&observation.confirmedFeet==15;telemetry.supervised_segment=motion_coordinator_.proneSegment();telemetry.session_profile_sha256=validation_profile_.sealed()?validation_profile_.workspace.artifact_sha256:"";telemetry.session_state=operational_session_.stateName();telemetry.session_reason=operational_session_.reason();
-  telemetry.session_last_revoke=operational_session_.lastRevoke();telemetry.session_failure=operational_session_.failureDetail();telemetry.session_failed_joint=operational_session_.failedJoint();
-  const auto orientation=imu_.orientationSnapshot();
-  telemetry.quaternion_valid=orientation.valid;
-  telemetry.quaternion_at_ms=orientation.sampled_at_ms;
-  telemetry.height_valid=ready.support_observable;
-  if(telemetry.height_valid)telemetry.base_height_m=observation.body.translationM.z;
-  for(unsigned i=0;i<4;i++)telemetry.quaternion[i]=orientation.wxyz[i];
-  telemetry.source="HARDWARE_SERVO_FEEDBACK";
-  telemetry.feedback_recovering=operational_feedback_.pending();
-  telemetry.feedback_max_age_ms=motion_executor_.timedSegmentsActive()||motion_executor_.streaming()?execution::MotionExecutor::kTimedFeedbackMaxAgeMs:reviewed_motion_bound_?reviewed_motion_.execution.feedback_max_age_ms:500;
-  telemetry.raw_valid=operational_producer_.rawFresh(now_ms,telemetry.feedback_max_age_ms);telemetry.joints_valid=telemetry.raw_valid;
-  telemetry.sampled_at_ms=now_ms;
-  for(unsigned i=0;i<12;++i){
-    telemetry.joints_valid=telemetry.joints_valid&&operational_feedback_.read_ok[i];
-    telemetry.actual_rad[i]=operational_feedback_.actual_rad[i];
-    telemetry.joint_at_ms[i]=operational_feedback_.sampled_at_ms[i];
-    telemetry.sampled_at_ms=static_cast<int32_t>(now_ms-telemetry.joint_at_ms[i])>static_cast<int32_t>(now_ms-telemetry.sampled_at_ms)?telemetry.joint_at_ms[i]:telemetry.sampled_at_ms;
-    telemetry.raw_ticks[i]=operational_producer_.raw(i).position;
-    telemetry.joint_mapped[i]=operational_feedback_.read_ok[i];
-    telemetry.raw_ok[i]=operational_producer_.raw(i).read_ok&&operational_producer_.raw(i).position<4096;
-  }
-  {static const auto head=motion::pairedProneSample(0,0,true); // immutable route head, no per-tick planner work
-   telemetry.prone_reference_valid=calibration.restored&&commissioning_bound_&&head.target.valid;
-   telemetry.prone_stationary=true;
-   telemetry.prone_max_deviation_rad=commissioning_params_.prone_max_deviation_rad;
-   telemetry.prone_max_rms_rad=commissioning_params_.prone_max_rms_rad;
-   for(unsigned i=0;i<12;++i){const auto& q=head.target.legs[i/3];
-    telemetry.prone_nominal_rad[i]=i%3==0?q.hip:i%3==1?q.upper:q.lower;
-    telemetry.prone_stationary=telemetry.prone_stationary&&operational_producer_.raw(i).speed==0;}}
-  telemetry.restore_decision=calibration::toString(last_restore_verdict_.decision);
-  telemetry.restore_reason=calibration::toString(last_restore_verdict_.reason);
-  if(!strcmp(last_restore_trigger_,"NONE")){telemetry.restore_decision="NOT_EVALUATED";telemetry.restore_reason="BOOT_EVALUATION_PENDING";}
-  {const auto& v=service_.readinessView();telemetry.system_health=v.system_health;telemetry.calibration_state=v.calibration;
-   telemetry.joint_feedback=v.joint_feedback;telemetry.motion_authority=v.motion_authority;telemetry.readiness_phase=v.phase;telemetry.readiness_reason=v.reason;
-   telemetry.operating_mode=operating_mode_.mode()==OperatingMode::RUN?"RUN":"MAINTENANCE";telemetry.entry_reason=motion_coordinator_.lastEntryReason();
-   telemetry.operator_present=operatorPresent(now_ms);
-   telemetry.walk=runtime_mode_==execution::RuntimeTestMode::OPERATIONAL&&commissioning_bound_?(motion_coordinator_.walking()?motion_coordinator_.state():operational_walk_reason_):"WALK_NOT_BOUND";
-   telemetry.walk_cycles=motion_coordinator_.walkCycles();telemetry.walk_drive=walk_drive_latched_&&motion_coordinator_.walkProfile()!=nullptr;}
-  telemetry.restore_trigger=last_restore_trigger_;telemetry.restore_generation=last_restore_generation_;
-  telemetry.restore_fingerprint=last_restore_fingerprint_;
-  // base_link height/contact stay unknown until independent measured
-  // observations and runtime transforms exist; IMU never invents height.
-  updateLivePose();
-  telemetry.runtime_mode=execution::toString(runtime_mode_);
-  telemetry.limits_scope=calibration.commissioning_limits_active?"COMMISSIONING_CONTACT_INSET":calibration.operational_limits_approved?"REVIEWED_ROUTE":"NONE";
-  telemetry.restore=calibration.restored?"RESTORED":calibration::toString(calibration.restore_status);
-  telemetry.approved_joints=calibration.approved_joints;telemetry.commissioning_joints=calibration.commissioning_joints;
-  telemetry.pose_class=live_pose_valid_?(live_pose_.kind==motion::FixturePoseKind::PRONE_COMPATIBLE?"PRONE_COMPATIBLE":"UNKNOWN"):"NOT_EVALUATED";
-  telemetry.pose_reason=live_pose_valid_?motion::fixturePoseReasonName(live_pose_.reason):(calibration.restored?"FEEDBACK_STALE":"RESTORE_REQUIRED");
-  telemetry.pose_joint=live_pose_valid_?static_cast<int>(live_pose_.failedJointIndex<12?live_pose_.failedJointIndex:live_pose_.maxErrorJointIndex):-1;
-  telemetry.pose_max_dev_rad=live_pose_valid_?live_pose_.maxNominalErrorRad:-1;telemetry.pose_rms_dev_rad=live_pose_valid_?live_pose_.rmsNominalErrorRad:-1;
-  {const auto& stand=motion_coordinator_.stand();telemetry.entry=!stand.entryActive()?"NONE":!stand.entryPending()?"DONE":stand.entryStage()==0?"E0":"E1";
-   const char* phases[]={"PRE_ALIGN","REAR_DEPLOY","FRONT_DEPLOY","LOAD_TRANSFER","RISE"};const unsigned ph=static_cast<unsigned>(motion::pairedPronePhase(motion_coordinator_.proneSegment()));
-   telemetry.phase=commissioning_bound_?phases[ph<5?ph:4]:"";}
-  telemetry.commissioning_reason=commissioning_reason_;telemetry.fixture_declared=commissioning_bound_&&ready.support_observable;
-  telemetry.prime_clamp_mask=operational_session_.primeClampMask();
-  telemetry.session_profile_sha256=commissioning_bound_?commissioning_entry_.sha256:telemetry.session_profile_sha256;
-  motion_service_.publishTelemetry(telemetry);
-  emitTelemetry(now_ms);
-  if(motion_executor_.status().safe_off_required||operational_session_.safeOffRequired()) {
-    // SAFE_OFF is ungated and independent of owner, mode, permit and policy.
-    // One leg joint per tick; repeatedly verify every failed joint.
-    emergencyTorqueOffBurst();
-    // Then independent verification of every joint (readback only); a joint
-    // that does not verify gets the reviewed unicast OFF write + readback.
-    const auto* joint=servo::legServoAt(motion_safe_off_next_);
-    const uint32_t verify_ms=validation_profile_.sealed()?validation_profile_.transaction_timeout_ms:commissioning_bound_?commissioning_params_.transaction_timeout_ms:servo::ServoBus::kOperationalTimeoutMs;
-    if(joint&&(servo_bus_.verifyTorqueOff(joint->bus_id,verify_ms)==servo::SafeOffResult::VERIFIED_OFF||servo_bus_.safeOff(joint->bus_id)==servo::SafeOffResult::VERIFIED_OFF))
-      motion_safe_off_mask_|=static_cast<uint16_t>(1u<<motion_safe_off_next_);
-    if(motion_safe_off_next_==11&&stop_metrics_.verify_rounds<255)++stop_metrics_.verify_rounds;
-    motion_safe_off_next_=static_cast<uint8_t>((motion_safe_off_next_+1)%12);
-    if(motion_safe_off_mask_==0x0fff){
-      stop_metrics_.all_off_verified_us=motion_clock_.extend(micros());
-      Serial.printf("MOTION_SAFE_OFF=VERIFIED latch_to_off_tx_us=%llu off_tx_us=%llu latch_to_verified_us=%llu last_target_tx_us=%llu rounds=%u\n",
-        (unsigned long long)(stop_metrics_.off_tx_start_us-stop_metrics_.latched_us),(unsigned long long)(stop_metrics_.off_tx_done_us-stop_metrics_.off_tx_start_us),
-        (unsigned long long)(stop_metrics_.all_off_verified_us-stop_metrics_.latched_us),(unsigned long long)stop_metrics_.last_target_tx_us,(unsigned)stop_metrics_.verify_rounds);
-      motion_executor_.confirmSafeOff(true);
-      operational_session_.confirmSafeOff();
-      operational_facts_.operator_permit=false;
-      operational_facts_.lease=AuthorityLease{};
-      if(authority_.current()==ActuatorAuthority::MOTION)
-        authority_.forceClear(AuthorityClearReason::OWNER_TEARDOWN);
-      motion_safe_off_mask_=0;motion_safe_off_next_=0;
-    }
-  } else { motion_safe_off_mask_=0;motion_safe_off_next_=0;safe_off_burst_sent_=false; }
-}
 bool Controller::stopPreempt(void* self) {
   auto* c=static_cast<Controller*>(self);
-  // Pending is only a wake-up hint, never authority. Admission stays on the
-  // Controller thread (PortalSession is not shared with httpd). A rejected
-  // request returns false and the in-flight transaction continues untouched.
-  if(!c->http_transport_.stopPending()||!c->http_transport_.serviceStopLane(millis()))return false;
-  c->stop_metrics_=StopMetrics{};c->stop_metrics_.latched_us=c->motion_clock_.extend(micros());
-  // No UART use here: unwind the current BusGuard before the OFF burst.
-  return true;
-}
-void Controller::emergencyTorqueOffBurst() {
-  if(safe_off_burst_sent_||!build::kServoPowerAvailable)return;
-  if(!(motion_executor_.status().safe_off_required||operational_session_.safeOffRequired()))return;
-  safe_off_burst_sent_=true;
-  if(stop_metrics_.all_off_verified_us)stop_metrics_=StopMetrics{};
-  if(!stop_metrics_.latched_us){stop_metrics_.latched_us=motion_clock_.extend(micros());}
-  stop_metrics_.last_target_tx_us=motion_executor_.status().last_tx_complete_us;
-  // ONE SYNC_WRITE TorqueEnable=0 to the twelve leg ids: no poll, no readback,
-  // no target in between. Verification follows per id; nothing is claimed here.
-  stop_metrics_.off_tx_start_us=motion_clock_.extend(micros());
-  stop_metrics_.off_bytes=servo_bus_.syncTorqueOff(canonical_leg_ids_,12);
-  stop_metrics_.off_tx_done_us=motion_clock_.extend(micros());
+  if(c->http_transport_.stopPending())c->http_transport_.serviceStopLane(millis());
+  return c->simple_motion_.stopping();
 }
 
 void Controller::update(uint32_t now_ms) {
-  const uint32_t cycle_started_us=micros();
-  motion_cycle_.gap_us=motion_cycle_.started_us?cycle_started_us-motion_cycle_.started_us:0;
-  motion_cycle_.started_us=cycle_started_us;
-  motion_clock_.extend(cycle_started_us);
-  // Issue #52: an authenticated Dashboard STOP waits in its own one-slot lane
-  // (never behind the ordinary mailbox); it is validated and applied here,
-  // first, and the torque-OFF burst leaves before any diagnostic or poll.
-  if(http_transport_.serviceStopLane(now_ms)){
-    stop_metrics_=StopMetrics{};stop_metrics_.latched_us=motion_clock_.extend(micros());
-    emergencyTorqueOffBurst();
-  }
+  esp_task_wdt_reset();
+  http_transport_.serviceStopLane(now_ms);
+  updateSimpleMotion(esp_timer_get_time());
   // First, unconditionally: the freshest possible permit/bootstrap state
   // must exist before command_router_.update() can act on it this tick.
   updateCalibrationMotionPermit();
@@ -1747,14 +1064,13 @@ void Controller::update(uint32_t now_ms) {
   // (operational readiness) keeps the AP that serves the Android Dashboard.
   wifi_.setRunMode(operating_mode_.routerRole());
 
-  const uint32_t imu_started_us=micros();
-  if(!imu_.taskRunning())imu_.service(now_ms);
-  motion_cycle_.imu_us=static_cast<uint32_t>(micros()-imu_started_us);
+  if(!imu_.taskRunning()&&!simple_motion_.engaged())imu_.service(now_ms);
   system_state_.setImuHealth(imu_.health());
-
-  const uint32_t bms_started_us=micros();
-  daly_.update(now_ms, operating_mode_.mode());
-  motion_cycle_.bms_us=static_cast<uint32_t>(micros()-bms_started_us);
+  // DALY's proven UART flush costs 8 bytes * 10 / 9600 = 8.34 ms.
+  // Start it only in Motion slack with 12 ms reserved; never on a release.
+  const uint64_t bms_now=esp_timer_get_time();
+  if(!simple_motion_.engaged()||simple_motion_.nextReleaseUs()>bms_now+12000)
+    daly_.update(now_ms, operating_mode_.mode());
   system_state_.setBmsHealth(daly_.health());
 
   led_.update(now_ms);
@@ -1767,7 +1083,7 @@ void Controller::update(uint32_t now_ms) {
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
   servo_preflight_.update();
-  updateOperationalReadiness(millis());
+
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();
@@ -1782,8 +1098,7 @@ void Controller::update(uint32_t now_ms) {
   // Same tick the executor turned terminal: record, complete the session,
   // revoke the permit. See updateFullLegFinalization().
   updateFullLegFinalization();
-  motion_cycle_.before_motion_us=static_cast<uint32_t>(micros()-cycle_started_us);
-  updateOperationalMotion(now_ms);
+  updateSimpleMotion(esp_timer_get_time());
 
   // System-level servo health is a population verdict under ROBOT_POWERED,
   // not the outcome of whichever individual Ping/read happened last.
@@ -1837,7 +1152,7 @@ void Controller::update(uint32_t now_ms) {
   // here — the first WiFi.mode() call is the expensive one — cannot sit
   // between a bus transaction and its follow-up. The cost of this call is
   // measured, not assumed: @WIFI STATUS reports last_us/max_us.
-  wifi_.update(now_ms);
+  if(!simple_motion_.engaged())wifi_.update(now_ms);
 
   // Drives the first-boot rollback lifecycle. Bounded, touches no flash, and
   // does almost nothing once the lifecycle has settled. The facts it judges
@@ -1909,6 +1224,7 @@ void Controller::update(uint32_t now_ms) {
   // Admission/status must use a clock AFTER this loop's completed servo reads.
   // The loop-entry clock makes the newest joint look future-dated.
   http_transport_.update(millis());
+  updateSimpleMotion(esp_timer_get_time());
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

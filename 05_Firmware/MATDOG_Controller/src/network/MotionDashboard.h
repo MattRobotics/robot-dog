@@ -1,191 +1,59 @@
-#ifndef MATDOG_NETWORK_MOTION_DASHBOARD_H
-#define MATDOG_NETWORK_MOTION_DASHBOARD_H
-// Adds Motion Control to the existing portal without replacing its six tabs.
-// The only motion write path is the Controller semantic command service.
-// Neither this UI nor its capability rendering can create a motion permit.
+#pragma once
+// Operator controls added to the existing portal. Calibration, persistence,
+// network and diagnostics pages remain owned by PortalPage.
 #define MATDOG_MOTION_DASHBOARD R"MOTION(<style>
-#motion-control .motion-layout{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
-#motion-control .motion-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
-#motion-control .motion-action{border:1px solid var(--line);padding:10px;border-radius:8px;min-width:0}
-#motion-control .motion-action b{display:block;font-size:14px}#motion-control .motion-action button{width:100%;margin-top:8px}
-#motion-control .motion-category{margin:16px 0 8px;color:var(--accent)}#motion-control .motion-meta{font-size:11px;overflow-wrap:anywhere}
-#motion-control .motion-joystick{width:190px;height:190px;border:2px solid var(--line);border-radius:50%;margin:12px auto;position:relative;touch-action:none;background:radial-gradient(circle,#20384a,#111c26);user-select:none}
-#motion-control .motion-joystick[aria-disabled=true]{opacity:.45}#motion-control .motion-joystick:before,#motion-control .motion-joystick:after{content:'';position:absolute;background:var(--line)}
-#motion-control .motion-joystick:before{height:1px;width:100%;top:50%}#motion-control .motion-joystick:after{width:1px;height:100%;left:50%}
-#motion-control .motion-stick{position:absolute;left:50%;top:50%;width:48px;height:48px;border:2px solid var(--accent);border-radius:50%;background:#245265;transform:translate(-50%,-50%);z-index:1;pointer-events:none}
-#motion-control .motion-arrows{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;max-width:260px;margin:auto}
-#motion-stop-button,#motion-control .motion-stop{background:#71252b;border-color:var(--bad);font-weight:700}#motion-control .motion-parameters{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-#motion-control input,#motion-control select{padding:7px}#motion-control label{margin:6px 0}#motion-result{white-space:pre-wrap}
+#simple-motion .controls{display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+#simple-motion button{min-height:48px}#simple-stop{background:#a52835;border-color:#ff7888;font-weight:800;min-width:130px}
+#simple-state{font-size:22px}#simple-state[data-state=FAULT]{color:var(--bad)}
+#simple-state[data-state=STANDING],#simple-state[data-state=READY]{color:var(--ok)}
+#simple-state[data-state=MOVING],#simple-state[data-state=WALKING]{color:var(--warn)}
+#simple-motion .note{max-width:850px}#simple-detail{max-height:320px;overflow:auto}
 </style><script>
-(()=>{'use strict';
-const doc=document,by=id=>doc.getElementById(id),make=(tag,text)=>{const e=doc.createElement(tag);if(text!=null)e.textContent=text;return e};
-const nav=doc.querySelector('nav'),tab=make('button','Motion Control');tab.dataset.page='motion-control';nav.insertBefore(tab,nav.children[1]);
-const panel=make('section');panel.id='motion-control';panel.className='page';panel.hidden=true;
-panel.innerHTML=`<h2>Motion Control <span id="motion-fresh" class="chip lock">IN ATTESA</span></h2>
-<p class="note">Intenzioni semantiche al Controller ESP32-S3. Disponibilità e limiti sono decisi dal Controller; la calibrazione salvata non concede il permesso di movimento.</p>
-<details id="motion-advanced"><summary>Diagnostica e comandi avanzati</summary><div class="motion-layout"><div class="card"><h3>Stato del movimento</h3><dl id="motion-state"></dl><pre id="motion-result" role="status">Caricamento delle capability…</pre><button id="motion-stop-button" class="motion-stop">STOP</button></div>
-<div class="card" id="motion-restore-card"><h3>Calibrazione · RESTORE in RAM</h3><dl id="motion-restore"></dl><label><input type="checkbox" id="motion-restore-confirm"> Confermo, presente al robot, che unità fisiche e montaggio corrispondono al record indicato</label><button id="motion-restore-button" disabled>RESTORE in RAM</button><p class="note">Solo RAM: nessuna scrittura NVS/EEPROM, nessun comando ai servo, nessun limite, permesso o autorità. Il torque resta OFF. Richiede accesso amministratore sull'AP.</p></div>
-<div class="card"><h3>Postura adattiva</h3><label>Quota base_link dal piano di supporto (m)<input id="motion-height" type="number" value="0.150" min="0.000" max="0.150" step="0.005" disabled></label><button id="motion-stand" disabled>STAND alla quota richiesta</button><button id="motion-lie" disabled>LIE DOWN</button><p class="note">Quota COMANDATA, non misurata: la ENTRY arriva sempre a 0.150 m, poi il Controller scende alla quota richiesta. Una quota fuori dai limiti live dei giunti viene rifiutata prima di dare coppia. Per WALK il Controller raggiunge automaticamente 0.150 m.</p><p class="note">PRIME → ENERGIZE → ARM → ENTRY → STAND sono automatici. Quota e supporto sono riferimenti del modello; encoder, IMU e alimentazione sono sorvegliati dal Controller.</p><p class="note">STOP avvia SAFE_OFF: coppia OFF su tutti i giunti. Non è un arresto di emergenza hardware certificato. La perdita del collegamento interrompe la teleoperazione continua.</p></div>
-<div class="card"><h3>Teleoperazione · mantenere premuto</h3><label>Gait<select id="motion-gait" disabled><option>WALK</option><option>TROT</option><option>PACE</option><option>BOUND</option><option>AMBLE</option><option>CRAWL</option></select></label><label>Velocità (m/s)<input id="motion-speed" type="range" min="0" max="0.03" step="0.001" value="0.01" disabled><output id="motion-speed-out">0.010 m/s</output></label>
-<div id="motion-joystick" class="motion-joystick" role="group" aria-label="Joystick XY: avanti, indietro, sinistra e destra" aria-disabled="true"><span class="motion-stick" id="motion-stick"></span></div>
-<div class="motion-arrows"><button data-velocity="1,1" disabled aria-label="Diagonale avanti sinistra">↖</button><button data-velocity="1,0" disabled aria-label="Avanti">↑</button><button data-velocity="1,-1" disabled aria-label="Diagonale avanti destra">↗</button><button data-velocity="0,1" disabled aria-label="Sinistra">←</button><button id="motion-zero" class="motion-stop">■</button><button data-velocity="0,-1" disabled aria-label="Destra">→</button><button data-velocity="-1,1" disabled aria-label="Diagonale indietro sinistra">↙</button><button data-velocity="-1,0" disabled aria-label="Indietro">↓</button><button data-velocity="-1,-1" disabled aria-label="Diagonale indietro destra">↘</button></div>
-<label>Yaw (rad/s)<input id="motion-yaw" type="range" min="-0.15" max="0.15" step="0.01" value="0" disabled><output id="motion-yaw-out">0.00 rad/s</output></label><p class="note" id="motion-teleop-gate">Teleoperazione non disponibile. STOP su rilascio, perdita focus/connessione e TTL (350 ms).</p><h3>WALK STANDARD</h3><label>Avanzamento per ciclo<select id="motion-walk-stride"><option value="0">20 mm</option><option value="1" selected>30 mm</option><option value="2">40 mm</option><option value="3" disabled>60 mm · 3 s FAST (SPERIMENTALE, non validato su hardware)</option></select></label><button id="motion-walk-start" disabled>WALK START</button><button id="motion-walk-stop" disabled>WALK STOP (controllato)</button><p class="note" id="motion-walk-note">Gait a 4 tempi: ciclo 7 s, sollevamento 15 mm, una zampa in volo alla volta. Il Controller raggiunge automaticamente STAND a 150 mm e avvia WALK; continua finché il collegamento della Dashboard resta attivo. WALK STOP: rallenta in due cicli e torna a STAND con coppia. STOP rosso, guasto o heartbeat assente = SAFE_OFF.</p><pre id="motion-velocity">vx 0.000 · vy 0.000 · yaw_rate 0.000</pre></div>
-<div class="card"><h3>Body pose</h3><div class="motion-parameters" id="motion-body-params"></div><button id="motion-body" disabled>BODY_POSE</button><p class="note">Traslazioni in metri; roll, pitch e yaw in radianti. Intervalli operativi non approvati restano bloccati.</p></div></div></div>
-<h3 class="motion-category">Catalogo azioni · <span id="motion-action-count">48 previste</span></h3><div id="motion-catalog"></div></details>`;
-const authorizedTwinOrigins=['http://192.168.4.2:8765','http://192.168.1.149:8765'];
-const twinCard=make('div');twinCard.className='card';twinCard.id='dashboard-twin-card';
-twinCard.innerHTML=`<h3>Digital Twin 3D <span id="dashboard-twin-chip" class="chip lock">RICERCA HOST</span></h3><p id="dashboard-twin-note" class="note">Ricerca automatica del bridge host (porta 8765) sugli indirizzi configurati. Gli asset 3D sono serviti dal computer host, mai dal Controller.</p><a id="motion-twin" href="#" target="_blank" rel="noopener" aria-disabled="true">Twin non disponibile</a><iframe id="dashboard-twin-frame" title="Digital Twin MATDOG" style="width:100%;height:540px;border:0" hidden></iframe>`;
-// Operator view (ADR-006): STAND / WALK / STOP, the actual cause and the battery.
-const quick=make('div');quick.className='card';quick.id='motion-quick';
-quick.innerHTML=`<h3>Movimento <span id="motion-link" class="chip lock">IN ATTESA</span></h3><p id="motion-cause" role="status">Collegamento al Controller…</p>
-<p id="motion-prone" role="status" style="color:#9ca3af">PRONE · UNKNOWN</p>
-<div class="motion-actions"><button id="motion-q-stand" disabled>STAND</button><label>WALK<select id="motion-q-stride"><option value="0">STANDARD · 20 mm/ciclo</option><option value="1" selected>STANDARD · 30 mm/ciclo</option><option value="2">STANDARD · 40 mm/ciclo</option><option value="3" disabled>FAST · 60 mm/ciclo (sperimentale)</option></select></label><button id="motion-q-walk" disabled>WALK</button><button id="motion-q-walk-stop" disabled>WALK STOP</button><button id="motion-q-stop" class="motion-stop">STOP</button></div>
-<dl id="motion-battery"></dl><p class="note">Disponibilità decisa dal Controller a runtime (limiti, feedback, energia, collegamento). Perdita di collegamento per 3 s = SAFE_OFF; scheda nascosta durante WALK = WALK STOP controllato.</p>`;
-by('dashboard').prepend(twinCard);by('dashboard').prepend(quick);
-doc.querySelector('script').before(panel);
-// STOP remains visible while the operator views the integrated Twin or any tab.
-doc.querySelector('header .who').append(by('motion-stop-button'));
-const presenceChip=make('span');presenceChip.id='motion-presence';presenceChip.className='chip lock';doc.querySelector('header .who').append(presenceChip);
-PAGES.push('motion-control');tab.onclick=()=>{page('motion-control');refreshMotion()};
-// Switching away or hiding the portal ends a held input.
-nav.addEventListener('click',e=>{if(e.target.dataset.page!=='motion-control')stopHeld('cambio scheda')});
-for(const [name,label] of [['x','X (m)'],['y','Y (m)'],['z','Z (m)'],['roll','Roll (rad)'],['pitch','Pitch (rad)'],['yaw','Yaw (rad)']]){const l=make('label',label),i=make('input');i.id='motion-body-'+name;i.type='number';i.value='0';i.step=['x','y','z'].includes(name)?'0.005':'0.01';i.disabled=true;l.append(i);by('motion-body-params').append(l)}
-let restoreBusy=false,caps=null,snapshot=null,capAt=0,statusAt=0,pollTimer=0,pollBusy=false,sequence=0,held=null,sendBusy=false,stopBusy=false,pendingStop=false,lastCommand=0,resultSequence=0;
-const session=Date.now().toString(36),TTL_MS=350,STATUS_STALE_MS=1500,CAPS_STALE_MS=5000;
-const ms=()=>performance.now(),clock=()=>snapshot&&Number.isFinite(snapshot.now_ms)?Math.floor(snapshot.now_ms+Math.max(0,ms()-statusAt)):0;
-const statusFresh=()=>!!snapshot&&ms()-statusAt<STATUS_STALE_MS;
-const telemetryFresh=()=>statusFresh()&&!snapshot.stale,capsFresh=()=>!!caps&&ms()-capAt<CAPS_STALE_MS;
-const fresh=()=>telemetryFresh()&&capsFresh()&&snapshot.fault!==true&&(!snapshot.fault||snapshot.fault==='NONE');
-const action=id=>caps&&Array.isArray(caps.actions)?caps.actions.find(a=>a.id===id):null;
-const allowed=id=>!caps?.transport_readonly&&fresh()&&action(id)?.available===true&&action(id)?.implemented===true;
-// Operational fixture WALK (2026-10-15): certified presets only; the free joystick stays off.
-const operationalWalk=()=>typeof snapshot?.operational?.walk==='string'&&snapshot.operational.walk!=='WALK_NOT_BOUND';
-const walkActive=()=>['WALK_STARTING','WALK','STOPPING'].includes(snapshot?.operational?.walk);
-const teleopAllowed=()=>fresh()&&caps.teleoperation===true&&caps.first_stride_only!==true&&!operationalWalk()&&caps.hardware_approved===true&&allowed('gait.'+by('motion-gait').value.toLowerCase());
-const walkAllowed=()=>!sendBusy&&!standPending&&snapshot?.active_command?.outcome!=='ACCEPTED'&&fresh()&&caps.teleoperation===true&&Number(caps.walk?.period_s)>0&&snapshot?.operational?.walk==='WALK_BOUND';
-const walkVelocity=()=>{const strides=caps?.walk?.strides_m||[],i=Number(by('motion-walk-stride').value);if(i===3){const f=caps?.walk?.fast;return f&&Number(f.period_s)>0?Number(f.stride_m)/Number(f.period_s):0}return i>=0&&i<strides.length?Number(strides[i])/Number(caps.walk.period_s):0};
-function result(text){by('motion-result').textContent=text+'\n'+formatDiagnosticTime(Date.now())}
-let standPending=null;
-const standAllowed=()=>!sendBusy&&!standPending&&snapshot?.active_command?.outcome!=='ACCEPTED'&&allowed('posture.stand');
-function showState(){const prone=snapshot?.prone,proneFresh=statusFresh()&&prone;
-const proneState=proneFresh?prone.state:'UNKNOWN',proneView=by('motion-prone');
-proneView.style.color=proneState==='IN_PRONE'?'#22c55e':proneState==='OUT_OF_PRONE'?'#ef4444':'#9ca3af';
-proneView.textContent='PRONE · '+proneState+' · finestra ingresso (non posa nominale né ammissione)'+(proneFresh&&prone.in_window!=null?' · '+prone.in_window+'/12 · slot '+prone.worst_joint+' · scostamento '+Number(prone.worst_offset_rad).toFixed(4)+' rad':'')+(proneFresh?' · '+prone.reason:'');
-const ack=snapshot?.active_command;if(ack&&Number(ack.sequence)>=resultSequence){resultSequence=Number(ack.sequence);by('motion-result').textContent=(ack.outcome==='ACCEPTED'?'IN CORSO · comando accettato, esecuzione non completata':ack.outcome==='COMPLETED'?'COMPLETATO':ack.outcome==='ABORTED'?'INTERROTTO':ack.outcome)+' · '+(ack.reason||'')+'\n'+JSON.stringify(ack,null,2);}if(standPending&&ack&&Number(ack.sequence)>=standPending.sequence&&ack.outcome!=='ACCEPTED')standPending=null;presenceChip.textContent=statusFresh()?'Controller connesso':'Collegamento assente';const s=snapshot||{},op=s.operational||{},pairs=[['Sistema',op.system_health||'N/D'],['Calibrazione',op.calibration||'N/D'],['Feedback giunti',s.telemetry?.recovering?'Rilettura in corso · traiettoria sospesa':op.joint_feedback||'N/D'],['Motion Authority',op.motion_authority||'N/D'],['Readiness',(op.phase||'N/D')+(op.reason?' · '+op.reason:'')],['Modo operativo',op.mode||'N/D'],['Collegamento teleoperazione',op.operator_present?'attivo':'assente'],['Ultimo planner',op.entry_reason||'—'],['WALK',op.walk||'N/D'],['Cicli WALK',op.walk_cycles==null?'N/D':Number(op.walk_cycles).toFixed(2)],['Profilo servo WALK',op.walk_drive?'attivo':'—'],['Executor',s.executor_state||'UNKNOWN'],['Prime / arm',s.local_session?.state||'OFF'],[s.local_session?.state==='OFF'?'Ultimo esito sessione (storico)':'Session gate',s.local_session?.reason||'IDLE'],['Stand',s.stand_state||'UNKNOWN'],['Owner',s.owner||'NONE'],['Scope',s.validation?.scope||'UNQUALIFIED'],['Modalità RAM',s.commissioning?.mode||'N/D'],['Limiti RAM commissioning',s.commissioning?.commissioning_joints==null?'N/D':s.commissioning.commissioning_joints+'/12 · '+(s.commissioning.limits||'NONE')],['Entry / fase',s.commissioning?(s.commissioning.entry||'NONE')+' / '+(s.commissioning.phase||'OFF'):'N/D'],['PRIME clamp mask',s.commissioning?.prime_clamp_mask==null?'N/D':String(s.commissioning.prime_clamp_mask)],['Segmento supervisionato',String(s.validation?.segment??'—')],['Carico piedi',s.validation?.foot_load_proven===true?'testimoni esterni freschi':'non misurato'],['RESTORE',s.readiness?.restore?'OK':'REQUIRED'],['12 limiti',s.readiness?.limits_approved?'APPROVED':'UNAPPROVED'],['Encoder actual',Array.isArray(s.telemetry?.actual_rad)?s.telemetry?.source==='OFFLINE_SYNTHETIC'?'SIMULATED':'MEASURED':'UNKNOWN'],['Sorgente telemetria',s.telemetry?.source||'UNKNOWN'],['Target',Array.isArray(s.telemetry?.target_rad)?'COMMANDED':'NONE'],['Fault',s.fault===true?'FAULT':s.fault||'NONE'],['Motivo',s.reason||'—'],['Clock Controller',s.now_ms==null?'N/D':s.now_ms+' ms'],['Telemetria',s.telemetry?.sampled_at_ms==null?'non disponibile':s.telemetry.sampled_at_ms+' ms']];const dl=by('motion-state');dl.replaceChildren();for(const [k,v] of pairs)dl.append(make('dt',k),make('dd',v));const codes=diagnosis();by('motion-fresh').textContent=(statusFresh()?'FRESH':'STALE')+(codes.length?' · '+codes.join(' · '):'');by('motion-fresh').className='chip '+(codes.length?'lock':'info');dl.append(make('dt','Rete (misurata)'),make('dd',(net.last==null?'nessuna risposta':'RTT '+net.last+' ms, max '+net.max+' ms, media '+Math.round(net.sum/Math.max(1,net.n))+' ms')+' · timeout '+net.timeout+' ms · scaduti '+net.timeouts+' · errori rete '+net.network+' · retry GET '+net.retries+(s.transport?' · loop Controller max '+s.transport.loop_max_ms+' ms · mailbox max '+s.transport.dispatch_max_ms+' ms · late '+s.transport.late+' · busy '+s.transport.busy:'')));
- {const r=s.restore||{},m=s.channels?.mapped,list=by('motion-restore');list.replaceChildren();
-  for(const [k,v] of [['Decisione',r.decision||'N/D'],['Motivo',r.reason||'—'],['Trigger',r.trigger||'NONE'],['Generazione record',r.generation?String(r.generation):'N/D'],['Fingerprint record',r.fingerprint||'N/D'],['Giunti mappati',m?m.count+'/12':'N/D'],['IMU',s.channels?.imu?.valid?'valida · '+s.channels.imu.age_ms+' ms':'non valida'],['Encoder raw',s.channels?.raw?s.channels.raw.count+'/12':'N/D']])list.append(make('dt',k),make('dd',v));
-  by('motion-restore-card').hidden=s.readiness?.restore===true;const admin=typeof csrf==='string'&&!!csrf;by('motion-restore-button').disabled=restoreBusy||caps?.transport_readonly===true||!admin||!by('motion-restore-confirm').checked||!(r.generation>0)||s.readiness?.restore===true;
-  by('motion-restore-button').textContent=s.readiness?.restore===true?'RESTORE già attivo in RAM':'RESTORE gen-'+(r.generation||'?')+' in RAM'+(admin?'':' (accesso amministratore richiesto)')}
- renderQuick();by('motion-stand').disabled=!standAllowed();by('motion-walk-start').disabled=!walkAllowed();by('motion-walk-stride').disabled=!walkAllowed();by('motion-walk-stop').disabled=!walkActive();by('motion-height').disabled=!allowed('posture.stand');by('motion-lie').disabled=!allowed('posture.lie_down');
- const drive=teleopAllowed();by('motion-joystick').setAttribute('aria-disabled',String(!drive));for(const e of panel.querySelectorAll('[data-velocity],#motion-speed,#motion-yaw'))e.disabled=!drive;
- by('motion-gait').disabled=!fresh()||!(caps?.actions||[]).some(a=>a.id.startsWith('gait.')&&a.available);for(const o of by('motion-gait').options)o.disabled=!allowed('gait.'+o.value.toLowerCase());
- const body=(caps?.actions||[]).some(a=>a.id.startsWith('body.')&&a.available&&a.implemented===true)&&fresh();by('motion-body').disabled=!body;for(const i of by('motion-body-params').querySelectorAll('input'))i.disabled=!body;
- by('motion-teleop-gate').textContent=drive?'Intervalli approvati dal Controller. Comandi rinnovati ogni 120 ms; TTL 350 ms.':'Teleoperazione bloccata dal Controller: '+(caps?.reason||'comando non disponibile')+'. STOP su rilascio, focus perso e TTL.';
- by('motion-stop-button').disabled=caps?.transport_readonly===true;
- for(const b of panel.querySelectorAll('[data-action]'))b.disabled=caps?.transport_readonly===true||(!allowed(b.dataset.action)&&!['motion.stop','motion.status'].includes(b.dataset.action));
- if(!drive&&held)stopHeld('capability scaduta o revocata');}
-
-// ---- operator view: the effective cause, never a generic badge -------------
-let authLost=false,authAt=-Infinity,lastPollAt=-Infinity,pollDueAt=Infinity,lastRefusal=null;
-function cause(){const s=snapshot||{},op=s.operational||{},errs=Object.values(net.errors);
- if(errs.some(k=>k==='NETWORK_ERROR'||k==='HTTP_TIMEOUT'))return ['RETE','Controller non raggiungibile ('+errs.join(', ')+'). Ripresa automatica.','bad'];
- if(!snapshot)return ['IN ATTESA','Collegamento al Controller…','lock'];
- if(caps?.transport_readonly)return ['SOLA LETTURA','Rete LAN in sola lettura: comandi dall\'AP MATDOG.','warn'];
- if(authLost)return ['AUTENTICAZIONE','Sessione amministratore non attiva: rinnovo automatico'+(typeof store==='object'&&store.get('md_remember')?'…':'; serve il token una volta (Ricorda questo dispositivo).'),'bad'];
- if(!statusFresh())return ['STALE','Il Controller non aggiorna lo stato da '+Math.round((ms()-statusAt)/1000)+' s.','warn'];
- if(errs.length)return ['HTTP',errs.join(', '),'warn'];
- const a=s.active_command;if(a&&a.outcome==='ABORTED')return ['CONTROLLER','Comando '+a.sequence+' interrotto: '+a.reason,'bad'];
- if(lastRefusal)return ['CONTROLLER','Rifiutato: '+lastRefusal,'bad'];
- const ls=s.local_session||{};if(ls.state==='OFF'&&ls.last_revoke)return ['CONTROLLER','Ultima sessione terminata: '+ls.last_revoke+(ls.failed_joint>=0?' · giunto '+ls.failed_joint:'')+(ls.failure?' · '+ls.failure:''),'warn'];
- if(s.fault===true||s.fault&&s.fault!=='NONE')return ['FAULT',String(s.reason||'FAULT'),'bad'];
- if(a&&a.outcome==='ACCEPTED')return ['IN CORSO',(ls.state&&ls.state!=='OFF'?ls.state+' · ':'')+(s.stand_state||''),'info'];
- if(op.phase&&op.phase!=='READY')return ['NON PRONTO',op.phase+(op.reason?' · '+op.reason:''),'warn'];
- return ['PRONTO',s.stand_state==='STAND'?'In STAND'+(op.walk&&op.walk!=='WALK_BOUND'&&op.walk!=='WALK_NOT_BOUND'?' · '+op.walk:''):'Pronto per STAND','ok']}
-function renderQuick(){const [k,text,tone]=cause();const badge=by('motion');if(badge){badge.firstChild.textContent=k;badge.className='motion'+(tone==='ok'?' live':'');by('motionWhy').textContent=text;}by('motion-link').textContent=k;by('motion-link').className='chip '+tone;by('motion-cause').textContent=text;
- by('motion-q-stand').disabled=!standAllowed();by('motion-q-walk').disabled=!walkAllowed();by('motion-q-stride').disabled=!walkAllowed();by('motion-q-walk-stop').disabled=!walkActive();by('motion-q-stop').disabled=caps?.transport_readonly===true;
- const b=typeof st==='object'&&st?st:{},valid=b.bms_valid==='YES'&&b.bms_fresh==='YES',num=v=>Number.isFinite(parseFloat(v))?parseFloat(v):null,soc=num(b.bms_soc_percent),dl=by('motion-battery');dl.replaceChildren();
- const daly=num(b.bms_remaining_ah),est=num(b.bms_remaining_estimate_ah),nom=num(b.bms_capacity_config_ah);
- for(const [kk,v] of valid?[['SOC DALY',soc==null?'N/D':soc.toFixed(1)+' %'],['Tensione pacco',b.bms_pack_v+' V'],['Cella minima',b.bms_cell_min_mv?b.bms_cell_min_mv+' mV':'N/D'],['Corrente',b.bms_current_a!=null?b.bms_current_a+' A':'N/D'],['Capacità residua (DALY)',daly!=null&&daly>0?daly.toFixed(1)+' Ah · valore BMS':'N/D'],['Capacità residua STIMA',est!=null?est.toFixed(2)+' Ah · STIMA = SOC × nominale':'N/D'],['Capacità nominale configurata',nom!=null?nom.toFixed(1)+' Ah (3S)':'N/D']]:[['Batteria',b.bms_valid==='YES'?'dato non aggiornato':'non disponibile']])dl.append(make('dt',kk),make('dd',v))}
-async function ensureAuth(force){if(typeof resume!=='function'||caps?.transport_readonly)return false;if(!force&&ms()-authAt<3000)return false;authAt=ms();
- const remembered=typeof store==='object'&&!!store.get('md_remember');if(!(typeof csrf==='string'&&csrf)&&!remembered)return false;try{return await resume()}catch(e){return false}}
-function catalog(){const container=by('motion-catalog');container.replaceChildren();const groups=new Map();for(const a of caps.actions||[]){const category=a.category||'other';if(!groups.has(category)){const h=make('h3',category);h.className='motion-category';const g=make('div');g.className='motion-actions';container.append(h,g);groups.set(category,g)}const card=make('article');card.className='motion-action';card.append(make('b',a.label||a.id));const id=make('div',a.id);id.className='motion-meta mono';card.append(id);const state=make('p',(a.implementation|| (a.implemented?'implemented':'planned'))+' · '+(a.reason||'—'));state.className='note';card.append(state);const meta=make('div','Capability: '+(a.capability||'N/D')+' · Parametri: '+(typeof a.parameters==='string'?a.parameters:JSON.stringify(a.parameters||{}))+' · Prerequisiti: '+(typeof a.prerequisites==='string'?a.prerequisites:JSON.stringify(a.prerequisites||[])));meta.className='motion-meta muted';card.append(meta);const b=make('button','Esegui');b.dataset.action=a.id;b.disabled=true;b.onclick=()=>dispatchAction(a.id);card.append(b);groups.get(category).append(card)}by('motion-action-count').textContent=(caps.actions||[]).length+' azioni';if(by('motion-result').textContent.startsWith('Caricamento'))result('Catalogo Controller ricevuto. Esecuzione subordinata alle capability e al permesso operativo.');showState()}
-// Retry only the two read endpoints, once; an unconfirmed POST is never replayed.
-async function request(path,options){const retries=!options&&['/api/motion/status','/api/motion/capabilities'].includes(path)?1:0;
- // Reads join the page-wide single-flight lane; a command keeps its own socket so STOP is never queued behind a read.
- const lane=!options&&typeof window.mdNet==='function'?window.mdNet:(f=>f());
- for(let attempt=0;;attempt++){let failure=null;
-  const out=await lane(async()=>{const t0=ms(),abort=new AbortController(),timer=setTimeout(()=>abort.abort(),net.timeout);
-   try{const r=await fetch(path,{cache:'no-store',...(options||{headers:typeof csrf==='string'&&csrf?{'X-Csrf-Token':csrf}:{}}),signal:abort.signal});const text=await r.text();let body=null;try{body=JSON.parse(text)}catch(e){}
-    const rtt=ms()-t0;net.last=Math.round(rtt);net.max=Math.max(net.max,net.last);net.n++;net.sum+=rtt;
-    // Status first: an error page is reported with its real code and text, never as a JSON problem.
-    if(!r.ok)throw Object.assign(Error((body&&(body.error||body.reason||body.message))||('HTTP '+r.status+' '+String(text).slice(0,80))),{kind:'HTTP_'+r.status});
-    if(body===null)throw Object.assign(Error('risposta non JSON: '+String(text).slice(0,80)),{kind:'HTTP_INVALID_JSON'});
-    delete net.errors[path];return {body};
-   }catch(e){const kind=abort.signal.aborted?'HTTP_TIMEOUT':e.kind||'NETWORK_ERROR';net.errors[path]=kind;if(kind==='HTTP_TIMEOUT')net.timeouts++;else if(kind==='NETWORK_ERROR')net.network++;failure=Object.assign(Error(kind+' dopo '+Math.round(ms()-t0)+' ms ('+path+'): '+e.message),{kind});return null}
-   finally{clearTimeout(timer)}});
-  if(out)return out.body;
-  if(attempt>=retries||!['HTTP_TIMEOUT','NETWORK_ERROR'].includes(failure.kind))throw failure;
-  net.retries++;await new Promise(resolve=>setTimeout(resolve,250));
- }
+(()=>{'use strict';const by=id=>document.getElementById(id);
+const card=document.createElement('div');card.className='card';card.id='simple-motion';
+card.innerHTML=`<h2>MATDOG SIMPLE <span id="simple-state" data-state="STOPPED">COLLEGAMENTO…</span></h2>
+<p id="simple-reason" role="status">Lettura dello stato reale dal Controller.</p>
+<div class="controls"><label>Quota nominale (mm)<input id="simple-height" type="number" min="0" max="150" step="5" value="150"></label>
+<button id="simple-stand" disabled>STAND</button><label>WALK STANDARD<select id="simple-stride"><option value="0">20 mm / ciclo</option><option value="1" selected>30 mm / ciclo</option><option value="2">40 mm / ciclo</option></select></label>
+<button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div>
+<dl id="simple-values"></dl><p class="note">STAND abilita automaticamente i servo. Il workspace STAND a contatti fissi consente 60–150 mm: una quota non raggiungibile viene rifiutata. WALK raggiunge prima 150 mm, poi usa il ciclo STANDARD di 7 s. WALK STOP conclude il passo e mantiene STAND. STOP toglie coppia; la perdita del collegamento operatore per 3 s avvia SAFE_OFF.</p>
+<p class="note">La quota è una stima da encoder e IMU con ipotesi di piano di appoggio. Sulla fixture non misura la distanza dal pavimento.</p>
+<details><summary>Feedback servo e manutenzione</summary><pre id="simple-detail"></pre><p>Calibrazione, generazioni NVS e certificati: scheda Diagnostics e comandi Calibration &amp; Maintenance esistenti via USB.</p></details>`;
+by('dashboard').prepend(card);
+const stop=document.createElement('button');stop.id='simple-stop';stop.textContent='STOP';document.querySelector('header .who').append(stop);
+let status=null,received=0,sequence=0,polling=false,sending=false;const session=Date.now().toString(36);
+const reasons={READY:'Pronto al comando.',STAND_REACHED:'Posa STAND raggiunta e mantenuta.',ACQUIRING_REAL_POSE:'Acquisizione della posa iniziale reale.',WALK_STANDARD:'WALK STANDARD in corso.',WALK_STOPPING:'Conclusione coordinata del passo.',STOP_REQUESTED:'STOP richiesto: torque OFF.',OPERATOR_LINK_LOST:'Collegamento operatore perso: torque OFF.',IMU_STALE:'Campione IMU scaduto: torque OFF.',HEIGHT_OUTSIDE_MATDOG_WORKSPACE:'Quota fuori dal workspace MATDOG o dai limiti reali.',SERVO_PREFLIGHT_REQUIRED:'Verifica iniziale dei profili servo in corso.',CALIBRATION_RESTORE_REQUIRED:'Calibrazione NVS non ancora ripristinata.',BMS_OR_POWER_UNAVAILABLE:'Alimentazione o BMS non disponibile.',SAFE_OFF_IN_PROGRESS:'Disabilitazione torque e verifica sui 13 servo in corso.',SERVO_COMMUNICATION_LOST:'Comunicazione servo persa: torque OFF.',SERVO_CONTROL_READ_LOST:'Lettura dei comandi servo persa: torque OFF.',SERVO_TORQUE_OR_GOAL_LOST:'Un servo non mantiene il comando richiesto: torque OFF.',SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT:'Allarme servo o limite elettrico: torque OFF.',MEASURED_MECHANICAL_LIMIT:'Un giunto ha raggiunto il limite meccanico ammesso.',NATIVE_TARGET_NOT_REACHED:'Un servo non ha raggiunto la posa entro il tempo disponibile.',INITIAL_POSE_OUTSIDE_SAFE_ENTRY:'Posa iniziale fuori dalla regione di ingresso geometricamente verificata.',REFERENCE_CHANGED_BEFORE_ENABLE:'La posa iniziale è cambiata prima dell’abilitazione.',STAND_CLEARANCE_UNAVAILABLE:'Il prossimo tratto STAND non ha spazio geometrico sufficiente.',IMU_UNAVAILABLE:'IMU non disponibile o campione non valido.',GEN1_LIMITS_OR_FINGERPRINT:'Calibrazione gen1 o limiti non corrispondenti.',SYNC_WRITE_FAILED:'Trasmissione coordinata ai servo non completata.',TORQUE_ENABLE_UNCERTAIN:'Abilitazione servo non confermata: torque OFF.',MOTION_DEADLINE_LOST:'Aggiornamento Motion interrotto: torque OFF.',FAULT_STOP_REQUIRED:'Premere STOP dopo aver risolto la causa del guasto.'};
+function render(){if(!status)return;const s=status,age=performance.now()-received,fresh=age<1500;
+by('simple-state').textContent=fresh?s.state:'COLLEGAMENTO PERSO';
+const bar=by('motion');if(bar&&bar.firstChild)bar.firstChild.nodeValue=fresh?s.state:'COLLEGAMENTO PERSO';if(by('motionWhy'))by('motionWhy').textContent=s.reason;by('simple-state').dataset.state=s.state;
+by('simple-reason').textContent=(reasons[s.reason]||s.reason)+(s.ready?'':' · '+(reasons[s.readiness_reason]||s.readiness_reason));
+const available=fresh&&s.ready&&!!csrf&&!sending&&!['MOVING','WALKING','FAULT'].includes(s.state);
+by('simple-stand').disabled=!available;by('simple-walk').disabled=!available;
+by('simple-walk-stop').disabled=!fresh||!csrf||!['MOVING','WALKING'].includes(s.state);
+const dl=by('simple-values');dl.replaceChildren();
+for(const [k,v] of [['Quota richiesta',s.requested_height_mm+' mm'],['Quota stimata',s.height_valid?Number(s.height_estimate_mm).toFixed(1)+' mm':'non disponibile'],['Fase',s.phase],['SAFE_OFF',s.safe_off_verified?'13/13 verificato':s.torque_active?'torque attivo':'verifica in corso'],['Collegamento operatore',s.heartbeat?'attivo':'accesso richiesto'],['IMU',s.imu_valid?'valida · '+s.imu_age_ms+' ms':'non disponibile'],['Compensazione IMU',!s.torque_active?'non attiva':s.imu_correction_limited?'limitata dal workspace':'attiva nei limiti'],['Cicli WALK',Number(s.walk_cycles).toFixed(2)]]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;dl.append(dt,dd)}
+by('simple-detail').textContent=JSON.stringify({period_us:s.period_us,missed_releases:s.missed_releases,max_gap_us:s.max_gap_us,joints:s.joints},null,2);
 }
-async function command(type,params={}){if(caps?.transport_readonly){result('LAN sola lettura: STOP e comandi dalla console USB locale o dal percorso RUN autenticato.');return null}if(type!=='MOTION.STOP'&&type!=='MOTION.STATUS'&&!fresh()){result('REFUSED: capability o stato STALE');return null}if(type==='BASE_VELOCITY'&&!teleopAllowed()&&!walkAllowed()&&!(walkActive()&&params.vx===0&&params.vy===0&&params.yaw_rate===0)){result('REFUSED: teleoperazione non disponibile dal Controller');return null}
- // STOP has its own lane (Issue #52): never waits behind a pending command; the Controller supersedes that command.
- if(type==='POSTURE.STAND'&&!standAllowed())return null;
- const isStop=type==='MOTION.STOP';if(isStop?stopBusy:sendBusy){if(isStop)pendingStop=true;return null}if(isStop)stopBusy=true;else sendBusy=true;showState();const now=clock();sequence=Math.max(sequence+1,Number(snapshot?.last_sequence||0)+1);const id='web-'+session+'-'+sequence;
- const body=JSON.stringify({version:1,id,sequence,issued_at_ms:now,ttl_ms:type==='BASE_VELOCITY'?TTL_MS:type==='MOTION.STOP'?1000:30000,owner:'dashboard',type,params});
- const post=()=>request('/api/motion/command',{method:'POST',headers:{'Content-Type':'application/json',...(typeof csrf==='string'&&csrf?{'X-Csrf-Token':csrf}:{})},body});
- try{let r;try{r=await post()}catch(e){if(!/AUTH_FAILED|HTTP_401/.test(e.message+' '+e.kind)||!await ensureAuth(true))throw e;authLost=false;r=await post()}
-  if(type==='POSTURE.STAND'&&r.outcome==='ACCEPTED')standPending={id:r.id,sequence:Number(r.sequence)};
-  resultSequence=Number(r.sequence)||sequence;
-  lastRefusal=r.outcome==='REJECTED'?r.reason:null;result((r.outcome==='ACCEPTED'?'IN CORSO · comando accettato, esecuzione non completata\n':'')+(r.outcome==='REJECTED'?'RIFIUTATO · '+r.reason+'\n':'')+JSON.stringify(r,null,2));if(r.outcome==='REJECTED'){capAt=-Infinity;void refreshMotion()}lastCommand=ms();return r}
- catch(e){result('Comando non confermato: '+e.message);if(type!=='MOTION.STOP'){capAt=-Infinity;stopHeld('connessione persa')}showState();return null}finally{if(isStop)stopBusy=false;else sendBusy=false;showState();if(pendingStop&&!stopBusy){pendingStop=false;void command('MOTION.STOP',{reason:'rilascio durante richiesta'},true)}}}
-async function restoreCalibration(){const s=snapshot||{},generation=s.restore?.generation;if(restoreBusy||!(generation>0)||!by('motion-restore-confirm').checked)return;restoreBusy=true;showState();
- const run=typeof window.mdNet==='function'?window.mdNet:(f=>f());
- try{const reply=await run(async()=>{const r=await fetch('/api/calibration/restore',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json',...(typeof csrf==='string'&&csrf?{'X-Csrf-Token':csrf}:{})},body:JSON.stringify({generation,confirm:'CONFIRM_CURRENT_INSTALLATION'})});const text=await r.text();let body=null;try{body=JSON.parse(text)}catch(e){}return {status:r.status,body,text}});
-  result('RESTORE · HTTP '+reply.status+' · '+(reply.body?JSON.stringify(reply.body,null,2):String(reply.text).slice(0,120)))}
- catch(e){result('RESTORE non confermato: '+e.message)}
- finally{restoreBusy=false;by('motion-restore-confirm').checked=false;capAt=-Infinity;showState();refreshMotion()}}
-by('motion-restore-confirm').onchange=()=>showState();by('motion-restore-button').onclick=()=>void restoreCalibration();
-function dispatchAction(id){if(id==='motion.stop')return stopHeld('STOP operatore',true);if(id==='motion.status')return command('MOTION.STATUS');if(!allowed(id)){result('REFUSED: '+id+' non disponibile dal Controller');return null}if(['posture.stand','posture.height','posture.confirm','recovery.stand'].includes(id))return command('POSTURE.STAND',{target_height_m:Number(by('motion-height').value)});if(id==='posture.lie_down')return command('POSTURE.LIE_DOWN');if(id.startsWith('gait.'))return command('GAIT.SELECT',{gait:id.slice(5).toUpperCase()});return command('ACTION.EXECUTE',{action_id:id})}
-function velocity(x,y,yaw=0){if(!teleopAllowed())return;const bounds=caps.limits||{},v=Math.min(Number(by('motion-speed').value),Number(bounds.vx_m_s)||0),norm=Math.max(1,Math.hypot(x,y));const vx=x/norm*v,vy=y/norm*Math.min(v,Number(bounds.vy_m_s)||0),yaw_rate=Math.max(-Number(bounds.yaw_rate_rad_s||0),Math.min(Number(bounds.yaw_rate_rad_s||0),yaw));by('motion-velocity').textContent='vx '+vx.toFixed(3)+' · vy '+vy.toFixed(3)+' · yaw_rate '+yaw_rate.toFixed(3);void command('BASE_VELOCITY',{vx,vy,yaw_rate})}
-function startHeld(x,y,yaw=0){if(!teleopAllowed())return;held={x,y,yaw};velocity(x,y,yaw)}
-function stopHeld(reason,force=false){const was=!!held;held=null;by('motion-stick').style.transform='translate(-50%,-50%)';by('motion-yaw').value='0';by('motion-yaw-out').textContent='0.00 rad/s';by('motion-velocity').textContent='vx 0.000 · vy 0.000 · yaw_rate 0.000';if(was||force)void command('MOTION.STOP',{reason},true)}
-const stick=by('motion-joystick');let pointer=null;
-function movePointer(e){if(pointer!==e.pointerId||!teleopAllowed())return;const r=stick.getBoundingClientRect(),rx=Math.max(-1,Math.min(1,(e.clientX-r.left-r.width/2)/(r.width*.42))),ry=Math.max(-1,Math.min(1,(e.clientY-r.top-r.height/2)/(r.height*.42))),norm=Math.max(1,Math.hypot(rx,ry));by('motion-stick').style.transform='translate(calc(-50% + '+rx/norm*65+'px),calc(-50% + '+ry/norm*65+'px))';startHeld(-ry/norm,-rx/norm,Number(by('motion-yaw').value))}
-stick.onpointerdown=e=>{if(!teleopAllowed())return;pointer=e.pointerId;stick.setPointerCapture(e.pointerId);movePointer(e)};stick.onpointermove=movePointer;stick.onpointerup=stick.onpointercancel=stick.onlostpointercapture=()=>{pointer=null;stopHeld('rilascio joystick')};
-for(const b of panel.querySelectorAll('[data-velocity]')){b.onpointerdown=e=>{if(b.disabled)return;b.setPointerCapture(e.pointerId);const [x,y]=b.dataset.velocity.split(',').map(Number);startHeld(x,y,Number(by('motion-yaw').value))};b.onpointerup=b.onpointercancel=b.onlostpointercapture=()=>stopHeld('rilascio freccia');b.onkeydown=e=>{if([' ','Enter'].includes(e.key)&&!e.repeat&&!b.disabled){e.preventDefault();const [x,y]=b.dataset.velocity.split(',').map(Number);startHeld(x,y,Number(by('motion-yaw').value))}};b.onkeyup=e=>{if([' ','Enter'].includes(e.key))stopHeld('rilascio tastiera')}}
-by('motion-speed').oninput=()=>{by('motion-speed-out').textContent=Number(by('motion-speed').value).toFixed(3)+' m/s'};
-by('motion-yaw').oninput=()=>{const yaw=Number(by('motion-yaw').value);by('motion-yaw-out').textContent=yaw.toFixed(2)+' rad/s';startHeld(held?.x||0,held?.y||0,yaw)};by('motion-yaw').onpointerup=by('motion-yaw').onpointercancel=()=>stopHeld('rilascio yaw');by('motion-yaw').onkeyup=()=>stopHeld('rilascio yaw tastiera');
-by('motion-gait').onchange=()=>{stopHeld('cambio gait');if(allowed('gait.'+by('motion-gait').value.toLowerCase()))void command('GAIT.SELECT',{gait:by('motion-gait').value})};
-by('motion-stop-button').onclick=by('motion-zero').onclick=()=>stopHeld('STOP operatore',true);by('motion-stand').onclick=()=>dispatchAction('posture.stand');by('motion-walk-start').onclick=()=>{const vx=walkVelocity();if(!walkAllowed()||!(vx>0)){result('REFUSED: WALK non disponibile dal Controller');return}void command('BASE_VELOCITY',{vx,vy:0,yaw_rate:0})};by('motion-walk-stop').onclick=()=>{if(!walkActive()){result('Nessun WALK in corso');return}void command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0})};by('motion-lie').onclick=()=>dispatchAction('posture.lie_down');
-by('motion-q-stand').onclick=()=>dispatchAction('posture.stand');by('motion-q-stop').onclick=()=>stopHeld('STOP operatore',true);by('motion-q-walk-stop').onclick=()=>by('motion-walk-stop').onclick();
-by('motion-q-stride').onchange=()=>{by('motion-walk-stride').value=by('motion-q-stride').value};by('motion-walk-stride').addEventListener('change',()=>{by('motion-q-stride').value=by('motion-walk-stride').value});by('motion-q-walk').onclick=()=>{by('motion-walk-stride').value=by('motion-q-stride').value;by('motion-walk-start').onclick()};by('motion-body').onclick=()=>{if(by('motion-body').disabled)return;const params={};for(const i of by('motion-body-params').querySelectorAll('input'))params[i.id.slice(12)]=Number(i.value);void command('BODY_POSE',params)};
-window.addEventListener('blur',()=>stopHeld('focus perso'));window.addEventListener('pagehide',()=>stopHeld('pagina chiusa'));window.addEventListener('offline',()=>{statusAt=-Infinity;capAt=-Infinity;stopHeld('connessione persa');showState()});
-// The status poll IS the communication heartbeat: it keeps running in the
-// background (the browser may slow it; a lapse > 3 s is the Controller deadman).
-// Hiding the page ends held input and asks a running WALK for a controlled stop.
-doc.addEventListener('visibilitychange',()=>{if(doc.hidden){stopHeld('pagina nascosta');if(walkActive())void command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0})}else{void ensureAuth();void refreshMotion()}});
-for(const ev of ['focus','pageshow','online'])window.addEventListener(ev,()=>{net.errors={};void ensureAuth();void refreshMotion()});
-const net={timeout:(()=>{const v=Number(new URLSearchParams(location.search).get('motion_timeout_ms'));return Number.isFinite(v)&&v>=300&&v<=5000?v:2000})(),last:null,max:0,n:0,sum:0,timeouts:0,network:0,retries:0,errors:{}};
-function diagnosis(){const s=snapshot||{},codes=[...new Set(Object.values(net.errors))];if(!telemetryFresh())codes.push('TELEMETRY_STALE');if(!capsFresh())codes.push('CAPABILITIES_STALE');if(s.readiness?.restore===false)codes.push('RESTORE_REQUIRED');if(s.readiness?.permit===false)codes.push('MOTION_NOT_PERMITTED');if(s.fault===true||s.fault&&s.fault!=='NONE')codes.push('MOTION_FAULT');return codes}
-// A foreground Dashboard renews its live cookie session before 5 min.
-// Authentication survives refresh; presence still expires in 3 s without polls.
-async function renewSession(){try{if(typeof resume==='function'&&typeof store==='object'&&typeof csrf==='string'&&csrf&&typeof sessionAt==='number'&&Date.now()-sessionAt>240000)await resume()}catch(e){}}
-async function refreshMotion(){clearTimeout(pollTimer);if(pollBusy)return;pollBusy=true;const pollStarted=ms();lastPollAt=pollStarted;try{if(typeof authReady!=='undefined')await authReady;await renewSession();const next=await request('/api/motion/status');if(!next||next.version!==1||!Number.isFinite(next.now_ms)){net.errors['/api/motion/status']='STATUS_SCHEMA_INVALID';throw Error('schema status non valido')}if(next.heartbeat===false&&!next.transport_readonly){if(!authLost)result('Sessione amministratore non attiva: rinnovo automatico.');authLost=true;void ensureAuth()}else if(next.heartbeat===true)authLost=false;
- const restarted=!!snapshot&&(next.now_ms<snapshot.now_ms||next.boot_nonce!=null&&snapshot.boot_nonce!=null&&next.boot_nonce!==snapshot.boot_nonce);const gateChanged=restarted||next.operational?.walk!==snapshot?.operational?.walk||next.reason!==snapshot?.reason||next.fault!==snapshot?.fault||['restore','permit','limits_approved','hardware_approved'].some(k=>next.readiness?.[k]!==snapshot?.readiness?.[k]);const clockAdvanced=!snapshot||next.now_ms!==snapshot.now_ms||restarted;snapshot=next;if(clockAdvanced)statusAt=ms();if(gateChanged){capAt=-Infinity;if(restarted)stopHeld('riavvio Controller');showState()}if(!caps||gateChanged||ms()-capAt>3500){const nextCaps=await request('/api/motion/capabilities');if(!nextCaps||nextCaps.version!==1||!Array.isArray(nextCaps.actions)){net.errors['/api/motion/capabilities']='CAPABILITIES_SCHEMA_INVALID';throw Error('schema capability non valido')}caps=nextCaps;capAt=ms();const max=Number(caps.limits?.vx_m_s)||0;by('motion-speed').max=String(max);by('motion-speed').step=String(max>0?max/100:.001);const yaw=Number(caps.limits?.yaw_rate_rad_s)||0;by('motion-yaw').min=String(-yaw);by('motion-yaw').max=String(yaw);catalog()}showState()}
- catch(e){capAt=-Infinity;stopHeld('telemetria persa');showState();result('Servizio Motion non disponibile: '+e.message)}finally{pollBusy=false;const delay=Math.max(50,1000-(ms()-pollStarted));pollDueAt=ms()+delay;pollTimer=setTimeout(refreshMotion,delay)}}
-setInterval(()=>{if(!pollBusy&&ms()>pollDueAt+3000)void refreshMotion();if(doc.hidden)return;showState();if(held){if(!teleopAllowed())stopHeld('stato scaduto');else if(!sendBusy&&ms()-lastCommand>=120)velocity(held.x,held.y,held.yaw)}},120);
-// Twin host discovery: each configured origin is probed with a 1x1 image from
-// the bridge (/api/bridge/ping.gif). The first that answers is framed; nothing
-// is typed, stored or loaded from the Controller. LIVE is decided by the viewer.
-{const link=by('motion-twin'),frame=by('dashboard-twin-frame'),chip=by('dashboard-twin-chip'),note=by('dashboard-twin-note');let found=null,probing=false;
- const probe=origin=>new Promise(resolve=>{const img=new Image(),t=setTimeout(()=>{img.src='';resolve(false)},2500);img.onload=()=>{clearTimeout(t);resolve(true)};img.onerror=()=>{clearTimeout(t);resolve(false)};img.src=origin+'/api/bridge/ping.gif?t='+Date.now()});
- const show=origin=>{found=origin;const ok=!!origin;chip.textContent=ok?'HOST '+new URL(origin).host:'HOST NON TROVATO';chip.className='chip '+(ok?'info':'lock');
-  note.textContent=ok?'Bridge host collegato. LIVE solo con feed hardware verificato (lo dichiara il viewer).':'Nessun bridge Twin raggiungibile su '+authorizedTwinOrigins.map(o=>new URL(o).host).join(' o ')+'. Avviare sul computer host: matdog_bridge.py (sorgente automatica, USB non richiesta). Nuovo tentativo automatico.';
-  link.href=ok?origin+'/':'#';link.setAttribute('aria-disabled',String(!ok));link.textContent=ok?'Apri Digital Twin a schermo intero':'Twin non disponibile';frame.hidden=!ok;if(ok&&frame.getAttribute('src')!==origin+'/')frame.src=origin+'/';if(!ok)frame.removeAttribute('src')};
- const scan=async()=>{if(probing||doc.hidden)return;probing=true;try{if(found&&await probe(found))return;for(const o of authorizedTwinOrigins)if(await probe(o)){show(o);return}show(null)}finally{probing=false}};
- link.onclick=e=>{if(link.getAttribute('aria-disabled')==='true')e.preventDefault()};show(null);chip.textContent='RICERCA HOST';void scan();setInterval(()=>void scan(),10000)}
-refreshMotion();
+async function command(type,params={},priority=false){
+if(!csrf){needLogin();return}if(sending&&!priority)return;
+if(!priority)sending=true;render();
+const uptime=status?Math.floor(status.now_ms+performance.now()-received):0;
+const body={version:1,id:'simple-'+session+'-'+(++sequence),sequence,issued_at_ms:uptime,ttl_ms:type==='BASE_VELOCITY'?1000:5000,owner:'DASHBOARD',type,params};
+const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),1200);
+try{const r=await fetch('/api/motion/command',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','X-Csrf-Token':csrf},body:JSON.stringify(body),signal:abort.signal});const a=await r.json();if(!r.ok)throw Error(a.message||a.reason||r.status);by('simple-reason').textContent=(reasons[a.reason]||a.reason)+' · '+a.outcome;if(a.outcome==='REJECTED')show(reasons[a.reason]||a.reason,'warn');}
+catch(e){show('Comando '+type+': '+e.message,'bad')}
+finally{clearTimeout(timer);if(!priority)sending=false;render()}
+}
+async function poll(){if(polling)return;polling=true;const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),800);
+try{const r=await fetch('/api/motion/status',{cache:'no-store',headers:csrf?{'X-Csrf-Token':csrf}:{},signal:abort.signal});if(!r.ok)throw Error(r.status);status=await r.json();received=performance.now();render()}
+catch(e){if(status&&performance.now()-received>1500){by('simple-state').textContent='COLLEGAMENTO PERSO';by('simple-stand').disabled=true;by('simple-walk').disabled=true}}
+finally{clearTimeout(timer);polling=false}}
+by('simple-stand').onclick=()=>command('STAND',{target_height_m:Number(by('simple-height').value)/1000});
+by('simple-walk').onclick=()=>command('BASE_VELOCITY',{vx:[.020,.030,.040][Number(by('simple-stride').value)]/7,vy:0,yaw_rate:0});
+by('simple-walk-stop').onclick=()=>command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true);
+stop.onclick=()=>command('STOP',{},true);
+window.addEventListener('keydown',e=>{if(e.key==='Escape')command('STOP',{},true)});
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&status?.state==='WALKING')command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true)});
+Promise.resolve(authReady).finally(()=>{poll();setInterval(poll,350)});
 })();
 </script>)MOTION"
-#endif

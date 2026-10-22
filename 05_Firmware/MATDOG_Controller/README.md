@@ -1,5 +1,7 @@
 # MATDOG Controller
 
+**Branch `matdog/simple-motion-v1`:** il percorso operativo corrente è descritto in [SIMPLE_MOTION_V1.md](SIMPLE_MOTION_V1.md). STAND/WALK STANDARD usano `src/simple`; le note Motion Core qui sotto sono storiche. Nessuna autorizzazione hardware è implicita nella build.
+
 The first unified operational ESP32-S3 runtime for MATDOG. It replaces the previous
 one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY probes)
 with one modular, deployable firmware image that initializes each subsystem module

@@ -354,6 +354,7 @@ bool ServoBus::readControlFeedbackBudgeted(int id, ControlFeedbackSnapshot* out,
 
 bool ServoBus::syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report) {
   FrameTx local{};FrameTx& r=report?*report:local;r=FrameTx{};
+  if(st_.bus.preemptRequested())return false;
   if(!validation_speed_||!validation_acceleration_)return false;   // no reviewed drive pair: nothing sent
   if(!st_.bus.idleAndOwned())return false;                          // unique UART owner, no overlap with an open transaction
   uint8_t packet[packet::kGoalFrameBytes];

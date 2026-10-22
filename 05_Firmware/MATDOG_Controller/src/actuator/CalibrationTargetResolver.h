@@ -67,6 +67,13 @@ TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
                                       MicroRad q_urad,
                                       uint16_t* raw_tick_out);
 
+// Observation-only conversion, including a recorded folded contact just outside
+// the URDF. Callers must enforce the recorded mechanical span. Command
+// conversion remains resolveRadiansToRaw and still enforces the URDF.
+TargetResolveStatus resolveRawObservation(const CalibrationGeometryProfile& profile,
+  const GeometryProvenance& expected_provenance,const JointTransform& transform,
+  uint16_t raw_tick,MicroRad* q_urad_out);
+
 TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
                                       const GeometryProvenance& expected_provenance,
                                       const JointTransform& transform,

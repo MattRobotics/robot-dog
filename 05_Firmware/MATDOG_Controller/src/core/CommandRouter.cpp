@@ -1,3 +1,4 @@
+#include <cmath>
 #include "CommandRouter.h"
 
 #include <esp_ota_ops.h>
@@ -111,7 +112,8 @@ bool CommandRouter::servoDiagnosticBusy() const {
 }
 
 void CommandRouter::update(uint32_t now_ms) {
-  while (Serial.available()) {
+  unsigned serial_bytes=0;
+  while (serial_bytes++<64 && Serial.available()) {
     char c = static_cast<char>(Serial.read());
 
     if (c == '\r') continue;
@@ -222,19 +224,23 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
-  if(upper.startsWith("@MOTION VALIDATION ")) {
-    char response[768]{};
-    if(modules_.validation_command)
-      modules_.validation_command(modules_.validation_context,line.c_str()+19,millis(),response,sizeof(response));
-    else snprintf(response,sizeof(response),"VALIDATION=REFUSED REASON=ADAPTER_NOT_BOUND");
-    Serial.println(response);return;
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||upper=="@MOTION HEARTBEAT") {
+    if(upper=="@MOTION STATUS"){static char out[6144];if(modules_.service->motionStatus(out,sizeof(out),millis()))Serial.println(out);return;}
+    if(upper=="@MOTION HEARTBEAT"){modules_.service->operatorHeartbeat(millis());Serial.println("MOTION_HEARTBEAT=OK");return;}
+    motion::MotionCommand c;c.owner=motion::ClientOwner::LOCAL;c.sequence=++simple_sequence_;c.issued_at_ms=millis();c.ttl_ms=1000;
+    snprintf(c.id,sizeof(c.id),"usb-%lu",(unsigned long)c.sequence);
+    c.intent=motion::Intent::STOP;
+    if(upper.startsWith("@MOTION STAND ")){char* end=nullptr;const char* value=upper.c_str()+14;
+      const double mm=strtod(value,&end);if(end==value||*end||!std::isfinite(mm)){Serial.println("MOTION=REJECTED REASON=INVALID_HEIGHT_MM");return;}
+      c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
+    }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=.030/7;}
+    else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
+    const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
   }
-  if(upper.startsWith("@MOTION COMMISSIONING ")||upper.startsWith("@MOTION TELEMETRY ")) {
-    char response[1024]{};
-    if(modules_.commissioning_command)
-      modules_.commissioning_command(modules_.validation_context,line.c_str()+8,millis(),response,sizeof(response));
-    else snprintf(response,sizeof(response),"COMMISSIONING=REFUSED REASON=ADAPTER_NOT_BOUND");
-    Serial.println(response);return;
+  // Keep slow diagnostic and persistent operations out of the active motion
+  // chain. STOP above is independent of this exclusion and of HTTP.
+  if(modules_.service&&modules_.service->motionEngaged()){
+    Serial.println("COMMAND=REFUSED REASON=MOTION_ACTIVE_USE_STOP");return;
   }
   if (upper == "@WIFI LAN ON" || upper == "@WIFI LAN OFF") {
     if (modules_.authority->current()!=ActuatorAuthority::NONE || modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE) { Serial.println("LAN=REJECT_MODE_OR_OWNER"); return; }

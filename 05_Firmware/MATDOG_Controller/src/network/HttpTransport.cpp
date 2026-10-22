@@ -578,7 +578,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     // holds STOP, has both. The read-only Twin, anonymous and LAN read-only
     // polls never keep a session alive (2026-10-15).
   {
-    const bool beat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);
+    const bool beat=!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);
     if(beat)service_->operatorHeartbeat(now_ms);
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
@@ -603,7 +603,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     if(req.stop_epoch!=stop_epoch_.load()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
-    if(req.ap_socket)service_->operatorHeartbeat(now_ms);  // the command itself proves presence
+    service_->operatorHeartbeat(now_ms);  // the command itself proves presence
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
     resp.ok=service_->motionAck(ack,resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"ACK_UNAVAILABLE";

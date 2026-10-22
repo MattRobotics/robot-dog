@@ -73,7 +73,7 @@ TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
   return TargetResolveStatus::OK;
 }
 
-TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
+TargetResolveStatus resolveRawObservation(const CalibrationGeometryProfile& profile,
                                       const GeometryProvenance& expected_provenance,
                                       const JointTransform& transform,
                                       uint16_t raw_tick,
@@ -96,11 +96,19 @@ TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
                          kMicroRadPerRevolution,
                      kTicksPerRevolution);
 
-  if (q < joint->urdf_lower || q > joint->urdf_upper) {
-    return TargetResolveStatus::REJECT_URDF_LIMIT;
-  }
   *q_urad_out = static_cast<MicroRad>(q);
   return TargetResolveStatus::OK;
+}
+
+TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
+  const GeometryProvenance& expected_provenance,const JointTransform& transform,
+  uint16_t raw_tick,MicroRad* q_urad_out) {
+  if(!q_urad_out)return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  MicroRad q=0;const auto r=resolveRawObservation(profile,expected_provenance,transform,raw_tick,&q);
+  if(r!=TargetResolveStatus::OK)return r;
+  const auto* joint=profile.findJoint(transform.identity);
+  if(q<joint->urdf_lower||q>joint->urdf_upper)return TargetResolveStatus::REJECT_URDF_LIMIT;
+  *q_urad_out=q;return TargetResolveStatus::OK;
 }
 
 bool radiansToMicroRad(double q_rad, MicroRad* q_urad_out) {

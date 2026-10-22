@@ -171,6 +171,7 @@ class CommandRouter {
   // shared ServoBus/UART - see servoDiagnosticBusy()'s own comment for why a
   // diagnostic scan/census/preflight/q0-capture transaction must never
   // interleave with it.
+  uint32_t simple_sequence_=0;
   bool motionExecutorBusy() const;
   bool servoDiagnosticBusy() const;
   void printHelp();

@@ -75,6 +75,7 @@ class BusTransaction {
   bool open() const { return open_; }
   // For bus use that needs no reply (SYNC_WRITE bursts): true only if no
   // transaction is open and the caller owns the bus; otherwise counted and refused.
+  bool preemptRequested() { return preempt_ && preempt_(preempt_ctx_); }
   bool idleAndOwned() {
     if (open_) { ++stats_.refused_reentrant; outcome_ = BusOutcome::REFUSED_REENTRANT; return false; }
     if (owner_fn_ && owner_fn_() != owner_) { ++stats_.refused_foreign; outcome_ = BusOutcome::REFUSED_FOREIGN_OWNER; return false; }

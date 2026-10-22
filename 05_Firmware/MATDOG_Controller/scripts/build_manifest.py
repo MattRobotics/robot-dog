@@ -270,7 +270,7 @@ def identity_problem(fields, *, source_commit, source_state, layout_id,
     for key, value in expected.items():
         if fields[key] != value:
             return f"{key} disagrees with its owner: {fields[key]!r} != {value!r}"
-    if fields["MOTION_STACK"] not in ("G1_G5A_COMPILED_UNWIRED", "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED"):
+    if fields["MOTION_STACK"] not in ("G1_G5A_COMPILED_UNWIRED", "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED", "MATDOG_SIMPLE_V1"):
         return "MOTION_STACK is not a qualified software architecture identity"
     if fields["BUILD_UTC_POLICY"] not in ("UTC_NOW", "SOURCE_DATE_EPOCH"):
         return "unknown BUILD_UTC_POLICY"

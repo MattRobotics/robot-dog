@@ -27,6 +27,10 @@ int main(){
   uint8_t ours[kGoalFrameBytes];const size_t n=buildGoalFrame(ids,ticks,12,1000,50,ours,sizeof(ours));
   CHECK(n==104&&lib.tx.size()==104&&std::equal(lib.tx.begin(),lib.tx.end(),ours)&&lib.readcalls==0);
   CHECK(ours[2]==0xFE&&ours[3]==100&&ours[4]==0x83&&ours[5]==41&&ours[6]==7);
+  Capture stand;
+  for(int i=0;i<12;++i){acc[i]=8;spd[i]=300;}
+  stand.SyncWritePosEx(ids,12,pos,spd,acc);
+  CHECK(buildGoalFrame(ids,ticks,12,300,8,ours,sizeof(ours))==104&&stand.tx.size()==104&&std::equal(stand.tx.begin(),stand.tx.end(),ours));
   // Refusals: zero bytes.
   uint8_t dup[12];std::copy(ids,ids+12,dup);dup[11]=dup[0];CHECK(buildGoalFrame(dup,ticks,12,1000,50,ours,sizeof(ours))==0);
   uint8_t bc[12];std::copy(ids,ids+12,bc);bc[3]=0xFE;CHECK(buildGoalFrame(bc,ticks,12,1000,50,ours,sizeof(ours))==0);
@@ -36,6 +40,9 @@ int main(){
   Capture lib2;unsigned char zero[12]={0};lib2.syncWrite(ids,12,40,zero,1);
   uint8_t off[kTorqueOffBytesMax];const size_t m=buildTorqueOff(ids,12,off,sizeof(off));
   CHECK(m==lib2.tx.size()&&std::equal(lib2.tx.begin(),lib2.tx.end(),off)&&m==32);
+  uint8_t all_ids[13];std::copy(ids,ids+12,all_ids);all_ids[12]=51;
+  Capture all_off;unsigned char zeros[13]{};all_off.syncWrite(all_ids,13,40,zeros,1);
+  CHECK(buildTorqueOff(all_ids,13,off,sizeof(off))==34&&all_off.tx.size()==34&&std::equal(all_off.tx.begin(),all_off.tx.end(),off));
   // Status parser: valid read reply of 15 bytes from id 13.
   auto reply=[](uint8_t id,const std::vector<uint8_t>& data,uint8_t err){std::vector<uint8_t> p={0xFF,0xFF,id,static_cast<uint8_t>(data.size()+2),err};
     p.insert(p.end(),data.begin(),data.end());p.push_back(checksum(p.data(),2,p.size()));return p;};
