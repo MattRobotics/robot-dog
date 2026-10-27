@@ -55,9 +55,34 @@ bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
  const uint64_t us=esp_timer_get_time();const bool fresh=motion_->fresh(us);
  size_t used=0;bool ok=true;
  auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
- add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
- (unsigned long)now,simple::name(motion_->state()),motion_->phase(),boolean(ready_),motion_->reason(),reason_,boolean(!fresh),boolean(motion_->state()==simple::State::FAULT),boolean(motion_->offVerified()),motion_->offMask(),boolean(motion_->energized()),boolean(motion_->heightValid()),motion_->requestedHeightM()*1000,motion_->heightM()*1000,motion_->walkCycles(),boolean(motion_->stabilizationLimited()),boolean(motion_->imuValid()),(unsigned long long)(us>=motion_->imuStampUs()?(us-motion_->imuStampUs())/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)motion_->releases(),(unsigned long)motion_->missed(),(unsigned long long)motion_->maxGapUs(),motion::toString(activeAck_.outcome),activeAck_.reason);
- for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"rad\":%.6f,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.q,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
- add("%s","]}");return ok;
+ add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
+ (unsigned long)now,simple::name(motion_->state()),motion_->phase(),motion_->poseRegion(us),boolean(ready_),motion_->reason(),reason_,boolean(!fresh),boolean(motion_->state()==simple::State::FAULT),boolean(motion_->offVerified()),motion_->offMask(),boolean(motion_->energized()),boolean(motion_->heightValid()),motion_->requestedHeightM()*1000,motion_->heightM()*1000,motion_->walkCycles(),boolean(motion_->stabilizationLimited()),boolean(motion_->imuValid()),(unsigned long long)(us>=motion_->imuStampUs()?(us-motion_->imuStampUs())/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)motion_->releases(),(unsigned long)motion_->missed(),(unsigned long long)motion_->maxGapUs(),motion::toString(activeAck_.outcome),activeAck_.reason);
+ // Raw torque/goal fields retain their dated control observation. SAFE_OFF is
+ // separate, newer evidence from 13 independent post-stop torque reads.
+ // Appended after joints below to keep the existing wire contract compatible.
+ for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
+ add("%s","]");
+ add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
+   motion_->powerReason(),(unsigned long)motion_->bmsAgeMs(),(unsigned long)motion_->maxReleaseWorkUs(),(unsigned long long)motion_->offVerifiedUs());
+ if(motion_->referenceFaultSlot()<12){const auto& f=motion_->referenceFaultFeedback();
+   add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
+     motion_->referenceFaultSlot(),f.raw,motion_->referenceFaultRaw(),f.torque,f.goal,(unsigned long long)f.controlStampUs);}
+
+ // Digital Twin contract already parsed by the existing viewer (telemetry v1):
+ // the same 12 ACTUAL angles and BNO085 quaternion SimpleMotion holds, no new
+ // read. sampled_at_ms dates the oldest joint sample; actual_rad when all 12
+ // are fresh, otherwise null plus actual_rad_by_joint (null: never read).
+ uint64_t oldest=us;bool all=fresh;
+ for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];if(f.valid&&f.stampUs<oldest)oldest=f.stampUs;all=all&&f.valid;}
+ const uint64_t ageMs=(us-oldest)/1000;
+ add(",\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)(ageMs<now?now-ageMs:0));
+ if(all){for(unsigned i=0;i<12;++i)add("%s%.6f",i?",":"[",motion_->feedback()[i].q);add("%s","]");}
+ else{add("%s","null,\"actual_rad_by_joint\":[");
+   for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];if(f.valid)add("%s%.6f",i?",":"",f.q);else add("%snull",i?",":"");}
+   add("%s","]");}
+ add("%s",",\"quaternion\":");
+ if(motion_->imuValid()){const double* q=motion_->quaternion();add("[%.6f,%.6f,%.6f,%.6f]",q[0],q[1],q[2],q[3]);}else add("%s","null");
+ add("%s",",\"source\":\"CONTROLLER\"},\"stale_scope\":\"MOTION_JOINT_FEEDBACK\"}");
+ return ok;
 }
 } }

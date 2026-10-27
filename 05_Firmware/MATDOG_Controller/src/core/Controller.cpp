@@ -238,7 +238,6 @@ void Controller::begin() {
   service_.begin(modules);
   service_.bindMotionService(&motion_service_);
   restore_hook_.owner=this;service_.bindCalibrationRestore(&restore_hook_);
-  heartbeat_hook_.owner=this;service_.bindOperatorHeartbeat(&heartbeat_hook_);
   // Never starts the listening socket here — see network/HttpTransport.h.
   // The secret is passed as raw bytes (strlen of the configured string, or
   // 0 if none was configured); OtaSession fails closed on a zero-length
@@ -488,10 +487,6 @@ calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibrat
     (unsigned long)facts.record_generation,(unsigned long long)facts.record_fingerprint,
     attestation.auto_restore_enabled?"ENABLED":"SUSPENDED",snap.restored?1u:0u,(unsigned)snap.restored_joints);
   return verdict;
-}
-
-void Controller::HeartbeatHook::heartbeat(uint32_t) {
-  if(owner)owner->simple_motion_.heartbeat(esp_timer_get_time());
 }
 
 bool Controller::RestoreHook::restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) {
@@ -976,6 +971,7 @@ void Controller::printBootBanner() {
   Serial.println();
   Serial.println("====================================");
   Serial.printf(" %s %s\n", build::kFirmwareName, build::kFirmwareVersion);
+  Serial.printf(" %s\n", build::kFirmwareDescription);
   Serial.println("====================================");
   Serial.printf("build      : %s\n", build::kBuildId);
   Serial.printf("board      : %s\n", build::kBoardName);
@@ -1066,14 +1062,14 @@ void Controller::update(uint32_t now_ms) {
 
   if(!imu_.taskRunning()&&!simple_motion_.engaged())imu_.service(now_ms);
   system_state_.setImuHealth(imu_.health());
-  // DALY's proven UART flush costs 8 bytes * 10 / 9600 = 8.34 ms.
-  // Start it only in Motion slack with 12 ms reserved; never on a release.
-  const uint64_t bms_now=esp_timer_get_time();
-  if(!simple_motion_.engaged()||simple_motion_.nextReleaseUs()>bms_now+12000)
-    daly_.update(now_ms, operating_mode_.mode());
+  // Independent 2 s DALY scheduler, non-waiting UART2 TX + bounded RX.
+  // Never make electrical monitoring depend on the IK's remaining slack.
+  now_ms=millis();
+  daly_.update(now_ms, operating_mode_.mode());
   system_state_.setBmsHealth(daly_.health());
 
-  led_.update(now_ms);
+  // Presentation can wait for torque OFF; RMT completion can wait up to 20 ms.
+  if(!simple_motion_.engaged())led_.update(now_ms);
   system_state_.setLedHealth(led_.health());
 
   // Advances at most one servo Ping() per tick when a scan is RUNNING —
@@ -1146,13 +1142,9 @@ void Controller::update(uint32_t now_ms) {
 
   system_state_.update();
 
-  // Last among the services, on purpose. Within one pass every
-  // timing-sensitive module (IMU, DALY, the incremental servo scan step)
-  // has already advanced before any network work happens, so a heavy tick
-  // here — the first WiFi.mode() call is the expensive one — cannot sit
-  // between a bus transaction and its follow-up. The cost of this call is
-  // measured, not assumed: @WIFI STATUS reports last_us/max_us.
-  if(!simple_motion_.engaged())wifi_.update(now_ms);
+  // Zero-wait RAM snapshot only; radio/NVS mutations stay in md_network on
+  // core 0. Keep link/digest/status publication alive during MOVING and HOLD.
+  wifi_.update(now_ms);
 
   // Drives the first-boot rollback lifecycle. Bounded, touches no flash, and
   // does almost nothing once the lifecycle has settled. The facts it judges
@@ -1199,7 +1191,7 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.battery_alarm = status::dalyAlarmBlocksChargingPresentation(battery.alarms);
     // No reviewed charge-completion policy exists yet: the reserved
     // charge_complete_verified input stays false, including at 100% SOC.
-    led_status_.update(led_now_ms, led_inputs);
+    if(!simple_motion_.engaged())led_status_.update(led_now_ms, led_inputs);
   }
 
   // Read-only copy of the calibration persistence RAM snapshot for the
@@ -1225,6 +1217,9 @@ void Controller::update(uint32_t now_ms) {
   // The loop-entry clock makes the newest joint look future-dated.
   http_transport_.update(millis());
   updateSimpleMotion(esp_timer_get_time());
+  const uint64_t telemetry_now=esp_timer_get_time();
+  if(!simple_motion_.engaged()||simple_motion_.nextReleaseUs()>telemetry_now+5000)
+    simple_motion_.updateTelemetry(telemetry_now);
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

@@ -4,7 +4,9 @@
 Checks src/network/TwinAssets.h: every gzip blob decompresses to the declared
 size, ETags are the SHA-256 prefix of the raw asset, the page loads only
 same-origin resources (no CDN, GitHub or cloud), the JS polls the robot's own
-/api/motion/status and contains no command/serial/servo path, the four routes
+/api/motion/status (or, framed by the dashboard with ?feed=parent, renders the
+status the dashboard posts: same origin, parent only, no poll of its own) and
+contains no command/serial/servo path, every body is time-bounded, the routes
 are registered on every listener, and the budget fits the app slot.
 """
 import gzip, hashlib, re, sys
@@ -43,7 +45,12 @@ for path in ("/twin", "/twin/", "/twin/assets/twin.js", "/twin/matdog_collision.
     check(transport.count(f'"{path}"') == 2 or transport.count(f'"{path}",') >= 2, f"{path} on admin+TLS and read-only listeners")
 handler = transport[transport.index("esp_err_t HttpTransport::handleTwin("):transport.index("esp_err_t HttpTransport::handleWifi(")]
 check("dispatch(" not in handler and "service_" not in handler, "twin handler never reaches the Controller")
-check('"Content-Encoding","gzip"' in handler and '"If-None-Match"' in handler and "304 Not Modified" in handler, "gzip + ETag revalidation")
+sender = transport[transport.index("esp_err_t sendBoundedResponse("):transport.index("} // namespace", transport.index("esp_err_t sendTwinAsset("))]
+check('"If-None-Match"' in handler and "304 Not Modified" in handler, "ETag revalidation")
+check(all(h in sender for h in ("Content-Length: %u", "Content-Encoding: gzip", "ETag: %s", "Cache-Control: no-cache", "Accept-Ranges: none")), "gzip + ETag + length, no resumable partial entry")
+# 2026-10-24: every asset body goes through the time-bounded writer (test_twin_bounded_send.py).
+check("return sendTwinAsset(req,*asset," in handler and "asset->gz" not in handler.replace("asset->gz_len", ""), "body only via sendTwinAsset")
+check("kTwinSendBudgetMs" in sender and "select(" in sender and "kTwinWriteBytes" in sender, "budget + writability + one segment per write")
 # 2026-10-15: the single httpd task never streams a large Twin asset while a
 # Motion torque sequence/motion is in progress (STOP/heartbeat are not queued
 # behind it); revalidation (304) stays available and comes first.
@@ -52,6 +59,10 @@ check(handler.index("304 Not Modified") < handler.index("twin_deferred_.load()")
 check("twin_deferred_.store(service_->motionEngaged());" in transport, "deferral flag published by the Controller thread")
 # The read-only Twin is never the operator heartbeat: no credentials, no CSRF.
 check(re.search(r'credentials:\s*["\']omit["\']', js) is not None, "twin fetches omit credentials")
+# Embedded in the dashboard: one poll per page; only the parent, same origin.
+feed = re.search(r'get\("feed"\)==="parent"&&window\.parent!==window\?window\.addEventListener\("message",(\w+)=>\{\1\.origin!==location\.origin\|\|\1\.source!==window\.parent\|\|', js)
+check(feed is not None, "feed=parent: listens to the framing dashboard only, same origin")
+check(js.count('addEventListener("message"') == 1, "no other message channel")
 check("X-Csrf-Token" not in js, "twin never presents a CSRF token")
 status = transport[transport.index("case HttpRequestKind::MOTION_STATUS:"):transport.index("case HttpRequestKind::MOTION_CAPABILITIES:")]
 check("portal_.authorize(" in status and "req.csrf" in status and "portal_.current(" not in status, "heartbeat requires session + CSRF (Dashboard only)")

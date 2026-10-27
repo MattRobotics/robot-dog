@@ -30,6 +30,10 @@ function render(): void {
   el('joints').textContent = facts.jointLines.join('\n');
   if (twin && stream.isStale(now)) twin.setStale(true);
 }
+function accept(body: unknown): void {
+  if (stream.accept(body, performance.now()) && stream.frame) twin?.apply(stream.frame, performance.now());
+  lastError = ''; failures = 0;
+}
 async function poll(): Promise<void> {
   const abort = new AbortController(), timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
   try {
@@ -40,8 +44,7 @@ async function poll(): Promise<void> {
     let body: unknown = null; try { body = JSON.parse(text); } catch { /* reported below */ }
     if (!response.ok) throw new Error(`HTTP_${response.status} ${(body as { error?: string } | null)?.error ?? text.slice(0, 60)}`);
     if (body === null) throw new Error('HTTP_INVALID_JSON');
-    if (stream.accept(body, performance.now()) && stream.frame) twin?.apply(stream.frame, performance.now());
-    lastError = ''; failures = 0;
+    accept(body);
   } catch (error) {
     failures += 1; lastError = abort.signal.aborted ? 'HTTP_TIMEOUT' : error instanceof Error ? error.message : String(error);
   } finally { clearTimeout(timer); render(); setTimeout(() => void poll(), POLL_MS); }
@@ -74,7 +77,14 @@ async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<
 async function boot(): Promise<void> {
   const viewer = createViewerScene(el('viewport'));
   await loadModel(viewer);
-  void poll();
+  // Embedded in the Controller dashboard (?feed=parent): reuse the status the
+  // dashboard already polls (same-origin postMessage), so one page = one poll.
+  if (new URLSearchParams(location.search).get('feed') === 'parent' && window.parent !== window) {
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || e.source !== window.parent) return;
+      accept(e.data); render();
+    });
+  } else void poll();
   setInterval(render, 1000);
 }
 void JOINT_NAMES;

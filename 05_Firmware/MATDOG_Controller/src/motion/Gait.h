@@ -73,7 +73,9 @@ struct LocomotionFrame {
 // Previous valid solution is the seed AND branch reference. nullptr anchors at
 // canonical stand. An error leaves target.valid false; there is no clipping.
 LocomotionFrame solveGait(const GaitParameters& p, const CartesianSample& sample,
-                         const LocomotionFrame* previous=nullptr);
+                         const LocomotionFrame* previous=nullptr,bool derivatives=true);
+// derivatives=false omits unused joint velocity/acceleration output for native
+// position-profile control; IK, branch, contact and conditioning gates stay on.
 struct GaitAssessment {
   bool collisionFree=false, contactsValid=false, positiveWalkSupport=false;
 };

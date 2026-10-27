@@ -21,6 +21,8 @@ struct HardwareSerial {
     int b=rx.front();rx.pop_front();return b;
   }
   size_t write(const uint8_t* p,size_t n){last_request.insert(last_request.end(),p,p+n);return n;}
+  void flush() {}
+  void flush(bool txOnly){if(!txOnly)rx.clear();}
 };
 constexpr uint8_t INST_READ=2;
 typedef uint8_t u8;

@@ -142,7 +142,7 @@ void CommandRouter::update(uint32_t now_ms) {
     line_buf_[line_len_++] = c;
   }
 
-  if (bms_stream_enabled_ && (now_ms - last_bms_stream_ms_ >= 2000)) {
+  if (bms_stream_enabled_ && !(modules_.service&&modules_.service->motionEngaged()) && (now_ms - last_bms_stream_ms_ >= 2000)) {
     last_bms_stream_ms_ = now_ms;
     printBmsStatus();
   }
@@ -224,9 +224,8 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
-  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||upper=="@MOTION HEARTBEAT"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
     if(upper=="@MOTION STATUS"){static char out[6144];if(modules_.service->motionStatus(out,sizeof(out),millis()))Serial.println(out);return;}
-    if(upper=="@MOTION HEARTBEAT"){modules_.service->operatorHeartbeat(millis());Serial.println("MOTION_HEARTBEAT=OK");return;}
     motion::MotionCommand c;c.owner=motion::ClientOwner::LOCAL;c.sequence=++simple_sequence_;c.issued_at_ms=millis();c.ttl_ms=1000;
     snprintf(c.id,sizeof(c.id),"usb-%lu",(unsigned long)c.sequence);
     c.intent=motion::Intent::STOP;

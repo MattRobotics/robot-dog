@@ -36,15 +36,22 @@ class ServoPort {
  public:
   virtual ~ServoPort()=default;
   virtual bool read(unsigned slot,bool control,Feedback&)=0;
+  // Query after a failed read: RX_PENDING, including a deferred second block
+  // after a successful first block. No new unanswered reply is implied.
+  virtual bool readDeferred() const { return false; }
   virtual bool resolve(unsigned slot,double q,uint16_t&)=0;
   virtual bool frame(const uint16_t raw[12],Drive)=0;
   virtual bool enable(unsigned slot)=0;
-  virtual bool off()=0;  // broadcast de-escalation, thirteen installed units
+  virtual bool off(unsigned first=0)=0; // OFF slots first..12 (includes neck); default SAFE_OFF is global
   virtual bool verifyOff(unsigned slot)=0;  // slots 0..12, includes neck
+  // One fault event, after the SAFE_OFF broadcast; no extra servo acquisition.
+  virtual void referenceFault(unsigned,const Feedback&,double,uint16_t) {}
 };
 struct Inputs {
   bool ready=false,powerOk=false,authorityOk=false,imuValid=false;
   const char* refusal="BOOTING";
+  const char* powerReason="POWER_NOT_READY";
+  uint32_t bmsAgeMs=UINT32_MAX;
   uint64_t imuStampUs=0; double quaternion[4]{1,0,0,0};
   double minRad[12]{},maxRad[12]{};
 };
@@ -52,7 +59,6 @@ class SimpleMotion {
  public:
   void begin(ServoPort* p,bool powered=true) { port_=p; if(powered)enterOff(false,"BOOTING");else reason_="USB_ONLY"; }
   void inputs(const Inputs& i) { input_=i; }
-  void heartbeat(uint64_t now) { heartbeatUs_=now; }
   const char* stand(double height,uint64_t now);
   const char* walk(unsigned stride,uint64_t now);
   void walkStop();
@@ -60,6 +66,8 @@ class SimpleMotion {
   void stop(const char* reason="STOP_REQUESTED");
   void fault(const char* reason);
   void update(uint64_t now);
+  // Read-only model estimate, 10 Hz in cooperative slack, outside Motion.
+  void updateTelemetry(uint64_t now);
   State state() const { return state_; }
   const char* reason() const { return reason_; }
   const char* phase() const;
@@ -71,6 +79,8 @@ class SimpleMotion {
   const Feedback* feedback() const { return fb_; }
   const motion::JointTargetFrame& target() const { return goal_; }
   bool fresh(uint64_t now) const;
+  // Telemetry only: certified region of the measured pose, never a condition.
+  const char* poseRegion(uint64_t now) const;
   bool heightValid() const { return heightValid_; }
   double heightM() const { return actualHeight_; } // encoder/FK + ground-plane MODEL
   double requestedHeightM() const { return requestedHeight_; }
@@ -80,12 +90,21 @@ class SimpleMotion {
   uint64_t maxGapUs() const { return maxGapUs_; }
   bool imuValid() const { return input_.imuValid; }
   uint64_t imuStampUs() const { return input_.imuStampUs; }
+  const double* quaternion() const { return input_.quaternion; }  // BNO085 w,x,y,z (normalized)
   bool stabilizationLimited() const { return imuLimited_; }
   uint64_t nextReleaseUs() const { return nextUs_; }
+  const char* powerReason() const { return input_.powerReason; }
+  uint32_t bmsAgeMs() const { return input_.bmsAgeMs; }
+  uint32_t maxReleaseWorkUs() const { return maxReleaseWorkUs_; }
+  uint64_t offVerifiedUs() const { return offVerified()?offVerifiedUs_:0; }
+  unsigned referenceFaultSlot() const { return referenceFaultSlot_; }
+  const Feedback& referenceFaultFeedback() const { return referenceFaultFeedback_; }
+  uint16_t referenceFaultRaw() const { return referenceFaultRaw_; }
  private:
   enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD };
   enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool planInitialReference();
+  bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
@@ -120,10 +139,16 @@ class SimpleMotion {
   bool operatorStopped_=false;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;
   uint16_t offMask_=0; unsigned offNext_=0;
-  uint64_t nowUs_=0,nextUs_=0,lastReleaseUs_=0,heartbeatUs_=0,goalSentUs_=0,goalDeadlineUs_=0;
+  uint64_t nowUs_=0,nextUs_=0,lastReleaseUs_=0,goalSentUs_=0,goalDeadlineUs_=0;
   uint64_t maxGapUs_=0;
   uint32_t releases_=0,missed_=0;
+  uint32_t maxReleaseWorkUs_=0;
+  uint64_t nextTelemetryUs_=0,offVerifiedUs_=0;
+  unsigned referenceFaultSlot_=12;
+  Feedback referenceFaultFeedback_{};
+  uint16_t referenceFaultRaw_=0;
   unsigned pollNext_=0,controlNext_=0,acquire_=0,enable_=0;
+  unsigned referenceOffRetries_=0;
   motion::JointTargetFrame goal_{},reference_{},pendingGoal_{};
   motion::JointTargetFrame segmentTo_{};
   const collision::Box* segmentBox_=nullptr;
@@ -140,6 +165,7 @@ class SimpleMotion {
   unsigned stride_=1;
   InitialRoute initialRoute_=InitialRoute::ENTRY;
   motion::LocomotionFrame walkPrevious_{};
+  motion::LocomotionFrame holdNominal_{};
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1;
   bool walkStopping_=false,imuLimited_=false;

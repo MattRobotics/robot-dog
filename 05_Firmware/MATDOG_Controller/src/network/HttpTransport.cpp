@@ -8,6 +8,7 @@
 #include <esp_wifi.h>
 #include <freertos/task.h>
 #include <lwip/sockets.h>
+#include <sys/select.h>
 #include <stdarg.h>
 #include <memory>
 #include <new>
@@ -130,6 +131,52 @@ void jsonString(const char *in, char *out, size_t cap) {
   }
   out[n] = 0;
 }
+// Twin asset response (handleTwin). This single httpd task also serves STOP,
+// so one asset occupies it for at most kTwinSendBudgetMs plus one write. Each
+// write first waits for lwIP writability with select() (budget left, in
+// slices so that `cancel` is seen) and is at most one TCP_MSS (1436 B): a
+// socket select() reports writable has more than TCP_SNDLOWAT (2873 B) free,
+// so the write itself does not wait for the peer. SO_SNDTIMEO is the slice
+// meanwhile: a write that still waits (lwIP out of buffers) returns at its
+// next lwIP poll (<= 1 s). Overrun, socket error or `cancel` fail the handler:
+// httpd closes the socket mid-body and the browser gets a truncated
+// Content-Length response, never a complete 200 (Accept-Ranges: none, so no
+// partial cache entry is resumed); it retries and revalidates by ETag.
+constexpr uint32_t kTwinSendBudgetMs = 1000, kTwinWaitSliceMs = 100;
+constexpr size_t kTwinWriteBytes = 1436;
+esp_err_t sendBoundedResponse(httpd_req_t* req,const char* head,size_t headSize,const char* data,size_t dataSize,const std::atomic<bool>* cancel) {
+  const int fd=httpd_req_to_sockfd(req);
+  timeval idle{},slice{0,static_cast<suseconds_t>(kTwinWaitSliceMs*1000)};socklen_t len=sizeof(idle);
+  if(fd<0||getsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&idle,&len)!=0||
+     setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&slice,sizeof(slice))!=0)return ESP_FAIL;
+  const char* part[2]={head,data};
+  const size_t size[2]={headSize,dataSize};
+  const int64_t deadline=esp_timer_get_time()+int64_t(kTwinSendBudgetMs)*1000;
+  for(int i=0;i<2;++i)for(size_t off=0;off<size[i];){
+    const int64_t left=deadline-esp_timer_get_time();
+    if(left<=0||(cancel&&cancel->load()))return ESP_FAIL;
+    const int64_t wait=left<int64_t(kTwinWaitSliceMs)*1000?left:int64_t(kTwinWaitSliceMs)*1000;
+    timeval tv{static_cast<time_t>(wait/1000000),static_cast<suseconds_t>(wait%1000000)};
+    fd_set writable;FD_ZERO(&writable);FD_SET(fd,&writable);
+    const int ready=select(fd+1,nullptr,&writable,nullptr,&tv);
+    if(ready<0)return ESP_FAIL;
+    if(ready==0)continue;
+    const int sent=httpd_send(req,part[i]+off,size[i]-off<kTwinWriteBytes?size[i]-off:kTwinWriteBytes);
+    if(sent<0&&sent!=HTTPD_SOCK_ERR_TIMEOUT)return ESP_FAIL;
+    if(sent>0)off+=static_cast<size_t>(sent);
+  }
+  setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&idle,sizeof(idle));  // keep-alive: httpd's own wait again
+  return ESP_OK;
+}
+esp_err_t sendTwinAsset(httpd_req_t* req,const twin_assets::Asset& a,const std::atomic<bool>* cancel) {
+  char head[320];
+  const int hn=snprintf(head,sizeof(head),"HTTP/1.1 200 OK\r\nContent-Type: %s\r\nContent-Length: %u\r\n"
+    "Content-Encoding: gzip\r\nETag: %s\r\nCache-Control: no-cache\r\nAccept-Ranges: none\r\n"
+    "X-Content-Type-Options: nosniff\r\n\r\n",a.type,static_cast<unsigned>(a.gz_len),a.etag);
+  if(hn<=0||static_cast<size_t>(hn)>=sizeof(head))return ESP_FAIL;
+  return sendBoundedResponse(req,head,hn,reinterpret_cast<const char*>(a.gz),a.gz_len,cancel);
+}
+
 } // namespace
 
 void HttpTransport::begin(core::ControllerService *service,
@@ -265,13 +312,17 @@ void HttpTransport::lifecycleTick() {
       httpd_config_t c = HTTPD_DEFAULT_CONFIG();
       c.stack_size = 24576;
       c.max_uri_handlers = 26;  // 19 admin/motion/restore + 5 twin (+2 spare)
-      c.max_open_sockets = 2;
-      // A phone browser may open more connections than the two this listener
-      // holds; the least recently used one is closed instead of stalling.
+      // One browser opens up to 6 connections to a host (Dashboard read lane,
+      // command/STOP lane, Twin page and its parallel assets). Below that, a
+      // new connection made httpd close the least recently used one, which
+      // can be a STOP still unread in its socket: no reply, no execution.
+      // 7 + listen + control <= CONFIG_LWIP_MAX_SOCKETS (16); never with TLS.
+      c.max_open_sockets = 7;
       c.lru_purge_enable = true;
       c.recv_wait_timeout = 3;
       c.send_wait_timeout = 3;
       c.task_priority = 2;
+      c.core_id = 0; // socket/asset/TLS work cannot preempt loopTask's Motion on core 1
       http_readonly_=readonly;
       if (httpd_start(&server_, &c) == ESP_OK && !(readonly?registerReadOnlyHandlers(server_):registerHandlers(server_))) {
         if (httpd_stop(server_) == ESP_OK) server_ = nullptr;
@@ -286,6 +337,7 @@ void HttpTransport::lifecycleTick() {
       c.httpd.max_uri_handlers = 17;  // 10 motion/auth + 5 twin (+2 spare)
       c.httpd.max_open_sockets = 1;
       c.httpd.task_priority = 2;
+      c.httpd.core_id = 0;
       c.httpd.recv_wait_timeout = 3;
       c.httpd.send_wait_timeout = 3;
       c.tls_handshake_timeout_ms = 5000;
@@ -357,6 +409,13 @@ bool HttpTransport::dispatch(const HttpTransportRequest &request,
     xSemaphoreGive(slot_free_); return fail("ADMIN_GATE_CLOSED");
   }
   pending_request_ = request;
+  // A Motion command cannot outlive its HTTP reader's total dispatch budget,
+  // even if Controller is preempted after the mailbox cancellation check.
+  auto& command = pending_request_.motion_command;
+  const int32_t budget_age = static_cast<int32_t>(entered + budget_ms - command.issued_at_ms);
+  if (request.kind == HttpRequestKind::MOTION_COMMAND && command.intent != motion::Intent::STOP &&
+      command.ttl_ms && command.ttl_ms <= 30000 && budget_age < static_cast<int32_t>(command.ttl_ms))
+    command.ttl_ms = budget_age > 0 ? static_cast<uint32_t>(budget_age) : 0;
   const uint32_t id = sequence_.fetch_add(1) + 1;
   pending_request_.sequence = id;
   mailbox_.beginDispatch();
@@ -438,13 +497,18 @@ void HttpTransport::update(uint32_t now_ms) {
     ota_->abort();
     session_.reset();
   }
+  // Keep Controller-side JSON/auth work in slack. The independent STOP lane
+  // is serviced before Motion and from every preemptible servo transaction.
   if (xSemaphoreTake(request_ready_, 0) != pdTRUE)
     return;
-  // A deferred request is served on a later pass only while its reader still
-  // waits (bounded by its dispatch budget); once abandoned it is released
-  // unexecuted, so it never runs late or twice.
-  if (deferred_ && !mailbox_.awaitingResponse()) {
+  // Reclaim every abandoned request, including one never serviced because
+  // Motion had no slack. Cleanup is zero-wait and must not depend on slack;
+  // an expired command must not execute when a later release leaves time.
+  if (!mailbox_.awaitingResponse()) {
     deferred_ = false; xSemaphoreGive(slot_free_); return;
+  }
+  if(!service_->motionSlack(esp_timer_get_time(),5000)) {
+    xSemaphoreGive(request_ready_); return;
   }
   // STOP precedence: a Motion command never runs while a STOP waits in its
   // lane. The next pass applies the STOP first; the command is then refused
@@ -503,7 +567,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     int n = snprintf(
         resp.text, sizeof(resp.text),
         // system / source identity
-        "build_id=%s\nsystem_health=%s\npower_state=%s\nmode=%s\nauthority=%s\n"
+        "firmware_name=%s\nfirmware_version=%s\nbuild_id=%s\nsystem_health=%s\npower_state=%s\nmode=%s\nauthority=%s\n"
         // module health
         "imu_availability=%s\nbms_availability=%s\nservo_availability=%s\n"
         "led_availability=%s\n"
@@ -527,7 +591,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
         // OTA status / provenance
         "ota_state=%s\nota_running_build_id=%s\nota_ingest_compiled=%s\n"
         "ota_rollback_possible=%s\n",
-        build::kBuildId, core::toString(service_->systemHealth()),
+        build::kFirmwareName, build::kFirmwareVersion, build::kBuildId, core::toString(service_->systemHealth()),
         core::toString(service_->powerState()),
         core::toString(service_->operatingMode()),
         core::toString(service_->authorityOwner()),
@@ -573,18 +637,17 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   }
 
   case HttpRequestKind::MOTION_STATUS:
-    // The operational operator heartbeat (deadman) is an AP poll that proves
-    // the admin session AND its CSRF token: only the Dashboard page, which
-    // holds STOP, has both. The read-only Twin, anonymous and LAN read-only
-    // polls never keep a session alive (2026-10-15).
+    // A Dashboard poll with session cookie AND CSRF token is authenticated use
+    // of the admin session (it keeps the session alive). It is never a Motion
+    // condition: an accepted command continues without any poll. Read-only
+    // Twin, anonymous and LAN polls never touch the session.
   {
-    const bool beat=!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);
-    if(beat)service_->operatorHeartbeat(now_ms);
+    const bool session=!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);
     resp.ok=service_->motionStatus(resp.text,sizeof(resp.text),now_ms);
     if(resp.ok&&readonly){const size_t n=strlen(resp.text);if(n&&n+28<sizeof(resp.text))strcpy(resp.text+n-1,",\"transport_readonly\":true}");else resp.ok=false;}
-    // Tells the Dashboard whether THIS poll renewed the operator heartbeat, so
-    // a lapsed admin session is shown (and resumed) instead of a silent deadman.
-    if(resp.ok){const size_t n=strlen(resp.text);if(n&&n+20<sizeof(resp.text))strcpy(resp.text+n-1,beat?",\"heartbeat\":true}":",\"heartbeat\":false}");else resp.ok=false;}
+    // Tells the Dashboard whether its admin session is valid, so a lapsed
+    // session is shown and resumed instead of failing the next command.
+    if(resp.ok){const size_t n=strlen(resp.text);if(n&&n+24<sizeof(resp.text))strcpy(resp.text+n-1,session?",\"admin_session\":true}":",\"admin_session\":false}");else resp.ok=false;}
   }
     if(resp.ok)appendTransportStats(resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"MOTION_STATUS_UNAVAILABLE";
@@ -603,8 +666,8 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
     if(req.stop_epoch!=stop_epoch_.load()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
-    service_->operatorHeartbeat(now_ms);  // the command itself proves presence
-    const auto ack=service_->motionCommand(req.motion_command,now_ms);
+    if(!mailbox_.awaitingResponse())break; // reader may have expired during admission
+    const auto ack=service_->motionCommand(req.motion_command,millis());
     resp.ok=service_->motionAck(ack,resp.text,sizeof(resp.text));
     resp.message=resp.ok?"OK":"ACK_UNAVAILABLE";
     resp.text_len=resp.ok?strlen(resp.text):0;break;
@@ -1202,7 +1265,10 @@ esp_err_t HttpTransport::handlePage(httpd_req_t *req) {
   httpd_resp_set_hdr(
       req, "Content-Security-Policy",
       kDashboardContentSecurityPolicy);
-  return httpd_resp_send(req, kPortalPage, sizeof(kPortalPage) - 1);
+  char head[768];
+  const int n=snprintf(head,sizeof(head),"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %u\r\nCache-Control: no-store\r\nX-Frame-Options: DENY\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: %s\r\n\r\n",static_cast<unsigned>(sizeof(kPortalPage)-1),kDashboardContentSecurityPolicy);
+  if(n<=0||static_cast<size_t>(n)>=sizeof(head))return ESP_FAIL;
+  return sendBoundedResponse(req,head,n,kPortalPage,sizeof(kPortalPage)-1,nullptr);
 }
 esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
@@ -1218,7 +1284,7 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   cookieValue(session_cookie,"md_session",r.cookie);
   if(req->method==HTTP_GET) {
     r.kind=strcmp(req->uri,"/api/motion/status")==0?HttpRequestKind::MOTION_STATUS:HttpRequestKind::MOTION_CAPABILITIES;
-    httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));  // heartbeat proof only, never a write
+    httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));  // session proof only, never a write
   } else {
     if(!r.local_authorized || req->content_len<=0 || req->content_len>1024)
       return sendJsonError(req,"400 Bad Request","ORIGIN_OR_BOUNDED_BODY_REQUIRED");
@@ -1246,7 +1312,8 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
       self->stop_request_=r;self->stop_pending_.store(true);self->stop_lock_.store(false,std::memory_order_release);
       while(self->stop_done_.load()!=ticket&&millis()-t0<kStopLaneBudgetMs)vTaskDelay(pdMS_TO_TICKS(2));
       if(self->stop_done_.load()!=ticket)return sendJsonError(req,"503 Service Unavailable","STOP_LANE_LATE",millis()-t0);
-      if(!self->stop_ack_ok_.load())return sendJsonError(req,"403 Forbidden","AUTH_FAILED",millis()-t0);
+      if(!self->stop_applied_.load())return sendJsonError(req,"403 Forbidden","AUTH_FAILED",millis()-t0);
+      if(!self->stop_ack_ok_.load())return sendJsonError(req,"500 Internal Server Error","ACK_UNAVAILABLE",millis()-t0);
       httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
       return httpd_resp_send(req,self->stop_ack_,strlen(self->stop_ack_));
     }
@@ -1261,7 +1328,8 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
   const uint32_t budget=r.kind==HttpRequestKind::MOTION_COMMAND?kDispatchTimeoutMs:kMotionReadBudgetMs;
   if(!self->dispatch(r,&resp,catalog.get(),catalog?kMotionCapabilitiesBytes:0,budget,&failure))
     return sendJsonError(req,"503 Service Unavailable",failure,millis()-t0);
-  if(!resp.ok)return sendJsonError(req,"403 Forbidden",resp.message,millis()-t0);
+  // ACK_UNAVAILABLE follows an executed command: unknown outcome, never a refusal.
+  if(!resp.ok)return sendJsonError(req,strcmp(resp.message,"ACK_UNAVAILABLE")?"403 Forbidden":"500 Internal Server Error",resp.message,millis()-t0);
   httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
   return httpd_resp_send(req,catalog?catalog.get():resp.text,resp.text_len);
 }
@@ -1283,7 +1351,7 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   memcpy(req.cookie,stop_request_.cookie,sizeof(req.cookie));memcpy(req.csrf,stop_request_.csrf,sizeof(req.csrf));
   req.motion_command=stop_request_.motion_command;
   stop_pending_.store(false);stop_lock_.store(false,std::memory_order_release);
-  bool applied=false;stop_ack_ok_.store(false);stop_ack_[0]=0;
+  bool applied=false;stop_applied_.store(false);stop_ack_ok_.store(false);stop_ack_[0]=0;
   // Recheck the same AP or RUN_STA/TLS admission as serviceRequest under
   // its fence. Socket facts were captured by the handler; generation/link and
   // portal remain live checks. No mailbox wait for either admitted transport.
@@ -1294,9 +1362,8 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
   }
   if(admitted&&req.local_authorized&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
     stop_epoch_.fetch_add(1);             // every command received before this STOP is superseded
-    service_->operatorHeartbeat(now_ms);
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
-    stop_ack_ok_.store(service_->motionAck(ack,stop_ack_,sizeof(stop_ack_)));applied=true;
+    stop_applied_.store(true);stop_ack_ok_.store(service_->motionAck(ack,stop_ack_,sizeof(stop_ack_)));applied=true;
   }
   stop_done_.store(req.sequence);
   return applied;
@@ -1368,16 +1435,15 @@ esp_err_t HttpTransport::handleTwin(httpd_req_t* req) {
     httpd_resp_set_status(req,"304 Not Modified");httpd_resp_set_hdr(req,"ETag",asset->etag);return httpd_resp_send(req,nullptr,0);
   }
   auto* self=static_cast<HttpTransport*>(req->user_ctx);
-  if(asset->gz_len>kTwinDeferBytes){
+  // Heavy assets start only while Motion is not engaged (torque off) and one
+  // in progress aborts if Motion engages; every body is time-bounded
+  // (sendTwinAsset). The browser keeps them by ETag: a reload is a 304,
+  // served above even during Motion; otherwise they wait (Retry-After).
+  if(asset->gz_len>kTwinDeferBytes&&(!self||self->twin_deferred_.load())){
     httpd_resp_set_hdr(req,"Retry-After","5");
-    return sendJsonError(req,"503 Service Unavailable",self&&self->twin_deferred_.load()?"TWIN_DEFERRED_MOTION_ACTIVE":"TWIN_HOST_REQUIRED");
+    return sendJsonError(req,"503 Service Unavailable","TWIN_DEFERRED_MOTION_ACTIVE");
   }
-  httpd_resp_set_type(req,asset->type);
-  httpd_resp_set_hdr(req,"Content-Encoding","gzip");
-  httpd_resp_set_hdr(req,"ETag",asset->etag);
-  httpd_resp_set_hdr(req,"Cache-Control","no-cache");
-  httpd_resp_set_hdr(req,"X-Content-Type-Options","nosniff");
-  return httpd_resp_send(req,reinterpret_cast<const char*>(asset->gz),static_cast<ssize_t>(asset->gz_len));
+  return sendTwinAsset(req,*asset,asset->gz_len>kTwinDeferBytes?&self->twin_deferred_:nullptr);
 }
 esp_err_t HttpTransport::handleWifi(httpd_req_t *req) {
   auto *self = static_cast<HttpTransport *>(req->user_ctx);

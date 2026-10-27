@@ -153,8 +153,9 @@ private:
       dispatch_max_ms_{0}, dispatch_late_{0}, dispatch_busy_{0};
   uint32_t last_update_ms_ = 0;
   // Set by the Controller thread each loop: a Motion torque sequence or motion
-  // is in progress. The single httpd task then defers large Twin downloads so a
-  // STOP or heartbeat is never queued behind a ~100 KB send (304 still served).
+  // is in progress. The single httpd task then starts no large Twin download
+  // and aborts one in progress, so a STOP or a status poll is not queued behind
+  // a ~140 KB send (304 still served; every body is time-bounded anyway).
   std::atomic<bool> twin_deferred_{false};
   // One-slot STOP lane (httpd task -> Controller), independent of slot_free_.
   std::atomic<bool> stop_lock_{false};   // tiny spin lock around stop_request_ copies
@@ -162,7 +163,9 @@ private:
   std::atomic<bool> stop_pending_{false};
   std::atomic<uint32_t> stop_epoch_{0}, stop_done_{0}, stop_ticket_{0};
   char stop_ack_[512]{};
-  std::atomic<bool> stop_ack_ok_{false};
+  // applied: the STOP passed admission and reached MotionService; ack_ok: its
+  // ACK was serialized. Applied without ACK is an unknown outcome, not AUTH_FAILED.
+  std::atomic<bool> stop_applied_{false},stop_ack_ok_{false};
   static constexpr uint32_t kStopLaneBudgetMs = 600;
   static constexpr size_t kTwinDeferBytes = 8192;
 };

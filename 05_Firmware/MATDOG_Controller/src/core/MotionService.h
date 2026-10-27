@@ -14,7 +14,9 @@ class MotionService {
   bool ackJson(const motion::MotionAck&,char*,size_t) const;
   bool busy() const { return motion_&&motion_->engaged(); }
   bool engaged() const {return busy();}
-  void disconnected(uint32_t){if(motion_)motion_->stop("DISCONNECTED");}
+  bool slack(uint64_t now,uint32_t reserve) const {
+    return !busy()||motion_->nextReleaseUs()>now+reserve;
+  }
  private:
   simple::SimpleMotion* motion_=nullptr;
   Prepare prepare_=nullptr;void* context_=nullptr;

@@ -504,7 +504,7 @@ DALY_WHITELISTED_READ_FRAMES = {
 }
 DALY_SOURCE_NAMES = {"DalyBms.h", "DalyBms.cpp", "DalyProtocol.h", "DalyProtocol.cpp"}
 DALY_TRANSMIT_CALL = "bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen)"
-DALY_UART_METHODS = {"begin", "available", "read", "write", "flush"}
+DALY_UART_METHODS = {"begin", "available", "availableForWrite", "read", "write", "flush"}
 BMS_COMMANDS_ALLOWED = {"@BMS STATUS", "@BMS STREAM ON", "@BMS STREAM OFF",
                         "@BMS KEY READ", "@BMS KEY STATUS",
                         "@BMS KEY SET DISCHARGE CONFIRM", "@BMS KEY WRITE STATUS"}
@@ -724,7 +724,7 @@ def check_daly_write(files):
                 fail(f"{path}: DALY transmit must be exactly {DALY_TRANSMIT_CALL!r}, "
                      f"found {m.group(0)!r}")
 
-    # 4. bms_uart_ is used only for begin/available/read/write/flush - never
+    # 4. bms_uart_ is used only for transport and read-only FIFO space - never
     #    print*/other writers, never handed to another function as a stream.
     for path, code in files:
         for m in re.finditer(r"\bbms_uart_\b", code):
@@ -6409,7 +6409,9 @@ def check_network_v3_boundaries(files, sketch_dir):
       "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
       "AdminAccess.cpp": ('xSemaphoreTake(static_cast<SemaphoreHandle_t>(mutex_),0)',),
       "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','g==generation_.load()'),
-      "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
+      # rc.4 boots in RUN with the AP role: motion activity and the operator's
+      # router role (not the default mode) make network mutations critical.
+      "ControllerService.h": ('motionActive()||powerState()!=PowerState::RUN||modules_.operating_mode->routerRole()','bool networkCritical() const','configBusy()','sessionLive()'),
       "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
       "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
     }
@@ -6497,7 +6499,8 @@ def check_network_v3_boundaries(files, sketch_dir):
     for token in ("update::hmac256(digest,32,message,sizeof(message),tag)","!anyByte(digest,32)",
                   "diff|=raw[16+i]^tag[i]","if(!portalDeviceValid(digest,device))",
                   "if(!device||!device[0])returnfalse;",
-                  "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
+                  # rc.4: the idle expiry is renewed only after cookie, peer AND CSRF proof.
+                  "if(!current(now,peer,cookie)||!tokenEqual(csrf,csrf_))returnfalse;issued_=now;returntrue;"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
     # portal_.authorize 4: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof)
     # + the operator heartbeat (2026-10-15): only a poll proving session AND CSRF (the Dashboard,
@@ -6638,8 +6641,10 @@ def check_stand_release_scope(files):
     # only the real quoted CSP lines here; do not weaken other audit rules.
     policy_path=next((p for p,c in files if p.name=='TwinHostPolicy.h'),None)
     policy=''.join(re.findall(r'^\s*"([^"]*)"',policy_path.read_text(),re.MULTILINE)) if policy_path else ''
-    expected="connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; img-src 'self' http://192.168.4.2:8765 http://192.168.1.149:8765; "
-    if expected not in policy or '*' in policy:fail('Twin CSP allowlist drift')
+    # rc.4: the Digital Twin is served by the Controller (/twin/); the Dashboard
+    # frames and fetches its own origin only, never a wildcard or another host.
+    expected="connect-src 'self'; frame-src 'self'; img-src 'self'; "
+    if expected not in policy or '*' in policy or 'http' in policy:fail('Twin CSP allowlist drift')
 
 
 def check_operational_session_boundaries(files):

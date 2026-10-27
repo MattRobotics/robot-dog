@@ -54,9 +54,11 @@ namespace build {
 // qualification is tracked outside the firmware and reported as such.
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
+constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Firmware";
 
-// This is a software development candidate, with hardware gates still held.
-constexpr const char* kFirmwareVersion = "1.0.0-rc.3";
+// Release candidate: 1.0.0 is assigned only after hardware qualification.
+// SIMPLE 1.0.0-rc.3 (f838f677) remains the historical predecessor.
+constexpr const char* kFirmwareVersion = "1.0.0-rc.5";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

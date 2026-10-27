@@ -15,6 +15,12 @@ class ValidatedServoRead : public SMS_STS {
  public:
   ValidatedServoRead() { bus.bindClock(&busClockUs); }
   BusTransaction bus;
+  // Operational recovery horizon, NOT a protocol guarantee. Reuse SCServo's
+  // 100 ms host margin without spending it in a synchronous wait: the normal
+  // 120 ms joint rotation retries. Late bytes seen before reissue are discarded.
+  // FT-SCS cannot distinguish a same-ID/width reply first arriving AFTER this
+  // horizon from a new one; this residual assumption needs hardware qualification.
+  static constexpr uint32_t kReadRecoveryUs = 100000;
   bool replyPending(uint8_t id) const {
     if (id < 254) for (auto bits : pending_[id]) if (bits) return true;
     return false;
@@ -51,7 +57,7 @@ class ValidatedServoRead : public SMS_STS {
   int ReadCaptured(uint8_t id,uint8_t address,uint8_t* data,uint8_t width,diagnostics::ReadCapture* capture){
     using diagnostics::ReadValidity;
     if(capture){*capture=diagnostics::ReadCapture{};capture->id=id;capture->address=address;capture->width=width;}
-    if (data == nullptr || width == 0 || width > 32 || pSerial == nullptr) {
+    if (data == nullptr || readWidthIndex(width) < 0 || pSerial == nullptr) {
       if(capture)capture->validity=ReadValidity::INVALID_ARGUMENT;
       return 0;
     }
@@ -105,6 +111,12 @@ class ValidatedServoRead : public SMS_STS {
   }
 
  private:
+  // All production READ shapes, including census, maintenance and calibration.
+  // Keep direct indexing for ALL protocol IDs; no second servo allocation map.
+  // Unsupported widths fail closed before TX, never alias another pending timer.
+  static int readWidthIndex(uint8_t width) {
+    switch(width){case 1:return 0;case 2:return 1;case 10:return 2;case 15:return 3;default:return -1;}
+  }
   // Discard stale RX before a request (a late reply must never be parsed as the
   // next one). Bounded by BYTES and TIME: a bus that keeps talking is a fault.
   bool drainRx(uint8_t* drained_out) {
@@ -133,12 +145,22 @@ class ValidatedServoRead : public SMS_STS {
     return true;
   }
   bool prepareReply(uint8_t id, uint8_t width) {
-    // No response carries an address or sequence. Silence cannot prove that a
-    // timed-out request will never answer. Keep its debt until a complete,
-    // checksummed reply is consumed; refuse indistinguishable requests meanwhile.
-    // Other IDs and a write's independent (different-length) readback still work.
-    if (id >= 254 || width > 32 || (pending_[id][width / 8] & (1u << (width % 8)))) {
+    if (id >= 254 || (width && readWidthIndex(width) < 0)) {
       bus.notePendingRx(); return false;
+    }
+    const uint8_t bit = static_cast<uint8_t>(1u << (width % 8));
+    if (pending_[id][width / 8] & bit) {
+      // Preserve unresolved write ACKs. Only READ admission gains recovery;
+      // STOP/SAFE_OFF and write verification keep their existing semantics.
+      if (!width || static_cast<uint32_t>(busClockUs() - last_tx_end_us_[id][readWidthIndex(width)]) < kReadRecoveryUs) {
+        bus.notePendingRx(); return false;
+      }
+      // Unlike available()/drain alone, flush(false) also purges the ESP32 RX
+      // FIFO/ring. No remote cancellation is claimed. One UART owner and the
+      // completed TX below bound this local purge; no sleep or extra READ.
+      pSerial->flush(false);
+      rx_size_ = 0;
+      pending_[id][width / 8] &= static_cast<uint8_t>(~bit);
     }
     return true;
   }
@@ -166,12 +188,21 @@ class ValidatedServoRead : public SMS_STS {
     }
   }
   void endPacket() {
-    if (tx_in_packet_) bus.txDone();
+    if (tx_in_packet_) {
+      // Account from physical TX completion, not from enqueue into TX FIFO.
+      // A partial packet also leaves a debt; never refresh it on suppressed TX.
+      pSerial->flush();
+      if (tx_width_) last_tx_end_us_[tx_id_][readWidthIndex(tx_width_)] = busClockUs();
+      bus.txDone();
+    }
     tx_in_packet_ = false; tx_suppress_ = false;
   }
   bool tx_in_packet_ = false, tx_suppress_ = false;
   uint8_t request_width_ = 0, tx_id_ = 0, tx_width_ = 0;
   uint8_t pending_[254][5]{}; // one bit per reply width 0..32 (0 = ACK/Ping)
+  // Match the pending identity: a successful width15 must not postpone
+  // recovery of an unanswered width10 on the same servo (or vice versa).
+  uint32_t last_tx_end_us_[254][4]{}; // byte, word, control block, fast block
   uint8_t rx_[38]{}, rx_size_ = 0;
 };
 } }

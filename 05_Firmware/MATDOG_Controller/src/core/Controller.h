@@ -59,10 +59,6 @@ class Controller {
   void printBootBanner();
   void updateSimpleMotion(uint64_t now_us);
   const char* prepareSimpleMotion();
-  struct HeartbeatHook : OperatorHeartbeatHook {
-    Controller* owner=nullptr;
-    void heartbeat(uint32_t) override;
-  } heartbeat_hook_{};
   struct RestoreHook : CalibrationRestoreHook {
     Controller* owner=nullptr;
     bool restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) override;
@@ -205,11 +201,13 @@ class Controller {
   struct SimpleServoPort : simple::ServoPort {
     Controller* owner=nullptr;
     bool read(unsigned,bool,simple::Feedback&) override;
+    bool readDeferred() const override;
     bool resolve(unsigned,double,uint16_t&) override;
     bool frame(const uint16_t[12],simple::Drive) override;
     bool enable(unsigned) override;
-    bool off() override;
+    bool off(unsigned first=0) override;
     bool verifyOff(unsigned) override;
+    void referenceFault(unsigned,const simple::Feedback&,double,uint16_t) override;
   } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false

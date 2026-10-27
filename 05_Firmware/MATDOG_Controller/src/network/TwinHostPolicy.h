@@ -1,15 +1,11 @@
 #ifndef MATDOG_TWIN_HOST_POLICY_H
 #define MATDOG_TWIN_HOST_POLICY_H
 namespace matdog { namespace network {
-// Explicit deployment allowlist: PC on MATDOG AP (reserved .2) or its reviewed
-// LAN address. Changing a host requires a reviewed config/build, never a wildcard.
-// MotionDashboard's matching list is pinned against this header by regression.
+// The Digital Twin is served by the Controller itself (/twin/), same origin:
+// no PC bridge host is part of the operational Dashboard.
 static constexpr char kDashboardContentSecurityPolicy[] =
     "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
-    "connect-src 'self'; frame-src http://192.168.4.2:8765 http://192.168.1.149:8765; "
-    // img-src: only the bridge reachability probe (/api/bridge/ping.gif), so the
-    // Dashboard finds the Twin host without an address field (2026-10-17).
-    "img-src 'self' http://192.168.4.2:8765 http://192.168.1.149:8765; "
+    "connect-src 'self'; frame-src 'self'; img-src 'self'; "
     "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 } }
 #endif

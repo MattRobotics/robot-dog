@@ -4,11 +4,17 @@
 #include "../motion/TiltCompensation.h"
 #include "../motion/ImuAttitude.h"
 #include <algorithm>
+#include <esp_timer.h>
 #include <cmath>
 #include <cstring>
 namespace matdog { namespace simple {
 using namespace motion;
 namespace {
+struct ReleaseTimer {
+  uint64_t start=esp_timer_get_time();uint32_t& maximum;
+  explicit ReleaseTimer(uint32_t& m):maximum(m){}
+  ~ReleaseTimer(){maximum=std::max(maximum,static_cast<uint32_t>(esp_timer_get_time()-start));}
+};
 constexpr double kArrivalRad=12*kTickRad; // V25 native positioning allowance
 int magnitude(int x){return x&0x7fff;}
 bool contains(const collision::Box& b,const JointTargetFrame& q,double extra=0){
@@ -47,10 +53,15 @@ const char* SimpleMotion::phase() const {
 void SimpleMotion::stop(const char* reason) { stopReason_.store(reason);stop_.store(true,std::memory_order_release); }
 void SimpleMotion::fault(const char* r){enterOff(true,r);}
 void SimpleMotion::enterOff(bool fault,const char* r){
+  // A repeated STOP while the same SAFE_OFF is still pending keeps its
+  // broadcast and 13-servo verification progress; a failed read still
+  // re-broadcasts in serviceOff. A fault, or a STOP after a fault, during
+  // motion or after completion starts SAFE_OFF again from the broadcast.
+  const bool repeated=!fault&&state_==State::STOPPED&&offPending_;
   state_=fault?State::FAULT:State::STOPPED;faultLatched_=fault;reason_=r;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
-  phase_=Phase::IDLE;offPending_=true;offSent_=false;offMask_=0;offNext_=0;
+  phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
   walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=0;
 }
 void SimpleMotion::serviceOff(){
@@ -59,7 +70,7 @@ void SimpleMotion::serviceOff(){
   if(port_->verifyOff(offNext_))offMask_|=1u<<offNext_;
   else {offMask_&=~(1u<<offNext_);offSent_=false;}
   offNext_=(offNext_+1)%13;
-  if(offMask_==0x1fff){energized_=false;offPending_=false;}
+  if(offMask_==0x1fff){energized_=false;offPending_=false;offVerifiedUs_=esp_timer_get_time();}
 }
 bool SimpleMotion::serviceStop(){
   if(!stop_.exchange(false,std::memory_order_acq_rel))return false;
@@ -68,6 +79,33 @@ bool SimpleMotion::serviceStop(){
 bool SimpleMotion::fresh(uint64_t now) const {
   for(const auto& f:fb_)if(!f.valid||(now>=f.stampUs&&now-f.stampUs>250000)||(f.stampUs>now&&f.stampUs-now>15000))return false;
   return true;
+}
+// The one ordered membership test of a joint frame in the certified regions.
+// ENTRY admits a folded measured contact outside the joint limits; every other
+// region also needs them (pointSafe). Shared by restart planning and telemetry.
+bool SimpleMotion::certifiedRegion(const JointTargetFrame& q,InitialRoute& route) const {
+  if(pointSafe(q)&&contains(collision::kHeight,q)){route=InitialRoute::HEIGHT;return true;}
+  if(contains(collision::kEntry,q)){route=InitialRoute::ENTRY;return true;}
+  if(!pointSafe(q))return false;
+  if(contains(collision::kWalk,q)){route=InitialRoute::WALK;return true;}
+  if(contains(collision::kLift,q)){route=InitialRoute::LIFT;return true;}
+  if(contains(collision::kDeploy,q)){route=InitialRoute::DEPLOY;return true;}
+  return false;
+}
+const char* SimpleMotion::poseRegion(uint64_t now) const {
+  // Telemetry of the 12 fresh ACTUAL angles. Encoder evidence only: the
+  // ground contact itself is not measured.
+  InitialRoute route=InitialRoute::ENTRY;
+  if(!fresh(now))return "UNKNOWN";
+  if(!certifiedRegion(measured(),route))return "OUTSIDE_CERTIFIED";
+  switch(route){
+    case InitialRoute::HEIGHT:return "STAND_HEIGHT";
+    case InitialRoute::ENTRY:return "PRONE_ENTRY";
+    case InitialRoute::WALK:return "WALK";
+    case InitialRoute::LIFT:return "STAND_LIFT";
+    case InitialRoute::DEPLOY:return "STAND_DEPLOY";
+  }
+  return "OUTSIDE_CERTIFIED";
 }
 bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
   if(!q.valid)return false;
@@ -78,13 +116,7 @@ bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
 bool SimpleMotion::planInitialReference(){
   // Restart after STOP/boot from any already proved configuration region.
   // This is physical path selection from measured Q, never route tracking.
-  if(pointSafe(reference_)&&contains(collision::kHeight,reference_)){initialRoute_=InitialRoute::HEIGHT;return true;}
-  if(contains(collision::kEntry,reference_)){initialRoute_=InitialRoute::ENTRY;return true;}
-  if(!pointSafe(reference_))return false;
-  if(contains(collision::kWalk,reference_)){initialRoute_=InitialRoute::WALK;return true;}
-  if(contains(collision::kLift,reference_)){initialRoute_=InitialRoute::LIFT;return true;}
-  if(contains(collision::kDeploy,reference_)){initialRoute_=InitialRoute::DEPLOY;return true;}
-  return false;
+  return certifiedRegion(reference_,initialRoute_);
 }
 bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFrame& b,const collision::Box& box) const {
   // All independent joint progress between two endpoints is enclosed. No
@@ -107,10 +139,12 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   if(state_==State::STANDING){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!fresh(now)||!transitionSafe(actual,q,collision::kHeight))return "HEIGHT_PATH_NOT_CLEAR";
-    requestedHeight_=h;walkRequested_=false;heartbeat(now);
+    referenceFaultSlot_=12; // new accepted command: invalidate previous incident
+    requestedHeight_=h;walkRequested_=false;
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
-  }else{requestedHeight_=h;walkRequested_=false;heartbeat(now);state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";}
+  }else{referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
+    std::fill(controlFailures_,controlFailures_+12,0);}
   return nullptr;
 }
 const char* SimpleMotion::walk(unsigned stride,uint64_t now){
@@ -153,14 +187,14 @@ bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool 
 }
 bool SimpleMotion::arrived(uint64_t now) const {
   const auto terminal=segmentBox_?settleUs_:goalSentUs_;
-  if(!terminal||now<terminal||!fresh(now)||now-terminal<100000)return false;
+  if(!terminal||now<terminal||!fresh(esp_timer_get_time())||now-terminal<100000)return false;
   for(unsigned i=0;i<12;++i)if(fb_[i].stampUs<=terminal||std::abs(fb_[i].q-jointSlot(goal_,i))>kArrivalRad||magnitude(fb_[i].speed)>50)return false;
   return true;
 }
 void SimpleMotion::measureHeight(){
   // Native encoders + measured IMU orientation + flat-ground assumption.
   // No absolute height sensor exists, especially on a suspended fixture.
-  heightValid_=false;if(!fresh(nowUs_)||!input_.imuValid)return;
+  heightValid_=false;if(!fresh(esp_timer_get_time())||!input_.imuValid)return;
   Attitude a;if(!tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a))return;
   double sum=0,lo=1,hi=-1;
   const auto body=bodyPoseFromRollPitch({0,0,0},a.rollRad,a.pitchRad);
@@ -170,6 +204,10 @@ void SimpleMotion::measureHeight(){
     const double h=-world.z;sum+=h;lo=std::fmin(lo,h);hi=std::fmax(hi,h);
   }
   actualHeight_=sum/4; heightValid_=hi-lo<.015&&(phase_==Phase::HOLD||phase_==Phase::HEIGHT);
+}
+void SimpleMotion::updateTelemetry(uint64_t now){
+  if(now<nextTelemetryUs_)return;
+  nextTelemetryUs_=now+100000;measureHeight();
 }
 JointTargetFrame SimpleMotion::measured() const {
   JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=fb_[i].q;return q;
@@ -258,7 +296,8 @@ void SimpleMotion::nextStand(uint64_t now){
     case Phase::WALK_HOLD:
       segmentBox_=nullptr;planned_=false;
       phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
-      measureHeight();
+      {GaitParameters g;g.heightM=requestedHeight_;holdNominal_=solveGait(g,gaitHold(g,0,requestedHeight_,0),nullptr,false);}
+      heightValid_=false;nextTelemetryUs_=0;
       if(walkRequested_)startWalk(now);
       return;
     default:return;
@@ -281,7 +320,7 @@ void SimpleMotion::generateStand(uint64_t now){
 }
 void SimpleMotion::startWalk(uint64_t now){
   const auto g=walkGait(stride_);plannedHeight_=.150;
-  walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0));
+  walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(collision::kWalk,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=false;stopCycle_=-1;cycles_=0;
   phase_=Phase::WALK;state_=State::WALKING;reason_="WALK_STANDARD";
@@ -343,7 +382,7 @@ void SimpleMotion::generateWalk(uint64_t now){
   const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
   cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
   const bool done=walkStopping_&&cycles_>=end;if(done)cycles_=end;
-  auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_);
+  auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
   if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(!send(f.target,kWalkDrive,now))return;
@@ -358,6 +397,8 @@ void SimpleMotion::update(uint64_t now){
   nowUs_=now;
   if(serviceStop())return;
   if(offPending_){serviceOff();return;}
+  // Electrical supervision is not gated by the 20 ms trajectory release.
+  if(engaged()&&!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!engaged()&&state_==State::READY&&(!input_.ready||!input_.powerOk||!input_.imuValid)){state_=State::STOPPED;reason_=input_.refusal;}
   if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_="READY";}
   if(!input_.ready&&!engaged())return;
@@ -366,9 +407,11 @@ void SimpleMotion::update(uint64_t now){
   const uint64_t gap=lastReleaseUs_?now-lastReleaseUs_:0;
   maxGapUs_=std::max(maxGapUs_,gap);lastReleaseUs_=now;++releases_;
   const auto skipped=(now-nextUs_)/kPeriodUs;missed_+=skipped;nextUs_+=(skipped+1)*kPeriodUs;
+  ReleaseTimer timer(maxReleaseWorkUs_);
   if(energized_&&gap>100000){fault("MOTION_DEADLINE_LOST");serviceOff();return;}
   if(engaged()&&(!input_.ready||!input_.powerOk||!input_.authorityOk)){fault(input_.refusal);serviceOff();return;}
-  if(engaged()&&(!heartbeatUs_||now-heartbeatUs_>3000000)){fault("OPERATOR_LINK_LOST");serviceOff();return;}
+  // An accepted command continues without any command source: no browser,
+  // session or heartbeat condition exists here, only physical faults below.
   if(energized_&&(!input_.imuValid||now-input_.imuStampUs>600000)){fault("IMU_STALE");serviceOff();return;}
   // Two single-block reads per 20 ms: whole population every 120 ms, at
   // most 4 ms wait. One 2-block control read each 120 ms adds <=4 ms.
@@ -379,19 +422,23 @@ void SimpleMotion::update(uint64_t now){
       // Hard physical limits, no comparison to a target's time history.
       if(energized_&&phase_!=Phase::ENABLE&&phase_!=Phase::LOWER&&phase_!=Phase::ALIGN&&
          (f.q<input_.minRad[i]-2*kTickRad||f.q>input_.maxRad[i]+2*kTickRad)){fault("MEASURED_MECHANICAL_LIMIT");break;}
-    }else if(++failures_[i]>=3&&energized_){fault("SERVO_COMMUNICATION_LOST");break;}
+    }else if(!port_->readDeferred()&&++failures_[i]>=3&&energized_){fault("SERVO_COMMUNICATION_LOST");break;}
     if(stop_.load())break;
   }
   if(serviceStop())return;
   if(offPending_){serviceOff();return;}
+  if(energized_&&phase_==Phase::ENABLE&&!fresh(esp_timer_get_time())){fault("SERVO_FEEDBACK_STALE");serviceOff();return;}
   if(phase_==Phase::ACQUIRE){
     Feedback f;const bool read=port_->read(acquire_,true,f);if(serviceStop())return;
-    if(!read){fault("INITIAL_SERVO_READ_FAILED");return;}
-    fb_[acquire_]=f;
+    // An unanswered READ measures nothing: the same servo is read again at the
+    // next release. RX_PENDING defers without a new lost reply; three actual
+    // failed attempts still fault. The pending horizon is owned by ServoBus.
+    if(!read){if(port_->readDeferred())return;if(++controlFailures_[acquire_]>=3)fault("INITIAL_SERVO_READ_FAILED");return;}
+    controlFailures_[acquire_]=0;fb_[acquire_]=f;
     if(f.torque!=0||f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");return;}
     if(++acquire_==12){
       reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-      if(!fresh(now)||!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+      if(!fresh(esp_timer_get_time())||!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
       phase_=Phase::REFERENCE;
     }
     return;
@@ -400,17 +447,61 @@ void SimpleMotion::update(uint64_t now){
     // Write the real measured reference with torque OFF before enabling.
     reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
     if(!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+    // ST-3215-C018 position-profile writes can arm torque (QC V6.1).
+    // Restore OFF immediately; ENABLE independently verifies it per joint.
+    energized_=true;offMask_=0; // even an uncertain reference TX may have armed
     if(!send(reference_,kStandDrive,now,true))return;
-    phase_=Phase::ENABLE;enable_=0;return;
+    if(!port_->off()){fault("REFERENCE_TORQUE_OFF_UNCERTAIN");serviceOff();return;}
+    phase_=Phase::ENABLE;enable_=0;referenceOffRetries_=0;return;
   }
   if(phase_==Phase::ENABLE){
     // Verify each exact GoalPosition/RAM profile BEFORE enabling that servo.
     Feedback f;
     const bool read=port_->read(enable_,true,f);if(serviceStop())return;
-    if(!read||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc||f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>kArrivalRad){fault("REFERENCE_CHANGED_BEFORE_ENABLE");return;}
+    if(read){
+      fb_[enable_]=f; // publish this actual observation, including failed admission
+      if(f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");serviceOff();return;}
+    }
+    if(read&&(f.torque!=0||std::abs(f.q-jointSlot(reference_,enable_))>kArrivalRad)){
+      // A profile write can arm an ST3215 and a broadcast OFF has no ACK.
+      // Only a stationary, unchanged, exact holding reference can retry OFF.
+      // No goal/ON write here: the next release must independently prove OFF
+      // and the same real position again. A lost OFF stays a bounded fault.
+      if(f.torque==1&&std::abs(f.q-jointSlot(reference_,enable_))<=kArrivalRad&&
+         f.goal==commandedRaw_[enable_]&&f.goalSpeed==kStandDrive.speed&&f.acc==kStandDrive.acc&&referenceOffRetries_<2){
+        ++referenceOffRetries_;
+        const bool off=port_->off(enable_);if(serviceStop())return;
+        if(!off){fault("REFERENCE_TORQUE_OFF_UNCERTAIN");serviceOff();}
+        return;
+      }
+      // Emit a reference guard only for the fault, not a recovered OFF retry.
+      referenceFaultSlot_=enable_;referenceFaultFeedback_=f;referenceFaultRaw_=commandedRaw_[enable_];
+      fault("REFERENCE_CHANGED_BEFORE_ENABLE");
+      serviceOff(); // de-escalate before emitting the single fault diagnostic
+      port_->referenceFault(enable_,f,jointSlot(reference_,enable_),commandedRaw_[enable_]);
+      return;
+    }
+    // No answer, or the reference SYNC_WRITE (no reply exists) not applied by
+    // this servo, is not a pose change. Re-send the identical frame, then
+    // restore OFF only for the not-yet-enabled suffix: a profile can arm it.
+    // Already enabled joints keep holding; the same slot is re-verified.
+    if(!read&&port_->readDeferred())return; // no new unanswered reply during RX recovery
+    if(!read||f.goal!=commandedRaw_[enable_]||f.goalSpeed!=kStandDrive.speed||f.acc!=kStandDrive.acc){
+      if(++controlFailures_[enable_]>=3){fault(read?"SERVO_TORQUE_OR_GOAL_LOST":"SERVO_CONTROL_READ_LOST");return;}
+      if(read){
+        const bool sent=port_->frame(commandedRaw_,kStandDrive);
+        const bool off=port_->off(enable_);
+        if(serviceStop())return;
+        if(!sent||!off){fault(sent?"REFERENCE_TORQUE_OFF_UNCERTAIN":"SYNC_WRITE_FAILED");serviceOff();}
+      }
+      return;
+    }
+    controlFailures_[enable_]=0;
     energized_=true;offMask_=0; // even a failed enable may have applied; SAFE_OFF required
     const bool enabled=port_->enable(enable_);if(serviceStop())return;
     if(!enabled){fault("TORQUE_ENABLE_UNCERTAIN");return;}
+    fb_[enable_].torque=1; // independent torque readback succeeded in enable()
+    referenceOffRetries_=0;
     if(++enable_==12){
       imuStartUs_=now;const auto actual=measured();
       switch(initialRoute_){
@@ -438,11 +529,12 @@ void SimpleMotion::update(uint64_t now){
     if(read){
       fb_[i]=f;controlFailures_[i]=0;
       if(energized_&&(f.torque!=1||f.goal!=commandedRaw_[i]||f.goalSpeed!=commandedDrive_.speed||f.acc!=commandedDrive_.acc)){fault("SERVO_TORQUE_OR_GOAL_LOST");return;}
-    }else if(energized_&&++controlFailures_[i]>=3){fault("SERVO_CONTROL_READ_LOST");return;}
+    }else if(energized_&&!port_->readDeferred()&&++controlFailures_[i]>=3){fault("SERVO_CONTROL_READ_LOST");return;}
   }
   if(serviceStop())return;
-  if(energized_&&!fresh(now)){fault("SERVO_FEEDBACK_STALE");return;}
-  measureHeight();
+  // READ publication can follow release entry by more than the future tolerance.
+  // Use the gate clock; keep the trajectory epoch and all age limits unchanged.
+  if(energized_&&!fresh(esp_timer_get_time())){fault("SERVO_FEEDBACK_STALE");return;}
   if(pendingGoalValid_){
     pendingGoalValid_=false;JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
@@ -453,13 +545,16 @@ void SimpleMotion::update(uint64_t now){
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
+    // At a settled boundary generate only the next segment in this release.
+    if(arrived(now)){nextStand(now);return;}
     if(segmentBox_)generateStand(now);
     if(offPending_||stop_.load())return;
-    if(arrived(now)){nextStand(now);return;}
     if(now>(segmentBox_?segmentDeadlineUs_:goalDeadlineUs_)){fault("NATIVE_TARGET_NOT_REACHED");return;}
   }
   if(phase_==Phase::HOLD){
-    GaitParameters g;g.heightM=requestedHeight_;auto f=solveGait(g,gaitHold(g,0,requestedHeight_,0));
+    // Nominal height/contacts are constant in HOLD; only the IMU correction
+    // changes. Do not solve the same nominal IK and differential every 20 ms.
+    auto f=holdNominal_;
     if(f.target.valid){compensate(f,now);send(f.target,kStandDrive,now);}
   }
 }

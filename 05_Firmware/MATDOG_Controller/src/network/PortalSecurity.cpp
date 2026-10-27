@@ -341,7 +341,12 @@ bool PortalSession::current(uint64_t now, uint32_t peer, const char *cookie) {
 }
 bool PortalSession::authorize(uint64_t now, uint32_t peer, const char *cookie,
                               const char *csrf) {
-  return current(now, peer, cookie) && tokenEqual(csrf, csrf_);
+  // Authenticated use (peer + cookie + CSRF) keeps the session alive: it ends
+  // 300 s after its last use, at logout or on a new AP generation, never
+  // while the Dashboard is in use.
+  if (!current(now, peer, cookie) || !tokenEqual(csrf, csrf_)) return false;
+  issued_ = now;
+  return true;
 }
 } // namespace network
 } // namespace matdog

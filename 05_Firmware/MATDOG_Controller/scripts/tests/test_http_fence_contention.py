@@ -18,7 +18,7 @@ def between(text, start, end):
     assert text.count(start) == 1 and text.count(end) == 1, (start, end)
     return text.split(start, 1)[1].split(end, 1)[0]
 dispatch = 'bool HttpTransport::dispatch(' + between(c, 'bool HttpTransport::dispatch(', 'void HttpTransport::appendTransportStats')
-tail = '  if (xSemaphoreTake(request_ready_, 0) != pdTRUE)\n    return;\n' + between(c, '  if (xSemaphoreTake(request_ready_, 0) != pdTRUE)\n    return;\n', '\nvoid HttpTransport::serviceRequest')
+tail = '  // Keep Controller-side JSON/auth work in slack.' + between(c, '  // Keep Controller-side JSON/auth work in slack.', '\nvoid HttpTransport::serviceRequest')
 admission = between(c, 'void HttpTransport::serviceRequest(uint32_t now_ms) {\n', '  switch (req.kind) {')
 status_case = 'case HttpRequestKind::MOTION_STATUS:' + between(c, 'case HttpRequestKind::MOTION_STATUS:', 'case HttpRequestKind::MOTION_CAPABILITIES:')
 command_case = 'case HttpRequestKind::MOTION_COMMAND: {' + between(c, 'case HttpRequestKind::MOTION_COMMAND: {', 'case HttpRequestKind::CALIBRATION_RESTORE: {')
@@ -67,6 +67,9 @@ struct FakeService {
   AdminAccess gate;
   struct { bool run_mode=false,connected=false; uint32_t ipv4=0; uint8_t role_reason=0; } wifi;
   std::atomic<unsigned> statuses{0},commands{0},stops{0};
+  std::atomic<bool> slack{true};
+  std::function<void()> beforeSlackReturn;
+  bool motionSlack(uint64_t,uint32_t reserve) const { if(beforeSlackReturn)beforeSlackReturn(); return reserve==5000&&slack.load(); }
   FakeService() { gate.begin(); gate.open(); }
   AdminAccess& networkAdminAccess() { return gate; }
   const decltype(wifi)& wifiStatus() const { return wifi; }
@@ -91,7 +94,7 @@ class HttpTransport {
   HttpTransportRequest pending_request_{}; HttpTransportResponse pending_response_{};
   std::atomic<uint32_t> sequence_{0},ready_sequence_{0},dispatch_last_ms_{0},dispatch_max_ms_{0},dispatch_late_{0},dispatch_busy_{0};
   char motion_capabilities_[kMotionCapabilitiesBytes]{};
-  std::atomic<bool> stop_lock_{false},stop_pending_{false},stop_ack_ok_{false};
+  std::atomic<bool> stop_lock_{false},stop_pending_{false},stop_ack_ok_{false},stop_applied_{false};
   HttpTransportRequest stop_request_{}; char stop_ack_[128]{};
   std::atomic<uint32_t> stop_epoch_{0},stop_done_{0},stop_ticket_{0};
   static constexpr uint32_t kDispatchTimeoutMs=3000;
@@ -210,6 +213,45 @@ int main(){
   // 9. No contention: ordinary request served on the first pass, once.
   { HttpTransport t;Loop loop(t);Result r;auto th=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&r);th.join();
     check(r.ok&&r.resp.ok&&t.service.statuses.load()==1,"uncontended GET served once"); }
+  // 10. No Motion slack: HTTP times out but cleanup must not require slack.
+  // An expired command must never execute when slack eventually returns.
+  { HttpTransport t;t.service.slack.store(false);Loop loop(t);Result r;
+    auto th=reader(t,apRequest(t,HttpRequestKind::MOTION_COMMAND),80,&r);th.join();loop.waitPasses(10);
+    check(!r.ok&&!std::strcmp(r.failure,"CONTROLLER_LOOP_LATE"),"no slack: bounded timeout");
+    const bool free=xSemaphoreTake(t.slot_free_,0)==pdTRUE;
+    check(free,"abandoned slot reclaimed even without Motion slack");
+    if(free)xSemaphoreGive(t.slot_free_);
+    check(t.service.commands.load()==0,"no command work without slack");
+    t.service.slack.store(true);loop.waitPasses(10);
+    check(t.service.commands.load()==0,"expired command never executed after slack returns");
+    // STOP has its own lane even while ordinary JSON work has no slack.
+    t.service.slack.store(false);
+    const auto ticket=publishStop(t);
+    loop.waitPasses(10);
+    check(t.stop_done_.load()==ticket&&t.service.stops.load()==1,"STOP serviced without Motion slack");
+    t.service.slack.store(true);loop.waitPasses(10);
+    Result again;auto retry=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&again);retry.join();
+    check(again.ok&&again.resp.ok,"HTTP recovers when Motion slack returns"); }
+  // 11. Repeated polls through alternating busy/released Motion windows.
+  { HttpTransport t;Loop loop(t);
+    for(unsigned i=0;i<50;++i){t.service.slack.store(false);Result r;
+      auto th=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&r);
+      loop.waitPasses(3);t.service.slack.store(true);th.join();
+      check(r.ok&&r.resp.ok,"poll served after bounded busy window");}
+    check(t.service.statuses.load()==50,"all repeated polls delivered exactly once"); }
+  // 12. Reader expires after update's initial cancellation check. Force the
+  // inter-core preemption order, without relying on a probabilistic race.
+  { HttpTransport t;std::atomic<bool> expired{false};Result r;
+    t.service.beforeSlackReturn=[&]{while(!expired.load())std::this_thread::yield();};
+    { Loop loop(t);
+      auto th=std::thread([&]{r.ok=t.dispatch(apRequest(t,HttpRequestKind::MOTION_COMMAND),&r.resp,nullptr,0,80,&r.failure);expired.store(true);});
+      th.join();loop.waitPasses(5);
+      check(!r.ok&&!std::strcmp(r.failure,"CONTROLLER_LOOP_LATE"),"preempted admission: reader expired");
+      check(t.service.commands.load()==0,"preempted admission: abandoned command never served");
+      const bool free=xSemaphoreTake(t.slot_free_,0)==pdTRUE;
+      check(free,"preempted admission: slot reclaimed");if(free)xSemaphoreGive(t.slot_free_);
+    }
+  }
   std::printf("HTTP_FENCE_CONTENTION %s checks=%d failures=%d (production dispatch/update/admission/STOP lane; threads; no hardware)\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;
 }

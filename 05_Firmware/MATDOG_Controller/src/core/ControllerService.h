@@ -61,19 +61,9 @@ class CalibrationRestoreHook {
   virtual bool restoreJson(uint32_t generation, bool operator_confirmed, char* out, size_t cap) = 0;
 };
 
-// Operational deadman (2026-10-14): an authenticated AP/Dashboard request
-// proves a present operator. Lapsing heartbeats expire the motion permit.
-class OperatorHeartbeatHook {
- public:
-  virtual ~OperatorHeartbeatHook() = default;
-  virtual void heartbeat(uint32_t now_ms) = 0;
-};
-
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
-  void bindOperatorHeartbeat(OperatorHeartbeatHook* hook) { heartbeat_hook_=hook; }
-  void operatorHeartbeat(uint32_t now_ms) { if(heartbeat_hook_)heartbeat_hook_->heartbeat(now_ms); }
   // Operational readiness view for the Dashboard (static strings).
   struct ReadinessView { const char* system_health="BOOTING"; const char* calibration="NOT_RESTORED";
     const char* joint_feedback="UNAVAILABLE"; const char* motion_authority="NOT_GRANTED"; const char* phase="BOOTING"; const char* reason="BOOTING"; };
@@ -92,7 +82,9 @@ class ControllerService {
   bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) const { return motion_&&motion_->ackJson(ack,out,cap); }
   bool motionActive() const { return motion_&&motion_->busy(); }
   bool motionEngaged() const { return motion_&&motion_->engaged(); }
-  void motionDisconnected(uint32_t now_ms) { if(motion_)motion_->disconnected(now_ms); }
+  bool motionSlack(uint64_t now,uint32_t reserve) const {
+    return !motion_||motion_->slack(now,reserve);
+  }
 
 
   void begin(const Modules& modules) { modules_ = modules; }
@@ -218,8 +210,10 @@ class ControllerService {
 
   // Network mutations share the Controller's safety facts; no actuator action
   // is exposed here. Config queue sets busy atomically before returning.
+  // The default RUN (administrative AP role) is not critical by itself; an
+  // operator @MODE RUN (router role) is, as before.
   bool networkCritical() const {
-    return motionActive() || powerState() != PowerState::RUN || operatingMode() != OperatingMode::MAINTENANCE ||
+    return motionActive() || powerState() != PowerState::RUN || modules_.operating_mode->routerRole() ||
            authorityOwner() != ActuatorAuthority::NONE || authorityInhibited() ||
            (modules_.calibration && modules_.calibration->sessionLive()) ||
            (modules_.q0_capture && modules_.q0_capture->active()) ||
@@ -263,7 +257,6 @@ class ControllerService {
   Modules modules_{};
   MotionService* motion_=nullptr;
   CalibrationRestoreHook* restore_hook_=nullptr;
-  OperatorHeartbeatHook* heartbeat_hook_=nullptr;
   ReadinessView readiness_view_{};
   CalibrationPersistenceView calibration_persistence_{};
 };
