@@ -10,7 +10,8 @@ const char* boolean(bool b){return b?"true":"false";}
 }
 void MotionService::update(){
  if(!active_||!motion_)return;
- if(!strcmp(motion_->phase(),"PRONE_CONTACT_UNVERIFIED"))activeAck_.reason="PRONE_CONTACT_UNVERIFIED";
+ // PRONE terminal completes the LIE_DOWN command: torque ON, contact NOT verified.
+ if(motion_->state()==simple::State::PRONE){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_CONTACT_UNVERIFIED";active_=false;}
  if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
  if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
  if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
@@ -35,7 +36,10 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
- if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){motion_->walkStop();return result(nullptr);}
+ if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
+   // Nothing to stop in the held PRONE terminal: never take over the active command.
+   if(motion_->state()==simple::State::PRONE)return result("NOT_WALKING");
+   motion_->walkStop();return result(nullptr);}
  if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY&&c.intent!=motion::Intent::LIE_DOWN)return result("COMMAND_NOT_IN_SIMPLE_V1");
  if(!ready_)return result(reason_);
  if(prepare_&&(why=prepare_(context_)))return result(why);

@@ -390,10 +390,17 @@ async function boot() {
   await refresh(fx.status_ready);
 
   // PRONE is visible, explicit and requires an existing STAND HOLD; it never masquerades as STOP.
+  // dev.5: offered only from STAND (the Controller still refuses it elsewhere: fixture ack_prone).
+  assert(q('#simple-prone').disabled, 'PRONE disabled outside STANDING');
+  const standing=JSON.parse(fx.status_ready);standing.state='STANDING';standing.phase='HOLD';await refresh(JSON.stringify(standing));
+  assert(!q('#simple-prone').disabled, 'PRONE offered from STANDING');
   await send('prone', () => q('#simple-prone').click(), ok(fx.ack_prone), 'POSTURE.LIE_DOWN', {}, 5000);
-  assert(/REJECTED.*PRONE_REQUIRES_STAND_HOLD/.test(last()));
+  assert(/REJECTED.*PRONE_REQUIRES_STAND_HOLD/.test(last())); // Controller refusal still rendered
   await refresh(fx.status_prone_unverified);
   assert(/Appoggio non verificato/.test(q('#simple-reason').textContent));
+  // Held PRONE terminal (state PRONE, torque ON): STAND/WALK offered without STOP; nothing to WALK STOP.
+  assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND after PRONE without STOP');
+  assert(q('#simple-prone').disabled && q('#simple-walk-stop').disabled);
   assert(/goal fissi; appoggio non verificato/.test(q('#simple-values').textContent));
   assert(!q('#simple-stop').disabled);
   // A new HTTP response with old controller feedback is not fresh.
@@ -404,6 +411,17 @@ async function boot() {
   const delayed=JSON.parse(fx.status_ready);delayed.snapshot_age_ms=2000;
   await refresh(JSON.stringify(delayed));
   assert.strictEqual(q('#simple-state').textContent,'COLLEGAMENTO PERSO');
+  // dev.5 (trace 30/10): source-fresh data stay fresh between polls. A render one
+  // poll period (350 ms) after the response is not FEEDBACK NON FRESCO; only the
+  // link bound (snapshot age >= 1500 ms) degrades it, to COLLEGAMENTO PERSO.
+  await refresh(fx.status_ready);device.holdUrl='/api/motion/status';
+  await p.poll(350);
+  assert.strictEqual(q('#simple-state').textContent,'READY','fresh source data between polls');
+  assert(/Età snapshot Motion\d+ ms/.test(values()) && parseInt(values().split('Età snapshot Motion')[1])>=350, 'effective page age stays visible');
+  await p.poll(1200);
+  assert.strictEqual(q('#simple-state').textContent,'COLLEGAMENTO PERSO','link bound unchanged');
+  const tr=p.dom.window.matdogMotionTrace;assert(tr.poll_skipped>=1,'skipped poll recorded');
+  device.release();await settle();
   // While the next GET hangs, age advances and stale controls disable without another response.
   await refresh(fx.status_walking);device.holdUrl='/api/motion/status';
   await p.poll(2000);

@@ -13,7 +13,7 @@ static void descend(Replay& r){
  if(!atEnd(r)){printf("FAIL descent: %s | %s\n",r.m.reason(),r.trail().c_str());std::exit(1);}
  assert(r.p.reads-reads<=2*(r.m.releases()-releases)+(r.m.releases()-releases+5)/6);
  for(unsigned i=0;i<12;++i){assert(mechanical[i]>=0&&boxMargin[i]>=0);printf("MARGIN,%u,%.12f,%.12f\n",i,mechanical[i],boxMargin[i]);}
- assert(r.m.energized()&&r.m.state()==simple::State::MOVING&&!r.m.offVerified());
+ assert(r.m.energized()&&r.m.state()==simple::State::PRONE&&!r.m.offVerified());
  assert(r.p.offCalls==off&&r.p.enables==enables&&maxStep<=12);
  for(unsigned j=frames;j<r.p.sent.size();++j)assert(r.p.sentTorqueOn[j]==12);
  for(unsigned i=0;i<12;++i)assert(r.p.observed[i].q>=r.in.minRad[i]&&r.p.observed[i].q<=r.in.maxRad[i]);
@@ -22,12 +22,38 @@ static void descend(Replay& r){
 }
 static void until(Replay& r,const char* phase){for(unsigned n=0;n<4000&&strcmp(r.m.phase(),phase)&&r.m.state()!=simple::State::FAULT;++n)r.tick();assert(!strcmp(r.m.phase(),phase));}
 int main(){
- (void)checks;(void)lowers;
+ setvbuf(stdout,nullptr,_IOLBF,0);(void)checks;(void)lowers;
  for(double h:{.05,.10,.15}){Replay r;r.in.quaternion[0]=1;r.in.quaternion[2]=0;assert(!r.m.stand(h,r.p.now));
    for(unsigned n=0;n<6000&&r.m.state()==simple::State::MOVING;++n)r.tick();assert(r.m.state()==simple::State::STANDING);descend(r);
    const auto frames=r.p.frames,off=r.p.offCalls;for(unsigned n=0;n<30000;++n)r.tick();
    assert(atEnd(r)&&r.p.frames==frames&&r.p.offCalls==off&&r.m.energized()); // virtual 600 s, NOT thermal validation
-   assert(!strcmp(r.m.stand(.05,r.p.now),"MOTION_BUSY"));r.m.stop();for(unsigned n=0;n<20;++n)r.tick(false);assert(r.m.offVerified());}
+   // dev.5: STAND directly from the held terminal, torque kept ON (no SAFE_OFF,
+   // no re-enable), through DISENGAGE/ALIGN/DEPLOY/LIFT; PRONE is refused there.
+   assert(!strcmp(r.m.prone(r.p.now),"PRONE_REQUIRES_STAND_HOLD"));
+   const auto enables=r.p.enables;assert(!r.m.stand(h,r.p.now)&&r.m.state()==simple::State::MOVING);
+   assert(!strcmp(r.m.stand(h,r.p.now),"MOTION_BUSY"));
+   for(unsigned n=0;n<6000&&r.m.state()==simple::State::MOVING;++n)r.tick();
+   if(r.m.state()!=simple::State::STANDING){printf("FAIL rise from PRONE: %s | %s\n",r.m.reason(),r.trail().c_str());std::exit(1);}
+   assert(r.p.offCalls==off&&r.p.enables==enables&&r.m.energized());
+   printf("PASS STAND%.0f -> PRONE -> STAND%.0f without STOP | %s\n",h*1000,h*1000,r.trail().c_str());
+   descend(r); // and down again
+   r.m.stop();for(unsigned n=0;n<20;++n)r.tick(false);assert(r.m.offVerified());}
+ // WALK from the held terminal: same STAND(150) rise, then the gait; WALK STOP -> HOLD, torque ON throughout.
+ {Replay r;r.start();assert(!r.m.prone(r.p.now));until(r,terminal);const auto off=r.p.offCalls,enables=r.p.enables;
+  assert(!r.m.walk(1,r.p.now));for(unsigned n=0;n<8000&&r.m.state()!=simple::State::WALKING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+  assert(r.m.state()==simple::State::WALKING);for(unsigned n=0;n<150;++n)r.tick();r.m.walkStop();
+  for(unsigned n=0;n<4000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+  assert(r.m.state()==simple::State::STANDING&&r.p.offCalls==off&&r.p.enables==enables&&r.m.energized());
+  printf("PASS PRONE -> WALK -> WALK STOP -> HOLD without STOP | %s\n",r.trail().c_str());}
+ // Rise refused without TX (stays PRONE, torque ON) on stale feedback; a measured
+ // pose outside the entry box is caught first by the existing terminal guard.
+ {Replay r;r.start();assert(!r.m.prone(r.p.now));until(r,terminal);const auto f=r.p.frames;
+  assert(!strcmp(r.m.stand(.05,r.p.now+400000),"PRONE_FEEDBACK_UNAVAILABLE")&&r.m.state()==simple::State::PRONE&&r.p.frames==f&&r.m.energized());
+  r.p.holdObservation=true;r.p.observed[0].raw+=400;r.p.observed[0].q+=400*simple::kTickRad;
+  for(unsigned n=0;n<12&&r.m.state()==simple::State::PRONE;++n)r.tick();
+  assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"PRONE_MEASURED_OUTSIDE_BOX"));
+  for(unsigned n=0;n<30;++n)r.tick(false);assert(r.m.offVerified());
+  puts("PASS rise refused on stale feedback; outside-box terminal guard unchanged");}
  for(const auto& c:residualCases){Replay r;r.start();r.sample=&c;for(unsigned n=0;n<12;++n)r.tick();descend(r);}
  for(const char* phase:{"PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND",terminal}){
   for(int mode=0;mode<6;++mode){Replay r;r.start();assert(!r.m.prone(r.p.now));until(r,phase);r.tick();
@@ -50,6 +76,15 @@ int main(){
  {Replay r;r.start();core::MotionService svc;svc.begin(&r.m,nullptr,nullptr);svc.setReady(true,"READY");
   motion::MotionCommand c;c.intent=motion::Intent::LIE_DOWN;c.owner=motion::ClientOwner::DASHBOARD;c.sequence=1;c.issued_at_ms=r.p.now/1000;c.ttl_ms=1000;strcpy(c.id,"prone-end");
   assert(svc.command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);until(r,terminal);svc.update();core::MotionStatusSnapshot s;assert(svc.captureStatus(s,r.p.now/1000));
-  assert(!strcmp(s.activeOutcome,"ACCEPTED")&&!strcmp(s.activeReason,terminal)&&s.energized&&!s.offVerified);}
- puts("PRONE PASS: 3 heights, 23 measured-residual scenarios, 30 STOP/fault cases, STOP in TX, 600 s virtual terminal; IMPLEMENTED NOT VALIDATED");
+  assert(!strcmp(s.activeOutcome,"COMPLETED")&&!strcmp(s.activeReason,terminal)&&s.energized&&!s.offVerified&&s.finishedMs);
+  // WALK STOP has nothing to stop there and must not take over the active command.
+  motion::MotionCommand w=c;w.intent=motion::Intent::BASE_VELOCITY;w.vx=0;w.sequence=2;w.issued_at_ms=r.p.now/1000;strcpy(w.id,"walk-stop");
+  const auto a=svc.command(w,r.p.now/1000);assert(a.outcome==motion::CommandOutcome::REJECTED&&!strcmp(a.reason,"NOT_WALKING"));
+  svc.update();assert(svc.captureStatus(s,r.p.now/1000)&&!strcmp(s.activeId,"prone-end")&&!strcmp(s.activeOutcome,"COMPLETED"));
+  motion::MotionCommand st=c;st.intent=motion::Intent::STAND;st.target_height_m=.05;st.sequence=3;st.issued_at_ms=r.p.now/1000;strcpy(st.id,"stand-again");
+  assert(svc.command(st,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+  for(unsigned n=0;n<6000&&r.m.state()==simple::State::MOVING;++n)r.tick();svc.update();assert(svc.captureStatus(s,r.p.now/1000));
+  assert(r.m.state()==simple::State::STANDING&&!strcmp(s.activeId,"stand-again")&&!strcmp(s.activeOutcome,"COMPLETED"));
+  puts("PASS service: PRONE COMPLETED, WALK STOP rejected NOT_WALKING, STAND accepted and COMPLETED");}
+ puts("PRONE PASS: 3 heights (STAND->PRONE->STAND->PRONE), 23 measured-residual scenarios, 30 STOP/fault cases, STOP in TX, 600 s virtual terminal; IMPLEMENTED NOT VALIDATED");
 }

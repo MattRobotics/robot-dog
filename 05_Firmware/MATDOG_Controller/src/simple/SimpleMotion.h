@@ -25,7 +25,9 @@ struct Drive { uint16_t speed; uint8_t acc; };
 // STAND rc.10: register ceilings above the planner (above); inside the WALK
 // pair already used in operation. WALK retains the STANDARD reference's ceilings.
 constexpr Drive kStandDrive{480,13}, kWalkDrive{1000,50}, kCalibrationDrive{160,8};
-enum class State : uint8_t { READY, MOVING, STANDING, WALKING, STOPPED, FAULT };
+// PRONE: held PRONE terminal, torque ON, contact unverified; not MOVING (a new
+// STAND may rise from it), never an automatic SAFE_OFF.
+enum class State : uint8_t { READY, MOVING, STANDING, WALKING, STOPPED, FAULT, PRONE };
 const char* name(State);
 struct Feedback {
   bool valid=false; uint64_t stampUs=0,controlStampUs=0;
@@ -151,6 +153,7 @@ class SimpleMotion {
   bool heightVias(double from,double to);
   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
   void beginProne(Phase,uint64_t);
+  bool proneDisengage(motion::JointTargetFrame&) const;
   bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT; }
   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
   void beginLift(const motion::JointTargetFrame* measured,uint64_t);

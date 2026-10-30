@@ -78,7 +78,7 @@ bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
   if(timing::state.active)++timing::state.working.frames;
   return port_->frame(raw,drive);
 }
-const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";}return "FAULT";}
+const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";case State::PRONE:return "PRONE";}return "FAULT";}
 const char* SimpleMotion::phase() const {
   static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE","PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND","PRONE_CONTACT_UNVERIFIED"};
   return p[static_cast<unsigned>(phase_)];
@@ -181,6 +181,20 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   if(!input_.imuValid)return "IMU_UNAVAILABLE";
   if(state_==State::MOVING||state_==State::WALKING)return "MOTION_BUSY";
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
+  if(state_==State::PRONE){
+    // Rise from the held terminal through the same DISENGAGE->ALIGN->DEPLOY->
+    // LIFT route as a STAND from PRONE_ENTRY, keeping torque ON (no SAFE_OFF,
+    // no re-enable). Admitted only from a fresh measured pose in the certified
+    // entry region whose DISENGAGE transition is clear; the release re-checks.
+    if(phase_!=Phase::PRONE_WAIT||!energized_||!segmentTo_.valid)return "MOTION_BUSY";
+    if(!fresh(now))return "PRONE_FEEDBACK_UNAVAILABLE";
+    InitialRoute route=InitialRoute::ENTRY;JointTargetFrame d;
+    if(!certifiedRegion(measured(),route)||route!=InitialRoute::ENTRY||!proneDisengage(d)||!transitionSafe(measured(),d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";
+    referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;reason_="STAND_FROM_PRONE";
+    pendingGoalValid_=true; // intent only; DISENGAGE starts at the next Motion release
+    timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
+    return nullptr;
+  }
   if(state_==State::STANDING){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!fresh(now)||!transitionSafe(actual,q,collision::kHeight))return "HEIGHT_PATH_NOT_CLEAR";
@@ -433,6 +447,13 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
   beginPlan(next,*box,now,next==Phase::PRONE_LAND?.10:kStandSpeedRadS,
                          next==Phase::PRONE_LAND?.20:kStandAccelerationRadS2);
 }
+bool SimpleMotion::proneDisengage(JointTargetFrame& q) const {
+  // Same DISENGAGE target rule as ENABLE (ENTRY): hips/uppers stay, lower
+  // joints go to the route head. Reference = last nominal PRONE_LAND goal.
+  if(!segmentTo_.valid)return false;
+  q=segmentTo_;const auto h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
+  return pointSafe(q)&&contains(collision::kEntry,q);
+}
 void SimpleMotion::nextStand(uint64_t now){
   timing::Section section(timing::NOMINAL);
   const JointTargetFrame actual=measured();
@@ -445,7 +466,7 @@ void SimpleMotion::nextStand(uint64_t now){
       // Deliberately NOT SAFE_OFF and NOT a contact assertion: the rigid CAD
       // endpoint still needs rear-foot support. Freeze the final written goal;
       // fresh feedback, native/electrical/IMU guards and STOP remain serviced.
-      phase_=Phase::PRONE_WAIT;reason_="PRONE_CONTACT_UNVERIFIED";planned_=false;
+      phase_=Phase::PRONE_WAIT;state_=State::PRONE;reason_="PRONE_CONTACT_UNVERIFIED";planned_=false;
       heightValid_=false;return;
     case Phase::ENABLE:{  // folded entry: lower joints to the route head first
       auto q=reference_,h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
@@ -721,6 +742,12 @@ void SimpleMotion::update(uint64_t now){
   if(pendingGoalValid_){
     pendingGoalValid_=false;
     if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
+    if(phase_==Phase::PRONE_WAIT){
+      // Nominal terminal goal, not the sagging encoder pose (as for HEIGHT).
+      JointTargetFrame d;if(!proneDisengage(d)||!transitionSafe(measured(),d,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
+      const double* head=paired_data::kKnots[0].p;initialRoute_=InitialRoute::ENTRY;imuStartUs_=now;
+      beginNative(Phase::LOWER,d,collision::kEntry,now,head[4],head[5],head[6]);return;
+    }
     JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
