@@ -3,8 +3,9 @@
 from geometry import *
 import subprocess
 here=Path(__file__).resolve().parent;fw=here.parents[1];out=Path(sys.argv[1]);out.mkdir(exist_ok=True,parents=True)
+assert 'frontLowerFloor=-1.5246163880149817' in (fw/'src/simple/SimpleMotion.cpp').read_text()
 names=['BodyPose','ContactMode','FootContact','Gait','GaitTiming','ImuAttitude','LegKinematics','LegInverseKinematics','StandTrajectory','TiltCompensation','TiltedContactIk','MotionContract']
-subprocess.run(['g++','-std=c++17','-O2',str(here/'path_probe.cpp'),*[str(fw/'src/motion'/(n+'.cpp')) for n in names],'-o',str(out/'path_probe')],check=True)
+subprocess.run(['g++','-std=c++17','-O2',str(here/'integration_path_probe.cpp'),*[str(fw/'src/motion'/(n+'.cpp')) for n in names],'-o',str(out/'path_probe')],check=True)
 with (out/'path.csv').open('w') as f:subprocess.run([str(out/'path_probe')],stdout=f,check=True)
 rows=list(csv.DictReader((out/'path.csv').open()));sample=[]
 for i,r in enumerate(rows):
