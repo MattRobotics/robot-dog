@@ -16,10 +16,12 @@ int main(){
     if(a<mech[i]){mech[i]=a;mp[i]=ph;}if(b<boxm[i]){boxm[i]=b;bp[i]=ph;}}
   }
   bool end=!strcmp(r.m.phase(),"PRONE_CONTACT_UNVERIFIED");reached+=end;faults+=!end;
+  if(end)for(unsigned i=0;i<12;++i){assert(mech[i]>4*simple::kTickRad);assert(boxm[i]>4*simple::kTickRad);}
   printf("RESULT,%d,%d,%s,%s\n",c.height,c.ms,end?"TERMINAL":"BLOCKED",r.m.reason());
   for(unsigned i=0;i<12;++i)printf("REAL_MARGIN,%d,%d,%u,%.6f,%s,%.6f,%s\n",c.height,c.ms,i,mech[i]/simple::kTickRad,mp[i],boxm[i]/simple::kTickRad,bp[i]);
   if(end){assert(r.m.energized()&&!r.m.offVerified());printf("REAL_END,%d,%d",c.height,c.ms);for(unsigned i=0;i<12;++i)printf(",%.12f",r.m.feedback()[i].q);puts("");}
   else {for(unsigned n=0;n<30;++n)r.tick(false);assert(r.m.offVerified());}
  }
+ assert(reached==69&&rejected==0&&faults==0);
  printf("REPLAY_SUMMARY terminal=%u rejected=%u blocked=%u; NO PHYSICAL VALIDATION\n",reached,rejected,faults);
 }

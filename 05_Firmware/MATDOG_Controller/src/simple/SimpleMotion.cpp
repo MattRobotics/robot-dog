@@ -399,6 +399,15 @@ void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,co
 void SimpleMotion::beginProne(Phase next,uint64_t now){
   // Same ViaPlan/FK/IK, native RAM profile and independent-joint box proof as
   // STAND. No target is based on the loaded encoder sag as a new nominal pose.
+  // PRONE-only front LOWER floor: +20 mrad from the stand route's folded
+  // target. Recorded STAND50 sag otherwise exits kLift; STAND100/150 leave
+  // only 1-2 ticks. Keep all boxes/gen1 and the operational STAND untouched.
+  constexpr double frontLowerFloor=-1.5246163880149817;
+  auto pronePoint=[&](unsigned k){auto q=routePoint(k);
+    for(unsigned l=0;l<2;++l)q.legs[l].lower=std::fmax(q.legs[l].lower,frontLowerFloor);
+    return q;};
+  auto proneVia=[&](unsigned k){const auto* p=paired_data::kKnots[k].p;
+    return via(pronePoint(k),p[4],p[5],p[6]);};
   plan_.clear();const collision::Box* box=nullptr;
   if(next==Phase::PRONE_HEIGHT){
     box=&collision::kHeight;
@@ -408,15 +417,15 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
     box=&collision::kLift;
     if(!via(segmentTo_,0,0,plannedHeight_)){fault("PRONE_PATH_NOT_CLEAR");return;}
     for(unsigned j=sizeof(collision::kLiftKnots)/sizeof(unsigned);j-->0;){const auto k=collision::kLiftKnots[j];
-      if(knotHeight(k)<plannedHeight_-1e-6&&!knotVia(k)){fault("PRONE_PATH_NOT_CLEAR");return;}}
+      if(knotHeight(k)<plannedHeight_-1e-6&&!proneVia(k)){fault("PRONE_PATH_NOT_CLEAR");return;}}
   }else if(next==Phase::PRONE_DEPLOY){
     box=&collision::kDeploy;
     for(unsigned j=sizeof(collision::kDeployKnots)/sizeof(unsigned);j-->0;)
-      if(!knotVia(collision::kDeployKnots[j])){fault("PRONE_PATH_NOT_CLEAR");return;}
+      if(!proneVia(collision::kDeployKnots[j])){fault("PRONE_PATH_NOT_CLEAR");return;}
   }else if(next==Phase::PRONE_LAND){
     box=&collision::kEntry;
-    auto q=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].hip=(l==0||l==3?1:-1)*.17;
-    if(!knotVia(0)||!via(q,.08183102100559651,0,.009626496609908074)){fault("PRONE_PATH_NOT_CLEAR");return;}
+    auto q=pronePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].hip=(l==0||l==3?1:-1)*.17;
+    if(!proneVia(0)||!via(q,.08183102100559651,0,.009626496609908074)){fault("PRONE_PATH_NOT_CLEAR");return;}
   }else {fault("PRONE_PATH_NOT_CLEAR");return;}
   // Check the measured handover too, even when ordinary arrival (12 ticks)
   // rather than loaded-settle completed the preceding segment. No box bypass.

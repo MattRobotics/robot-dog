@@ -6,7 +6,7 @@
 #include <cassert>
 using namespace matdog;
 void knot(unsigned k,double* q){const auto* p=motion::paired_data::kKnots[k].p;
- for(unsigned l=0;l<4;++l){q[l*3]=(l==0||l==3?-1:1)*p[7];q[l*3+1]=p[l<2?2:0];q[l*3+2]=std::fmax((l<2?-88.5:-89.)*M_PI/180,p[l<2?3:1]);}
+ for(unsigned l=0;l<4;++l){q[l*3]=(l==0||l==3?-1:1)*p[7];q[l*3+1]=p[l<2?2:0];q[l*3+2]=std::fmax((l<2?(-88.5*M_PI/180+.020):(-89.*M_PI/180)),p[l<2?3:1]);}
  q[12]=p[4];q[13]=p[5];q[14]=p[6];}
 int main(){
  const double lo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
