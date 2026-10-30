@@ -73,6 +73,7 @@ void CalibrationGeometryProfile::bind(const GeometryProvenance* provenance,
     return;
   }
   provenance_ = provenance;
+  provenance_tag_ = geometryProvenanceTag(*provenance);
   joints_ = joints;
   joint_count_ = joint_count;
   endpoints_ = endpoints;
@@ -81,6 +82,7 @@ void CalibrationGeometryProfile::bind(const GeometryProvenance* provenance,
 
 void CalibrationGeometryProfile::clear() {
   provenance_ = nullptr;
+  provenance_tag_ = kNoGeometryProvenance;
   joints_ = nullptr;
   endpoints_ = nullptr;
   joint_count_ = 0;
@@ -94,7 +96,7 @@ bool CalibrationGeometryProfile::provenanceMatches(const GeometryProvenance& exp
 
 GeometryProvenanceTag CalibrationGeometryProfile::provenanceTag() const {
   if (!bound()) return kNoGeometryProvenance;
-  return geometryProvenanceTag(*provenance_);
+  return provenance_tag_;
 }
 
 const GeometryJointRecord* CalibrationGeometryProfile::findJoint(

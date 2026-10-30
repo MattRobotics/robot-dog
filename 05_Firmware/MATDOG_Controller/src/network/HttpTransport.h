@@ -60,6 +60,9 @@ struct HttpTransportResponse {
   bool ok = false;
   const char *message = "";
   char text[kHttpStatusTextBytes]{};
+  core::MotionStatusSnapshot motion_snapshot{};
+  bool motion_session=false,motion_readonly=false;
+  uint32_t loop_stack_free=0;
   size_t text_len = 0;
   uint32_t sequence = 0;
   char cookie[65]{}, device[65]{};
@@ -107,21 +110,23 @@ private:
   void lifecycleTick();
   bool admitAdmin(HttpTransportRequest &request,const char** failure=nullptr);
   bool admitReadOnly(HttpTransportRequest&);
-  bool readOnlyAdmitted(const HttpTransportRequest&) const;
+  bool readOnlyAdmitted(const HttpTransportRequest&,bool verify_radio=true) const;
   bool registerReadOnlyHandlers(httpd_handle_t);
   bool http_readonly_=false;
   uint32_t portal_generation_ = 0;
   bool portal_sta_=false;
   bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
-  bool motionStaAdmitted(const HttpTransportRequest&) const;
-  bool motionStaAdmitted(bool tls,uint32_t local_ipv4,uint32_t generation,const char** failure=nullptr) const;
+  bool motionStaAdmitted(const HttpTransportRequest&,bool verify_radio=true) const;
+  bool motionStaAdmitted(bool tls,uint32_t local_ipv4,uint32_t generation,const char** failure=nullptr,bool verify_radio=true) const;
   bool registerHandlers(httpd_handle_t server, bool admin = true);
   // failure (optional) names why false was returned: MAILBOX_BUSY,
   // ADMIN_GATE_CLOSED or CONTROLLER_LOOP_LATE. timeout_ms bounds the wait.
   bool dispatch(const HttpTransportRequest &request,
                 HttpTransportResponse *response, char* large_text=nullptr, size_t large_cap=0,
                 uint32_t timeout_ms=kDispatchTimeoutMs, const char** failure=nullptr);
-  void appendTransportStats(char* text,size_t cap);
+  void appendTransportStats(char* text,size_t cap,uint32_t loop_stack_free);
+  bool formatMotionResponse(HttpTransportResponse&);
+  bool motionReadResponseAdmitted(const HttpTransportRequest&) const;
   void serviceRequest(uint32_t now_ms);
   void wifiResponse(HttpTransportResponse &response,bool redact_network_names=false);
   void statusExtension(HttpTransportResponse &response,
@@ -147,14 +152,18 @@ private:
   // Motion READS answer within this budget or return a structured 503, so a
   // browser never has to abort first and retry behind a still-busy handler.
   static constexpr uint32_t kMotionReadBudgetMs = 1200;
+  // Requests needing Motion slack while Motion is engaged: 5 periods, then 503.
+  static constexpr uint32_t kMotionBusyBudgetMs = 100;
   // Instrumentation (no behaviour): Controller-loop gap seen by update() and
   // HTTP dispatch latency. Max values are windowed: reset when reported.
   std::atomic<uint32_t> loop_last_ms_{0}, loop_max_ms_{0}, dispatch_last_ms_{0},
       dispatch_max_ms_{0}, dispatch_late_{0}, dispatch_busy_{0};
+  std::atomic<uint32_t> read_service_last_us_{0},read_service_max_us_{0};
   uint32_t last_update_ms_ = 0;
   // Set by the Controller thread each loop: a Motion torque sequence or motion
-  // is in progress. The single httpd task then defers large Twin downloads so a
-  // STOP or heartbeat is never queued behind a ~100 KB send (304 still served).
+  // is in progress. The single httpd task then starts no large Twin download
+  // and aborts one in progress, so a STOP or a status poll is not queued behind
+  // a ~140 KB send (304 still served; every body is time-bounded anyway).
   std::atomic<bool> twin_deferred_{false};
   // One-slot STOP lane (httpd task -> Controller), independent of slot_free_.
   std::atomic<bool> stop_lock_{false};   // tiny spin lock around stop_request_ copies
@@ -162,7 +171,9 @@ private:
   std::atomic<bool> stop_pending_{false};
   std::atomic<uint32_t> stop_epoch_{0}, stop_done_{0}, stop_ticket_{0};
   char stop_ack_[512]{};
-  std::atomic<bool> stop_ack_ok_{false};
+  // applied: the STOP passed admission and reached MotionService; ack_ok: its
+  // ACK was serialized. Applied without ACK is an unknown outcome, not AUTH_FAILED.
+  std::atomic<bool> stop_applied_{false},stop_ack_ok_{false};
   static constexpr uint32_t kStopLaneBudgetMs = 600;
   static constexpr size_t kTwinDeferBytes = 8192;
 };

@@ -50,14 +50,81 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"STOP\"],\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
  return n>0&&static_cast<size_t>(n)<cap;
 }
+bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
+ if(!motion_)return false;
+ s.capturedUs=esp_timer_get_time();s.capturedMs=now;
+ s.ready=ready_;s.readinessReason=reason_;
+ s.fresh=motion_->fresh(s.capturedUs);s.poseRegion=motion_->poseRegion(s.capturedUs);
+ s.activeOutcome=motion::toString(activeAck_.outcome);s.activeReason=activeAck_.reason;
+ s.state=motion_->state();
+ s.phase=motion_->phase();
+ s.reason=motion_->reason();
+ s.offVerified=motion_->offVerified();
+ s.offMask=motion_->offMask();
+ s.energized=motion_->energized();
+ s.heightValid=motion_->heightValid();
+ s.requestedHeightM=motion_->requestedHeightM();
+ s.heightM=motion_->heightM();
+ s.walkCycles=motion_->walkCycles();
+ s.stabilizationLimited=motion_->stabilizationLimited();
+ s.imuValid=motion_->imuValid();
+ s.imuStampUs=motion_->imuStampUs();
+ s.releases=motion_->releases();
+ s.missed=motion_->missed();
+ s.maxGapUs=motion_->maxGapUs();
+ s.powerReason=motion_->powerReason();
+ s.bmsAgeMs=motion_->bmsAgeMs();
+ s.maxReleaseWorkUs=motion_->maxReleaseWorkUs();
+ s.offVerifiedUs=motion_->offVerifiedUs();
+ s.referenceFaultSlot=motion_->referenceFaultSlot();
+ s.referenceFaultRaw=motion_->referenceFaultRaw();
+ for(unsigned i=0;i<12;++i)s.feedback[i]=motion_->feedback()[i];
+ for(unsigned i=0;i<4;++i)s.quaternion[i]=motion_->quaternion()[i];
+ s.referenceFaultFeedback=motion_->referenceFaultFeedback();return true;
+}
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
- if(!motion_||!out||!cap)return false;
- const uint64_t us=esp_timer_get_time();const bool fresh=motion_->fresh(us);
+ MotionStatusSnapshot s;return captureStatus(s,now)&&formatStatus(s,out,cap);
+}
+bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t cap) {
+ if(!out||!cap)return false;
+ // No Motion object is touched by HTTPD. Date the immutable observation at
+ // serialization too: a delayed reader must not advertise old feedback as fresh.
+ const uint64_t clock=esp_timer_get_time(),us=clock>=s.capturedUs?clock:s.capturedUs;
+ const uint64_t elapsedMs=(us-s.capturedUs)/1000,bmsAge=static_cast<uint64_t>(s.bmsAgeMs)+elapsedMs;
+ const uint32_t now=s.capturedMs+static_cast<uint32_t>(elapsedMs);
+ bool fresh=s.fresh&&clock>=s.capturedUs;
+ for(const auto& f:s.feedback)fresh=fresh&&f.valid&&
+   !((us>=f.stampUs&&us-f.stampUs>250000)||(f.stampUs>us&&f.stampUs-us>15000));
  size_t used=0;bool ok=true;
  auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
- add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
- (unsigned long)now,simple::name(motion_->state()),motion_->phase(),boolean(ready_),motion_->reason(),reason_,boolean(!fresh),boolean(motion_->state()==simple::State::FAULT),boolean(motion_->offVerified()),motion_->offMask(),boolean(motion_->energized()),boolean(motion_->heightValid()),motion_->requestedHeightM()*1000,motion_->heightM()*1000,motion_->walkCycles(),boolean(motion_->stabilizationLimited()),boolean(motion_->imuValid()),(unsigned long long)(us>=motion_->imuStampUs()?(us-motion_->imuStampUs())/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)motion_->releases(),(unsigned long)motion_->missed(),(unsigned long long)motion_->maxGapUs(),motion::toString(activeAck_.outcome),activeAck_.reason);
- for(unsigned i=0;i<12;++i){const auto& f=motion_->feedback()[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"rad\":%.6f,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.q,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
- add("%s","]}");return ok;
+ add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
+ (unsigned long)now,simple::name(s.state),s.phase,fresh?s.poseRegion:"UNKNOWN",boolean(s.ready),s.reason,s.readinessReason,boolean(!fresh),boolean(s.state==simple::State::FAULT),boolean(s.offVerified),s.offMask,boolean(s.energized),boolean(s.heightValid),s.requestedHeightM*1000,s.heightM*1000,s.walkCycles,boolean(s.stabilizationLimited),boolean(s.imuValid),(unsigned long long)(us>=s.imuStampUs?(us-s.imuStampUs)/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)s.releases,(unsigned long)s.missed,(unsigned long long)s.maxGapUs,s.activeOutcome,s.activeReason);
+ // Raw torque/goal fields retain their dated control observation. SAFE_OFF is
+ // separate, newer evidence from 13 independent post-stop torque reads.
+ // Appended after joints below to keep the existing wire contract compatible.
+ for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
+ add("%s","]");
+ add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
+   s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long long)s.offVerifiedUs);
+ if(s.referenceFaultSlot<12){const auto& f=s.referenceFaultFeedback;
+   add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
+     s.referenceFaultSlot,f.raw,s.referenceFaultRaw,f.torque,f.goal,(unsigned long long)f.controlStampUs);}
+
+ // Digital Twin contract already parsed by the existing viewer (telemetry v1):
+ // the same 12 ACTUAL angles and BNO085 quaternion SimpleMotion holds, no new
+ // read. sampled_at_ms dates the oldest joint sample; actual_rad when all 12
+ // are fresh, otherwise null plus actual_rad_by_joint (null: never read).
+ uint64_t oldest=us;bool all=fresh;
+ for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];if(f.valid&&f.stampUs<oldest)oldest=f.stampUs;all=all&&f.valid;}
+ const uint64_t ageMs=(us-oldest)/1000;
+ add(",\"telemetry\":{\"sampled_at_ms\":%lu,\"actual_rad\":",(unsigned long)(ageMs<now?now-ageMs:0));
+ if(all){for(unsigned i=0;i<12;++i)add("%s%.6f",i?",":"[",s.feedback[i].q);add("%s","]");}
+ else{add("%s","null,\"actual_rad_by_joint\":[");
+   for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];if(f.valid)add("%s%.6f",i?",":"",f.q);else add("%snull",i?",":"");}
+   add("%s","]");}
+ add("%s",",\"quaternion\":");
+ if(s.imuValid){const double* q=s.quaternion;add("[%.6f,%.6f,%.6f,%.6f]",q[0],q[1],q[2],q[3]);}else add("%s","null");
+ add("%s",",\"source\":\"CONTROLLER\"},\"stale_scope\":\"MOTION_JOINT_FEEDBACK\"}");
+ return ok;
 }
 } }

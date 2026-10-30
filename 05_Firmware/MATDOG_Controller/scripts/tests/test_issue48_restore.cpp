@@ -115,7 +115,12 @@ int main() {
   { auto q = manual; q.operator_confirmed_installation = false; CHECK(decide(ok, none, q).reason == RestoreReason::OPERATOR_CONFIRMATION_REQUIRED); }
   { auto q = manual; q.requested_generation = 2; CHECK(decide(ok, none, q).reason == RestoreReason::GENERATION_MISMATCH); }
   // Every precondition refuses even with a pinned attestation (fail closed).
-  { auto f = ok; f.maintenance = false; CHECK(decide(f, pinned, boot).reason == RestoreReason::NOT_MAINTENANCE); }
+  // rc.4 boots in RUN: the automatic restore keeps every physical fact below
+  // but not the mode; an operator restore is still a MAINTENANCE operation.
+  { auto f = ok; f.maintenance = false; CHECK(decide(f, pinned, boot).decision == RestoreDecision::ALLOW_AUTOMATIC); }
+  { auto f = ok; f.maintenance = false; CHECK(decide(f, pinned, manual).reason == RestoreReason::NOT_MAINTENANCE); }
+  { auto f = ok; f.maintenance = false; f.runtime_idle = false; CHECK(decide(f, pinned, boot).reason == RestoreReason::RUNTIME_NOT_IDLE); }
+  { auto f = ok; f.maintenance = false; f.torque_off = 11; CHECK(decide(f, pinned, boot).reason == RestoreReason::TORQUE_NOT_OFF); }
   { auto f = ok; f.runtime_idle = false; CHECK(decide(f, pinned, manual).reason == RestoreReason::RUNTIME_NOT_IDLE); }
   { auto f = ok; f.nvs_ready = false; CHECK(decide(f, pinned, boot).decision == RestoreDecision::REFUSED); }
   { auto f = ok; f.write_outcome_uncertain = true; CHECK(decide(f, pinned, boot).reason == RestoreReason::WRITE_OUTCOME_UNCERTAIN); }

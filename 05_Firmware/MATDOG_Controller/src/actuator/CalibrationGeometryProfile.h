@@ -229,6 +229,8 @@ bool isExecutable(const GeometryEndpointRecord& endpoint);
 
 class CalibrationGeometryProfile {
  public:
+  // Bound tables must remain immutable for the lifetime of the binding. Rebind
+  // when replacing provenance; production binds generated constexpr tables.
   // Null pointers or a zero count leave the profile unbound; unbound is a
   // refusal, not a permission.
   void bind(const GeometryProvenance* provenance,
@@ -268,6 +270,7 @@ class CalibrationGeometryProfile {
 
  private:
   const GeometryProvenance* provenance_ = nullptr;
+  GeometryProvenanceTag provenance_tag_ = kNoGeometryProvenance;
   const GeometryJointRecord* joints_ = nullptr;
   const GeometryEndpointRecord* endpoints_ = nullptr;
   uint8_t joint_count_ = 0;

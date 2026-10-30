@@ -38,19 +38,28 @@ class HardwareSerial {
     bool no_ack=false;               // write ACK suppressed (applied, not acknowledged)
   };
   inline static HardwareSerial* bus=nullptr;
-  explicit HardwareSerial(int=0){bus=this;}
+  inline static HardwareSerial* bms=nullptr;
+  int uart_id=0;
+  explicit HardwareSerial(int id=0):uart_id(id){if(id==2)bms=this;else bus=this;}
   std::array<std::array<uint8_t,71>,254> regs{};
   std::deque<Timed> rx;
   ReplyPlan plan;
+  int silent_read_id=-1,silent_read_width=-1,silent_reads=0; // selective actual request loss
   std::vector<std::vector<uint8_t>> requests;      // every complete request that reached the wire
   std::vector<uint8_t> pending;
   size_t unflushed=0,tx_bytes_total=0;uint64_t last_at=0;
+  int ignore_torque_off_id=-1; // applied-goal / lost OFF fault injection
+  bool torque_on_goal=false; // ST-3215-C018 QC: a position-profile write can arm torque
   bool flood=false;                                 // babbling bus: a byte is always readable
   unsigned bytes_read=0, jump_after_byte=0;
   uint32_t read_jump_us=0;
   size_t max_write=SIZE_MAX;                         // short UART write injection
+  int availableForWrite(){return 128;}
   void begin(unsigned long,int,int,int){}
   void flush(){host_us+=unflushed*10;unflushed=0;}
+  // ESP32 flush(false): purge bytes that have arrived locally, not a future
+  // remote response. Keep future deliveries so late-reply tests remain honest.
+  void flush(bool txOnly){flush();if(!txOnly)while(!rx.empty()&&rx.front().at<=host_us)rx.pop_front();}
   int available(){if(flood)return 1;int n=0;for(auto& t:rx)if(t.at<=host_us)++n;return n;}
   int read(){if(flood)return 0xAA;if(rx.empty()||rx.front().at>host_us)return -1;const int b=rx.front().b;rx.pop_front();if(++bytes_read==jump_after_byte)host_us+=read_jump_us;return b;}
   static uint8_t checksum(const std::vector<uint8_t>& p){uint8_t sum=0;for(size_t i=2;i<p.size();++i)sum+=p[i];return static_cast<uint8_t>(~sum);}
@@ -76,22 +85,28 @@ class HardwareSerial {
     const int id=p[2],inst=p[4];
     if(id==254&&inst==0x83&&p.size()>=8){                // existing no-reply SYNC_WRITE (including SAFE_OFF)
       const unsigned address=p[5],width=p[6];if(!width)return;
-      for(size_t i=7;i+width<p.size();i+=width+1)if(p[i]<254)
+      for(size_t i=7;i+width<p.size();i+=width+1)if(p[i]<254){
+        if(address==40&&width==1&&p[i+1]==0&&p[i]==ignore_torque_off_id)continue;
         for(unsigned j=0;j<width&&address+j<71;++j)regs[p[i]][address+j]=p[i+1+j];
+        if(torque_on_goal&&address<=42&&address+width>43)regs[p[i]][40]=1;
+      }
       return;
     }
     if(id>=254)return;                                  // broadcast: no reply
     const int address=p[5];
     if(inst==3){                                           // WRITE: applied, then ACK
       for(size_t i=6;i+1<p.size();++i){const int reg=address+static_cast<int>(i)-6;if(reg<71)regs[id][reg]=p[i];}
+      if(torque_on_goal&&address<=42&&address+p.size()-7>43)regs[id][40]=1;
       if(!plan.no_ack)schedule(frame(id,{}));
     }else if(inst==2&&p.size()==8&&address+p[6]<=71){
+      if(id==silent_read_id&&p[6]==silent_read_width&&silent_reads){if(silent_reads>0)--silent_reads;return;}
       schedule(frame(id,std::vector<uint8_t>(regs[id].begin()+address,regs[id].begin()+address+p[6])));
     }else if(inst==1){schedule(frame(id,{}));}              // PING
   }
   size_t write(const uint8_t* p,size_t n){
     n=std::min(n,max_write);
     unflushed+=n;tx_bytes_total+=n;
+    if(uart_id==2){requests.emplace_back(p,p+n);return n;}
     for(size_t i=0;i<n;++i){
       pending.push_back(p[i]);
       if(pending.size()>=4&&pending.size()==static_cast<size_t>(pending[3])+4){auto packet=pending;pending.clear();dispatch(packet);}

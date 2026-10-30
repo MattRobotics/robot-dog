@@ -110,8 +110,15 @@ refuse() {
 echo "== MATDOG Controller — application-only flash =="
 echo
 
-# --- Gate: working tree clean, know the exact source commit ---------------
-if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
+# An existing final receipt can prove a DIRTY build byte-for-byte; do not
+# require a new firmware build merely to change its Git label.
+RECEIPT_ARGS=()
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ] && python3 -c 'import json,sys; sys.exit(0 if "app" in json.load(open(sys.argv[1])) else 1)' "$MATDOG_FLASH_CANDIDATE_DESIGNATION"; then
+  python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field source >/dev/null
+  RECEIPT_ARGS=(--source-receipt "$MATDOG_FLASH_CANDIDATE_DESIGNATION")
+fi
+# --- Gate: clean tree OR exact compiled source receipt -------------------
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ] && [ "${#RECEIPT_ARGS[@]}" -eq 0 ]; then
   refuse "working tree is not clean — commit or stash before an application-only flash. \
 This is what guarantees the binary we are about to write corresponds to a real, \
 inspectable commit rather than an untracked mix of edits."
@@ -151,8 +158,9 @@ APPLICATION_SIZE="$(stat -c%s "$APPLICATION_BINARY")"
 # equal the recorded ones; the manifest profile is recognized; and it
 # equals the profile the operator asked to flash. Any failure REFUSES — see
 # scripts/build_manifest.py and scripts/tests/test_build_manifest.py.
-TREE_STATE="CLEAN"  # proven by the working-tree gate above
-MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify \
+TREE_STATE="CLEAN"
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then TREE_STATE="DIRTY"; fi
+MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify "${RECEIPT_ARGS[@]}" \
   --manifest "$BUILD_MANIFEST" \
   --binary "$APPLICATION_BINARY" \
   --head "$SOURCE_COMMIT" \
@@ -233,6 +241,9 @@ unexpected board"
 # --- device's own partition table + otadata (never assumed), AND the ------
 # --- real rollback/anti-rollback config of the build being flashed --------
 SDKCONFIG="$BUILD_DIR/sdkconfig"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  SDKCONFIG="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field sdkconfig)"
+fi
 [ -f "$SDKCONFIG" ] || refuse "sdkconfig not found: $SDKCONFIG (run scripts/build.sh first)"
 
 PARTITION_INFO="$(python3 "$SCRIPT_DIR/verify_application_partition.py" \

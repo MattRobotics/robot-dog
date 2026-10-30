@@ -39,6 +39,7 @@ public:
   // the CSRF proof: enough to be told its own CSRF token again after a page
   // reload, or to end the session. Never enough for a write.
   bool current(uint64_t now, uint32_t peer, const char *cookie);
+  // Cookie + CSRF + peer; a success also renews the 300 s idle expiry.
   bool authorize(uint64_t now, uint32_t peer, const char *cookie,
                  const char *csrf);
   const char *cookie() const { return cookie_; }

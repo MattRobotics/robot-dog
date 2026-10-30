@@ -264,7 +264,7 @@ class ServoBus {
     validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
   // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
   bool setOperationalDrive(uint16_t speed,uint8_t acc) {
-    if(!((speed==300&&acc==8)||(speed==1000&&acc==50)))return false;
+    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)))return false;  // STAND rc.10, WALK
     validation_speed_=speed;validation_acceleration_=acc;return true;
   }
   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}

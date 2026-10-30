@@ -1,6 +1,22 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
 namespace matdog { namespace core {
+// Immutable per-request observation, transferred by the existing HTTP mailbox.
+// Contains no owner, port, command or writable Motion state. String pointers
+// refer only to firmware-lifetime reason/phase literals.
+struct MotionStatusSnapshot {
+  uint64_t capturedUs=0,imuStampUs=0,maxGapUs=0,offVerifiedUs=0;
+  uint32_t capturedMs=0,releases=0,missed=0,bmsAgeMs=0,maxReleaseWorkUs=0;
+  simple::State state=simple::State::STOPPED;
+  const char *phase="IDLE",*poseRegion="UNKNOWN",*reason="BOOTING",*readinessReason="BOOTING",*powerReason="POWER_NOT_READY";
+  const char *activeReason="",*activeOutcome="";
+  bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
+  uint16_t offMask=0,referenceFaultRaw=0;
+  double requestedHeightM=0,heightM=0,walkCycles=0,quaternion[4]{};
+  unsigned referenceFaultSlot=12;
+  simple::Feedback feedback[12]{},referenceFaultFeedback{};
+};
+static_assert(sizeof(MotionStatusSnapshot)<=1536,"bounded per-request Motion observation");
 // Transport adapter only. SimpleMotion is the one operational state owner.
 class MotionService {
  public:
@@ -10,11 +26,16 @@ class MotionService {
   void update();
   motion::MotionAck command(const motion::MotionCommand&,uint32_t now_ms);
   bool statusJson(char*,size_t,uint32_t) const;
+  bool captureStatus(MotionStatusSnapshot&,uint32_t) const;
+  static bool formatStatus(const MotionStatusSnapshot&,char*,size_t);
   bool capabilitiesJson(char*,size_t) const;
   bool ackJson(const motion::MotionAck&,char*,size_t) const;
   bool busy() const { return motion_&&motion_->engaged(); }
+  const simple::SimpleMotion* motion() const { return motion_; } // LOADDIAG read-only
   bool engaged() const {return busy();}
-  void disconnected(uint32_t){if(motion_)motion_->stop("DISCONNECTED");}
+  bool slack(uint64_t now,uint32_t reserve) const {
+    return !busy()||motion_->nextReleaseUs()>now+reserve;
+  }
  private:
   simple::SimpleMotion* motion_=nullptr;
   Prepare prepare_=nullptr;void* context_=nullptr;

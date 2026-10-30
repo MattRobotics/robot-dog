@@ -77,15 +77,22 @@ int main() {
   check(s.current(t0, peer, cookie), "holder recognised without CSRF");
   check(!s.current(t0, peer + 1, cookie), "holder check is peer bound");
   check(!s.current(t0, peer, csrf), "CSRF is not the cookie");
-  check(s.authorize(t0 + 299999, peer, cookie, csrf), "TTL minus one");
-  check(!s.authorize(t0 + 300000, peer, cookie, csrf), "resumed session expires like any other");
-  check(!s.current(t0 + 300000, peer, cookie), "expired session has no holder");
-  check(!s.authorize(t0, peer, cookie, csrf), "expiry is irreversible");
+  // Authenticated use renews the idle expiry: a Dashboard polling every
+  // 350 ms keeps the session for 20 minutes; 300 s without use ends it.
+  uint64_t used = t0;
+  for (uint64_t t = t0; t <= t0 + 1200000; t += 350) { if (!s.authorize(t, peer, cookie, csrf)) { check(false, "continuous use keeps the session"); break; } used = t; }
+  check(s.authorize(used + 299999, peer, cookie, csrf), "idle TTL minus one");
+  used += 299999;
+  check(!s.current(used + 299999, peer, csrf), "CSRF still never a cookie");
+  check(!s.authorize(used + 1, peer + 1, cookie, csrf) && !s.authorize(used + 1, peer, cookie, cookie), "a refused request renews nothing");
+  check(!s.authorize(used + 300000, peer, cookie, csrf), "300 s without use: resumed session expires like any other");
+  check(!s.current(used + 300000, peer, cookie), "expired session has no holder");
+  check(!s.authorize(used, peer, cookie, csrf), "expiry is irreversible");
   // ...and is renewed from the device, with new secrets.
   for (unsigned i = 0; i < 64; ++i) random[i] = static_cast<uint8_t>(200 - i);
-  check(s.resume(t0 + 300000, peer, device, digest, random), "renewal after expiry, no token");
-  check(!s.authorize(t0 + 300000, peer, cookie, csrf), "old cookie/CSRF not reusable after renewal");
-  check(s.authorize(t0 + 300000, peer, s.cookie(), s.csrf()), "renewed session valid");
+  check(s.resume(used + 300000, peer, device, digest, random), "renewal after expiry, no token");
+  check(!s.authorize(used + 300000, peer, cookie, csrf), "old cookie/CSRF not reusable after renewal");
+  check(s.authorize(used + 300000, peer, s.cookie(), s.csrf()), "renewed session valid");
   check(s.resume(t0 + cycle, peer, device, digest, random) && s.authorize(t0 + cycle + 1, peer, s.cookie(), s.csrf()),
         "valid across the 32-bit millisecond wrap");
 

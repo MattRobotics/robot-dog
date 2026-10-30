@@ -99,7 +99,7 @@ bool solve3(const double j[3][3],const double b[3],double x[3]) {
   for(unsigned r=0;r<3;++r){x[r]=m[r][3];if(!std::isfinite(x[r]))return false;}return true;
 }
 bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 acceleration,
-                  LegJointAngles& qv,LegJointAngles& qa,double& condition) {
+                  LegJointAngles& qv,LegJointAngles& qa,double& condition,bool derivatives) {
   const auto& m=*legModel(leg);double a=-m.lowerOrigin.z,f=m.footOrigin.x;
   double r=footContactModel().radiusM,g=m.footOrigin.z+r,d=m.upperOrigin.y+m.footOrigin.y;
   double ch=std::cos(q.hip),sh=std::sin(q.hip),su=std::sin(q.upper),cu=std::cos(q.upper);
@@ -111,6 +111,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
   for(unsigned c=0;c<3;++c){double b[3]={0,0,0},x[3];b[c]=1;if(!solve3(j,b,x))return false;for(unsigned k=0;k<3;++k)inverse[k][c]=x[k];}
   for(unsigned k=0;k<3;++k){double n=0,in=0;for(unsigned c=0;c<3;++c){n+=std::abs(j[k][c]);in+=std::abs(inverse[k][c]);}norm=std::fmax(norm,n);inorm=std::fmax(inorm,in);}
   condition=norm*inorm;
+  if(!derivatives)return true;
   double bv[3]={velocity.x,velocity.y,velocity.z},qs[3],qss[3];if(!solve3(j,bv,qs))return false;
   double h=qs[0],u=qs[1],t=u+qs[2],vp=vu*u+vl*qs[2];
   double xpp=a*su*u*u-(f*ct+g*st)*t*t,vpp=a*cu*u*u+(f*st-g*ct)*t*t;
@@ -173,7 +174,7 @@ CartesianSample gaitHold(const GaitParameters& p,double cycle,double height,doub
   for(unsigned i=0;i<4;++i){out.feet[i]=cycle==0?canonicalStandDefinition().contactsWorldM[i]:anchor(p,i,cycle,cycle);out.phases[i].stance=true;}
   out.valid=true;return out;
 }
-LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const LocomotionFrame* prev){
+LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const LocomotionFrame* prev,bool derivatives){
   LocomotionFrame out;out.cartesian=s;
   if(!validGaitParameters(p)){out.status=GaitStatus::INVALID_PARAMETER;return out;}
   if(!s.valid||(prev&&!prev->target.valid)){out.status=GaitStatus::STATE_ERROR;return out;}
@@ -196,7 +197,7 @@ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const
     double w=s.yawVelocity,wa=s.yawAcceleration;
     Vector3 velocity={vr.x+w*r.y,vr.y-w*r.x,vr.z};
     Vector3 acceleration={ar.x+2*w*vr.y+wa*r.y-w*w*r.x,ar.y-2*w*vr.x-wa*r.x-w*w*r.y,ar.z};
-    if(!differential(leg,b.joints,velocity,acceleration,out.velocityRadS[i],out.accelerationRadS2[i],out.condition[i])||out.condition[i]>p.maxCondition){out.status=GaitStatus::ILL_CONDITIONED;return out;}
+    if(!differential(leg,b.joints,velocity,acceleration,out.velocityRadS[i],out.accelerationRadS2[i],out.condition[i],derivatives)||out.condition[i]>p.maxCondition){out.status=GaitStatus::ILL_CONDITIONED;return out;}
     out.target.legs[i]=b.joints;out.branches[i]=b.branch;out.maxResidualM=std::fmax(out.maxResidualM,b.residualM);
     const auto& m=*legModel(leg);double q[3]={b.joints.hip,b.joints.upper,b.joints.lower};
     for(unsigned j=0;j<3;++j)out.minJointMarginRad=std::fmin(out.minJointMarginRad,std::fmin(q[j]-m.limits[j].lower,m.limits[j].upper-q[j]));

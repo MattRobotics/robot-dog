@@ -11,8 +11,11 @@ RestoreVerdict evaluateRestore(const RestoreFacts& f, const InstallationAttestat
   const bool manual = q.trigger == RestoreTrigger::OPERATOR_MANUAL;
 
   // Safety context first: nothing below may be evaluated as "ready" while
-  // the runtime could be moving or the mode is not MAINTENANCE.
-  if (!f.maintenance) return refuse(RestoreReason::NOT_MAINTENANCE);
+  // the runtime could be moving. The boot restore runs in the default RUN
+  // mode on the same physical facts (idle runtime, 12 torque-OFF reads, live
+  // positions inside the record); an operator restore stays a MAINTENANCE
+  // operation.
+  if (manual && !f.maintenance) return refuse(RestoreReason::NOT_MAINTENANCE);
   if (!f.runtime_idle) return refuse(RestoreReason::RUNTIME_NOT_IDLE);
   if (!f.nvs_ready) return refuse(RestoreReason::NVS_NOT_READY);
   if (f.write_outcome_uncertain) return refuse(RestoreReason::WRITE_OUTCOME_UNCERTAIN);

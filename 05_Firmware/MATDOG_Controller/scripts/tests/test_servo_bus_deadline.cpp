@@ -4,6 +4,7 @@
 // time of the model, not an ESP32 WCET and not a hardware measurement.
 #include <cinttypes>
 #include <cstring>
+#include <cstdlib>
 #include "../../src/servo/ServoBus.h"
 #include "../../src/servo/ServoBusActuatorBackend.h"
 using namespace matdog;
@@ -58,8 +59,8 @@ int main(){
     Rig r;r.uart->plan.silent=true;bool ok;const uint64_t e=r.timeIt(fastRead,&ok);
     CHECK(!ok&&r.bus.lastBusOutcome()==BusOutcome::NO_RESPONSE&&e<=8100&&e>=7900);
     std::printf("BUS_SILENT outcome=%s elapsed_us=%llu\n",toString(r.bus.lastBusOutcome()),(unsigned long long)e);
-    // Silence is not proof that the old request can never answer. No fresh
-    // sample and no second indistinguishable request until that debt is settled.
+    // No fresh sample/reissue during recovery. A completed old reply can settle
+    // the debt earlier; otherwise normal polling resumes after the stated horizon.
     r.uart->plan=HardwareSerial::ReplyPlan{};const auto requests=r.uart->requests.size();
     CHECK(!fastRead(r));CHECK(r.bus.lastBusOutcome()==BusOutcome::RX_PENDING);CHECK(r.uart->requests.size()==requests);
   }
@@ -150,9 +151,10 @@ int main(){
   {
     Rig r;r.uart->plan.silent=true;CHECK(!fastRead(r));r.uart->plan.silent=false;
     ServoBus::FastFeedback fb;CHECK(r.bus.readFastFeedback(kId+1,&fb,8)); // discovery/other IDs still work
-    host_us+=200000;const size_t requests=r.uart->requests.size();CHECK(!fastRead(r));CHECK(r.uart->requests.size()==requests);
+    const size_t requests=r.uart->requests.size();CHECK(!fastRead(r));CHECK(r.uart->requests.size()==requests);
     CHECK(r.bus.safeOff(kId)==SafeOffResult::VERIFIED_OFF);CHECK(r.uart->regs[kId][40]==0); // distinct-length OFF readback remains usable
-    CHECK(!fastRead(r)&&r.bus.lastBusOutcome()==BusOutcome::RX_PENDING); // OFF cannot erase the unresolved old fast reply
+    CHECK(!fastRead(r)&&r.bus.lastBusOutcome()==BusOutcome::RX_PENDING); // OFF cannot erase it immediately
+    host_us+=120000;CHECK(fastRead(r)); // normal rotation, no permanent debt
   }
   {
     Rig r;r.uart->jump_after_byte=21;r.uart->read_jump_us=9000;ServoBus::FastFeedback fb;
@@ -175,7 +177,7 @@ int main(){
     const uint64_t e=host_us-t0;std::printf("BUS_NOMINAL 12x fast read ok=%u elapsed_us=%llu per_read_us=%.1f model: latency 60us + 21 bytes x 10us simulated\n",ok,(unsigned long long)e,e/12.0);
     CHECK(ok==12);
   }
-  {
+  if(!std::getenv("MATDOG_BUS_FOCUSED")){
     Rng rng{12345};uint64_t worst_over=0,sum=0;std::vector<uint64_t> el;unsigned okn=0,bad_accept=0;
     for(unsigned i=0;i<4000;++i){
       Rig r;auto& p=r.uart->plan;
@@ -194,6 +196,115 @@ int main(){
     std::printf("BUS_RANDOM runs=4000 budget_us=8000 accepted=%u false_accepts=%u elapsed_p50_us=%llu p99_us=%llu max_us=%llu max_overrun_us=%llu simulated\n",
       okn,bad_accept,(unsigned long long)el[2000],(unsigned long long)el[3960],(unsigned long long)el.back(),(unsigned long long)worst_over);
     CHECK(bad_accept==0);
+  }
+  // Every legitimate read shape remains independent, including maintenance
+  // byte/word reads and all protocol IDs (no remapping to the 13-servo census).
+  CHECK(sizeof(ValidatedServoRead)<8192);
+  for(uint8_t id : {uint8_t(0),uint8_t(21),uint8_t(33),uint8_t(253)}) {
+    HardwareSerial uart;ValidatedServoRead reader;reader.pSerial=&uart;reader.IOTimeOut=2;
+    uint8_t data[32];uart.plan.silent=true;
+    for(uint8_t width : {1,2,10,15})CHECK(reader.Read(id,0,data,width)==0);
+    uart.plan.silent=false;
+    const auto before=uart.requests.size();
+    for(uint8_t width : {1,2,10,15})CHECK(reader.Read(id,0,data,width)==0);
+    CHECK(uart.requests.size()==before);
+    host_us+=101000;
+    for(uint8_t width : {1,2,10,15})CHECK(reader.Read(id,0,data,width)==width);
+    const auto after=uart.requests.size();
+    CHECK(reader.Read(id,0,data,3)==0&&uart.requests.size()==after);
+  }
+  // Recovery uses the existing host margin, never as a synchronous READ wait.
+  CHECK(ValidatedServoRead::kReadRecoveryUs==ServoBus::kOperationalTimeoutMs*1000u);
+  for(unsigned kind=0;kind<3;++kind){
+    Rig r;r.uart->regs[kId][56]=0x34;r.uart->regs[kId][57]=1;
+    if(kind==0)r.uart->plan.silent=true;
+    if(kind==1)r.uart->plan.truncate_to=12;
+    if(kind==2)r.uart->plan.corrupt_checksum=true;
+    ServoBus::FastFeedback f;CHECK(!r.bus.readFastFeedback(kId,&f,2)&&f.present_position==-1);
+    r.uart->plan=HardwareSerial::ReplyPlan{};
+    r.uart->regs[kId][56]=0x78;r.uart->regs[kId][57]=2;
+    auto before=r.uart->requests.size();const auto t=host_us;
+    CHECK(!r.bus.readFastFeedback(kId,&f,2)&&r.bus.lastBusOutcome()==BusOutcome::RX_PENDING);
+    CHECK(r.uart->requests.size()==before&&host_us-t<400);
+    CHECK(r.bus.readFastFeedback(23,&f,2)); // unaffected ID progresses
+    ServoBus::ControlFeedbackSnapshot c;before=r.uart->requests.size();
+    CHECK(!r.bus.readControlFeedbackBudgeted(kId,&c,2));
+    CHECK(r.uart->requests.size()==before+1&&r.uart->requests.back()[6]==10);
+    host_us+=120000;before=r.uart->requests.size();
+    CHECK(r.bus.readFastFeedback(kId,&f,2)&&f.present_position==0x0278);
+    CHECK(r.bus.readControlFeedbackBudgeted(kId,&c,2)&&c.present_position==0x0278);
+    CHECK(r.uart->requests.size()==before+3);
+    std::printf("BUS_RECOVERY kind=%u fast=OK control=OK immediate_retry_tx=0 extra_reads=0 hardware=false\n",kind);
+  }
+  // A different-width TX neither cancels a pending read nor shortens its
+  // 100 ms horizon. Check the boundary also across micros() wrap.
+  for(bool wrap : {false,true}) {
+    Rig r;if(wrap)host_us=0x100000000ull-50000;
+    r.uart->plan.silent=true;ServoBus::ControlFeedbackSnapshot c;
+    CHECK(!r.bus.readControlFeedbackBudgeted(kId,&c,2));const uint64_t start=host_us;
+    r.uart->plan.silent=false;ServoBus::FastFeedback f;
+    host_us=start+50000;CHECK(r.bus.readFastFeedback(kId,&f,2));
+    auto requests=r.uart->requests.size();CHECK(!r.bus.readControlFeedbackBudgeted(kId,&c,2));
+    CHECK(r.bus.lastBusOutcome()==BusOutcome::RX_PENDING&&r.uart->requests.size()==requests);
+    host_us=start+101000;CHECK(r.bus.readFastFeedback(kId,&f,2));
+    requests=r.uart->requests.size();CHECK(r.bus.readControlFeedbackBudgeted(kId,&c,2));
+    CHECK(r.uart->requests.size()==requests+2);
+  }
+  // Production idle scheduler order: two fast slots each 20 ms, then one
+  // two-block control slot each sixth release (12 control slots / 1.44 s).
+  // Lose ONLY width10 once. All later fast reads succeed, including the fast
+  // read immediately before control: this used to refresh the wrong timer.
+  for(unsigned kind=0;kind<3;++kind) for(unsigned victim : {5u,6u}) { // ID21 RF_LOWER, ID33 RH_HIP in canonical slots
+    Rig r;const uint8_t ids[12]={13,12,11,23,22,21,33,32,31,43,42,41};
+    // Exercise actual affected IDs as well as both scheduler phase offsets.
+    const uint8_t id=ids[victim];
+    uint8_t population[12];std::memcpy(population,ids,12);
+    for(auto servo:population){r.uart->regs[servo][40]=0;r.uart->regs[servo][56]=0x34;r.uart->regs[servo][57]=1;}
+    ServoBus::ControlFeedbackSnapshot seed;CHECK(r.bus.readControlFeedbackBudgeted(id,&seed,2));
+    const uint64_t epoch=host_us;unsigned poll=0,control=0,attempts=0,recovered=0;
+    uint64_t controlStamp=epoch;bool lost=false;
+    for(unsigned release=1;release<=6*12*4;++release){
+      host_us=epoch+release*20000;const uint64_t begin=host_us;
+      for(unsigned n=0;n<2;++n){ServoBus::FastFeedback f;CHECK(r.bus.readFastFeedback(population[poll++%12],&f,2));}
+      if(release%6==0){
+        const uint8_t current=population[control++%12];
+        if(current==id&&!lost){
+          if(kind==0)r.uart->plan.silent=true;
+          if(kind==1)r.uart->plan.truncate_to=9;
+          if(kind==2)r.uart->plan.corrupt_checksum=true;
+        }
+        ServoBus::ControlFeedbackSnapshot c;const size_t before=r.uart->requests.size();
+        const bool ok=r.bus.readControlFeedbackBudgeted(current,&c,2);
+        if(current==id){
+          ++attempts;
+          std::printf("CONTROL_ROTATION kind=%u id=%u release=%u lost=%d ok=%d tx=%zu reason=%s prior_age_ms=%llu\n",kind,id,release,lost,ok,r.uart->requests.size()-before,toString(r.bus.lastBusOutcome()),(unsigned long long)((host_us-controlStamp)/1000));
+          if(!lost){CHECK(!ok&&r.uart->requests.size()==before+1&&r.uart->requests.back()[6]==10);lost=true;}
+          else{CHECK(ok);CHECK(r.uart->requests.size()==before+2);if(ok){controlStamp=host_us;++recovered;CHECK(c.present_position==0x0134);}}
+        }else CHECK(ok);
+        r.uart->plan=HardwareSerial::ReplyPlan{};
+      }
+      CHECK(host_us-begin<8000); // existing two fast + two control phase budget
+    }
+    CHECK(attempts==4&&recovered==3&&host_us-controlStamp<1440000);
+  }
+  // An old same-ID/width frame arriving anywhere inside the recovery window
+  // is consumed as debt, never returned as the new sample.
+  for(unsigned delay:{3000u,20000u,95000u}){
+    Rig r;r.uart->regs[kId][56]=0x34;r.uart->regs[kId][57]=1;r.uart->plan.latency_us=delay;
+    ServoBus::FastFeedback f;CHECK(!r.bus.readFastFeedback(kId,&f,2));
+    r.uart->regs[kId][56]=0x78;r.uart->regs[kId][57]=2;r.uart->plan.latency_us=60;
+    host_us+=120000;CHECK(r.bus.readFastFeedback(kId,&f,2)&&f.present_position==0x0278);
+    std::printf("BUS_RECOVERY_LATE delay_us=%u old=0x0134 published=0x%04x hardware=false\n",delay,f.present_position);
+  }
+  {
+    Rig r;unsigned failuresBefore=r.bus.busStats().no_response;
+    for(unsigned k=0;k<20;++k){
+      r.uart->plan.silent=true;ServoBus::FastFeedback f;
+      CHECK(!r.bus.readFastFeedback(11,&f,2)&&f.present_position==-1);
+      r.uart->plan.silent=false;CHECK(r.bus.readFastFeedback(23,&f,2));host_us+=120000;
+    }
+    CHECK(r.bus.busStats().no_response>=failuresBefore+20);
+    std::puts("BUS_PERSISTENT absent_id11=STALE healthy_id23=OK no_fabricated_sample=1 hardware=false");
   }
   std::printf("SERVO_BUS_DEADLINE %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;

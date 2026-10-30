@@ -34,13 +34,15 @@ class RouterStorage : public MemStorage {
   }
 };
 
+// Persistence work is a MAINTENANCE operation; the firmware boots in RUN (rc.4).
+struct MaintenanceMode : OperatingModeManager { MaintenanceMode() { setMode(OperatingMode::MAINTENANCE); } };
 struct Fixture {
   Scenario scenario;
   RouterStorage storage;
   CalibrationPersistenceService persistence;
   CalibrationQ0CaptureSession q0;
   ActuatorAuthorityArbiter authority;
-  OperatingModeManager mode;
+  MaintenanceMode mode;
   CalibrationManager calibration;
   CalibrationMotionPermit permit;
   CalibrationMotionAuthorizationState authorization;

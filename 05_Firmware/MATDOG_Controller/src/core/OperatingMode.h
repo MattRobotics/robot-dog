@@ -69,7 +69,10 @@ class OperatingModeManager {
   bool operatorMaintenanceHold() const { return operator_selected_ && mode_ == OperatingMode::MAINTENANCE; }
 
  private:
-  OperatingMode mode_ = OperatingMode::MAINTENANCE;
+  // Operational firmware (rc.4): boot in RUN with the administrative AP radio
+  // role. Servo scan/read diagnostics, calibration and persistence work need
+  // an explicit @MODE MAINTENANCE, which force-clears a MOTION authority.
+  OperatingMode mode_ = OperatingMode::RUN;
   bool router_role_ = false, operator_selected_ = false;
 };
 
