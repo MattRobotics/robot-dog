@@ -34,7 +34,7 @@ const html = fs.readFileSync(path.join(viewer, 'mobile.html'), 'utf8');
 let instance = 0;
 async function boot(query, framed) {
   const dom = new JSDOM(html, { url: 'http://192.168.4.1/twin/' + query });
-  const fetches = [], timers = [], listeners = [], parent = { dashboard: true };
+  const fetches = [], timers = [], listeners = [], parent = { dashboard: true, postMessage(){} };
   const win = { addEventListener: (type, fn) => { if (type === 'message') listeners.push(fn); } };
   win.parent = framed ? parent : win;
   globalThis.__twins = [];

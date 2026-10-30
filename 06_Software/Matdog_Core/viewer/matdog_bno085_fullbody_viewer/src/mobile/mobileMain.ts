@@ -17,12 +17,13 @@ const URDF_URL = 'matt_robodog_rev00.urdf', MESH_URL = 'matdog_collision.mtw', S
 const POLL_MS = 500, TIMEOUT_MS = 2000;
 const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const stream = new MotionTelemetryStream();
-let twin: MotionTwinController | null = null, lastError = '', failures = 0;
+let twin: MotionTwinController | null = null, lastError = '', modelError = '', failures = 0;
+const parentFeed = new URLSearchParams(location.search).get('feed') === 'parent' && window.parent !== window;
 
 function chip(id: string, text: string, tone: string): void { const c = el(id); c.textContent = text; c.className = `chip ${tone}`; }
 function render(): void {
   const now = performance.now(), frame = stream.frame;
-  const facts: TwinFacts = describeTwin(frame, stream.ageMs(now), stream.isStale(now), twin?.actualState ?? null, lastError, failures);
+  const facts: TwinFacts = describeTwin(frame, stream.ageMs(now), stream.isStale(now), twin?.actualState ?? null, modelError || lastError, failures);
   for (const c of facts.chips) chip(c.id, c.text, c.tone);
   el('banner').textContent = facts.banner;
   const dl = el('facts'); dl.replaceChildren();
@@ -62,24 +63,27 @@ async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<
     const actual = await buildRobot({ model, urdfUrl: URDF_URL, loadMeshGeometry, styleForLink });
     const target = await buildRobot({ model, urdfUrl: URDF_URL, loadMeshGeometry, styleForLink });
     twin = new MotionTwinController(actual, target);
-    twin.interpolationMs = POLL_MS;
+    twin.interpolationMs = 0; // display the received ACTUAL pose, no extra 500 ms lag
     viewer.setBeforeRender((nowMs) => twin?.animate(nowMs));
     viewer.robotAnchor.add(target.rootObject); viewer.robotAnchor.add(actual.rootObject);
     actual.resetJoints();
     viewer.start();
+    modelError='';
+    if(stream.frame){twin.apply(stream.frame,performance.now());twin.setStale(stream.isStale(performance.now()));}
+    if(parentFeed)window.parent.postMessage({type:'MATDOG_TWIN_READY'},location.origin);
     if (actual.collisionMeshCount !== 17) lastError = `ASSETS_MISSING ${actual.collisionMeshCount}/17`;
   } catch (error) {
-    lastError = `MODEL_LOAD_FAILED ${error instanceof Error ? error.message : String(error)} (retry ${MODEL_RETRY_MS / 1000} s)`;
+    modelError = `MODEL_LOAD_FAILED ${error instanceof Error ? error.message : String(error)} (retry ${MODEL_RETRY_MS / 1000} s)`;
     setTimeout(() => void loadModel(viewer), MODEL_RETRY_MS);
   }
   render();
 }
 async function boot(): Promise<void> {
   const viewer = createViewerScene(el('viewport'));
-  await loadModel(viewer);
+  void loadModel(viewer);
   // Embedded in the Controller dashboard (?feed=parent): reuse the status the
   // dashboard already polls (same-origin postMessage), so one page = one poll.
-  if (new URLSearchParams(location.search).get('feed') === 'parent' && window.parent !== window) {
+  if (parentFeed) {
     window.addEventListener('message', (e) => {
       if (e.origin !== location.origin || e.source !== window.parent) return;
       accept(e.data); render();

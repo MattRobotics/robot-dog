@@ -57,7 +57,8 @@ async function boot() {
           assert(next, 'unexpected command ' + init.body);
           if (next === 'hang') return new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(new w.DOMException('aborted', 'AbortError')), { once: true }));
           if (next === 'network') throw new TypeError('Failed to fetch');
-          return reply(next.body, next.status);
+          let responseBody=next.body;try{const a=JSON.parse(responseBody),c=JSON.parse(init.body);if(a.ack===true&&!next.keepIdentity){a.id=c.id;a.sequence=c.sequence;responseBody=JSON.stringify(a)}}catch{}
+          return reply(responseBody, next.status);
         }
         return reply('{}', 404);
       };
@@ -164,11 +165,11 @@ async function boot() {
     // it renders this page's own status (postMessage, same origin): one status
     // read per poll either way (test_twin_feed_parent.mjs: the Twin never polls).
     const frameEl = q('#simple-twin-frame');
-    assert.strictEqual(frameEl.getAttribute('src'), null, 'no Twin download before opening');
+    assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'Twin preloaded at SAFE_OFF');
     const posted = [], reads = () => p.calls.filter(c => c.url === '/api/motion/status').length;
     Object.defineProperty(frameEl, 'contentWindow', { configurable: true, get: () => ({ postMessage: (data, origin) => posted.push({ data, origin }) }) });
     await refresh(fx.status_ready);
-    assert.strictEqual(posted.length, 0, 'closed Twin: nothing posted');
+    assert.strictEqual(posted.length, 1, 'closed preloaded Twin receives same telemetry');posted.length=0;
     q('#simple-twin').open = true; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
     assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'Twin served by the same host, fed by this page');
     let before = reads();
@@ -179,10 +180,10 @@ async function boot() {
     assert.deepStrictEqual(rest, polled, 'the Twin gets exactly the polled status');
     assert.deepStrictEqual(JSON.parse(JSON.stringify(channels)), { imu: { valid: polled.imu_valid, age_ms: polled.imu_age_ms }, raw: { count: 12 } }, 'IMU age and RAW count bound to the viewer channels');
     q('#simple-twin').open = false; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
-    assert.strictEqual(frameEl.getAttribute('src'), 'about:blank', 'a closed Twin is unloaded: no poll, no download');
+    assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'closed Twin preserves its model');
     before = reads();
     await refresh(fx.status_ready);
-    assert(reads() === before + 1 && posted.length === 1, 'closed again: one read, nothing posted');
+    assert(reads() === before + 1 && posted.length === 2, 'closed again: one read and existing feed');
     // First open during WALK may get a 503 for the module itself: retry the
     // iframe once after SAFE_OFF, without a timer/download loop during WALK.
     await refresh(fx.status_walking);
@@ -212,6 +213,10 @@ async function boot() {
   await send('stand50', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .05 }, 5000);
   assert(/STAND 50 mm · .* · HTTP 200 · ACCEPTED · COMMAND_ACCEPTED/.test(last()), last());
   assert(/movimento da confermare nello stato Motion/.test(last()) && kind() === 'acked');
+  // Matching identity resolves even a delayed/lost ACK; unrelated statuses cannot.
+  const traceCommand=p.dom.window.matdogMotionTrace.commands.at(-1);
+  const completed=JSON.parse(fx.status_ready);completed.active_command={id:traceCommand.id,sequence:traceCommand.sequence,outcome:'COMPLETED',reason:'STAND_REACHED'};
+  await refresh(JSON.stringify(completed));assert(/completamento confermato/.test(last())&&!/movimento da confermare/.test(last()),last());
   // 10. The ACK survives the telemetry render, also when the state changes.
   const ack = last();
   await refresh(fx.status_ready); assert.strictEqual(last(), ack, 'ACK kept after a poll');
@@ -258,7 +263,7 @@ async function boot() {
   await send('', () => p.dom.window.dispatchEvent(new p.dom.window.KeyboardEvent('keydown', { key: 'Escape' })), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
   // Browser abort at 1.2 s: the Controller budget is 3 s, so the outcome is unknown.
   await p.fire(5000);
-  assert(/STAND 150 mm · .* · nessuna risposta entro 5 s · ESITO SCONOSCIUTO/.test(last()) && kind() === 'warn', last());
+  assert(/STOP \(Esc\).*SAFE_OFF_REQUESTED/.test(last()), 'a late older timeout cannot overwrite STOP: '+last());
 
   // 8. Refusals show HTTP code, backend error and reason; 9. REJECTED is not success.
   // Explicit pre-execution refusals vs unknown outcomes (HttpTransport semantics):
@@ -295,6 +300,16 @@ async function boot() {
   await send('', () => q('#simple-stand').click(), 'network', 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/errore di rete: Failed to fetch · ESITO SCONOSCIUTO/.test(last()), last());
 
+  await refresh(fx.status_ready);
+  await send('',()=>q('#simple-stand').click(),'hang','POSTURE.STAND',{target_height_m:.15},5000);
+  await p.fire(5000);assert(/ESITO SCONOSCIUTO/.test(last()),last());
+  const lost=p.dom.window.matdogMotionTrace.commands.at(-1), recovered=JSON.parse(fx.status_ready);
+  recovered.active_command={id:lost.id,sequence:lost.sequence,outcome:'COMPLETED',reason:'STAND_REACHED'};
+  await refresh(JSON.stringify(recovered));assert(/completamento confermato/.test(last())&&!/SCONOSCIUTO/.test(last()),last());
+  assert(lost.error==='AbortError'&&lost.observed.outcome==='COMPLETED','trace keeps timeout AND later execution proof');
+  await refresh(fx.status_ready);
+  await send('',()=>q('#simple-stand').click(),{status:200,body:fx.ack_stand_accepted,keepIdentity:true},'POSTURE.STAND',{target_height_m:.15},5000);
+  assert(/ACK_ID_MISMATCH.*ESITO SCONOSCIUTO/.test(last()),last());
   // B. One read lane for the whole page (PortalPage mdNet; listener: 2 sockets,
   // LRU purge). Request-level model only: no socket or latency is simulated.
   await refresh(fx.status_ready);
@@ -393,7 +408,7 @@ async function boot() {
   await refresh(fx.status_walking);device.holdUrl='/api/motion/status';
   await p.poll(2000);
   assert.strictEqual(q('#simple-state').textContent,'COLLEGAMENTO PERSO');
-  assert(q('#simple-walk-stop').disabled && !q('#simple-stop').disabled);
+  assert(!q('#simple-walk-stop').disabled && !q('#simple-stop').disabled, 'deceleration and emergency STOP remain reachable when telemetry is late');
   assert(values().includes('NON AGGIORNATO'));
   const agedRow=q('#simple-joints').tBodies[0].rows[0];
   assert(parseInt(agedRow.cells[7].textContent)>=2000);
@@ -412,6 +427,19 @@ async function boot() {
 
   assert.deepStrictEqual(p.errors, []);
   assert(p.calls.filter(c => c.method === 'GET').every(c => c.reads === 1), 'never two page reads in flight during the whole session');
+  // A session renewal of an older command cannot resend it after priority STOP.
+  {
+    const r=await boot();r.device.holdUrl='/wifi/session';
+    r.device.replies.push({status:403,body:jsonError('AUTH_FAILED')});
+    r.q('#simple-stand').click();await settle();
+    assert(r.device.release,'old command waiting for session renewal');
+    r.device.replies.push(ok(fx.ack_stop));r.q('#simple-stop').click();await settle();
+    r.device.release();await settle();
+    const sent=r.calls.filter(c=>c.url==='/api/motion/command').map(c=>JSON.parse(c.body).type);
+    assert.deepStrictEqual(sent,['POSTURE.STAND','MOTION.STOP'],'no stale authenticated retry after STOP');
+    assert(/SAFE_OFF_REQUESTED/.test(r.q('#simple-last').textContent));
+    assert.deepStrictEqual(r.errors,[]);r.dom.window.close();
+  }
   fs.writeFileSync(envelopesPath, envelopes.join('\n') + '\n');
   console.log('SIMPLE_DASHBOARD_DOM = PASS (' + envelopes.length + ' envelopes captured from the shipped page; real MotionService fixtures; ' + (sequence) + ' commands)');
   p.dom.window.close();

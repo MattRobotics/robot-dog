@@ -60,7 +60,9 @@ check("twin_deferred_.store(service_->motionEngaged());" in transport, "deferral
 # The read-only Twin is never the operator heartbeat: no credentials, no CSRF.
 check(re.search(r'credentials:\s*["\']omit["\']', js) is not None, "twin fetches omit credentials")
 # Embedded in the dashboard: one poll per page; only the parent, same origin.
-feed = re.search(r'get\("feed"\)==="parent"&&window\.parent!==window\?window\.addEventListener\("message",(\w+)=>\{\1\.origin!==location\.origin\|\|\1\.source!==window\.parent\|\|', js)
+parent_mode = re.search(r'(\w+)=new URLSearchParams\(location.search\).get\("feed"\)==="parent"&&window\.parent!==window', js)
+check(parent_mode is not None, "embedded mode bound to feed=parent and framed window")
+feed = re.search(re.escape(parent_mode[1])+r'\?window\.addEventListener\("message",(\w+)=>\{\1\.origin!==location\.origin\|\|\1\.source!==window\.parent\|\|', js)
 check(feed is not None, "feed=parent: listens to the framing dashboard only, same origin")
 check(js.count('addEventListener("message"') == 1, "no other message channel")
 check("X-Csrf-Token" not in js, "twin never presents a CSRF token")
