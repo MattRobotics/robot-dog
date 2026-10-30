@@ -35,8 +35,20 @@ class TestMatdogUrdfFk(unittest.TestCase):
         self.assertEqual(sha256_file(self.urdf), CANONICAL_URDF_SHA256)
 
     def test_collision_path_separation_is_the_only_urdf_text_change(self):
+        # REV01-FIX: every <visual> and <collision> uses meshes/collision/, and
+        # the four hip_joint origins are 2.2 mm higher in Z. Undoing exactly
+        # those two intentional changes must reproduce the historical digest,
+        # so nothing else in the URDF text may have changed.
         current = self.urdf.read_text(encoding="utf-8")
         normalized = current.replace("meshes/collision/", "meshes/")
+        for revised, historical in (
+            ('xyz="0.1125 0.0475 0.0487"', 'xyz="0.1125 0.0475 0.0465"'),
+            ('xyz="0.1125 -0.0475 0.0487"', 'xyz="0.1125 -0.0475 0.0465"'),
+            ('xyz="-0.1125 -0.0475 0.0287"', 'xyz="-0.1125 -0.0475 0.0265"'),
+            ('xyz="-0.1125 0.0475 0.0287"', 'xyz="-0.1125 0.0475 0.0265"'),
+        ):
+            self.assertEqual(normalized.count(revised), 1, revised)
+            normalized = normalized.replace(revised, historical)
         digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
         self.assertEqual(
             digest,
@@ -68,7 +80,7 @@ class TestMatdogUrdfFk(unittest.TestCase):
 
         self.assertAlmostEqual(x, 0.2195, places=12)
         self.assertAlmostEqual(y, 0.0940, places=12)
-        self.assertAlmostEqual(z, -0.0934, places=12)
+        self.assertAlmostEqual(z, -0.0912, places=12)
 
     def test_lf_joint_axes_are_canonical(self):
         joints = load_urdf_joints(self.urdf)

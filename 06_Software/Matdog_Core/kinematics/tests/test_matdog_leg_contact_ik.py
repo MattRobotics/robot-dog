@@ -29,7 +29,7 @@ class TestMatdogLegContactIk(unittest.TestCase):
         cls.repo = repo_root()
 
     def test_visual_zero_target_returns_zero_solution(self):
-        target = (0.2195, 0.0940, -0.0934)
+        target = (0.2195, 0.0940, -0.0912)
 
         result = solve_lf_ground_contact_ik(
             repo_root=self.repo,
@@ -126,7 +126,7 @@ class TestMatdogLegContactIk(unittest.TestCase):
         target = (
             0.2195 + world_shift[0],
             0.0940 + world_shift[1],
-            -0.0934 + world_shift[2],
+            -0.0912 + world_shift[2],
         )
 
         result = solve_lf_ground_contact_ik(

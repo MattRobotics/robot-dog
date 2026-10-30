@@ -92,7 +92,7 @@
     },
     {
       "path": "05_Firmware/MATDOG_Controller/src/motion/LegGeometryData.h",
-      "sha256": "343f1cebe24a791fdd20946d12c576a8951c56cfb00cd16b1961c7fd4d5b45db",
+      "sha256": "114d261c12ca563dcedba6e4b896a16d2f6fd68f91686074084eeeec2588a5cc",
       "classification": "PORT_AS_RUNTIME_LIBRARY"
     },
     {
@@ -236,11 +236,11 @@
   "canonical_inputs": [
     {
       "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
-      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+      "sha256": "5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73"
     },
     {
       "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
-      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+      "sha256": "c2eadf6d6db1b03379cf256b542dadbcd8d63076179bc84ebd7169634e9f0097"
     },
     {
       "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
@@ -308,7 +308,7 @@
     },
     {
       "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
-      "sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966"
+      "sha256": "ac1fc5a2a4bb49e15159cbc55854ee2cbadade78d5825010a48b19b0e2e9d272"
     },
     {
       "path": "09_Logs/Validation_Reports/2026-07-08_175245_C4A_offline_safe_stand_candidate.json",
@@ -366,7 +366,7 @@
     },
     {
       "path": "06_Software/Matdog_Core/kinematics/matdog_urdf_fk.py",
-      "sha256": "8646de211301cd767906b2e7a5019ef7a864cd6f15c8b380777cd3ee9192a8e5"
+      "sha256": "74b527e61f2996ae89b8e99a248468b0110de2b464c0f24d56e1edf66b3b4a9f"
     }
   ],
   "protected_installation": [

@@ -2,7 +2,7 @@
 
 ## Status
 
-Archived and validated kinematic baseline.
+Canonical kinematic model (REV00 kinematics with the REV01-FIX base_link and HIP offsets, see below).
 
 This directory is the canonical REV00 robot description used as the starting point for inverse kinematics, stand-pose development, gait generation and later simulation work.
 
@@ -11,11 +11,11 @@ This directory is the canonical REV00 robot description used as the starting poi
 - `matt_robodog_rev00.urdf`
   Canonical URDF model.
 
-- `meshes/*.stl`
-  Detailed STL visual meshes used by the URDF.
-
 - `meshes/collision/*.stl`
-  Dedicated, simplified STL collision meshes used by the URDF.
+  The single STL per link (17 files). Since REV01-FIX every `<visual>` and every
+  `<collision>` in the URDF references the same file, so what is rendered is
+  exactly what the Geometry Compiler V5 checks. The former detailed visual set
+  under `meshes/*.stl` was removed (recoverable from Git history).
 
 - `textures/`
   URDF Studio texture assets, when present.
@@ -86,16 +86,39 @@ No compensating mesh transform should be reintroduced without updating the canon
 
 ## Collision Status
 
-The REV00 model keeps the detailed meshes under `meshes/` for `<visual>` and
-uses the approved dedicated meshes under `meshes/collision/` for
-`<collision>`. Both sets retain their canonical link filenames; the directory
-separates their roles.
+Every link uses one STL, `meshes/collision/<link>.stl`, for both `<visual>` and
+`<collision>` (same `origin` and `scale="0.001 0.001 0.001"`, verified identical
+before unification). The 16 leg meshes are the dedicated collision baseline
+approved on 2026-08-10 and are unchanged. `base_link.stl` is the REV01-FIX CAD
+export (36,832 triangles, SHA-256 `c2eadf6d6db1b03379cf256b542dadbcd8d63076179bc84ebd7169634e9f0097`),
+which replaced the 22,044-triangle REV00 base. The set now totals 134,484
+triangles.
 
-The dedicated collision baseline approved on 2026-08-10 contains 17 meshes,
-119,696 triangles and 5,986,228 bytes. It reduces the historical 472,020-triangle
-collision set by 74.64%. Collision origins and `scale="0.001 0.001 0.001"`
-remain unchanged, so this representation change does not create a new
-mechanical revision.
+The REV00 baseline had 119,696 triangles and 5,986,228 bytes; it reduced the
+historical 472,020-triangle collision set by 74.64%.
+
+## REV01-FIX Integration (2026-10-30)
+
+- `base_link` collision/visual mesh replaced by REV01-FIX. Its eight motor pins
+  were corrected to a nominal 0.25 mm radial and axial clearance to the HIP
+  sockets, which are unchanged.
+- The four `hip_joint` origins were raised by 2.2 mm in Z: LF/RF 0.0465 ->
+  0.0487 m, RH/LH 0.0265 -> 0.0287 m. The front/rear hip offset is still
+  20.0 mm. All other joint origins, axes and limits are unchanged.
+- The directory and file names keep the `rev00` label on purpose, so existing
+  tools and paths keep working; the revision is identified by the SHA-256 values
+  in `SHA256SUMS.txt`.
+- Geometry Compiler V5 (offline, unchanged kernel): q=0 12/12 pairs separated,
+  24/24 endpoint searches completed. Against REV00, 22 endpoints are identical;
+  the RH hip minimum and LH hip maximum differ by 6.8e-5 rad, below the 1e-4 rad
+  bisection resolution. Measured pin/socket clearance on the STL meshes is
+  0.250 mm axial and 0.250 mm radial by vertex distance (0.203-0.204 mm
+  minimum surface distance because the two cylinders are tessellated
+  differently).
+- Not updated here and still historical: the link mass/inertia blocks of
+  `base_link` (REV00 CAD values) and `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx`
+  (it still lists the REV00 HIP Z coordinates). Updated Solid Edge values are
+  required for both.
 
 ## Physical Data Status
 

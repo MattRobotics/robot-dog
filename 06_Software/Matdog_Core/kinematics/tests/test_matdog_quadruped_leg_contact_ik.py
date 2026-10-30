@@ -353,7 +353,7 @@ class TestMatdogQuadrupedLegContactIk(unittest.TestCase):
         )
         self.assertAlmostEqual(
             translation[2],
-            0.112526186261669,
+            0.110334826452145,
             places=12,
         )
 
@@ -450,7 +450,7 @@ class TestMatdogQuadrupedLegContactIk(unittest.TestCase):
 
         self.assertAlmostEqual(
             closed_translation[2],
-            0.103928814059235,
+            0.101737454249711,
             places=12,
         )
 

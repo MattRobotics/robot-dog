@@ -35,7 +35,7 @@ from matdog_geometry_mesh_kernel import (  # noqa: E402
 
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-URDF_MESH_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/meshes"
+URDF_MESH_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/meshes/collision"
 
 
 def _box_triangles(min_xyz: tuple[float, float, float], max_xyz: tuple[float, float, float]) -> np.ndarray:
