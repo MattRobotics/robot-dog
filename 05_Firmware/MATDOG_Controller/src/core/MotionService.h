@@ -1,6 +1,7 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
 namespace matdog { namespace core {
+constexpr size_t kMotionStatusJsonBytes=5120; // fixed HTTPD buffer, including transport diagnostics
 // Immutable per-request observation, transferred by the existing HTTP mailbox.
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
@@ -9,6 +10,9 @@ struct MotionStatusSnapshot {
   uint32_t capturedMs=0,releases=0,missed=0,bmsAgeMs=0,maxReleaseWorkUs=0;
   simple::State state=simple::State::STOPPED;
   const char *phase="IDLE",*poseRegion="UNKNOWN",*reason="BOOTING",*readinessReason="BOOTING",*powerReason="POWER_NOT_READY";
+  char activeId[49]{};
+  uint32_t activeSequence=0,acceptedMs=0,finishedMs=0;
+  uint16_t commandedRaw[12]{};
   const char *activeReason="",*activeOutcome="";
   bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
   uint16_t offMask=0,referenceFaultRaw=0;
@@ -42,6 +46,7 @@ class MotionService {
   bool ready_=false,active_=false;
   const char* reason_="BOOTING";
   motion::MotionAck last_{},activeAck_{};
+  uint32_t acceptedMs_=0,finishedMs_=0;
   struct Replay {uint32_t sequence=0;char id[49]{};motion::MotionAck ack{};} replay_[3]{};
 };
 } }

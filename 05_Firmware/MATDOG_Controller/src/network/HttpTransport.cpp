@@ -1395,6 +1395,10 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
     if(!self->formatMotionResponse(resp))return sendJsonError(req,"503 Service Unavailable","MOTION_STATUS_UNAVAILABLE",millis()-t0);
   }
   httpd_resp_set_type(req,"application/json");httpd_resp_set_hdr(req,"Cache-Control","no-store");
+  // HTTPD-local timing only: excludes browser/socket queue before handler entry
+  // and transfer after send. No servo access, logging, task or shared buffer.
+  char timing[48];snprintf(timing,sizeof(timing),"handler;dur=%lu",(unsigned long)(millis()-t0));
+  httpd_resp_set_hdr(req,"Server-Timing",timing);
   return httpd_resp_send(req,catalog?catalog.get():resp.text,resp.text_len);
 }
 bool HttpTransport::serviceStopLane(uint32_t now_ms) {

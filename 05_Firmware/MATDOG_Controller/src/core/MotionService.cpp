@@ -13,6 +13,7 @@ void MotionService::update(){
  if(!strcmp(motion_->phase(),"PRONE_CONTACT_UNVERIFIED"))activeAck_.reason="PRONE_CONTACT_UNVERIFIED";
  if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
  if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
  activeAck_.executor_state=simple::name(motion_->state());
 }
 motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t now){
@@ -29,8 +30,9 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  // IDs include the browser instance; a page reload may restart sequence at 1.
  if(replay.sequence&&!strcmp(c.id,replay.id)){if(c.sequence==replay.sequence)return replay.ack;a.reason="COMMAND_ID_REUSED";return last_=a;}
  auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
+   a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){motion_->walkStop();return result(nullptr);}
@@ -57,6 +59,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.capturedUs=esp_timer_get_time();s.capturedMs=now;
  s.ready=ready_;s.readinessReason=reason_;
  s.fresh=motion_->fresh(s.capturedUs);s.poseRegion=motion_->poseRegion(s.capturedUs);
+ memcpy(s.activeId,activeAck_.id,sizeof(s.activeId));s.activeSequence=activeAck_.sequence;s.acceptedMs=acceptedMs_;s.finishedMs=finishedMs_;
+ for(unsigned i=0;i<12;++i)s.commandedRaw[i]=motion_->commandedRaw()[i];
  s.activeOutcome=motion::toString(activeAck_.outcome);s.activeReason=activeAck_.reason;
  s.state=motion_->state();
  s.phase=motion_->phase();
@@ -99,12 +103,12 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    !((us>=f.stampUs&&us-f.stampUs>250000)||(f.stampUs>us&&f.stampUs-us>15000));
  size_t used=0;bool ok=true;
  auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
- add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\"},\"joints\":[",
- (unsigned long)now,simple::name(s.state),s.phase,fresh?s.poseRegion:"UNKNOWN",boolean(s.ready),s.reason,s.readinessReason,boolean(!fresh),boolean(s.state==simple::State::FAULT),boolean(s.offVerified),s.offMask,boolean(s.energized),boolean(s.heightValid),s.requestedHeightM*1000,s.heightM*1000,s.walkCycles,boolean(s.stabilizationLimited),boolean(s.imuValid),(unsigned long long)(us>=s.imuStampUs?(us-s.imuStampUs)/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)s.releases,(unsigned long)s.missed,(unsigned long long)s.maxGapUs,s.activeOutcome,s.activeReason);
+ add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\",\"id\":\"%s\",\"sequence\":%lu,\"accepted_ms\":%lu,\"finished_ms\":%lu},\"joints\":[",
+ (unsigned long)now,simple::name(s.state),s.phase,fresh?s.poseRegion:"UNKNOWN",boolean(s.ready),s.reason,s.readinessReason,boolean(!fresh),boolean(s.state==simple::State::FAULT),boolean(s.offVerified),s.offMask,boolean(s.energized),boolean(s.heightValid),s.requestedHeightM*1000,s.heightM*1000,s.walkCycles,boolean(s.stabilizationLimited),boolean(s.imuValid),(unsigned long long)(us>=s.imuStampUs?(us-s.imuStampUs)/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)s.releases,(unsigned long)s.missed,(unsigned long long)s.maxGapUs,s.activeOutcome,s.activeReason,s.activeId,(unsigned long)s.activeSequence,(unsigned long)s.acceptedMs,(unsigned long)s.finishedMs);
  // Raw torque/goal fields retain their dated control observation. SAFE_OFF is
  // separate, newer evidence from 13 independent post-stop torque reads.
  // Appended after joints below to keep the existing wire contract compatible.
- for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
+ for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"commanded_raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,s.commandedRaw[i],f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]");
  add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

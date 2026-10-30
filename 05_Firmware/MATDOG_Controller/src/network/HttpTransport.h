@@ -37,7 +37,7 @@ enum class HttpRequestKind : uint8_t {
   CALIBRATION_RESTORE
 };
 constexpr size_t kMotionCapabilitiesBytes=20480;
-constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = 4096;
+constexpr size_t kHttpChunkBufferBytes = 1024, kHttpStatusTextBytes = core::kMotionStatusJsonBytes;
 struct HttpTransportRequest {
   HttpRequestKind kind = HttpRequestKind::NONE;
   uint32_t sequence = 0;

@@ -80,9 +80,9 @@ std::string replace(std::string s, const std::string& from, const std::string& t
   return at == std::string::npos ? s : s.replace(at, from.size(), to);
 }
 std::string statusJson(core::MotionService& service, Rig& rig) {
-  char out[4096]{};
+  char out[core::kMotionStatusJsonBytes]{};
   test_clock_us = rig.p.now;
-  check(service.statusJson(out, sizeof(out) - 400, rig.p.now / 1000), "statusJson fits the transport buffer");
+  check(service.statusJson(out, sizeof(out) - 640, rig.p.now / 1000), "statusJson fits the transport buffer");
   std::string s = out; s.pop_back();
   return s + ",\"admin_session\":true}";  // appended by serviceRequest MOTION_STATUS
 }
