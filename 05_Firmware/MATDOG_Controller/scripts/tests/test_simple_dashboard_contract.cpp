@@ -129,12 +129,22 @@ int fixtures(const char* path) {
     test_clock_us = rig.p.now;
     check(rig.m.fresh(rig.p.now) && !std::strcmp(rig.m.poseRegion(rig.p.now), "PRONE_ENTRY"), "idle PRONE pose classified from fresh feedback");
     put("status_ready", statusJson(service, rig));
+    auto prone=semantic(motion::Intent::LIE_DOWN,rig);strcpy(prone.id,"prone-fixture");
+    put("ack_prone",ackJson(service,service.command(prone,prone.issued_at_ms)));
     const auto c = semantic(motion::Intent::STAND, rig); auto stand = c; stand.target_height_m = .15;
     const auto a = service.command(stand, c.issued_at_ms);
     check(a.outcome == motion::CommandOutcome::ACCEPTED, "fixture STAND accepted");
     put("ack_stand_accepted", ackJson(service, a));
     rig.tick(); service.update();
     put("status_moving", statusJson(service, rig));
+  }
+  {
+    Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    check(!rig.m.stand(.05,rig.p.now)&&rig.reachStand(),"PRONE terminal fixture starts in HOLD");
+    auto c=semantic(motion::Intent::LIE_DOWN,rig);check(service.command(c,c.issued_at_ms).outcome==motion::CommandOutcome::ACCEPTED,"PRONE accepted from HOLD");
+    for(unsigned i=0;i<4000&&strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED");++i)rig.tick();
+    service.update();check(!strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED"),"PRONE trajectory ends torque ON, no contact claim");
+    put("status_prone_unverified",statusJson(service,rig));
   }
   {
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr);
@@ -261,6 +271,11 @@ int envelopes(const char* path, const char* src) {
       check(rig.reachStand() && rig.m.requestedHeightM() == h, name + ": scripted STAND reached at the requested height (software only)");
       Rig late; core::MotionService lateService; lateService.begin(&late.m, nullptr, nullptr); lateService.setReady(true, "READY");
       check(serve(request(body, session), session, lateService, late, c.issued_at_ms + c.ttl_ms).code == "REJECTED EXPIRED", name + ": TTL still enforced");
+    } else if (name == "prone") {
+      const auto frames=rig.p.frames,off=rig.p.offCalls;
+      const auto r=serve(request(body,session),session,service,rig,now);
+      check(c.intent==motion::Intent::LIE_DOWN&&!gate.stopLane&&r.code=="REJECTED PRONE_REQUIRES_STAND_HOLD","PRONE explicit refusal through real parser/service");
+      check(rig.p.frames==frames&&rig.p.offCalls==off,"PRONE refusal does not move or STOP");
     } else if (name.rfind("walk", 0) == 0 && name != "walk_stop") {
       const unsigned i = name == "walk30" ? 0 : name == "walk45" ? 1 : 2;
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[i] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000,
@@ -293,7 +308,7 @@ int envelopes(const char* path, const char* src) {
       check(rig.m.offVerified() && rig.m.state() == simple::State::STOPPED, name + ": 13/13 verified by the scripted port only");
     } else check(false, "unknown envelope case " + name);
   }
-  check(seen == 8, "eight dashboard envelopes captured (" + std::to_string(seen) + ")");
+  check(seen == 9, "nine dashboard envelopes captured (" + std::to_string(seen) + ")");
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
   // Rejections keep working on the generated envelopes: none reaches the service.
   {

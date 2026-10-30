@@ -80,7 +80,7 @@ bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
 }
 const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";}return "FAULT";}
 const char* SimpleMotion::phase() const {
-  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE"};
+  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE","PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND","PRONE_CONTACT_UNVERIFIED"};
   return p[static_cast<unsigned>(phase_)];
 }
 void SimpleMotion::stop(const char* reason) { stopReason_.store(reason);stop_.store(true,std::memory_order_release); }
@@ -193,6 +193,23 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
   return nullptr;
 }
+const char* SimpleMotion::prone(uint64_t now){
+  if(stopping())return "SAFE_OFF_IN_PROGRESS";
+  if(faultLatched_)return "FAULT_STOP_REQUIRED";
+  if(!input_.ready)return input_.refusal;
+  if(!input_.powerOk)return "POWER_NOT_READY";
+  if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000)return "IMU_UNAVAILABLE";
+  if(state_!=State::STANDING||phase_!=Phase::HOLD||!energized_)return "PRONE_REQUIRES_STAND_HOLD";
+  if(!fresh(now)||!segmentTo_.valid)return "PRONE_FEEDBACK_UNAVAILABLE";
+  const auto& box=plannedHeight_>.053?collision::kHeight:collision::kLift;
+  if(!pointSafe(measured())||!contains(box,measured())||!contains(box,segmentTo_))return "PRONE_PATH_NOT_CLEAR";
+  // Intent only. Keep the preceding nominal support goals until a Motion release.
+  // 53 mm is inside both existing boxes, including the recorded STAND100 sag.
+  pendingGoalValid_=true;walkRequested_=false;state_=State::MOVING;phase_=Phase::PRONE_HEIGHT;
+  reason_="PRONE_DESCENT_NOT_VALIDATED";requestedHeight_=0;heightValid_=false;
+  timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";referenceFaultSlot_=12;
+  return nullptr;
+}
 const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   if(stride>=3)return "STANDARD_STRIDE_REQUIRED";
   if(state_==State::WALKING)return "ALREADY_WALKING";
@@ -269,6 +286,9 @@ bool SimpleMotion::settledUnderLoad(uint64_t now){
     case Phase::DEPLOY:allowed=0xfff;next=&collision::kLift;break;
     case Phase::LIFT:allowed=0xfff;if(std::abs(plannedHeight_-requestedHeight_)>1e-9)next=&collision::kHeight;break;
     case Phase::HEIGHT:allowed=0xfff;break;
+    case Phase::PRONE_HEIGHT:allowed=0xfff;next=&collision::kLift;break;
+    case Phase::PRONE_LIFT:allowed=0xfff;next=&collision::kDeploy;break;
+    case Phase::PRONE_DEPLOY:case Phase::PRONE_LAND:allowed=0xfff;next=&collision::kEntry;break;
     default:break;  // WALK_SETTLE and HOLD keep the 12-tick arrival only
   }
   const auto terminal=segmentBox_?settleUs_:goalSentUs_;
@@ -326,10 +346,10 @@ bool SimpleMotion::heightVias(double from,double to){
     if(k>=160&&std::fmin(from,to)+1e-6<z&&z<std::fmax(from,to)-1e-6&&!knotVia(k))return false;}
   JointTargetFrame q;return heightTarget(to,q)&&via(q,0,0,to);
 }
-void SimpleMotion::beginPlan(Phase next,const collision::Box& box,uint64_t now){
+void SimpleMotion::beginPlan(Phase next,const collision::Box& box,uint64_t now,double speed,double acc){
   // The whole time-continuous group lies in one certified box: each joint
   // stays within the range of its via points, which are all checked here.
-  if(plan_.n<1||!plan_.plan(kStandSpeedRadS,kStandAccelerationRadS2)){fault("STAND_PLAN_UNAVAILABLE");return;}
+  if(plan_.n<1||!plan_.plan(speed,acc)){fault("STAND_PLAN_UNAVAILABLE");return;}
   double distance=0;
   for(unsigned k=0;k<plan_.n;++k){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[k][i];
     if(!contains(box,q)||!pointSafe(q)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
@@ -376,11 +396,48 @@ void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,co
   if(!via(from,0,0,fromHeight)||!heightVias(fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
   plannedHeight_=requestedHeight_;beginPlan(Phase::HEIGHT,box,now);
 }
+void SimpleMotion::beginProne(Phase next,uint64_t now){
+  // Same ViaPlan/FK/IK, native RAM profile and independent-joint box proof as
+  // STAND. No target is based on the loaded encoder sag as a new nominal pose.
+  plan_.clear();const collision::Box* box=nullptr;
+  if(next==Phase::PRONE_HEIGHT){
+    box=&collision::kHeight;
+    if(!via(segmentTo_,0,0,plannedHeight_)||!heightVias(plannedHeight_,.053)){fault("PRONE_PATH_NOT_CLEAR");return;}
+    plannedHeight_=.053;
+  }else if(next==Phase::PRONE_LIFT){
+    box=&collision::kLift;
+    if(!via(segmentTo_,0,0,plannedHeight_)){fault("PRONE_PATH_NOT_CLEAR");return;}
+    for(unsigned j=sizeof(collision::kLiftKnots)/sizeof(unsigned);j-->0;){const auto k=collision::kLiftKnots[j];
+      if(knotHeight(k)<plannedHeight_-1e-6&&!knotVia(k)){fault("PRONE_PATH_NOT_CLEAR");return;}}
+  }else if(next==Phase::PRONE_DEPLOY){
+    box=&collision::kDeploy;
+    for(unsigned j=sizeof(collision::kDeployKnots)/sizeof(unsigned);j-->0;)
+      if(!knotVia(collision::kDeployKnots[j])){fault("PRONE_PATH_NOT_CLEAR");return;}
+  }else if(next==Phase::PRONE_LAND){
+    box=&collision::kEntry;
+    auto q=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].hip=(l==0||l==3?1:-1)*.17;
+    if(!knotVia(0)||!via(q,.08183102100559651,0,.009626496609908074)){fault("PRONE_PATH_NOT_CLEAR");return;}
+  }else {fault("PRONE_PATH_NOT_CLEAR");return;}
+  // Check the measured handover too, even when ordinary arrival (12 ticks)
+  // rather than loaded-settle completed the preceding segment. No box bypass.
+  if(!pointSafe(measured())||!contains(*box,measured())){fault("PRONE_PATH_NOT_CLEAR");return;}
+  beginPlan(next,*box,now,next==Phase::PRONE_LAND?.10:kStandSpeedRadS,
+                         next==Phase::PRONE_LAND?.20:kStandAccelerationRadS2);
+}
 void SimpleMotion::nextStand(uint64_t now){
   timing::Section section(timing::NOMINAL);
   const JointTargetFrame actual=measured();
   const double* head=paired_data::kKnots[0].p;
   switch(phase_){
+    case Phase::PRONE_HEIGHT:beginProne(Phase::PRONE_LIFT,now);return;
+    case Phase::PRONE_LIFT:beginProne(Phase::PRONE_DEPLOY,now);return;
+    case Phase::PRONE_DEPLOY:beginProne(Phase::PRONE_LAND,now);return;
+    case Phase::PRONE_LAND:
+      // Deliberately NOT SAFE_OFF and NOT a contact assertion: the rigid CAD
+      // endpoint still needs rear-foot support. Freeze the final written goal;
+      // fresh feedback, native/electrical/IMU guards and STOP remain serviced.
+      phase_=Phase::PRONE_WAIT;reason_="PRONE_CONTACT_UNVERIFIED";planned_=false;
+      heightValid_=false;return;
     case Phase::ENABLE:{  // folded entry: lower joints to the route head first
       auto q=reference_,h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
       if(!transitionSafe(actual,q,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
@@ -653,12 +710,18 @@ void SimpleMotion::update(uint64_t now){
   // Use the gate clock; keep the trajectory epoch and all age limits unchanged.
   if(energized_&&!fresh(esp_timer_get_time())){fault("SERVO_FEEDBACK_STALE");return;}
   if(pendingGoalValid_){
-    pendingGoalValid_=false;JointTargetFrame actual;actual.valid=true;
+    pendingGoalValid_=false;
+    if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
+    JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
     // Start from the preceding NOMINAL stand: an already compensated encoder
     // pose fed back as nominal would apply the IMU correction twice.
     beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;
+  }
+  if(returningProne()){
+    if(!segmentBox_||!pointSafe(measured())||!contains(*segmentBox_,measured())){fault("PRONE_MEASURED_OUTSIDE_BOX");return;}
+    if(phase_==Phase::PRONE_WAIT)return; // torque/goals persist, no timeout or automatic recovery
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){

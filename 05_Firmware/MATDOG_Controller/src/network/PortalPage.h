@@ -44,7 +44,7 @@ section{margin:12px 0}section.page{background:var(--card);padding:16px;border-ra
 dl{display:grid;grid-template-columns:minmax(36%,1fr) auto;gap:4px 12px;margin:0;align-items:baseline}dt{color:var(--muted);font-size:14px}dd{margin:0;text-align:right;overflow-wrap:anywhere;min-width:0}dd.ok{color:var(--ok)}dd.warn{color:var(--warn)}dd.bad{color:var(--bad)}dd.na{color:var(--na)}dd.lock{color:var(--lock)}
 .mods{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.note{font-size:13px;color:var(--muted);margin:8px 0 0}.sub{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.sub.first{margin:0;padding:0;border:0}.sub>b{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
 details{margin-top:10px}summary{cursor:pointer;color:var(--accent);font-size:14px}details dl{margin-top:8px}
-.stale .card,.stale .mode{opacity:.5}#staleNote{display:none;margin-top:12px;padding:10px;border-radius:8px;background:#4a2326;border-left:5px solid var(--bad)}.stale #staleNote{display:block}
+.stale .card:not(#simple-motion),.stale .mode{opacity:.5}#staleNote{display:none;margin-top:12px;padding:10px;border-radius:8px;background:#4a2326;border-left:5px solid var(--bad)}.stale #staleNote{display:block}
 label{display:block;margin:12px 0;font-size:14px;color:var(--muted)}input,select{display:block;width:100%;margin-top:4px;padding:11px;background:var(--bg);color:#fff;border:1px solid #456075;border-radius:6px;font:inherit}input[type=checkbox]{display:inline;width:auto;margin:0 6px 0 0}label.check{color:var(--text)}
 fieldset{border:1px solid #456075;margin:14px 0;border-radius:8px;padding:6px 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 18px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{color:var(--accent)}.result{white-space:pre-line;margin:12px 0;padding:12px;border-radius:8px;border-left:5px solid var(--na);background:#111c26}.result.ok{border-color:var(--ok)}.result.bad{border-color:var(--bad)}.result.warn{border-color:var(--warn)}
@@ -202,13 +202,13 @@ function renderWifi(){
 function link(){
  const age=lastOk?Date.now()-lastOk:0,dot=$('#linkDot'),text=$('#linkText');
  if(watch&&(fails||age>2*POLL_MS)){dot.className='dot warn';text.textContent='Prova del router in corso da '+dur(Date.now()-watch.t)+': AP chiuso (previsto). Se il telefono non si ricollega da solo, riconnettilo a «'+watch.ap+'».'}
- else if(budget){dot.className='dot warn';text.textContent='Movimento in corso: stato temporaneamente non disponibile (MOTION_BUDGET_UNAVAILABLE)'+(lastOk?' · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa), non aggiornati':'')}
+ else if(budget){dot.className='dot warn';text.textContent=(window.mdMotionHealth?.fresh?'Motion disponibile · snapshot '+window.mdMotionHealth.age+' ms. ':'Motion: consultare stato ed età nella scheda dedicata. ')+'Diagnostica generale sospesa durante il movimento (MOTION_BUDGET_UNAVAILABLE)'+(lastOk?' · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa), non aggiornati':'')}
  else if(!lastOk){dot.className='dot '+(fails>1?'bad':'');text.textContent=fails>1?'Dispositivo non raggiungibile. Collega il telefono al Wi-Fi MATDOG e apri http://192.168.4.1':'Connessione al dispositivo…'}
  else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+formatDiagnosticTime(lastOk)}
  else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa)'}
  else{dot.className='dot ok';text.textContent='Aggiornato alle '+formatDiagnosticTime(lastOk)+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
  document.body.classList.toggle('stale',!!lastOk&&(budget||fails>=2||age>STALE_MS));
- $('#staleNote').textContent=budget?'Dati non aggiornati: durante il movimento il dispositivo sospende questa telemetria. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.':'Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.';
+ $('#staleNote').textContent=budget?'Dati non aggiornati: durante il movimento il dispositivo sospende la diagnostica generale. La scheda Motion ha telemetria ed età indipendenti. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.':'Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.';
  // A temporary session ends on the controller SESSION_MS after its last
  // authenticated use; the Motion poll refreshes sessionAt on each one.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}

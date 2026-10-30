@@ -61,7 +61,7 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 // rc.6 (OP1, 367e2b32, not installed): rc.5 + IK cost reduction + prompt 503.
 // rc.7 (5d208c36, not installed): rc.6 + compensate IK tolerance 1e-6 m + WALK STOP without slack wait.
 // rc.8: rc.7 + bounded HTTPD wait while Motion is engaged + dashboard 503 = paused telemetry.
-constexpr const char* kFirmwareVersion = "1.0.0-rc.11";
+constexpr const char* kFirmwareVersion = "1.0.1-dev.3";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

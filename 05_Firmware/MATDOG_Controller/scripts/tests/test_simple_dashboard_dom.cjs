@@ -374,6 +374,31 @@ async function boot() {
   assert.strictEqual(commands().length, beforeHidden, 'no WALK STOP when the page is hidden');
   await refresh(fx.status_ready);
 
+  // PRONE is visible, explicit and requires an existing STAND HOLD; it never masquerades as STOP.
+  await send('prone', () => q('#simple-prone').click(), ok(fx.ack_prone), 'POSTURE.LIE_DOWN', {}, 5000);
+  assert(/REJECTED.*PRONE_REQUIRES_STAND_HOLD/.test(last()));
+  await refresh(fx.status_prone_unverified);
+  assert(/Appoggio non verificato/.test(q('#simple-reason').textContent));
+  assert(/goal fissi; appoggio non verificato/.test(q('#simple-values').textContent));
+  assert(!q('#simple-stop').disabled);
+  // A new HTTP response with old controller feedback is not fresh.
+  const stale=JSON.parse(fx.status_ready);stale.stale=true;
+  await refresh(JSON.stringify(stale));
+  assert.strictEqual(q('#simple-state').textContent,'FEEDBACK NON FRESCO');
+  assert(q('#simple-stand').disabled && q('#simple-prone').disabled && !q('#simple-stop').disabled);
+  const delayed=JSON.parse(fx.status_ready);delayed.snapshot_age_ms=2000;
+  await refresh(JSON.stringify(delayed));
+  assert.strictEqual(q('#simple-state').textContent,'COLLEGAMENTO PERSO');
+  // While the next GET hangs, age advances and stale controls disable without another response.
+  await refresh(fx.status_walking);device.holdUrl='/api/motion/status';
+  await p.poll(2000);
+  assert.strictEqual(q('#simple-state').textContent,'COLLEGAMENTO PERSO');
+  assert(q('#simple-walk-stop').disabled && !q('#simple-stop').disabled);
+  assert(values().includes('NON AGGIORNATO'));
+  const agedRow=q('#simple-joints').tBodies[0].rows[0];
+  assert(parseInt(agedRow.cells[7].textContent)>=2000);
+  await send('', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
+  device.release();await settle();received=p.clock();
   // D. Controller readiness, not System READY, decides the controls.
   await refresh(fx.status_not_ready);
   assert(values().includes('Motion ammessa dal Controllerno · IMU non disponibile'), values());

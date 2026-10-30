@@ -1,0 +1,126 @@
+{
+  "source": "/home/matteo-manicardi/MATDOG/verification-artifacts/SIMPLE_OPT_20261022/gen1-restored.json",
+  "sha256": "d55df7301f173cd6c6f592e8199237f7d9597618e53190772dd89ac4d3f3cabc",
+  "joints": [
+    {
+      "slot": 0,
+      "q0_tick": 1983,
+      "min_tick": 1472,
+      "max_tick": 2494,
+      "limits_rad": [
+        -0.783864,
+        0.783864
+      ]
+    },
+    {
+      "slot": 1,
+      "q0_tick": 2095,
+      "min_tick": 1499,
+      "max_tick": 3471,
+      "limits_rad": [
+        -0.914253,
+        2.110758
+      ]
+    },
+    {
+      "slot": 2,
+      "q0_tick": 2102,
+      "min_tick": 1717,
+      "max_tick": 3144,
+      "limits_rad": [
+        -1.598408,
+        0.590583
+      ]
+    },
+    {
+      "slot": 3,
+      "q0_tick": 2030,
+      "min_tick": 1519,
+      "max_tick": 2541,
+      "limits_rad": [
+        -0.783864,
+        0.783864
+      ]
+    },
+    {
+      "slot": 4,
+      "q0_tick": 2096,
+      "min_tick": 727,
+      "max_tick": 2692,
+      "limits_rad": [
+        -0.914253,
+        2.10002
+      ]
+    },
+    {
+      "slot": 5,
+      "q0_tick": 1971,
+      "min_tick": 941,
+      "max_tick": 2350,
+      "limits_rad": [
+        -1.58,
+        0.581379
+      ]
+    },
+    {
+      "slot": 6,
+      "q0_tick": 2087,
+      "min_tick": 1576,
+      "max_tick": 2590,
+      "limits_rad": [
+        -0.783864,
+        0.771592
+      ]
+    },
+    {
+      "slot": 7,
+      "q0_tick": 2061,
+      "min_tick": 668,
+      "max_tick": 2657,
+      "limits_rad": [
+        -0.914253,
+        2.136835
+      ]
+    },
+    {
+      "slot": 8,
+      "q0_tick": 2034,
+      "min_tick": 996,
+      "max_tick": 2419,
+      "limits_rad": [
+        -1.592272,
+        0.590583
+      ]
+    },
+    {
+      "slot": 9,
+      "q0_tick": 2028,
+      "min_tick": 1517,
+      "max_tick": 2538,
+      "limits_rad": [
+        -0.783864,
+        0.78233
+      ]
+    },
+    {
+      "slot": 10,
+      "q0_tick": 2092,
+      "min_tick": 1496,
+      "max_tick": 3480,
+      "limits_rad": [
+        -0.914253,
+        2.129166
+      ]
+    },
+    {
+      "slot": 11,
+      "q0_tick": 2092,
+      "min_tick": 1710,
+      "max_tick": 3129,
+      "limits_rad": [
+        -1.590738,
+        0.585981
+      ]
+    }
+  ]
+}

@@ -72,6 +72,8 @@ class SimpleMotion {
   void begin(ServoPort* p,bool powered=true) { port_=p; if(powered)enterOff(false,"BOOTING");else reason_="USB_ONLY"; }
   void inputs(const Inputs& i) { input_=i; }
   const char* stand(double height,uint64_t now);
+  // Experimental: arrival is not proof of ventral support; torque stays ON.
+  const char* prone(uint64_t now);
   const char* walk(unsigned stride,uint64_t now);
   void walkStop();
   // Atomic latch only: callable independently of HTTP and of the Motion tick.
@@ -128,7 +130,7 @@ class SimpleMotion {
   uint32_t tempSpikes() const { return tempSpikes_; }
   uint16_t hotPendingMask() const { uint16_t m=0;for(unsigned i=0;i<12;++i)if(hotSinceUs_[i])m|=1u<<i;return m; }
  private:
-  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD };
+  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT };
   enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool readTimed(unsigned slot,bool control,Feedback&);
   bool frameTimed(const uint16_t raw[12],Drive);
@@ -147,7 +149,9 @@ class SimpleMotion {
   bool via(const motion::JointTargetFrame&,double pitch,double x,double z);
   bool knotVia(unsigned knot);
   bool heightVias(double from,double to);
-  void beginPlan(Phase,const collision::Box&,uint64_t);
+  void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
+  void beginProne(Phase,uint64_t);
+  bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT; }
   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
   void beginLift(const motion::JointTargetFrame* measured,uint64_t);
   void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);

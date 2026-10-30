@@ -270,7 +270,7 @@ void CommandRouter::handleLine(String line) {
     for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_max_us=%lu",k,(unsigned long)t.externalMax[k]);
     for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();return;
   }
-  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
     if(upper=="@MOTION STATUS"){
       static char out[6144];MotionStatusSnapshot snapshot;bool ok;
       {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
@@ -285,6 +285,7 @@ void CommandRouter::handleLine(String line) {
       c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
     }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=simple::kStrideM[1]/simple::kWalkPeriodS;}
     else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
+    else if(upper=="@MOTION PRONE")c.intent=motion::Intent::LIE_DOWN;
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
   }
   // Keep slow diagnostic and persistent operations out of the active motion

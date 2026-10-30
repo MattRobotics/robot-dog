@@ -10,6 +10,7 @@ const char* boolean(bool b){return b?"true":"false";}
 }
 void MotionService::update(){
  if(!active_||!motion_)return;
+ if(!strcmp(motion_->phase(),"PRONE_CONTACT_UNVERIFIED"))activeAck_.reason="PRONE_CONTACT_UNVERIFIED";
  if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
  if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
  activeAck_.executor_state=simple::name(motion_->state());
@@ -33,9 +34,10 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){motion_->walkStop();return result(nullptr);}
- if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY)return result("COMMAND_NOT_IN_SIMPLE_V1");
+ if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY&&c.intent!=motion::Intent::LIE_DOWN)return result("COMMAND_NOT_IN_SIMPLE_V1");
  if(!ready_)return result(reason_);
  if(prepare_&&(why=prepare_(context_)))return result(why);
+ if(c.intent==motion::Intent::LIE_DOWN)return result(motion_->prone(us));
  if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
  for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)return result(motion_->walk(i,us));
@@ -47,7 +49,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"STOP\"],\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"TORQUE_ON_CONTACT_UNVERIFIED\",\"automatic_safe_off\":false,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
@@ -104,6 +106,7 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  // Appended after joints below to keep the existing wire contract compatible.
  for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]");
+ add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
    s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long long)s.offVerifiedUs);
  if(s.referenceFaultSlot<12){const auto& f=s.referenceFaultFeedback;
