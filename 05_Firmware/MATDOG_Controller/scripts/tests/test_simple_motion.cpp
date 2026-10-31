@@ -411,5 +411,26 @@ int main(){
     assert(!r.m.prone(r.p.now));for(unsigned i=0;i<6000&&r.m.state()!=simple::State::PRONE;++i){r.tick();assert(r.m.state()!=simple::State::FAULT);}
     assert(r.m.state()==simple::State::PRONE);}
   std::puts("PRONE from STAND100 under +-1 deg roll/pitch: handover inside kLift, no fault");
+  // Height changes from real loaded holds: follower with the HOLD residuals of
+  // the robot (commanded-raw, 31/10/2026) at 50/100/150 mm, signed by servo direction.
+  {static const double kE[3][12]={{-1,3,-25,1,1,17,3,0,9,1,0,-5},{-1,3,-24,1,1,19,2,11,9,3,-8,-9},{-1,-1,-9,-2,1,1,5,3,4,1,1,1}};
+   static const double kS[12]={-1,1,-1,-1,-1,1,1,-1,1,1,1,-1},kL[3]={-1.0655,-.467,.3496};
+   auto step=[](Rig& r,double scale){r.p.now+=simple::kPeriodUs;r.in.imuStampUs=r.p.now;r.m.inputs(r.in);
+     bool on=true;for(unsigned i=0;i<12;++i)on=on&&r.p.observed[i].torque==1;
+     if(!on)r.p.publishCommandedPose();
+     else{const double q=(int(r.p.target[2])-2048)*simple::kTickRad;
+       const unsigned k=q<=kL[1]?0:1;const double t=std::clamp((q-kL[k])/(kL[k+1]-kL[k]),0.,1.);
+       for(unsigned i=0;i<12;++i){const double e=q<kL[0]-.02?0:(kE[k][i]+t*(kE[k+1][i]-kE[k][i]))*scale*kS[i];
+         const int goal=std::lround(r.p.target[i]-e),raw=r.p.observed[i].raw+std::clamp(goal-int(r.p.observed[i].raw),-10,10);
+         r.p.observed[i].raw=raw;r.p.observed[i].q=(raw-2048)*simple::kTickRad;const int d=int(r.p.target[i])-raw;r.p.observed[i].load=(d>0?1024:0)|std::min(900,4*std::abs(d));}}
+     test_clock_us=r.p.now;r.m.update(r.p.now);r.m.updateTelemetry(r.p.now);};
+   auto reach=[&](Rig& r,double h,double scale){assert(!r.m.stand(h,r.p.now));for(unsigned i=0;i<4000;++i){step(r,scale);assert(r.m.state()!=simple::State::FAULT);
+       if(i>2&&r.m.state()==simple::State::STANDING){assert(std::abs(r.m.requestedHeightM()-h)<1e-9);for(unsigned k=0;k<15;++k)step(r,scale);return;}}assert(false);};
+   for(double scale:{0.,1.,1.5}){Rig r;for(double h:{.05,.07,.11,.10,.15,.10,.05,.10,.15,.05,.15,.07,.05,.052,.05,.053,.054,.05,.073,.127})reach(r,h,scale);}
+   Rig r;reach(r,.05,1);assert(!r.m.walk(1,r.p.now));for(unsigned i=0;i<1500&&r.m.state()!=simple::State::WALKING;++i)step(r,1);assert(r.m.state()==simple::State::WALKING);
+   for(unsigned i=0;i<200;++i)step(r,1);r.m.walkStop();for(unsigned i=0;i<1500&&r.m.state()!=simple::State::STANDING;++i)step(r,1);assert(r.m.state()==simple::State::STANDING);
+   reach(r,.05,1);assert(!r.m.prone(r.p.now));for(unsigned i=0;i<2500&&r.m.state()!=simple::State::PRONE;++i){step(r,1);assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::PRONE);
+   reach(r,.05,1);assert(!r.m.stand(.10,r.p.now));for(unsigned i=0;i<30;++i)step(r,1);r.m.stop();for(unsigned i=0;i<20;++i)step(r,1);assert(r.m.offVerified());
+   std::puts("STAND height changes from loaded holds: 50<->150 and intermediate heights, WALK and PRONE from low holds, STOP mid-change");}
   std::puts("PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION");
 }

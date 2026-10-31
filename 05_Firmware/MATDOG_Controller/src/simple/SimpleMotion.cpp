@@ -170,6 +170,13 @@ bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFra
   // assumption that twelve motors have the same instantaneous response.
   return contains(box,a)&&contains(box,b)&&pointSafe(b);
 }
+// A low HOLD can rest loaded outside kHeight: it starts the same move as the
+// LIFT -> HEIGHT handover when that leads back into kHeight, otherwise (a change
+// between low heights) stays wholly inside kLift. Boxes and targets are unchanged.
+bool SimpleMotion::heightStartClear(const JointTargetFrame& actual,const JointTargetFrame& q) const {
+  return transitionSafe(actual,q,collision::kHeight)||entersHeight(actual,q)||
+    (contains(collision::kLift,segmentTo_)&&transitionSafe(actual,q,collision::kLift));
+}
 bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
   if(!std::isfinite(h)||h<kMinStandM||h>.150)return false; // effective C4 workspace
   const double body=baseLinkHeightFromNominalM(h);auto d=canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;
@@ -199,7 +206,7 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   }
   if(state_==State::STANDING){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
-    if(!fresh(now)||!transitionSafe(actual,q,collision::kHeight))return "HEIGHT_PATH_NOT_CLEAR";
+    if(!fresh(now)||!heightStartClear(actual,q))return "HEIGHT_PATH_NOT_CLEAR";
     referenceFaultSlot_=12; // new accepted command: invalidate previous incident
     requestedHeight_=h;walkRequested_=false;
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
@@ -277,9 +284,8 @@ bool SimpleMotion::arrived(uint64_t now) const {
 // monotonic per joint. A joint outside kHeight is admitted only if that
 // nominal start is inside kHeight and HEIGHT moves the joint away from the
 // violated bound, i.e. back into the box. Everything else stays as before.
-bool SimpleMotion::entersHeight(const JointTargetFrame& actual) const {
-  if(phase_!=Phase::LIFT||std::abs(plannedHeight_-requestedHeight_)<=1e-9)return false;
-  JointTargetFrame q;if(!segmentTo_.valid||!heightTarget(requestedHeight_,q))return false;
+bool SimpleMotion::entersHeight(const JointTargetFrame& actual,const JointTargetFrame& q) const {
+  if(!segmentTo_.valid||!q.valid||!pointSafe(actual)||!contains(collision::kLift,actual))return false;
   const auto& b=collision::kHeight;
   for(unsigned i=0;i<12;++i){
     const double a=jointSlot(actual,i),n=jointSlot(segmentTo_,i),d=jointSlot(q,i)-n;
@@ -287,6 +293,10 @@ bool SimpleMotion::entersHeight(const JointTargetFrame& actual) const {
     if(n<b.lo[i]||n>b.hi[i]||!(a<b.lo[i]?d>0:d<0))return false;
   }
   return true;
+}
+bool SimpleMotion::liftEntersHeight(const JointTargetFrame& actual) const {
+  JointTargetFrame q;
+  return phase_==Phase::LIFT&&std::abs(plannedHeight_-requestedHeight_)>1e-9&&heightTarget(requestedHeight_,q)&&entersHeight(actual,q);
 }
 bool SimpleMotion::settledUnderLoad(uint64_t now){
   // Per phase: which joints may rest loaded, and the certified box in which
@@ -319,7 +329,9 @@ bool SimpleMotion::settledUnderLoad(uint64_t now){
     loaded|=1u<<i;
   }
   const auto actual=measured();
-  ok=ok&&loaded&&pointSafe(actual)&&contains(*segmentBox_,actual)&&(contains(*next,actual)||entersHeight(actual));
+  // A descent to a low height rests loaded in kLift, where its target also lies.
+  const bool lowRest=phase_==Phase::HEIGHT&&contains(collision::kLift,segmentTo_)&&contains(collision::kLift,actual);
+  ok=ok&&loaded&&pointSafe(actual)&&(lowRest||(contains(*segmentBox_,actual)&&(contains(*next,actual)||liftEntersHeight(actual))));
   if(!ok){loadedSinceUs_=0;return false;}
   // Slow creep below the speed threshold restarts the dwell from the new RAW.
   bool still=loadedSinceUs_!=0;
@@ -759,10 +771,12 @@ void SimpleMotion::update(uint64_t now){
     }
     JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
-    if(!transitionSafe(actual,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+    if(!heightStartClear(actual,pendingGoal_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
     // Start from the preceding NOMINAL stand: an already compensated encoder
     // pose fed back as nominal would apply the IMU correction twice.
-    beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;
+    if(transitionSafe(actual,pendingGoal_,collision::kHeight)||entersHeight(actual,pendingGoal_)){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
+    plan_.clear();if(!via(segmentTo_,0,0,plannedHeight_)||!via(pendingGoal_,0,0,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+    plannedHeight_=requestedHeight_;beginPlan(Phase::LIFT,collision::kLift,now);return;
   }
   if(returningProne()){
     if(!segmentBox_||!pointSafe(measured())||!contains(*segmentBox_,measured())){fault("PRONE_MEASURED_OUTSIDE_BOX");return;}

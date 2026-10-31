@@ -151,7 +151,9 @@ class SimpleMotion {
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
   bool arrived(uint64_t) const;
   bool settledUnderLoad(uint64_t);
-  bool entersHeight(const motion::JointTargetFrame& actual) const;
+  bool entersHeight(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
+  bool liftEntersHeight(const motion::JointTargetFrame& actual) const;
+  bool heightStartClear(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
   bool heightTarget(double,motion::JointTargetFrame&) const;
   void measureHeight();
   void nextStand(uint64_t);
