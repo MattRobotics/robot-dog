@@ -296,6 +296,15 @@ async function boot() {
   await send('', () => q('#simple-stand').click(), ok(fx.ack_rejected), 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/HTTP 200 · REJECTED dal Controller, non eseguito · IMU_UNAVAILABLE/.test(last()) && kind() === 'warn', last());
   assert(!/ACCEPTED|movimento da confermare/.test(last()), 'a REJECTED ACK is never shown as accepted motion');
+  assert(/REJECTED/.test(q('#message').textContent), 'the refusal is in the banner');
+  await refresh(fx.status_ready);
+  q('#simple-height').value = '73';
+  await send('', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .073 }, 5000);
+  assert(q('#message').hidden && !/REJECTED/.test(q('#message').textContent), 'a later accepted command clears the earlier refusal: ' + q('#message').textContent);
+  assert(p.dom.window.matdogMotionTrace.commands.some(c => c.ack && c.ack.outcome === 'REJECTED'), 'the refusal stays in the diagnostics');
+  q('#simple-height').value = '150';
+  await refresh(fx.status_ready);
+  assert(values().includes('Release perse · ultimo movimento') && values().includes('Release perse · totale dal boot'));
   await refresh(fx.status_ready);
   await send('', () => q('#simple-stand').click(), 'network', 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/errore di rete: Failed to fetch · ESITO SCONOSCIUTO/.test(last()), last());
