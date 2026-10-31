@@ -15,13 +15,19 @@ This directory is the canonical REV00 robot description used as the starting poi
   The single STL per link (17 files). Since REV01-FIX every `<visual>` and every
   `<collision>` in the URDF references the same file, so what is rendered is
   exactly what the Geometry Compiler V5 checks. The former detailed visual set
-  under `meshes/*.stl` was removed (recoverable from Git history).
+  under `meshes/*.stl` was removed (recoverable from Git history), and so was
+  the former URDF Studio project archive `urdf_studio/matt_robodog_rev00.usp`
+  (it embedded those detailed meshes, the REV00 `base_link` and an out-of-date
+  URDF, i.e. a second geometry source; recoverable from Git history). The
+  digital-twin render meshes are generated from the 17 canonical STL files by
+  the existing tools (viewer staging and decimation) and are never a second
+  source.
 
 - `textures/`
   URDF Studio texture assets, when present.
 
 - `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx`
-  Authoritative table for joints, frames, limits, servo IDs, mesh transforms, masses and material notes.
+  The single canonical workbook (7 sheets, see "Physical Data Status"): joint table, link masses/CoM/inertias, CAD source data, mass reconciliation, weight evidence, and the preliminary ST3215 3S speed/torque reference.
 
 - `SHA256SUMS.txt`
   Integrity manifest for the canonical URDF assets.
@@ -123,7 +129,7 @@ Single nominal configuration, including the Jetson Orin (175 g, inside `base_lin
 
 The robot weighed on 2026-10-30 (2.807 kg) did not carry the Jetson: it is historical evidence of the hardware assembled that day, not a second configuration. No dynamic hardware validation has been performed on these properties.
 
-Provenance, derivation tools, input hashes and the reconciliation are in `09_Logs/Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/`. The single canonical workbook `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx` holds the current data (sheets `Inertial_Properties` — the one source of the masses, read by formula elsewhere —, `Mass_Reconciliation`, `Mass_Summary`, `CAD_Source_Data`, `Weight_Evidence_2026-10-30`, `Physical_Evidence_Log`; hip Z 48.7/28.7 mm in `Joint_Parameters`). Its previous version is kept by Git (commit `0f8f7ff`); there is no second workbook.
+Provenance, derivation tools, input hashes and the reconciliation are in `09_Logs/Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/`. The single canonical workbook `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx` has 7 sheets: `Joint_Parameters` (16 joints, motor IDs, origins incl. hip Z 48.7/28.7 mm, limits, and the *design candidate* speed/torque columns), `Reference_Notes` (conventions, model audit, method notes, evidence register), `Inertial_Properties` (the one source of the masses, CoM and inertia tensors of the 17 links, with mesh paths and provenance), `CAD_Source_Data`, `Mass_Reconciliation`, `Weight_Evidence_2026-10-30` (distinta e pesata) and `ST3215_3S_Reference` (preliminary speed/torque estimate with a chart). Earlier sheets `Mesh_Transforms`, `Link_Engineering`, `Mass_Summary`, `Engineering_Weight_Source`, `URDF_Audit`, `Physical_Property_Method` and `Physical_Evidence_Log` were merged into the remaining ones in the approved 2026-10-31 consolidation. Previous versions are kept by Git only (commits `0f8f7ff` and `7d04939`); there is no second workbook.
 
 ## Mechanical Segment and Foot-Contact Frame
 
@@ -149,6 +155,17 @@ All twelve revolute leg joints currently use:
 These are conservative MATDOG nominal-operation limits for the intended 3S
 operating point. They are not an official Feetech torque-speed curve at
 exactly 11.1 V.
+
+**Design reference under review (2026-10-31).** The approved workbook
+(`ST3215_3S_Reference`) adopts 40 RPM (4.18879 rad/s) as the *nearly no-load
+design ceiling* at 11.1 V, scaled from the 45 RPM no-load figure Feetech
+declares at 12 V, with a linear torque-speed estimate (about 27.8 RPM at
+9.2 kg·cm). That curve is a preliminary estimate, not measured on the robot,
+and 40 RPM is not available together with the torque budget. The URDF above
+(29 RPM) and anything pinned to it are intentionally **unchanged**: 29 RPM is
+neither confirmed nor discarded as the final constraint. Changing the executive
+limit, and re-qualifying what depends on it, is a separate Motion task
+(`09_Logs/Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md`).
 
 ### Calibration provenance (2026-10-31)
 
