@@ -34,13 +34,15 @@ class RouterStorage : public MemStorage {
   }
 };
 
+// Persistence work is a MAINTENANCE operation; the firmware boots in RUN (rc.4).
+struct MaintenanceMode : OperatingModeManager { MaintenanceMode() { setMode(OperatingMode::MAINTENANCE); } };
 struct Fixture {
   Scenario scenario;
   RouterStorage storage;
   CalibrationPersistenceService persistence;
   CalibrationQ0CaptureSession q0;
   ActuatorAuthorityArbiter authority;
-  OperatingModeManager mode;
+  MaintenanceMode mode;
   CalibrationManager calibration;
   CalibrationMotionPermit permit;
   CalibrationMotionAuthorizationState authorization;
@@ -252,7 +254,7 @@ void uncertain_reconciliation_through_handler() {
 
 // P3a.2: byte-level USB framing. The same cases run with memory storage and
 // through the real CalibrationRecordNvsBackend + a simulated platform NVS API.
-constexpr size_t kMaxUsbLine = 95;
+constexpr size_t kMaxUsbLine = 319;
 const char* const kMutatingCommands[] = {
     "@CALIBRATION PERSIST SAVE CONFIRM_SAVE_FULL_CALIBRATION",
     "@CALIBRATION PERSIST ACK 2",
@@ -350,7 +352,7 @@ void checkSuccessfulMutation(Fixture& f, unsigned operation, bool nvs, const std
 }
 
 void valid_usb_framing_limits() {
-  CHECK(CommandRouter::kLineBufSize == 96);  // pinned contract, no buffer growth
+  CHECK(CommandRouter::kLineBufSize == 320);  // bounded reviewed profile-card transport; overflow still discards the entire line
   framing_case = "valid USB line boundary / CRLF";
   for (bool nvs : {false, true}) {
     for (unsigned operation = 0; operation < 3; ++operation) {
@@ -604,7 +606,7 @@ void source_identity_is_read_only() {
   CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
   before.checkUnchanged(f);
   const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
-  CHECK(out.find("FW_VERSION=0.2.0-dev.3") != std::string::npos);
+  CHECK(out.find("FW_VERSION=0.2.0-dev.5") != std::string::npos);
   CHECK(out.find("GIT_SHA=") != std::string::npos);
   CHECK(out.find("GIT_DIRTY=") != std::string::npos);
   CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);
@@ -612,7 +614,7 @@ void source_identity_is_read_only() {
   CHECK(out.find("CAL_RECORD_SCHEMA=1 CAL_MARKER_SCHEMA=2") != std::string::npos);
   CHECK(out.find("OTA_INGEST=0") != std::string::npos);
   CHECK(out.find("MOTION_AUTHORIZED=0") != std::string::npos);
-  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED") != std::string::npos);
+  CHECK(out.find("APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY") != std::string::npos);
   before.checkUnchanged(f);
 }
 

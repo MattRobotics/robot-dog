@@ -6,6 +6,7 @@
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/FullLegCalibrationFinalizer.h"
 #include "ActuatorAuthority.h"
+#include "MotionService.h"
 #include "Availability.h"
 #include "CommandRouter.h"
 #include "OperatingMode.h"
@@ -52,9 +53,41 @@ struct CalibrationPersistenceView {
   const char* nvs = "NOT_INITIALIZED";
 };
 
+// Issue #48 Dashboard path. Implemented by the Controller; the transport
+// sees only generation + explicit confirmation in, a JSON verdict out.
+class CalibrationRestoreHook {
+ public:
+  virtual ~CalibrationRestoreHook() = default;
+  virtual bool restoreJson(uint32_t generation, bool operator_confirmed, char* out, size_t cap) = 0;
+};
+
 class ControllerService {
  public:
   using Modules = CommandRouter::Modules;
+  // Operational readiness view for the Dashboard (static strings).
+  struct ReadinessView { const char* system_health="BOOTING"; const char* calibration="NOT_RESTORED";
+    const char* joint_feedback="UNAVAILABLE"; const char* motion_authority="NOT_GRANTED"; const char* phase="BOOTING"; const char* reason="BOOTING"; };
+  void setReadinessView(const ReadinessView& v) { readiness_view_=v; }
+  const ReadinessView& readinessView() const { return readiness_view_; }
+  void bindCalibrationRestore(CalibrationRestoreHook* hook) { restore_hook_=hook; }
+  bool calibrationRestore(uint32_t generation,bool confirmed,char* out,size_t cap) {
+    return restore_hook_&&restore_hook_->restoreJson(generation,confirmed,out,cap);
+  }
+  void bindMotionService(MotionService* motion) { motion_=motion; }
+  motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now_ms) {
+    return motion_?motion_->command(command,now_ms):motion::MotionAck{};
+  }
+  bool motionSnapshot(MotionStatusSnapshot& out,uint32_t now_ms) const { return motion_&&motion_->captureStatus(out,now_ms); }
+  bool motionStatus(char* out,size_t cap,uint32_t now_ms) const { return motion_&&motion_->statusJson(out,cap,now_ms); }
+  bool motionCapabilities(char* out,size_t cap) const { return motion_&&motion_->capabilitiesJson(out,cap); }
+  bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) const { return motion_&&motion_->ackJson(ack,out,cap); }
+  bool motionActive() const { return motion_&&motion_->busy(); }
+  bool motionEngaged() const { return motion_&&motion_->engaged(); }
+  const simple::SimpleMotion* motionDiagnostic() const { return motion_?motion_->motion():nullptr; } // LOADDIAG
+  bool motionSlack(uint64_t now,uint32_t reserve) const {
+    return !motion_||motion_->slack(now,reserve);
+  }
+
 
   void begin(const Modules& modules) { modules_ = modules; }
 
@@ -113,6 +146,7 @@ class ControllerService {
   bool ledDataPinDriven() const { return modules_.led->dataPinDriven(); }
   status::LedPresentationState ledPresentationState() const { return modules_.led_status->state(); }
   const status::LedStatusSnapshot& ledSnapshot() const { return modules_.led_status->snapshot(); }
+  const status::LedStatusManager& ledManager() const { return *modules_.led_status; }
   status::LedDiagnostic ledDiagnostic() const { return modules_.led->diagnostic(); }
 
   // --- Wi-Fi / OTA / Calibration (already-aggregated structs) ------------------
@@ -178,8 +212,10 @@ class ControllerService {
 
   // Network mutations share the Controller's safety facts; no actuator action
   // is exposed here. Config queue sets busy atomically before returning.
+  // The default RUN (administrative AP role) is not critical by itself; an
+  // operator @MODE RUN (router role) is, as before.
   bool networkCritical() const {
-    return powerState() != PowerState::RUN || operatingMode() != OperatingMode::MAINTENANCE ||
+    return motionActive() || powerState() != PowerState::RUN || modules_.operating_mode->routerRole() ||
            authorityOwner() != ActuatorAuthority::NONE || authorityInhibited() ||
            (modules_.calibration && modules_.calibration->sessionLive()) ||
            (modules_.q0_capture && modules_.q0_capture->active()) ||
@@ -221,6 +257,9 @@ class ControllerService {
 
  private:
   Modules modules_{};
+  MotionService* motion_=nullptr;
+  CalibrationRestoreHook* restore_hook_=nullptr;
+  ReadinessView readiness_view_{};
   CalibrationPersistenceView calibration_persistence_{};
 };
 

@@ -1,0 +1,10 @@
+# Issue #52 + dynamic optimisation compile-only builds (NOT flashed, NOT a flash candidate) — 2026-10-15 late
+# source: commit 5358499 + FAST-constant refactor (committed next as the follow-up commit); SOURCE_DATE_EPOCH=b064ef5 time; external build roots
+1d1b31fc35dee1d1413c9a584e7b43a647cf2e6561cfc15ed3bb13b573255cd0  realtime-20261015c-powered/artifacts/ROBOT_POWERED-ota0/MATDOG_Controller.ino.bin
+5cac4e062c4f23e5ab1c57da5919f838e59dff8a0330b298c6c3f07e731e15cf  realtime-20261015c-usb/artifacts/USB_ONLY-ota0/MATDOG_Controller.ino.bin
+8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7  realtime-20261015c-powered/artifacts/ROBOT_POWERED-ota0/MATDOG_Controller.ino.partitions.bin
+8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7  realtime-20261015c-usb/artifacts/USB_ONLY-ota0/MATDOG_Controller.ino.partitions.bin
+63f45f568d1718e4c77e897722b1bdd87867bfcfaad4b0d9a57ef4fafcb170cc  realtime-20261015c-powered/artifacts/ROBOT_POWERED-ota0/matdog_build_manifest.txt
+a180074a5cdebf304d838c064068dd0faad9d3ce2f7cc7046f9b03a2fe51cba1  realtime-20261015c-usb/artifacts/USB_ONLY-ota0/matdog_build_manifest.txt
+LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1
+PARTITION_TABLE_SHA256=8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7

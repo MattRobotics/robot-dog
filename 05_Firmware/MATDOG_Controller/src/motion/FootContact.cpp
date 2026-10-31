@@ -8,7 +8,9 @@ namespace {
 Vector3 add(Vector3 a, Vector3 b) { return {a.x+b.x, a.y+b.y, a.z+b.z}; }
 Vector3 scale(Vector3 a, double s) { return {a.x*s, a.y*s, a.z*s}; }
 double dot(Vector3 a, Vector3 b) { return a.x*b.x+a.y*b.y+a.z*b.z; }
-double norm(Vector3 a) { return std::hypot(std::hypot(a.x,a.y),a.z); }
+// Unit axes/normals and decimetre offsets: no overflow or underflow to guard,
+// so one sqrt replaces two soft-double hypot calls on the ESP32-S3.
+double norm(Vector3 a) { return std::sqrt(dot(a,a)); }
 bool finite(Vector3 a) { return std::isfinite(a.x)&&std::isfinite(a.y)&&std::isfinite(a.z); }
 Vector3 rotate(const double r[3][3], Vector3 a) {
   return {r[0][0]*a.x+r[0][1]*a.y+r[0][2]*a.z,

@@ -2,6 +2,8 @@
 #define MATDOG_CORE_CONTROLLER_H
 
 #include <Arduino.h>
+#include "../simple/SimpleMotion.h"
+#include "MotionService.h"
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
@@ -10,6 +12,8 @@
 #include "../calibration/CalibrationExecutionEngine.h"
 #include "../calibration/CalibrationManager.h"
 #include "../calibration/CalibrationPersistenceService.h"
+#include "../calibration/CalibrationRuntimeRestore.h"
+#include "../calibration/RestoreAttestationPolicy.h"
 #include "../calibration/CalibrationRecordNvsBackend.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/CalibrationQ0CaptureSession.h"
@@ -45,9 +49,28 @@ class Controller {
  public:
   void begin();
   void update(uint32_t now_ms);
+  // Issue #48: the ONE RAM-only RESTORE entry for boot (automatic) and
+  // operator (USB / authenticated Dashboard) triggers. Never writes NVS,
+  // EEPROM or a servo register, never approves limits, authority or permit.
+  calibration::RestoreVerdict requestCalibrationRestore(const calibration::RestoreRequestFacts&);
+  const calibration::RestoreVerdict& lastRestoreVerdict() const { return last_restore_verdict_; }
 
  private:
   void printBootBanner();
+  void updateSimpleMotion(uint64_t now_us);
+  const char* prepareSimpleMotion();
+  struct RestoreHook : CalibrationRestoreHook {
+    Controller* owner=nullptr;
+    bool restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) override;
+  } restore_hook_{};
+  calibration::RestoreFacts gatherRestoreFacts(bool,calibration::RecordInspection*,calibration::LivePositionEvidence*);
+  calibration::RestoreVerdict last_restore_verdict_{};
+  const char* last_restore_trigger_="NONE";
+  uint64_t last_restore_fingerprint_=0;
+  uint32_t last_restore_generation_=0;
+  bool installation_live_verified_=false,auto_restore_suspended_=false;
+  bool restore_refused_permanent_=false,restore_refused_transient_=false;
+  const char* restore_refusal_reason_="";
   void updateQ0Capture();
   void updateStartupQualification();
   // Every tick, before any command is processed: rebuilds
@@ -90,6 +113,8 @@ class Controller {
                                    const calibration::FullLegHeldObservation& o);
 
   servo::ServoBus servo_bus_;
+  // Controller-thread admission: only an authenticated/applied STOP preempts UART.
+  static bool stopPreempt(void* self);
   // The LF V25 runtime PresentTemperature over-limit confirmation's bus port:
   // fresh direct reads through servo_bus_ and the oracle's 50 ms wait.
   class ServoThermalReadPort : public calibration::ThermalReadPort {
@@ -166,6 +191,24 @@ class Controller {
   actuator::SafeActuatorPolicy actuator_policy_;
   actuator::ActuatorRuntime actuator_runtime_;
   calibration::CalibrationExecutionEngine calibration_execution_;
+  calibration::CalibrationRuntimeRestore runtime_restore_;
+  simple::SimpleMotion simple_motion_;
+  simple::Inputs simple_inputs_{};
+  MotionService motion_service_;
+  AuthorityLease motion_authority_lease_{};
+  calibration::RecordInspection simple_record_{};
+  bool simple_limits_ready_=false,preflight_started_=false;
+  struct SimpleServoPort : simple::ServoPort {
+    Controller* owner=nullptr;
+    bool read(unsigned,bool,simple::Feedback&) override;
+    bool readDeferred() const override;
+    bool resolve(unsigned,double,uint16_t&) override;
+    bool frame(const uint16_t[12],simple::Drive) override;
+    bool enable(unsigned) override;
+    bool off(unsigned first=0) override;
+    bool verifyOff(unsigned) override;
+    void referenceFault(unsigned,const simple::Feedback&,double,uint16_t) override;
+  } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false
   // throughout (CalibrationManager.h). Reset at boot.

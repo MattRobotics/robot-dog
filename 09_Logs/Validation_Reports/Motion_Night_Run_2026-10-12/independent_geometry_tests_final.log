@@ -1,0 +1,12 @@
+test_01_geometry_identity_and_17_full_meshes (__main__.FrozenGeometry.test_01_geometry_identity_and_17_full_meshes) ... ok
+test_02_synthetic_origin_and_individual_limits (__main__.FrozenGeometry.test_02_synthetic_origin_and_individual_limits) ... ok
+test_03_full_vertex_plane_extrema_match_hull_and_cpp_fk (__main__.FrozenGeometry.test_03_full_vertex_plane_extrema_match_hull_and_cpp_fk) ... ok
+test_04_true_fk_mirror_and_hip_fixed_after_pre_align (__main__.FrozenGeometry.test_04_true_fk_mirror_and_hip_fixed_after_pre_align) ... ok
+test_05_continuous_seams_final_height_and_prerequisites (__main__.FrozenGeometry.test_05_continuous_seams_final_height_and_prerequisites) ... ok
+test_06_walk_entry_stop_and_rearm_geometry (__main__.FrozenGeometry.test_06_walk_entry_stop_and_rearm_geometry) ... ok
+test_07_intermediate_suffix_and_unknown_contact_not_promoted (__main__.FrozenGeometry.test_07_intermediate_suffix_and_unknown_contact_not_promoted) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 2.119s
+
+OK

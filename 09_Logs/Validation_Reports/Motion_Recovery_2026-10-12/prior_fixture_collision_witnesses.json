@@ -1,0 +1,736 @@
+{
+  "schema": "MATDOG_REJECTED_ACQUISITION_WITNESSES_V1",
+  "trace_sha256": "63814089f69072536f28eb48e25398e74cfbf2f3222d5504bd735b580ad35464",
+  "source": "previous REST_GROUND fixture-lift synthetic candidate, rejected by canonical V5",
+  "hardware_access": false,
+  "geometry_pass": false,
+  "cause": "Rigid fixture lift moves both meshes equally and cannot remove their self-intersection. Positive-lower-angle REST_GROUND puts front distal geometry behind its hip; Cartesian unfolding crosses the posterior hip.",
+  "frames": [
+    {
+      "frame": 261,
+      "time_s": 10.439,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.2600000000000011,
+        "lf_upper_leg_joint": 1.9562792106474975,
+        "lf_lower_leg_joint": 0.5827872133851514,
+        "rf_hip_joint": -0.25999999999999934,
+        "rf_upper_leg_joint": 1.956279210647497,
+        "rf_lower_leg_joint": 0.582787213385153,
+        "rh_hip_joint": 0,
+        "rh_upper_leg_joint": 2.045849863951826,
+        "rh_lower_leg_joint": 0.45299367197876217,
+        "lh_hip_joint": -3.608224830031759e-16,
+        "lh_upper_leg_joint": 2.045849863951826,
+        "lh_lower_leg_joint": 0.45299367197876217
+      },
+      "pair_result": {
+        "link_a": "lf_foot_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 73,
+        "witness_triangle_b": 2054
+      },
+      "transforms": {
+        "lf_foot_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.8239065663445844,
+              0.0,
+              0.5667256566755001
+            ],
+            [
+              0.14569414458958221,
+              0.9663899781345129,
+              0.21181035478343718
+            ],
+            [
+              -0.547677994962904,
+              0.2570805518921562,
+              -0.7962150486346247
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.0873331404534884,
+            0.08875731149912945,
+            0.0722870445417764
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              3.608224830031759e-16
+            ],
+            [
+              0.0,
+              -3.608224830031759e-16,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_foot_link": [
+          [
+            -0.08635578601667075,
+            0.08981976062997664,
+            0.04663448422226605
+          ],
+          [
+            -0.08776413951162546,
+            0.08957957608365076,
+            0.04753736052606936
+          ],
+          [
+            -0.08735334119840041,
+            0.0902837727263878,
+            0.04729426856549866
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.087139404296875,
+            0.06646430397033692,
+            0.0471320514678955
+          ],
+          [
+            -0.087127254486084,
+            0.1090147171020508,
+            0.04711793136596677
+          ],
+          [
+            -0.08732295608520507,
+            0.1090147171020508,
+            0.04727639389038084
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.008790637044447797,
+        0.02019154323443495,
+        0.015304964650803617
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    },
+    {
+      "frame": 270,
+      "time_s": 10.799,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.2600000000000007,
+        "lf_upper_leg_joint": 1.9552472214544632,
+        "lf_lower_leg_joint": 0.5803584451953817,
+        "rf_hip_joint": -0.2599999999999989,
+        "rf_upper_leg_joint": 1.9552472214544632,
+        "rf_lower_leg_joint": 0.5803584451953824,
+        "rh_hip_joint": 0,
+        "rh_upper_leg_joint": 2.044718641819716,
+        "rh_lower_leg_joint": 0.4520275766336187,
+        "lh_hip_joint": 2.7755575615628914e-17,
+        "lh_upper_leg_joint": 2.044718641819716,
+        "lh_lower_leg_joint": 0.4520275766336187
+      },
+      "pair_result": {
+        "link_a": "lf_foot_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 908,
+        "witness_triangle_b": 2051
+      },
+      "transforms": {
+        "lf_foot_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.8219403363649272,
+              0.0,
+              0.5695735979277043
+            ],
+            [
+              0.14642629489845504,
+              0.9663899781345131,
+              0.21130487529511965
+            ],
+            [
+              -0.5504302168473502,
+              0.25708055189215573,
+              -0.7943149036875764
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.08729974482974802,
+            0.08888300483369446,
+            0.0718145514731725
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              -2.7755575615628914e-17
+            ],
+            [
+              0.0,
+              2.7755575615628914e-17,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_foot_link": [
+          [
+            -0.08952368573653847,
+            0.09957649038330296,
+            0.05126038260726129
+          ],
+          [
+            -0.08909784558052364,
+            0.09002128467166459,
+            0.048280985855459015
+          ],
+          [
+            -0.09018274362445475,
+            0.08972549252596203,
+            0.04939289635632714
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.08838712692260742,
+            0.0665,
+            0.04795481491088867
+          ],
+          [
+            -0.088,
+            0.10901471710205078,
+            0.047731306076049806
+          ],
+          [
+            -0.10785769510269165,
+            0.10901471710205078,
+            0.05919615173339844
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.008714692625925904,
+        0.020191164988178537,
+        0.015746957749113916
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    },
+    {
+      "frame": 281,
+      "time_s": 11.239,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.2600000000000007,
+        "lf_upper_leg_joint": 1.95359088137803,
+        "lf_lower_leg_joint": 0.5766608218231406,
+        "rf_hip_joint": -0.25999999999999934,
+        "rf_upper_leg_joint": 1.9535908813780305,
+        "rf_lower_leg_joint": 0.5766608218231406,
+        "rh_hip_joint": 0,
+        "rh_upper_leg_joint": 2.042940349359577,
+        "rh_lower_leg_joint": 0.45055286238299985,
+        "lh_hip_joint": 2.7755575615628914e-17,
+        "lh_upper_leg_joint": 2.042940349359577,
+        "lh_lower_leg_joint": 0.45055286238299985
+      },
+      "pair_result": {
+        "link_a": "lf_foot_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 907,
+        "witness_triangle_b": 2051
+      },
+      "transforms": {
+        "lf_foot_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.8188790943083585,
+              0.0,
+              0.5739660520490062
+            ],
+            [
+              0.14755550942812026,
+              0.9663899781345131,
+              0.21051788949774144
+            ],
+            [
+              -0.5546750404895918,
+              0.25708055189215573,
+              -0.7913565500434645
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.0872471698771965,
+            0.08907863900344863,
+            0.07107914422575691
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              -2.7755575615628914e-17
+            ],
+            [
+              0.0,
+              2.7755575615628914e-17,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_foot_link": [
+          [
+            -0.09001295829512428,
+            0.08992501420001817,
+            0.04864287561454285
+          ],
+          [
+            -0.08976083172312786,
+            0.09966265173585648,
+            0.050936493977812684
+          ],
+          [
+            -0.08935001336437245,
+            0.0997751022529265,
+            0.05051378190592441
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.08838712692260742,
+            0.0665,
+            0.04795481491088867
+          ],
+          [
+            -0.088,
+            0.10901471710205078,
+            0.047731306076049806
+          ],
+          [
+            -0.10785769510269165,
+            0.10901471710205078,
+            0.05919615173339844
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.008596141386891507,
+        0.020190416023382313,
+        0.016434563574249578
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    },
+    {
+      "frame": 282,
+      "time_s": 11.279,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.26000000000000145,
+        "lf_upper_leg_joint": 1.9534166566187603,
+        "lf_lower_leg_joint": 0.5762852351197751,
+        "rf_hip_joint": -0.26000000000000023,
+        "rf_upper_leg_joint": 1.9534166566187605,
+        "rf_lower_leg_joint": 0.5762852351197763,
+        "rh_hip_joint": 0,
+        "rh_upper_leg_joint": 2.042755775132018,
+        "rh_lower_leg_joint": 0.45040280559139567,
+        "lh_hip_joint": 1.3877787807814457e-16,
+        "lh_upper_leg_joint": 2.042755775132018,
+        "lh_lower_leg_joint": 0.45040280559139567
+      },
+      "pair_result": {
+        "link_a": "lf_lower_leg_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 5339,
+        "witness_triangle_b": 2057
+      },
+      "transforms": {
+        "lf_lower_leg_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.8185633974391174,
+              0.0,
+              0.5744161943860301
+            ],
+            [
+              0.14767123226855286,
+              0.9663899781345129,
+              0.21043672997236695
+            ],
+            [
+              -0.5551100535328257,
+              0.2570805518921565,
+              -0.7910514637529013
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            0.029007943689871862,
+            0.08524836660892991,
+            0.09131224555257432
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              -1.3877787807814457e-16
+            ],
+            [
+              0.0,
+              1.3877787807814457e-16,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_lower_leg_link": [
+          [
+            -0.08638605699550786,
+            0.08788251408728484,
+            0.04640175489494649
+          ],
+          [
+            -0.08614118298933436,
+            0.08728844182342956,
+            0.04611802081274266
+          ],
+          [
+            -0.08729677189960007,
+            0.08696626945133867,
+            0.047329097066192816
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.08692157554626465,
+            0.06644573020935059,
+            0.04694082641601563
+          ],
+          [
+            -0.08649125480651856,
+            0.10901471710205078,
+            0.04649384307861329
+          ],
+          [
+            -0.08670034217834473,
+            0.10901471710205078,
+            0.04672000122070313
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.005772142002561043,
+        0.0621103912018295,
+        0.01792778709743885
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    },
+    {
+      "frame": 400,
+      "time_s": 15.999,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.26000000000000045,
+        "lf_upper_leg_joint": 1.8895505611396008,
+        "lf_lower_leg_joint": 0.5115097331811289,
+        "rf_hip_joint": -0.2599999999999998,
+        "rf_upper_leg_joint": 1.8895505611396006,
+        "rf_lower_leg_joint": 0.5115097331811299,
+        "rh_hip_joint": 0,
+        "rh_upper_leg_joint": 1.9881475006369262,
+        "rh_lower_leg_joint": 0.42383419914153775,
+        "lh_hip_joint": 5.551115123125783e-17,
+        "lh_upper_leg_joint": 1.9881475006369262,
+        "lh_lower_leg_joint": 0.42383419914153775
+      },
+      "pair_result": {
+        "link_a": "lf_lower_leg_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 3775,
+        "witness_triangle_b": 2784
+      },
+      "transforms": {
+        "lf_lower_leg_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.7381094906834185,
+              0.0,
+              0.6746809466429777
+            ],
+            [
+              0.17344735011409868,
+              0.9663899781345131,
+              0.18975359522173108
+            ],
+            [
+              -0.6520049052740798,
+              0.25708055189215556,
+              -0.7133016145624254
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            0.027033609813817264,
+            0.08663587991356904,
+            0.0860964525170358
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              -5.551115123125783e-17
+            ],
+            [
+              0.0,
+              5.551115123125783e-17,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_lower_leg_link": [
+          [
+            -0.08569036860239611,
+            0.10724048003791639,
+            0.04170538917271194
+          ],
+          [
+            -0.0852396014661509,
+            0.10780409428088625,
+            0.03958671021418678
+          ],
+          [
+            -0.08471376813216702,
+            0.10761967621027187,
+            0.040279955089837276
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.085,
+            0.08549999999999999,
+            0.033
+          ],
+          [
+            -0.085,
+            0.10901471710205078,
+            0.033
+          ],
+          [
+            -0.085,
+            0.10901471710205078,
+            0.04253515434265137
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.002584411992579999,
+        0.062123816168909086,
+        0.03585838445166839
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    },
+    {
+      "frame": 431,
+      "time_s": 17.239,
+      "state": "ACQUIRE_SUPPORT",
+      "base_link_z_m": 0.06500000000000011,
+      "q_rad": {
+        "lf_hip_joint": 0.26000000000000034,
+        "lf_upper_leg_joint": 1.8548559415727515,
+        "lf_lower_leg_joint": 0.5016919608789222,
+        "rf_hip_joint": -0.2599999999999998,
+        "rf_upper_leg_joint": 1.8548559415727515,
+        "rf_lower_leg_joint": 0.5016919608789226,
+        "rh_hip_joint": -4.440892098500626e-16,
+        "rh_upper_leg_joint": 1.962749608998522,
+        "rh_lower_leg_joint": 0.4196941934163414,
+        "lh_hip_joint": 1.1102230246251565e-16,
+        "lh_upper_leg_joint": 1.962749608998522,
+        "lh_lower_leg_joint": 0.4196941934163414
+      },
+      "pair_result": {
+        "link_a": "lf_lower_leg_link",
+        "link_b": "lh_hip_link",
+        "status": "INTERSECTING",
+        "clearance_m": null,
+        "clearance_kind": null,
+        "witness_triangle_a": 4103,
+        "witness_triangle_b": 2784
+      },
+      "transforms": {
+        "lf_lower_leg_link": {
+          "rotation_base_from_collision": [
+            [
+              -0.7073566372275736,
+              0.0,
+              0.7068568368277262
+            ],
+            [
+              0.18171914572041512,
+              0.9663899781345131,
+              0.18184763468304382
+            ],
+            [
+              -0.6830993630861775,
+              0.25708055189215545,
+              -0.6835823651836577
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            0.026106693785580018,
+            0.08740239192528129,
+            0.08321506175921141
+          ]
+        },
+        "lh_hip_link": {
+          "rotation_base_from_collision": [
+            [
+              1.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              1.0,
+              -1.1102230246251565e-16
+            ],
+            [
+              0.0,
+              1.1102230246251565e-16,
+              1.0
+            ]
+          ],
+          "translation_base_from_collision_m": [
+            -0.1125,
+            0.0475,
+            0.0265
+          ]
+        }
+      },
+      "witness_triangles_base_m": {
+        "lf_lower_leg_link": [
+          [
+            -0.08503995184798684,
+            0.10700500910904892,
+            0.039742283453623795
+          ],
+          [
+            -0.08542148127609374,
+            0.10647615467764258,
+            0.03971627086705388
+          ],
+          [
+            -0.0848627393420963,
+            0.10606990414770805,
+            0.0412434048250721
+          ]
+        ],
+        "lh_hip_link": [
+          [
+            -0.085,
+            0.08549999999999999,
+            0.033
+          ],
+          [
+            -0.085,
+            0.10901471710205078,
+            0.03300000000000001
+          ],
+          [
+            -0.085,
+            0.10901471710205078,
+            0.04253515434265137
+          ]
+        ]
+      },
+      "aabb_overlap_axes_m": [
+        0.001338056119280201,
+        0.062107156554280805,
+        0.04299017431232002
+      ],
+      "distance_statement": "INTERSECTING establishes no positive clearance. Kernel does not estimate signed penetration depth; AABB overlap is not mesh penetration depth."
+    }
+  ]
+}

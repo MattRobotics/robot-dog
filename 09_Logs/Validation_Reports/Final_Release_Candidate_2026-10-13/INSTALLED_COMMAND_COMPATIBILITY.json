@@ -1,0 +1,24 @@
+{
+  "status": "PASS_SOURCE_COMPATIBILITY",
+  "installed_historical_source_commit": "b08322dedc5564c080f691dc98047511ef2b953f",
+  "checked_commands": [
+    "@STATUS",
+    "@SYSTEM SOURCE_SIGNATURE",
+    "@AUTHORITY STATUS",
+    "@CALIBRATION STATUS",
+    "@CALIBRATION PERSIST STATUS",
+    "@IMU STATUS",
+    "@BMS STATUS",
+    "@WIFI STATUS",
+    "@LED STATUS",
+    "@SERVO PREFLIGHT",
+    "@SERVO READ"
+  ],
+  "diagnostic_count_including_13_servo_reads": 23,
+  "source_file_sha256": {
+    "05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp": "8ccd7728ae648ae4001502e66aab792291808d22ae2a5dd60c5e00f5588c641d",
+    "05_Firmware/MATDOG_Controller/src/core/CommandRouterPersistence.cpp": "44421594c6005fb2e13c3bb2c51f3610707d371ab99314ea9975425816b08064"
+  },
+  "device_opened": false,
+  "current_installation_observed": false
+}

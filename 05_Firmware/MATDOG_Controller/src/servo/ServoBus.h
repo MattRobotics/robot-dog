@@ -115,7 +115,7 @@ class ServoBus {
   // readRuntimeState() — so the documented "operational timeout = 100ms,
   // diagnostic timeout = 20ms" split was not actually true in code. Two
   // named constants now exist and every method states, explicitly, via
-  // ScopedIOTimeout, which one it uses — there is no "default/untouched"
+  // BusGuard (BusTransaction.h), which one it uses — there is no "default/untouched"
   // case to trust implicitly:
   //   kDiagnosticTimeoutMs (20ms) — @SERVO SCAN's per-ID probe, ping(),
   //     readModel(): bounded absence-detection only, MAINTENANCE-only today.
@@ -199,6 +199,14 @@ class ServoBus {
   static constexpr uint8_t kSearchEnvelopeAcceleration = 8;
   ServoWriteVerifyResult writeGoalPosition(int id, uint16_t target_tick,
                                            GoalMotionProfile profile);
+  const diagnostics::GoalWriteCapture& lastGoalWriteCapture() const {return goal_capture_;}
+  // STOP priority on the bus: while a non-safety transaction waits for a reply it
+  // polls fn(ctx); true means an admitted STOP and abandons the transaction.
+  // SAFE_OFF/verify transactions are never preempted. This is software priority:
+  // it does not make the physical stop instantaneous on a busy or faulty UART.
+  void setStopPreempt(BusTransaction::PreemptFn fn, void* ctx) { st_.bus.bindPreempt(fn, ctx); }
+  const BusStats& busStats() const { return st_.bus.stats(); }
+  BusOutcome lastBusOutcome() const { return st_.bus.outcome(); }
 
   // The reviewed RAM TorqueLimit (LF V25 hardware oracle, matdog.rs
   // TORQUE_LIMIT = 500, "still only half of the ST3215 command range"). The
@@ -230,6 +238,7 @@ class ServoBus {
   struct ControlFeedbackSnapshot {
     int torque_enable = -1;
     int goal_position = -1;
+    int goal_speed=-1,goal_acceleration=-1;
     int torque_limit = -1;
     int present_position = -1;
     int present_speed = -1;
@@ -240,6 +249,46 @@ class ServoBus {
     int present_current = -1;
   };
   bool readControlFeedback(int id, ControlFeedbackSnapshot* out);
+  bool readControlFeedbackBudgeted(int id,ControlFeedbackSnapshot* out,uint32_t timeout_ms);
+  ServoWriteVerifyResult reduceValidationOutputWhileOff(int id,uint16_t ceiling);
+  // The commissioning range (1..40 / 1..10) or EXACTLY the reviewed fixture
+  // WALK pair (2026-10-15, motion/OperationalWalkProfile.h): a register
+  // ceiling only; every target is still bounded by limits and per-frame steps.
+  // Issue #52: + the EXPERIMENTAL fast walk pair (1200 steps/s, ACC 100), RAM only.
+  static constexpr uint16_t kWalkDriveSpeed=1000;static constexpr uint8_t kWalkDriveAcceleration=50;
+  static constexpr uint16_t kFastWalkDriveSpeed=1200;static constexpr uint8_t kFastWalkDriveAcceleration=100;
+  static constexpr uint16_t kStandDriveSpeed=300;static constexpr uint8_t kStandDriveAcceleration=20;   // operational STAND frames
+  void setValidationDrive(uint16_t speed,uint8_t acceleration){
+    const bool walk=(speed==kWalkDriveSpeed&&acceleration==kWalkDriveAcceleration)||(speed==kFastWalkDriveSpeed&&acceleration==kFastWalkDriveAcceleration)||
+                    (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
+    validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
+  // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
+  bool setOperationalDrive(uint16_t speed,uint8_t acc) {
+    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)))return false;  // STAND rc.10, WALK
+    validation_speed_=speed;validation_acceleration_=acc;return true;
+  }
+  void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
+
+  // ---- Issue #52 streaming primitives (2026-10-15) -------------------------
+  // ONE SYNC_WRITE (servo/ServoPacket.h) of the twelve committed GoalPositions
+  // at SRAM 41..47 with the latched validation drive pair. Only reachable
+  // through ServoBusActuatorBackend::writeGoalPositionFrame (SafeActuator
+  // commitFrame). No ACK exists: the report says whether every byte left the
+  // UART (HardwareSerial::flush = TX complete), never that a servo applied it.
+  // Refuses (zero bytes) without a validation drive pair or with invalid ids.
+  struct FrameTx { bool started=false, complete=false; uint32_t started_us=0, complete_us=0; uint16_t bytes=0; };
+  bool syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report);
+  // Emergency de-escalation: ONE SYNC_WRITE TorqueEnable=0 to an explicit id
+  // list (no reply, no readback, no retry). Never claims VERIFIED_OFF: each id
+  // must still be verified by verifyTorqueOff() (readback only, no write).
+  uint16_t syncTorqueOff(const uint8_t* ids, unsigned count);
+  SafeOffResult verifyTorqueOff(int id, uint32_t timeout_ms);
+  // Fast per-joint feedback: ONE read of the contiguous block 56..70
+  // (position, speed, load, voltage, temperature, status, current). The slow
+  // 40..49 control block stays in readControlFeedbackBudgeted().
+  struct FastFeedback { int present_position=-1, present_speed=-1, present_load=-1, present_voltage=-1,
+                        present_temperature=-1, status=-1, present_current=-1; };
+  bool readFastFeedback(int id, FastFeedback* out, uint32_t timeout_ms);
 
   // Read-only runtime snapshot (present position/speed/load/voltage/temp).
   // Returns false if the servo does not answer within the bounded timeout.
@@ -270,7 +319,7 @@ class ServoBus {
   // V25 read_motor_temperature_direct() the runtime over-limit confirmation
   // needs (calibration/ThermalConfirmation.h). Read-only; false and *out
   // untouched if the servo does not answer.
-  bool readPresentTemperatureDirect(int id, int* celsius_out);
+  bool readPresentTemperatureDirect(int id, int* celsius_out, uint32_t timeout_ms = kOperationalTimeoutMs);
 
   // -------------------------------------------------------------------------
   // H0 preflight reads — READ-ONLY, no write path exists for any of them
@@ -305,29 +354,15 @@ class ServoBus {
   bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out);
 
  private:
-  // RAII guard: saves SMS_STS::IOTimeOut (a plain public field, not a
-  // vendored-library edit), sets it to the given timeout for the guard's
-  // scope, and restores the saved value on every exit path (destructor
-  // runs on early `return` too, not just fall-through). Generic over which
-  // of the two named timeouts above it applies — every call site names its
-  // choice explicitly (Session 2.3 Finding 1), there is no implicit
-  // "leave it at whatever it already was" case. Deliberately not
-  // copyable/movable: exactly one guard per transaction, matching "no
-  // overengineering" from the handoff.
-  class ScopedIOTimeout {
-   public:
-    ScopedIOTimeout(SMS_STS& st, unsigned long timeout_ms)
-        : st_(st), previous_ms_(st.IOTimeOut) {
-      st_.IOTimeOut = timeout_ms;
-    }
-    ~ScopedIOTimeout() { st_.IOTimeOut = previous_ms_; }
-    ScopedIOTimeout(const ScopedIOTimeout&) = delete;
-    ScopedIOTimeout& operator=(const ScopedIOTimeout&) = delete;
-
-   private:
-    SMS_STS& st_;
-    unsigned long previous_ms_;
-  };
+  // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -
+  // ONE absolute budget (total + per-reply phase) on a wrap-safe microsecond
+  // clock, a single owner, STOP preemption for non-safety transactions and TX
+  // suppression once the budget is spent. SCServo's inter-byte IOTimeOut is
+  // never consulted by ServoBus. Each method states its own phase count.
+  static constexpr uint32_t us(unsigned long ms, unsigned phases = 1) { return static_cast<uint32_t>(ms) * 1000u * phases; }
+  uint32_t validation_timeout_ms_=0;
+  diagnostics::GoalWriteCapture goal_capture_{};
+  uint16_t validation_speed_=0;uint8_t validation_acceleration_=0;
 
   HardwareSerial servo_uart_{1};  // matches frozen bench source's UART index.
   ValidatedServoRead st_;

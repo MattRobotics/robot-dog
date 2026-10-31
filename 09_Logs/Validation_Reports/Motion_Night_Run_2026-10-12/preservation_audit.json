@@ -1,0 +1,12 @@
+{
+  "initial_file_count": 1336,
+  "missing": [],
+  "changed_since_checkpoint": [
+    "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/telemetry.ts",
+    "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/src/motion/twinController.ts",
+    "06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer/tests/motionTwin.test.ts"
+  ],
+  "deletions": [],
+  "worktree": "/home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog",
+  "baseline": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af"
+}

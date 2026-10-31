@@ -1,0 +1,485 @@
+{
+  "schema": "matdog.motion_recovery.prone_evidence.v1",
+  "created_utc": "2026-10-12T16:04:05.091673+00:00",
+  "physical_readiness": false,
+  "hardware_accessed": false,
+  "nvs_eeprom_modified": false,
+  "torque_or_motion_command_used": false,
+  "excluded_g35_artifacts_imported": false,
+  "scope": {
+    "worktree_baseline": "fdd04345c39b50137cc7cdc50fb08cd592b8c2af",
+    "installed_firmware_closeout": "b08322dedc5564c080f691dc98047511ef2b953f",
+    "searched": [
+      "Motion worktree repository documents and local Git blobs",
+      "/home/matteo-manicardi/MATDOG/handoffs/historical",
+      "/home/matteo-manicardi/MATDOG/archive/matdog-download-artifacts/2026-07-26_cleanup"
+    ],
+    "search_is_exhaustive": false,
+    "applicable_agents_files_found": []
+  },
+  "historical_physical_stand_success": {
+    "classification": "REPOSITORY_HISTORICAL_DECLARATION_OF_PHYSICAL_SUCCESS",
+    "source": {
+      "commit": "58b97392dc13efa30e166fe3802efa677dcba011",
+      "path": "05_Firmware/MATDOG_Controller/CALIBRATION_BOOTSTRAP.md",
+      "sha256": "4a6b9fb151fb8622d9de56e2230596003ae5dc40a9c74e36932150a75f718e87",
+      "lines": [
+        684,
+        686
+      ]
+    },
+    "supporting_current_runbook": {
+      "path": "05_Firmware/MATDOG_Controller/H0_LEG_PREFLIGHT_RUNBOOK.md",
+      "lines": [
+        542,
+        545
+      ]
+    },
+    "statement": "C4-C 51-frame trajectory executed on real hardware, from near q=0 to roughly 150 mm body height, on the ground, four-foot support, stable Torque-ON hold.",
+    "event_timestamp": null,
+    "observed_initial_12_joint_values": null,
+    "observed_final_12_joint_values": null,
+    "measured_base_link_support_plane_height_m": null,
+    "natural_fold_identified_uniquely": false,
+    "note": "Supports historical success but does not identify a measured prone start. near q=0 is descriptive, not a twelve-joint observation. Old direction prose in the same commit is not imported as current encoder-sign evidence.",
+    "current_corresponding_statement_lines": [
+      723,
+      725
+    ]
+  },
+  "historical_c5_july_failure": {
+    "classification": "DOCUMENTED_PHYSICAL_SUPPORTED_ATTEMPT_WITH_RF_FAILURE",
+    "date": "2026-07-09",
+    "executor_commit": "f4bab021a2b32299fc080775806c5424e6de8553",
+    "source": {
+      "path": "/home/matteo-manicardi/MATDOG/archive/matdog-download-artifacts/2026-07-26_cleanup/README_C5_HANDOFF_NEXT_CHAT.md",
+      "sha256": "3a762426cd0b9bfeaf298c5b4b2793f0011413887b2c14260e198dbd4af4e954",
+      "initial_readback_lines": [
+        91,
+        99
+      ],
+      "final_readback_lines": [
+        191,
+        248
+      ]
+    },
+    "sequence": {
+      "sent_frames": 121,
+      "terminal_duration_s": 24.24,
+      "reported_hold": "Torque ON at delivery completion; physical success not implied"
+    },
+    "legacy_initial_visual_zero_raw_ticks_by_bus_id": {
+      "LF": {
+        "13": 3541,
+        "12": 2830,
+        "11": 2045
+      },
+      "RF": {
+        "23": 4083,
+        "22": 1088,
+        "21": 4070
+      },
+      "RH": {
+        "33": 1492,
+        "32": 1019,
+        "31": 4039
+      },
+      "LH": {
+        "43": 1223,
+        "42": 2917,
+        "41": 139
+      }
+    },
+    "legacy_initial_is_measured_prone_fold": false,
+    "final_readback": {
+      "LF": {
+        "raw_ticks_by_bus_id": {
+          "13": 3541,
+          "12": 3087,
+          "11": 1843
+        },
+        "semantic_joint_deg": {
+          "hip": 0.0,
+          "upper": 23.55,
+          "lower": 19.86
+        },
+        "foot_link_origin_base_m": [
+          0.119957,
+          0.094,
+          -0.145789
+        ]
+      },
+      "RF": {
+        "full_raw_triple": null,
+        "hip_rad": -0.829883606246,
+        "failure": "RF hip exceeded URDF limit; lower folded upward/collided with hip"
+      },
+      "RH": {
+        "raw_ticks_by_bus_id": {
+          "33": 1491,
+          "32": 424,
+          "31": 4038
+        },
+        "semantic_joint_deg": {
+          "hip": -0.09,
+          "upper": 51.59,
+          "lower": 0.0
+        },
+        "foot_link_origin_base_m": [
+          -0.155651,
+          -0.094262,
+          -0.144188
+        ]
+      },
+      "LH": {
+        "raw_ticks_by_bus_id": {
+          "43": 1223,
+          "42": 3528,
+          "41": 140
+        },
+        "semantic_joint_deg": {
+          "hip": 0.18,
+          "upper": 51.59,
+          "lower": 0.0
+        },
+        "foot_link_origin_base_m": [
+          -0.155651,
+          0.094524,
+          -0.144116
+        ]
+      }
+    },
+    "height_evidence_scope": "FK foot_link depths from old raw mapping, not measured world height of base_link or proof of ground contact.",
+    "executor_start_policy": {
+      "path": "06_Software/Matdog_Core/hardware/matdog_c5_supervised_first_stand_executor.py",
+      "lines": [
+        297,
+        305
+      ],
+      "description": "Assumes visual_zero_pose_ticks then circular encoder interpolation to C4-C frame0; does not classify/acquire measured prone start. Historical bridge is not admissible in new architecture."
+    }
+  },
+  "rest_ground_model": {
+    "classification": "CANONICAL_STATIC_RIGID_MODEL_ONLY",
+    "source": {
+      "commit": "e1704719979789cd9c9f18741e4546725558797e",
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/pose_library.json",
+      "sha256": "746f4393a2f9de5dc532c6b48e083f2089e3cc2fa25f381dc4ef9d08f9903a58"
+    },
+    "report_source": {
+      "commit": "e1704719979789cd9c9f18741e4546725558797e",
+      "path": "09_Logs/Validation_Reports/G35_Pose_Audit/REPORT.md",
+      "sha256": "d42d119e9803beaa40cd9999643c633e754db931f881fb9ecde0ca35dee0eef9",
+      "lines": [
+        17,
+        86
+      ]
+    },
+    "current_header": "05_Firmware/MATDOG_Controller/src/motion/PoseReferenceData.h",
+    "source_digest_header_matches": true,
+    "base_link_world_translation_m": [
+      0.0,
+      0.0,
+      1.0999563076780766e-16
+    ],
+    "base_link_orientation": "identity",
+    "support_regime": "BODY_SUPPORT",
+    "base_contact": true,
+    "active_feet": [],
+    "real_hardware_contact_height": "NOT_ESTABLISHED",
+    "minimum_tested_nonadjacent_mesh_separation_m": 0.000661635,
+    "minimum_joint_limit_margin_rad": 0.06647651121567633,
+    "joint_and_segment_metrics": {
+      "LF": {
+        "semantic_urdf_rad": {
+          "hip": 0.26,
+          "upper": 1.9583620871641767,
+          "lower": 0.5880219582823236
+        },
+        "semantic_urdf_deg": {
+          "hip": 14.896902673401405,
+          "upper": 112.20588235293837,
+          "lower": 33.691176470594904
+        },
+        "upper_pivot_to_knee_vector_base_m": [
+          -0.08332486095304428,
+          -0.008744395904503516,
+          0.032871006790500625
+        ],
+        "knee_to_foot_joint_vector_base_m": [
+          -0.11657738318298921,
+          0.0033511748020725453,
+          -0.018432128408093777
+        ],
+        "upper_segment_inclination_to_level_support_plane_deg": 21.421947781845354,
+        "lower_segment_inclination_to_level_support_plane_deg": 8.981047965579398,
+        "angle_between_directed_segments_deg": 31.31419082097946,
+        "internal_knee_endpoint_angle_deg": 148.68580917902054
+      },
+      "RF": {
+        "semantic_urdf_rad": {
+          "hip": -0.26,
+          "upper": 1.9583620871641767,
+          "lower": 0.5880219582823236
+        },
+        "semantic_urdf_deg": {
+          "hip": -14.896902673401405,
+          "upper": 112.20588235293837,
+          "lower": 33.691176470594904
+        },
+        "upper_pivot_to_knee_vector_base_m": [
+          -0.08332486095304428,
+          0.008744395904503516,
+          0.032871006790500625
+        ],
+        "knee_to_foot_joint_vector_base_m": [
+          -0.11657738318298921,
+          -0.0033511748020725453,
+          -0.018432128408093777
+        ],
+        "upper_segment_inclination_to_level_support_plane_deg": 21.421947781845354,
+        "lower_segment_inclination_to_level_support_plane_deg": 8.981047965579398,
+        "angle_between_directed_segments_deg": 31.31419082097946,
+        "internal_knee_endpoint_angle_deg": 148.68580917902054
+      },
+      "RH": {
+        "semantic_urdf_rad": {
+          "hip": 0,
+          "upper": 2.048195210428588,
+          "lower": 0.4550689358509703
+        },
+        "semantic_urdf_deg": {
+          "hip": 0.0,
+          "upper": 117.35294117646764,
+          "lower": 26.0735294117702
+        },
+        "upper_pivot_to_knee_vector_base_m": [
+          -0.07993737559617377,
+          0.0,
+          0.041352339508137166
+        ],
+        "knee_to_foot_joint_vector_base_m": [
+          -0.11566404452448996,
+          0.0015,
+          -0.02368203547495029
+        ],
+        "upper_segment_inclination_to_level_support_plane_deg": 27.35294117646763,
+        "lower_segment_inclination_to_level_support_plane_deg": 11.570348138041776,
+        "angle_between_directed_segments_deg": 38.92996092673552,
+        "internal_knee_endpoint_angle_deg": 141.07003907326447
+      },
+      "LH": {
+        "semantic_urdf_rad": {
+          "hip": -0.0,
+          "upper": 2.048195210428588,
+          "lower": 0.4550689358509703
+        },
+        "semantic_urdf_deg": {
+          "hip": -0.0,
+          "upper": 117.35294117646764,
+          "lower": 26.0735294117702
+        },
+        "upper_pivot_to_knee_vector_base_m": [
+          -0.07993737559617377,
+          0.0,
+          0.041352339508137166
+        ],
+        "knee_to_foot_joint_vector_base_m": [
+          -0.11566404452448996,
+          -0.0015,
+          -0.02368203547495029
+        ],
+        "upper_segment_inclination_to_level_support_plane_deg": 27.35294117646763,
+        "lower_segment_inclination_to_level_support_plane_deg": 11.570348138041776,
+        "angle_between_directed_segments_deg": 38.92996092673552,
+        "internal_knee_endpoint_angle_deg": 141.07003907326447
+      }
+    },
+    "segment_metric_definition": "R=Rx(hip)Ry(upper), upper=R*(0,0,-0.09); lower=Rx(hip)Ry(upper+lower)*(.107, foot_y, -.0499); inclination=asin(abs(vz)/norm(v)); directed angle=acos(dot(upper,lower)/(norm(upper)*norm(lower))). Endpoints are URDF joint pivots, not visual mesh long axes. Identity base orientation and level model plane only.",
+    "lowest_foot_mesh_vertex_world_z_m": {
+      "LF": 0.04562327692685405,
+      "LH": 0.017298788526273305,
+      "RF": 0.045629191228187094,
+      "RH": 0.017298788526273305
+    },
+    "cad_urdf_total_mass_kg": 2.48,
+    "mass_is_hardware_measured": false,
+    "connection_to_stand": "NO_VALIDATED_CONNECTION in frozen G3.5 bounded search; not proof of physical impossibility.",
+    "identical_to_actual_natural_fold": "UNKNOWN",
+    "startup_authority": false
+  },
+  "current_geometry_source_pins": {
+    "count": 19,
+    "matched": 19,
+    "all_match": true,
+    "pins": [
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf",
+        "expected_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+        "observed_current_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+        "expected_sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+        "observed_current_sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+        "expected_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "observed_current_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+        "expected_sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+        "observed_current_sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+        "expected_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "observed_current_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+        "expected_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "observed_current_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+        "expected_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "observed_current_sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+        "expected_sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+        "observed_current_sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+        "expected_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "observed_current_sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+        "expected_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "observed_current_sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+        "expected_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "observed_current_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+        "expected_sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+        "observed_current_sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+        "expected_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "observed_current_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+        "expected_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "observed_current_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+        "expected_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "observed_current_sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+        "expected_sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+        "observed_current_sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+        "expected_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "observed_current_sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "match": true
+      },
+      {
+        "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+        "expected_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "observed_current_sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "match": true
+      },
+      {
+        "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+        "expected_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+        "observed_current_sha256": "43dc72abdc132ef2492d383efe4ed12dfe2e18cf17705e69fc21f4166c4f0966",
+        "match": true
+      }
+    ]
+  },
+  "c4c_reusable_component": {
+    "source": {
+      "commit": "734583106b4162f16e46a8b488f6d07edb64c1cd",
+      "path": "09_Logs/Validation_Reports/C4_rest_to_stand_trajectory/2026-07-08_190405_C4C_contact_locked_rest_to_stand_trajectory.json",
+      "sha256": "4b667a5995e55122b9578c39042914a373aa6bb4e0be84de11381e7f2398b7b2"
+    },
+    "classification": "OFFLINE_CONTACT_LOCKED_RISE_COMPONENT",
+    "sample_count": 51,
+    "base_link_start_height_m": 0.1,
+    "base_link_target_height_m": 0.15,
+    "command_eligible": false,
+    "direct_q0_interpolation_rejected": true,
+    "belly_supported_acquisition_included": false,
+    "original_urdf_sha256": "5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef",
+    "current_urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+    "all_16_urdf_joint_elements_equal": true,
+    "all_17_link_elements_equal_after_collision_path_relocation": true,
+    "original_collision_mesh_content_equal_to_current": "NOT_ASSERTED: old mesh LFS declared content OIDs differ from current collision assets; full current V5 collision qualification remains required.",
+    "contact_yaml_difference": "Only canonical URDF SHA changed at compared commit; does not independently qualify collision meshes."
+  },
+  "current_mapping_compatibility": {
+    "legacy_raw_tick_mapping_admissible": false,
+    "reason": "2026-08-27 reassembly removed/remounted horns/links and reprovisioned units; current expected physical allocation differs. Semantic joint ID is distinct from physical servo identity.",
+    "reset_source": {
+      "path": "09_Logs/Calibration/MATDOG_CALIBRATION_RESET_2026-08-27.md",
+      "lines": [
+        13,
+        55
+      ]
+    },
+    "allocation_source": {
+      "path": "05_Firmware/MATDOG_Controller/src/servo/ServoPopulation.h",
+      "lines": [
+        74,
+        112
+      ]
+    },
+    "current_q0_reference": {
+      "path": "09_Logs/Validation_Reports/Full_Calibration_24_Contact_Hardware_2026-10-01/q0_promoted.json",
+      "sha256": "14a8dfe85e8cf0f6e6779bcd72076da2fed7179619af129623637eac9965f29f",
+      "values_are_folded_pose_observation": false
+    },
+    "full_calibration_24_24_reopened": false,
+    "generation_1_record_preserved": true,
+    "runtime_restore_confers_motion_permit": false
+  },
+  "missing_measurements": [
+    "Timestamped coherent observations of all 12 actual joint encoders in current-installation natural belly-supported folded pose, mapped through verified generation-1 runtime calibration, including units/read uncertainty/age.",
+    "Observed base_link orientation and position relative to measured support plane; IMU quaternion alone does not measure body height.",
+    "Independent witness of belly/foot contacts and load-support regime, plane normal and recovery fixture conditions; encoder/IMU readings alone do not establish contact.",
+    "Provenance linking historical successful start/end capture and timing to installation/calibration; no complete folded-start capture located in bounded audit."
+  ],
+  "conclusion": "Historical stand success, failed July attempt and G3.5 model pose are identifiable distinct evidence. Actual natural prone-folded pose has no uniquely recovered twelve-joint measurement in bounded search. Do not substitute q0, calibration fold prerequisites or REST_GROUND for missing observation."
+}

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "CalibrationGeometryProfile.h"
+#include "../servo/ServoPopulation.h"
 
 namespace matdog {
 namespace actuator {
@@ -66,11 +67,66 @@ TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
                                       MicroRad q_urad,
                                       uint16_t* raw_tick_out);
 
+// Observation-only conversion, including a recorded folded contact just outside
+// the URDF. Callers must enforce the recorded mechanical span. Command
+// conversion remains resolveRadiansToRaw and still enforces the URDF.
+TargetResolveStatus resolveRawObservation(const CalibrationGeometryProfile& profile,
+  const GeometryProvenance& expected_provenance,const JointTransform& transform,
+  uint16_t raw_tick,MicroRad* q_urad_out);
+
 TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
                                       const GeometryProvenance& expected_provenance,
                                       const JointTransform& transform,
                                       uint16_t raw_tick,
                                       MicroRad* q_urad_out);
+
+// ---------------------------------------------------------------------------
+// Core Motion V6: the one joint convention of every runtime consumer
+// ---------------------------------------------------------------------------
+//
+// Semantic joint slot: leg*3 + {HIP, UPPER, LOWER}, legs LF, RF, RH, LH (the
+// order of every Motion frame, feedback vector and telemetry array). The
+// canonical allocation lists each leg LOWER, UPPER, HIP, so slot i is
+// canonical leg servo (i/3)*3 + 2 - i%3. Motion, feedback, telemetry and
+// maintenance take a slot's servo and JointIdentity from here only.
+// Inline: only units that use a slot link the servo population table.
+inline const servo::CanonicalServo* slotServo(unsigned slot) {
+  if (slot >= servo::kLegServoCount) return nullptr;
+  return servo::legServoAt(static_cast<uint8_t>((slot / 3) * 3 + 2 - slot % 3));
+}
+inline bool slotIdentity(unsigned slot, calibration::JointIdentity* out) {
+  const servo::CanonicalServo* unit = slotServo(slot);
+  if (out == nullptr || unit == nullptr) return false;
+  *out = calibration::JointIdentity{};
+  out->leg = static_cast<calibration::Leg>(slot / 3);
+  out->joint = static_cast<calibration::JointKind>(slot % 3);
+  calibration::setPhysicalUnit(out, unit->physical_unit);
+  return out->valid() && out->unitKnown();
+}
+
+// Joint radians are DERIVED from the integer micro-radian domain above through
+// ONE conversion, q / 1e6: the correctly rounded quotient. (q * 1e-6 rounds
+// twice and can differ by one ULP for the same integer.) A RAW limit end and a
+// RAW encoder sample on the same tick therefore give bit-identical radians,
+// so an inclusive comparison of encoder-derived values never fails by rounding
+// and never passes one tick beyond.
+inline double microRadToRadians(MicroRad q) { return static_cast<double>(q) / 1e6; }
+// Nearest micro-radian. false for a non-finite or out-of-domain angle (never a
+// wrapped or saturated value); the URDF check of the resolver still applies.
+bool radiansToMicroRad(double q_rad, MicroRad* q_urad_out);
+// RAW tick -> joint radians: encoder samples and RAW limit ends.
+TargetResolveStatus resolveRawToRadians(const CalibrationGeometryProfile& profile,
+                                        const GeometryProvenance& expected_provenance,
+                                        const JointTransform& transform,
+                                        uint16_t raw_tick,
+                                        double* q_rad_out);
+// Joint radians -> RAW tick: every commanded target. q_urad_out is optional.
+TargetResolveStatus resolveRadiansToRaw(const CalibrationGeometryProfile& profile,
+                                        const GeometryProvenance& expected_provenance,
+                                        const JointTransform& transform,
+                                        double q_rad,
+                                        uint16_t* raw_tick_out,
+                                        MicroRad* q_urad_out = nullptr);
 
 // DIRECTION_VERIFY is a raw excursion around current q0. Its SAFETY envelope
 // is independent of direction, but the absolute ST3215 GoalPosition still

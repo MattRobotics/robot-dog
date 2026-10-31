@@ -1,0 +1,162 @@
+CLOCK_SCHEDULER [MISURATO HOST] 32-bit wrap monotonic, next_release+=period, late poll -> 1 release + 3 skipped, 500 releases/10 s across 2^32 us
+FRAME_TRANSACTION [MISURATO HOST] invalid 12th joint / revoked lease / replay / copy / duplicate / torque-in-frame / out-of-limits / stale epoch / aux id: zero bytes
+LEGACY_HEARTBEAT_STAMP [MISURATO HOST] baseline contract: 50 ms frame unblocked within 1 s: NO (stamp only advances at the next heartbeat)
+OPERATIONAL_WALK_DENSE_RANGES [MISURATO HOST] profile=STANDARD complete=1
+  min={-0.000002,0.292046,0.039823,-0.000002,0.260121,0.050931,-0.000002,0.743189,-0.255825,-0.000002,0.822858,-0.236307}
+  max={0.000002,0.671827,0.402658,0.000002,0.600114,0.421604,0.000002,1.067419,0.067421,0.000002,1.083130,0.099825}
+OPERATIONAL_WALK_DENSE_RANGES [MISURATO HOST] profile=FAST complete=1
+  min={-0.000002,0.236363,0.127918,-0.000002,0.171256,0.139976,-0.000002,0.642144,-0.193684,-0.000002,0.785299,-0.168344}
+  max={0.000002,0.682490,0.435999,0.000002,0.587008,0.482014,0.000002,1.032080,0.104601,0.000002,1.049820,0.152245}
+STAND_TIME_LAW [MISURATO HOST] same polyline (max off-path 9.1e-14 rad), route 10.86 s (phases 0.46/2.22/0.51/0.11/7.55) vs legacy 60.03 s x route_time_scale, frames=546, |qd|max=0.290 rad/s, |qdd|max=0.999 rad/s2, finite-diff max=1.498 rad/s2
+OPERATIONAL_STAND peak_joint_step_rad=0.005788 per_0.020s -> peak_joint_velocity_rad_s=0.2894
+OPERATIONAL_STAND fold_offset_deg=0.00 entry=OK entry_s=1.02+1.02 frames=648 writes=7788 approvals=0 old_tube_needed=no
+OPERATIONAL_STAND peak_joint_step_rad=0.005788 per_0.020s -> peak_joint_velocity_rad_s=0.2894
+OPERATIONAL_STAND fold_offset_deg=0.80 entry=OK entry_s=1.02+1.02 frames=648 writes=7788 approvals=0 old_tube_needed=no
+OPERATIONAL_STAND peak_joint_step_rad=0.005788 per_0.020s -> peak_joint_velocity_rad_s=0.2894
+OPERATIONAL_STAND fold_offset_deg=-2.00 entry=OK entry_s=1.02+1.10 frames=652 writes=7836 approvals=0 old_tube_needed=no
+STAND_TIMING [SIMULATO] LEGACY model=B_TAU30_LOOP2_RR2 fold_deg=0.0 ok=1 prone_to_stand_s=175.94 entry_s=4.05+4.05 frames=0 writes=32352 peak_lag_mrad=10.92 final_error_mrad=0.76 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=A_IDEAL fold_deg=0.0 ok=1 prone_to_stand_s=20.74 entry_s=1.02+1.02 frames=648 writes=7788 peak_lag_mrad=6.55 final_error_mrad=0.76 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=B_TAU30_LOOP2_RR2 fold_deg=0.0 ok=1 prone_to_stand_s=21.06 entry_s=1.02+1.02 frames=648 writes=7788 peak_lag_mrad=9.71 final_error_mrad=0.74 (STAND_VERIFIED)
+STAND_AB [SIMULATO] model=B legacy=175.9 s issue52=21.1 s speedup=8.4x
+STAND_TIMING [SIMULATO] ISSUE52 model=A_IDEAL fold_deg=0.8 ok=1 prone_to_stand_s=20.74 entry_s=1.02+1.02 frames=648 writes=7788 peak_lag_mrad=6.55 final_error_mrad=0.76 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=B_TAU30_LOOP2_RR2 fold_deg=0.8 ok=1 prone_to_stand_s=21.06 entry_s=1.02+1.02 frames=648 writes=7788 peak_lag_mrad=9.71 final_error_mrad=0.74 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=A_IDEAL fold_deg=-2.0 ok=1 prone_to_stand_s=20.87 entry_s=1.02+1.10 frames=652 writes=7836 peak_lag_mrad=6.55 final_error_mrad=0.76 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=B_TAU30_LOOP2_RR2 fold_deg=-2.0 ok=1 prone_to_stand_s=21.19 entry_s=1.02+1.10 frames=652 writes=7836 peak_lag_mrad=9.66 final_error_mrad=0.74 (STAND_VERIFIED)
+STAND_TIMING [SIMULATO] ISSUE52 model=C_TAU60_LOOP5_RR1_JIT2 fold_deg=0.0 ok=1 prone_to_stand_s=59.09 entry_s=1.02+1.02 frames=648 writes=7788 peak_lag_mrad=8.42 final_error_mrad=0.74 (STAND_VERIFIED)
+keepout unfolding side: PATH_KEEPOUT joint=2 sample=21 clearance_mrad=6.64 required_mrad=7.00
+HEARTBEAT_1HZ [SIMULATO] time-driven frames/s=49.9 cycles_in_10s=0.926 expected=0.929 (heartbeat 1 Hz = presence only)
+STREAM_FAULT emergency_stop LF_STANCE cycles=1.05 -> SAFE_OFF, frames after latch=0
+STREAM_FAULT emergency_stop LF_STANCE cycles=1.40 -> SAFE_OFF, frames after latch=0
+STREAM_FAULT emergency_stop LF_SWING cycles=1.85 -> SAFE_OFF, frames after latch=0
+STREAM_FAULT heartbeat_lost -> SAFE_OFF after 3398 ms (presence window 3000 ms, last heartbeat up to 1000 ms earlier)
+STREAM_FAULT feedback_lost -> SAFE_OFF after 90 ms (STREAM_FEEDBACK_STALE)
+STREAM_FAULT stuck_LF_LOWER -> SAFE_OFF after 538 ms (TRACKING_LAG_PERSISTENT)
+STREAM_FAULT slow_drive_20steps_s -> SAFE_OFF after 3622 ms (TRACKING_LAG_PERSISTENT): the reference is never stretched
+STREAM_FAULT controller_stall_150ms -> SAFE_OFF (STREAM_STARVED), frames after=0:1
+STREAM_WALK [SIMULATO] model=A_IDEAL preset=20mm cycles=10.00 walk_s=73.50 period_s=7.000 equiv_mm_s=2.86 stop_s=21.41 frames=4725 frame_hz=49.8 writes=56700 scheduler releases=4725 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.767
+STREAM_TRACK [SIMULATO] model=A_IDEAL J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J01 monitor_mrad rms=0.308 p95=0.667 p99=0.752 max=0.762 | lead_to_latest_target_mrad rms=0.87 p95=0.75 p99=3.88 max=10.63
+STREAM_TRACK [SIMULATO] model=A_IDEAL J02 monitor_mrad rms=0.312 p95=0.683 p99=0.741 max=0.763 | lead_to_latest_target_mrad rms=1.35 p95=0.74 p99=7.41 max=16.07
+STREAM_TRACK [SIMULATO] model=A_IDEAL J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J04 monitor_mrad rms=0.311 p95=0.669 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=0.88 p95=0.75 p99=4.13 max=10.44
+STREAM_TRACK [SIMULATO] model=A_IDEAL J05 monitor_mrad rms=0.309 p95=0.674 p99=0.741 max=0.764 | lead_to_latest_target_mrad rms=1.38 p95=0.74 p99=8.00 max=15.87
+STREAM_TRACK [SIMULATO] model=A_IDEAL J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J07 monitor_mrad rms=0.324 p95=0.686 p99=0.761 max=0.767 | lead_to_latest_target_mrad rms=0.85 p95=0.75 p99=4.52 max=9.61
+STREAM_TRACK [SIMULATO] model=A_IDEAL J08 monitor_mrad rms=0.342 p95=0.731 p99=0.759 max=0.767 | lead_to_latest_target_mrad rms=1.13 p95=0.75 p99=6.62 max=13.55
+STREAM_TRACK [SIMULATO] model=A_IDEAL J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J10 monitor_mrad rms=0.324 p95=0.681 p99=0.757 max=0.767 | lead_to_latest_target_mrad rms=0.85 p95=0.75 p99=4.77 max=9.47
+STREAM_TRACK [SIMULATO] model=A_IDEAL J11 monitor_mrad rms=0.341 p95=0.732 p99=0.759 max=0.767 | lead_to_latest_target_mrad rms=1.14 p95=0.75 p99=6.66 max=13.19
+STREAM_WALK [SIMULATO] model=A_IDEAL preset=30mm cycles=10.00 walk_s=73.50 period_s=7.000 equiv_mm_s=4.29 stop_s=21.41 frames=4725 frame_hz=49.8 writes=56700 scheduler releases=4725 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.767
+STREAM_TRACK [SIMULATO] model=A_IDEAL J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J01 monitor_mrad rms=0.318 p95=0.683 p99=0.757 max=0.767 | lead_to_latest_target_mrad rms=0.94 p95=0.76 p99=3.96 max=13.44
+STREAM_TRACK [SIMULATO] model=A_IDEAL J02 monitor_mrad rms=0.313 p95=0.686 p99=0.751 max=0.766 | lead_to_latest_target_mrad rms=1.40 p95=0.75 p99=7.02 max=17.09
+STREAM_TRACK [SIMULATO] model=A_IDEAL J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J04 monitor_mrad rms=0.317 p95=0.682 p99=0.757 max=0.767 | lead_to_latest_target_mrad rms=0.95 p95=0.76 p99=4.54 max=11.34
+STREAM_TRACK [SIMULATO] model=A_IDEAL J05 monitor_mrad rms=0.311 p95=0.686 p99=0.749 max=0.766 | lead_to_latest_target_mrad rms=1.42 p95=0.75 p99=8.61 max=16.49
+STREAM_TRACK [SIMULATO] model=A_IDEAL J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J07 monitor_mrad rms=0.311 p95=0.679 p99=0.740 max=0.766 | lead_to_latest_target_mrad rms=0.90 p95=0.75 p99=4.61 max=11.54
+STREAM_TRACK [SIMULATO] model=A_IDEAL J08 monitor_mrad rms=0.333 p95=0.712 p99=0.754 max=0.767 | lead_to_latest_target_mrad rms=1.16 p95=0.76 p99=6.30 max=13.98
+STREAM_TRACK [SIMULATO] model=A_IDEAL J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J10 monitor_mrad rms=0.313 p95=0.682 p99=0.753 max=0.766 | lead_to_latest_target_mrad rms=0.89 p95=0.75 p99=4.63 max=10.52
+STREAM_TRACK [SIMULATO] model=A_IDEAL J11 monitor_mrad rms=0.331 p95=0.712 p99=0.754 max=0.767 | lead_to_latest_target_mrad rms=1.16 p95=0.76 p99=6.71 max=14.45
+STREAM_WALK [SIMULATO] model=A_IDEAL preset=40mm cycles=10.00 walk_s=73.50 period_s=7.000 equiv_mm_s=5.71 stop_s=21.41 frames=4725 frame_hz=49.8 writes=56700 scheduler releases=4725 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.767
+STREAM_TRACK [SIMULATO] model=A_IDEAL J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J01 monitor_mrad rms=0.319 p95=0.689 p99=0.751 max=0.765 | lead_to_latest_target_mrad rms=1.03 p95=0.82 p99=3.84 max=15.27
+STREAM_TRACK [SIMULATO] model=A_IDEAL J02 monitor_mrad rms=0.310 p95=0.669 p99=0.735 max=0.766 | lead_to_latest_target_mrad rms=1.44 p95=0.75 p99=7.19 max=18.15
+STREAM_TRACK [SIMULATO] model=A_IDEAL J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J04 monitor_mrad rms=0.317 p95=0.684 p99=0.751 max=0.767 | lead_to_latest_target_mrad rms=1.04 p95=0.80 p99=4.62 max=13.06
+STREAM_TRACK [SIMULATO] model=A_IDEAL J05 monitor_mrad rms=0.307 p95=0.669 p99=0.735 max=0.765 | lead_to_latest_target_mrad rms=1.46 p95=0.75 p99=8.57 max=17.38
+STREAM_TRACK [SIMULATO] model=A_IDEAL J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J07 monitor_mrad rms=0.332 p95=0.710 p99=0.759 max=0.765 | lead_to_latest_target_mrad rms=0.93 p95=0.76 p99=4.18 max=13.08
+STREAM_TRACK [SIMULATO] model=A_IDEAL J08 monitor_mrad rms=0.340 p95=0.728 p99=0.756 max=0.767 | lead_to_latest_target_mrad rms=1.19 p95=0.76 p99=6.19 max=15.47
+STREAM_TRACK [SIMULATO] model=A_IDEAL J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=A_IDEAL J10 monitor_mrad rms=0.332 p95=0.710 p99=0.758 max=0.765 | lead_to_latest_target_mrad rms=0.93 p95=0.76 p99=4.38 max=11.93
+STREAM_TRACK [SIMULATO] model=A_IDEAL J11 monitor_mrad rms=0.340 p95=0.728 p99=0.756 max=0.767 | lead_to_latest_target_mrad rms=1.20 p95=0.76 p99=6.19 max=15.73
+STREAM_WALK [SIMULATO] model=B_TAU30_LOOP2_RR2 preset=30mm cycles=10.00 walk_s=73.50 period_s=7.000 equiv_mm_s=4.29 stop_s=21.41 frames=4725 frame_hz=49.8 writes=56700 scheduler releases=4725 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.765
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J01 monitor_mrad rms=0.090 p95=0.220 p99=0.461 max=0.731 | lead_to_latest_target_mrad rms=4.65 p95=12.23 p99=20.17 max=27.49
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J02 monitor_mrad rms=0.191 p95=0.478 p99=0.608 max=0.737 | lead_to_latest_target_mrad rms=7.25 p95=20.66 p99=29.11 max=35.63
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J04 monitor_mrad rms=0.097 p95=0.257 p99=0.492 max=0.731 | lead_to_latest_target_mrad rms=4.73 p95=12.70 p99=20.07 max=23.48
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J05 monitor_mrad rms=0.191 p95=0.475 p99=0.609 max=0.742 | lead_to_latest_target_mrad rms=7.40 p95=21.25 p99=29.08 max=34.93
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J07 monitor_mrad rms=0.164 p95=0.447 p99=0.627 max=0.753 | lead_to_latest_target_mrad rms=4.33 p95=12.03 p99=17.70 max=24.07
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J08 monitor_mrad rms=0.202 p95=0.522 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=5.88 p95=16.43 p99=23.35 max=30.20
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J10 monitor_mrad rms=0.164 p95=0.453 p99=0.624 max=0.753 | lead_to_latest_target_mrad rms=4.32 p95=12.03 p99=17.61 max=21.83
+STREAM_TRACK [SIMULATO] model=B_TAU30_LOOP2_RR2 J11 monitor_mrad rms=0.197 p95=0.504 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=5.91 p95=16.66 p99=23.41 max=30.33
+STREAM_WALK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 preset=30mm cycles=10.00 walk_s=73.51 period_s=7.000 equiv_mm_s=4.29 stop_s=22.27 frames=4725 frame_hz=49.3 writes=56700 scheduler releases=4728 overruns=0 skipped=0 max_late_ms=6.96 loop_us p50=5993 p99=6980 max=6999 monitor_peak_mrad=0.788
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J01 monitor_mrad rms=0.085 p95=0.173 p99=0.454 max=0.755 | lead_to_latest_target_mrad rms=8.80 p95=22.80 p99=37.39 max=46.74
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J02 monitor_mrad rms=0.158 p95=0.424 p99=0.563 max=0.788 | lead_to_latest_target_mrad rms=13.80 p95=41.17 p99=52.42 max=59.84
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J04 monitor_mrad rms=0.084 p95=0.183 p99=0.454 max=0.667 | lead_to_latest_target_mrad rms=8.95 p95=24.59 p99=37.06 max=41.49
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J05 monitor_mrad rms=0.151 p95=0.397 p99=0.560 max=0.709 | lead_to_latest_target_mrad rms=14.16 p95=41.95 p99=52.31 max=58.67
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J07 monitor_mrad rms=0.133 p95=0.356 p99=0.612 max=0.737 | lead_to_latest_target_mrad rms=7.99 p95=21.82 p99=32.69 max=39.79
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J08 monitor_mrad rms=0.164 p95=0.411 p99=0.752 max=0.763 | lead_to_latest_target_mrad rms=11.22 p95=32.39 p99=43.58 max=50.77
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J10 monitor_mrad rms=0.134 p95=0.393 p99=0.617 max=0.732 | lead_to_latest_target_mrad rms=7.96 p95=21.73 p99=32.45 max=37.18
+STREAM_TRACK [SIMULATO] model=C_TAU60_LOOP5_RR1_JIT2 J11 monitor_mrad rms=0.162 p95=0.406 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=11.24 p95=32.62 p99=43.41 max=50.22
+STREAM_WALK [SIMULATO] model=D_TAU30_STALL40_EVERY1S preset=30mm cycles=10.00 walk_s=73.50 period_s=7.000 equiv_mm_s=4.29 stop_s=21.45 frames=4537 frame_hz=47.8 writes=54444 scheduler releases=4537 overruns=94 skipped=188 max_late_ms=40.00 loop_us p50=2000 p99=2000 max=42000 monitor_peak_mrad=5.298
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J01 monitor_mrad rms=0.090 p95=0.221 p99=0.459 max=0.731 | lead_to_latest_target_mrad rms=4.75 p95=12.51 p99=20.38 max=27.49
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J02 monitor_mrad rms=0.189 p95=0.485 p99=0.606 max=0.737 | lead_to_latest_target_mrad rms=7.44 p95=21.49 p99=29.12 max=35.63
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J04 monitor_mrad rms=0.120 p95=0.287 p99=0.569 max=1.548 | lead_to_latest_target_mrad rms=5.40 p95=12.24 p99=27.33 max=39.35
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J05 monitor_mrad rms=0.245 p95=0.475 p99=0.630 max=5.298 | lead_to_latest_target_mrad rms=8.29 p95=21.28 p99=39.24 max=54.05
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J07 monitor_mrad rms=0.164 p95=0.447 p99=0.624 max=0.740 | lead_to_latest_target_mrad rms=4.72 p95=12.62 p99=19.71 max=34.38
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J08 monitor_mrad rms=0.201 p95=0.508 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=6.04 p95=17.02 p99=23.65 max=30.20
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J10 monitor_mrad rms=0.164 p95=0.453 p99=0.624 max=0.740 | lead_to_latest_target_mrad rms=4.69 p95=12.75 p99=19.63 max=25.27
+STREAM_TRACK [SIMULATO] model=D_TAU30_STALL40_EVERY1S J11 monitor_mrad rms=0.199 p95=0.507 p99=0.752 max=0.765 | lead_to_latest_target_mrad rms=7.55 p95=16.52 p99=40.71 max=54.06
+STREAM_WALK [SIMULATO] model=FAST_A_IDEAL preset=60mm cycles=10.00 walk_s=31.50 period_s=3.000 equiv_mm_s=20.00 stop_s=9.41 frames=2025 frame_hz=49.5 writes=24300 scheduler releases=2025 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.767
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J01 monitor_mrad rms=0.289 p95=0.665 p99=0.748 max=0.764 | lead_to_latest_target_mrad rms=2.14 p95=2.74 p99=6.09 max=31.11
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J02 monitor_mrad rms=0.309 p95=0.666 p99=0.708 max=0.767 | lead_to_latest_target_mrad rms=2.31 p95=1.07 p99=14.91 max=27.86
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J04 monitor_mrad rms=0.281 p95=0.645 p99=0.727 max=0.763 | lead_to_latest_target_mrad rms=2.16 p95=2.76 p99=8.87 max=25.88
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J05 monitor_mrad rms=0.307 p95=0.661 p99=0.704 max=0.767 | lead_to_latest_target_mrad rms=2.35 p95=1.07 p99=15.22 max=27.53
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J07 monitor_mrad rms=0.306 p95=0.665 p99=0.722 max=0.767 | lead_to_latest_target_mrad rms=1.68 p95=1.72 p99=6.98 max=27.22
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J08 monitor_mrad rms=0.298 p95=0.673 p99=0.752 max=0.766 | lead_to_latest_target_mrad rms=1.96 p95=1.35 p99=11.06 max=25.72
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J10 monitor_mrad rms=0.309 p95=0.668 p99=0.733 max=0.767 | lead_to_latest_target_mrad rms=1.64 p95=1.65 p99=7.23 max=21.18
+STREAM_TRACK [SIMULATO] model=FAST_A_IDEAL J11 monitor_mrad rms=0.289 p95=0.669 p99=0.752 max=0.766 | lead_to_latest_target_mrad rms=1.99 p95=1.40 p99=11.32 max=26.34
+STREAM_WALK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 preset=60mm cycles=10.00 walk_s=31.50 period_s=3.000 equiv_mm_s=20.00 stop_s=9.41 frames=2025 frame_hz=49.5 writes=24300 scheduler releases=2025 overruns=0 skipped=0 max_late_ms=0.00 loop_us p50=2000 p99=2000 max=2000 monitor_peak_mrad=0.764
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J01 monitor_mrad rms=0.075 p95=0.000 p99=0.382 max=0.737 | lead_to_latest_target_mrad rms=11.58 p95=31.76 p99=47.19 max=67.04
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J02 monitor_mrad rms=0.146 p95=0.406 p99=0.509 max=0.652 | lead_to_latest_target_mrad rms=12.60 p95=34.55 p99=48.87 max=62.56
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J04 monitor_mrad rms=0.062 p95=0.000 p99=0.327 max=0.613 | lead_to_latest_target_mrad rms=11.72 p95=32.09 p99=46.06 max=56.12
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J05 monitor_mrad rms=0.144 p95=0.406 p99=0.519 max=0.660 | lead_to_latest_target_mrad rms=12.80 p95=34.64 p99=48.87 max=59.77
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J07 monitor_mrad rms=0.107 p95=0.000 p99=0.584 max=0.733 | lead_to_latest_target_mrad rms=9.01 p95=24.08 p99=37.09 max=58.61
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J08 monitor_mrad rms=0.133 p95=0.238 p99=0.752 max=0.764 | lead_to_latest_target_mrad rms=10.64 p95=27.40 p99=43.36 max=56.88
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J10 monitor_mrad rms=0.108 p95=0.014 p99=0.588 max=0.733 | lead_to_latest_target_mrad rms=8.79 p95=23.84 p99=35.91 max=44.99
+STREAM_TRACK [SIMULATO] model=FAST_B_TAU30_LOOP2_RR2 J11 monitor_mrad rms=0.130 p95=0.155 p99=0.752 max=0.764 | lead_to_latest_target_mrad rms=10.77 p95=27.71 p99=43.46 max=56.85
+STREAM_WALK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 preset=60mm cycles=10.00 walk_s=31.51 period_s=3.000 equiv_mm_s=20.00 stop_s=10.27 frames=2025 frame_hz=48.5 writes=24300 scheduler releases=2028 overruns=0 skipped=0 max_late_ms=6.93 loop_us p50=6008 p99=6980 max=6999 monitor_peak_mrad=0.760
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J00 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J01 monitor_mrad rms=0.061 p95=0.000 p99=0.305 max=0.558 | lead_to_latest_target_mrad rms=21.42 p95=62.51 p99=82.32 max=109.02
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J02 monitor_mrad rms=0.137 p95=0.406 p99=0.497 max=0.582 | lead_to_latest_target_mrad rms=22.35 p95=60.72 p99=81.81 max=96.66
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J03 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J04 monitor_mrad rms=0.054 p95=0.000 p99=0.301 max=0.461 | lead_to_latest_target_mrad rms=21.76 p95=63.60 p99=80.56 max=91.55
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J05 monitor_mrad rms=0.132 p95=0.406 p99=0.496 max=0.650 | lead_to_latest_target_mrad rms=22.78 p95=61.14 p99=81.69 max=93.92
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J06 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J07 monitor_mrad rms=0.105 p95=0.000 p99=0.583 max=0.694 | lead_to_latest_target_mrad rms=16.35 p95=46.12 p99=63.28 max=94.81
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J08 monitor_mrad rms=0.133 p95=0.224 p99=0.752 max=0.760 | lead_to_latest_target_mrad rms=18.91 p95=51.14 p99=73.30 max=89.35
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J09 monitor_mrad rms=0.000 p95=0.000 p99=0.000 max=0.000 | lead_to_latest_target_mrad rms=0.00 p95=0.00 p99=0.00 max=0.00
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J10 monitor_mrad rms=0.106 p95=0.000 p99=0.587 max=0.681 | lead_to_latest_target_mrad rms=15.81 p95=44.88 p99=61.51 max=71.12
+STREAM_TRACK [SIMULATO] model=FAST_C_TAU60_LOOP5_RR1_JIT2 J11 monitor_mrad rms=0.130 p95=0.069 p99=0.752 max=0.759 | lead_to_latest_target_mrad rms=19.14 p95=53.58 p99=73.44 max=89.30
+STREAM_WALK FAILED model=FAST_ON_STANDARD_DRIVE_1000_50 preset=0 at cycles=0.494 executor=TRACKING_LAG_PERSISTENT frame=OK
+FAST_RESULT [SIMULATO] ideal=1 tau30=1 tau60=1 on_1000_50_drive=0 (a FAIL here is a physical following limit, not hidden)
+FAST_STOP_AT cycles=0.50 -> STAND stop_s=7.91
+FAST_STOP_AT cycles=1.00 -> STAND stop_s=9.41
+FAST_STOP_AT cycles=1.37 -> STAND stop_s=8.29
+FAST_STOP_AT cycles=2.00 -> STAND stop_s=9.41
+FAST_STOP_AT cycles=2.62 -> STAND stop_s=7.55
+FAST_STOP_AT cycles=3.00 -> STAND stop_s=9.41
+OPERATIONAL_MOTION PASS checks=8810358 failures=0 hardware=false
+rc=0

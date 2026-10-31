@@ -2,16 +2,69 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MATDOG — BNO085 full-body viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1014" />
+    <title>MATDOG — Motion Digital Twin</title>
   </head>
   <body>
     <div id="app">
+      <header id="live-bar">
+        <span id="source-badge" class="badge src-off" title="Telemetry source">OFF</span>
+        <span id="diag-chips" class="chips" aria-live="polite"></span>
+        <span class="bar-spacer"></span>
+        <button id="btn-panel-toggle" type="button" class="bar-btn" aria-expanded="true">Panel</button>
+        <button id="btn-stop" type="button" class="stop-btn" hidden>STOP</button>
+      </header>
       <aside id="panel">
         <header>
-          <h1>MATDOG BNO085</h1>
-          <p class="subtitle">full-body collision viewer · IMU phase</p>
+          <h1>MATDOG Motion Digital Twin</h1>
+          <p class="subtitle">actual / target · visual + collision layers</p>
         </header>
+
+        <section class="block" id="dashboard-block" hidden>
+          <div class="row"><h2>Live dashboard</h2><span id="dash-age" class="detail mono-inline">—</span></div>
+          <p id="dash-stop-result" class="detail" hidden></p>
+          <p id="dash-diagnostics" class="detail"></p>
+          <details open>
+            <summary>Commissioning · readiness</summary>
+            <dl class="kv">
+              <dt>mode</dt><dd id="dash-mode">—</dd>
+              <dt>pose class</dt><dd id="dash-pose">—</dd>
+              <dt>entry stage</dt><dd id="dash-entry">—</dd>
+              <dt>limits / approved</dt><dd id="dash-limits">—</dd>
+              <dt>restore</dt><dd id="dash-restore">—</dd>
+              <dt>local session</dt><dd id="dash-session">—</dd>
+              <dt>executor / stand</dt><dd id="dash-executor">—</dd>
+              <dt>reason</dt><dd id="dash-reason">—</dd>
+              <dt>tracking error</dt><dd id="dash-tracking">—</dd>
+              <dt>segment / phase</dt><dd id="dash-segment">—</dd>
+              <dt>readiness</dt><dd id="dash-readiness">—</dd>
+              <dt>power</dt><dd id="dash-power">—</dd>
+            </dl>
+          </details>
+          <details open>
+            <summary>12 joints · measured / target</summary>
+            <div class="table-wrap"><table id="joint-table"><thead></thead><tbody></tbody></table></div>
+            <p class="detail">Grey model = measured, cyan ghost = target. "—" = channel not reported (never shown as 0). Amber row: sample older than 1.5 s; purple: RESTORE not done (unmapped); red: outside URDF limit.</p>
+          </details>
+          <details open>
+            <summary>IMU (BNO085 rotation vector)</summary>
+            <dl class="kv">
+              <dt>roll / pitch / yaw</dt><dd id="dash-rpy">—</dd>
+              <dt>q (w x y z)</dt><dd id="dash-quat">—</dd>
+              <dt>valid / age</dt><dd id="dash-imu">—</dd>
+            </dl>
+          </details>
+          <details open>
+            <summary>Host bridge</summary>
+            <dl class="kv">
+              <dt>source / transport</dt><dd id="dash-bridge-mode">—</dd>
+              <dt>rates</dt><dd id="dash-bridge-rates">—</dd>
+              <dt>serial</dt><dd id="dash-bridge-serial">—</dd>
+              <dt>boot nonce / reboots</dt><dd id="dash-bridge-boot">—</dd>
+            </dl>
+          </details>
+        </section>
 
         <section class="block">
           <div class="row">
@@ -25,6 +78,18 @@
             <button id="btn-recenter" type="button">Recenter</button>
             <button id="btn-clear-reference" type="button">Clear recenter</button>
           </div>
+        </section>
+
+        <section class="block" id="motion-block">
+          <div class="row"><h2>Motion telemetry</h2><span id="twin-fresh" class="badge state-disconnected">NO DATA</span></div>
+          <div class="buttons"><button id="btn-motion-synthetic">Synthetic demo</button><button id="btn-motion-live">Controller read-only</button><button id="btn-motion-pause">Pause feed</button></div>
+          <label class="detail">Replay offline trace (JSON / JSONL)<input id="motion-trace-file" type="file" accept=".json,.jsonl,application/json,application/x-ndjson"></label>
+          <p id="twin-source" class="detail">Telemetry off. Existing Web Serial orientation remains available.</p>
+          <p class="detail">Solid grey: measured joints. Cyan wireframe: targets. Green feet: reported support; amber: swing; grey: unknown. Contact is reported, never inferred from IMU or encoders.</p>
+          <dl><dt>Executor / stand / owner</dt><dd id="twin-executor">—</dd><dt>Controller / sample / transport age</dt><dd id="twin-time">—</dd><dt>base_link height above support plane</dt><dd id="twin-height">UNKNOWN (not measured by IMU)</dd><dt>Fault / tracking error</dt><dd id="twin-fault">—</dd><dt>Four feet / gait phases</dt><dd id="twin-feet">—</dd></dl>
+          <details><summary>12 joints · actual / target (rad)</summary><pre id="twin-joints">—</pre></details>
+          <p id="twin-diagnostic" class="detail"></p>
+          <p class="detail">Rendering capped at 30 Hz; HTTP telemetry 1 Hz; synthetic/replay 10 Hz. Hidden tabs suspend sampling and rendering. Stale samples remain marked; target and contact overlays are hidden.</p>
         </section>
 
         <section class="block">
@@ -87,6 +152,7 @@
             <dd id="model-counts">—</dd>
             <dt>world axes</dt>
             <dd id="model-legend" class="legend"></dd>
+            <dt>Collision layer</dt><dd><label><input id="collision-layer" type="checkbox"> Show certified collision meshes (purple)</label></dd>
           </dl>
           <p class="detail">
             World is Z-up and identical to base_link. The robot uses one neutral material;

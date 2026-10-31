@@ -7,7 +7,10 @@ const path = require('path');
 const assert = require('assert');
 const network = path.join(__dirname, '../../src/network');
 const source = fs.readFileSync(path.join(network, 'PortalPage.h'), 'utf8');
-const html = source.split('R"MATDOG(')[1].split(')MATDOG";')[0];
+// The six existing portal features are isolated here; the appended Motion fragment
+// is executed by test_motion_dashboard_dom.cjs with Controller capability fixtures.
+const literals = [...source.matchAll(/R"MATDOG\(([\s\S]*?)\)MATDOG"/g)].map(m => m[1]);
+const html = literals[0] + "</html>";
 const security = fs.readFileSync(path.join(network, 'PortalSecurity.cpp'), 'utf8');
 
 const xss = '<img src=x onerror=alert(1)>';
@@ -98,7 +101,7 @@ async function boot(options = {}) {
   const d = dom.window.document;
   // The page's only other timer is the 6 s abort guard of a request.
   // poll() runs the scheduled refresh and returns the delay of the next one.
-  const poll = async () => { const t = timers.filter(x => x.ms !== 6000).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 6000).pop() || {}).ms; };
+  const poll = async () => { const t = timers.filter(x => x.ms !== 800).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 800).pop() || {}).ms; };
   const tick = () => intervals.forEach(i => i.fn());
   return {dom, d, device, errors, timers, intervals, poll, tick, q: s => d.querySelector(s),
     close: () => dom.window.close()};
@@ -164,6 +167,14 @@ const row = (page, list, label) => {
   eq(p.q('#socBar i').style.width, '25%', 'bar follows the update');
   p.device.status.bms_soc_percent = '10.0'; await p.poll();
   ok(p.q('#socBar').classList.contains('bad') && p.q('#bmsBadge').textContent === 'CRITICA', 'critical charge colour');
+  Object.assign(p.device.status,{bms_soc_percent:'33.2',bms_pack_v:'9.7',bms_cell_min_mv:'3190',led_battery_critical:'YES'});await p.poll();
+  eq(p.q('#soc').textContent,'33 %','BMS estimate retained, not rewritten as physical zero');
+  ok(p.q('#socBar').hidden,'critical: no SOC bar suggesting usable autonomy');
+  ok(p.q('#energyState').textContent.includes('energia operativa esaurita'),'qualitative unavailable energy');
+  p.device.status.bms_soc_percent='NaN';await p.poll();
+  eq(p.q('#bmsBadge').textContent,'CRITICA','voltage alarm remains critical with invalid SOC');
+  eq(p.q('#soc').textContent,'N/D','fresh invalid SOC is unknown, not false stale or zero');
+  p.device.status.led_battery_critical='NO';
   Object.assign(p.device.status, {bms_soc_percent: '38.0', bms_fresh: 'NO', bms_sample_age_ms: '9000', bms_comm: 'TIMEOUT'}); await p.poll();
   eq(p.q('#soc').textContent, 'STALE', 'stale sample is not shown as current');
   eq(p.q('#socBar i').style.width, '0px', 'stale: empty bar');
@@ -232,7 +243,7 @@ const row = (page, list, label) => {
   p = await boot();
   const gets = p.device.calls.filter(c => c.method === 'GET').map(c => c.url);
   eq(gets.join(','), '/status,/wifi/status', 'one sequential pair per refresh');
-  eq(p.timers.filter(x => x.ms !== 6000).pop().ms, 4000, 'poll interval');
+  eq(p.timers.filter(x => x.ms !== 800).pop().ms, 4000, 'poll interval');
   eq(await p.poll(), 4000, 'steady poll interval');
   eq(p.device.calls.filter(c => c.method === 'GET').length, 4, 'exactly two requests per poll');
   p.device.down = true;

@@ -52,7 +52,7 @@ LedPresentationState selectFromFacts(const LedStatusInputs& in, const LedStatusS
 LedStatusSnapshot factsFor(const LedStatusInputs& in) {
   LedStatusSnapshot facts;
   const bool fresh = telemetryFresh(in);
-  facts.soc_valid = fresh && std::isfinite(in.soc_percent);
+  facts.soc_valid = fresh && std::isfinite(in.soc_percent) && in.soc_percent >= 0 && in.soc_percent <= 100;
   if (facts.soc_valid) {
     facts.soc_percent = in.soc_percent;
     facts.soc_segments = socCompletedSegments(in.soc_percent);
@@ -116,8 +116,7 @@ LedEffect ledEffectFor(LedPresentationState state, uint32_t now_ms, uint8_t max_
       return {255, 0, 0, triangleBrightness(now_ms, kBreathePeriodMs, kBreatheMinBrightness,
                                            max_brightness)};
     case LedPresentationState::BATTERY_CRITICAL:
-      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,
-                                           max_brightness / 2)};
+      return {255, 0, 0, static_cast<uint8_t>(now_ms%500<250?max_brightness:0)};
     case LedPresentationState::DEGRADED:
       return {255, 140, 0, static_cast<uint8_t>(max_brightness / 2)};
     case LedPresentationState::BATTERY_WARNING:
@@ -157,6 +156,48 @@ const char* toString(LedPresentationState state) {
 LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
                                  uint8_t max_brightness) {
   snapshot_ = factsFor(inputs);
+  // SOC affects presentation only. No KEY, MOS or charging-policy writes.
+  // Enter at 30/15; release at 33/18. Stale data renders UNKNOWN and cannot
+  // assert a low-SOC alarm; the latch survives to avoid threshold chatter.
+  if (snapshot_.soc_valid) {
+    const float soc=snapshot_.soc_percent;
+    if (soc<=15) soc_level_=2;
+    else if (soc_level_==2 && soc<18) {}
+    else if (soc<=30 || (soc_level_!=0 && soc<33)) soc_level_=1;
+    else soc_level_=0;
+    if (!snapshot_.charging) {
+      snapshot_.battery_critical=inputs.battery_critical || soc_level_==2;
+      snapshot_.battery_warning=inputs.battery_warning || soc_level_==1;
+    }
+  }
+  // Advisory margins above DALY's 3.20 V/cell and 9.60 V/pack cutoffs.
+  // No writes or motion gates: conservative candidate thresholds require a
+  // loaded hardware capture. Hysteresis prevents threshold chatter.
+  const bool voltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&
+    std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;
+  if(voltage_valid){
+    const auto cell=inputs.cell_min_mv;const auto pack=inputs.pack_voltage_v;
+    const bool distinct=!voltage_seen_||static_cast<int32_t>(inputs.sampled_at_ms-voltage_stamp_)>0;
+    if(distinct){
+      voltage_seen_=true;voltage_stamp_=inputs.sampled_at_ms;
+      // Critical is immediate, including the real 3190 mV/9.7 V event.
+      if(cell<=3350||pack<=10.05f){voltage_level_=2;voltage_votes_=0;}
+      else {
+        uint8_t next=0;
+        if(voltage_level_==2&&(cell<3450||pack<10.35f))next=2;
+        else if(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))next=1;
+        // Two consecutive distinct fresh DALY samples for warning/recovery.
+        // Repainting one cached sample can never advance this counter.
+        if(next==voltage_level_)voltage_votes_=0;
+        else {if(next!=voltage_candidate_){voltage_candidate_=next;voltage_votes_=0;}
+          if(++voltage_votes_>=2){voltage_level_=next;voltage_votes_=0;}}
+      }
+    }
+  }else {voltage_votes_=0;voltage_seen_=false;}
+  // Stale/invalid data cannot clear a known low-voltage alarm. UI labels the
+  // current data unknown; charging only suppresses presentation on fresh facts.
+  if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}
+  snapshot_.presentation=selectFromFacts(inputs,snapshot_);
   if (state() == LedPresentationState::READY || state() == LedPresentationState::CHARGING) {
     if (!snapshot_.soc_valid) {
       return uniformFrame({255, 140, 0, subtleBrightness(now_ms, max_brightness)});
@@ -166,7 +207,11 @@ LedFrame LedStatusPolicy::update(const LedStatusInputs& inputs, uint32_t now_ms,
       // At reported 100%, keep the final logical segment pulsing. Never FULL.
       const uint8_t next = snapshot_.soc_segments < kSocPixelCount
                                ? snapshot_.soc_segments : kSocPixelCount - 1;
-      frame.pixels[kSocPixelOrder[next]] = ledEffectFor(state(), now_ms, max_brightness);
+      // Raised-cosine pulse: continuous slope at extrema, visibly spans the
+      // full ceiling instead of the old subtle one-third brightness.
+      const double phase=(now_ms%3000)/3000.0;
+      const auto pulse=static_cast<uint8_t>(std::lround(2+(max_brightness>2?max_brightness-2:0)*(.5-.5*std::cos(6.283185307179586*phase))));
+      frame.pixels[kSocPixelOrder[next]] = {0,255,0,static_cast<uint8_t>(pulse>max_brightness?max_brightness:pulse)};
     }
     return frame;
   }

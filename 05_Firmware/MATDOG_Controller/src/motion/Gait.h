@@ -14,8 +14,20 @@ struct GaitParameters {
   double heightM = .15, liftM = .01, duty = .8;
   // Body displacement in the instantaneous base plane per normalized cycle.
   double advanceXM = .01, advanceYM = 0, yawRad = 0;
-  // Open-loop study parameter, not a feedback/stabilization controller.
+  // WALK fore/aft COM offset: forward while a hind leg swings, backward while
+  // a front leg swings, changing only inside four-contact windows. Open-loop
+  // geometry, not a feedback/stabilization controller.
   double swayXM = 0;
+  // WALK lateral COM offset: +Y while the right legs swing, -Y while the left
+  // legs swing. It changes only inside four-contact windows (duty-0.75 cycle),
+  // so every three-contact interval holds a constant offset. With a terminal
+  // cycle T the walk ends at T+duty-0.75: the last window recentres to zero
+  // with four contacts. Open-loop geometry, not a balance controller.
+  double swayYM = 0;
+  // Geometric stride ramps (cycles), C2 in the gait clock: the body progress
+  // rate rises 0->1 over startCycles and, with a terminal cycle T, falls 1->0
+  // over the stopCycles that end at T. Zero keeps the legacy law.
+  double startCycles = 0, stopCycles = 0;
   double maxCondition = 10000;
 };
 struct LegPhase { double phase=0, swingProgress=0; bool stance=true, boundary=false; };
@@ -23,6 +35,8 @@ bool validGaitParameters(const GaitParameters& p);
 bool validGaitPeriod(double seconds);
 double gaitOffset(GaitType type, LegId leg);
 LegPhase legPhase(const GaitParameters& p, LegId leg, double cycles);
+// Four-contact recentring window after the terminal touchdown; 0 without sway.
+double gaitSettleCycles(const GaitParameters& p);
 struct CartesianSample {
   BodyPose body{};
   Vector3 bodyVelocity{}, bodyAcceleration{};
@@ -30,10 +44,13 @@ struct CartesianSample {
   Vector3 feet[4]{}, velocity[4]{}, acceleration[4]{};
   LegPhase phases[4]{};
   double cycles=0;
+  double stlSmoothing=0,stlSmoothingVelocity=0,stlSmoothingAcceleration=0;
   bool valid=false;
 };
 // Initial anchors are canonical C4 contacts at world origin. Optional terminal
-// integer cycle assembles canonical contacts at that cycle's body transform.
+// cycle, a touchdown instant (multiple of 0.25), assembles canonical contacts
+// at that cycle's body transform
+// (with sway: at terminal+gaitSettleCycles, the final four-contact window).
 // All values are SI. No roll/pitch or sloping terrain is represented.
 CartesianSample gaitCartesian(const GaitParameters& p, double cycles,
                               double cyclesPerS, double cyclesPerS2,
@@ -56,7 +73,9 @@ struct LocomotionFrame {
 // Previous valid solution is the seed AND branch reference. nullptr anchors at
 // canonical stand. An error leaves target.valid false; there is no clipping.
 LocomotionFrame solveGait(const GaitParameters& p, const CartesianSample& sample,
-                         const LocomotionFrame* previous=nullptr);
+                         const LocomotionFrame* previous=nullptr,bool derivatives=true);
+// derivatives=false omits unused joint velocity/acceleration output for native
+// position-profile control; IK, branch, contact and conditioning gates stay on.
 struct GaitAssessment {
   bool collisionFree=false, contactsValid=false, positiveWalkSupport=false;
 };

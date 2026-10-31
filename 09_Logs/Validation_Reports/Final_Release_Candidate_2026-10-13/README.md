@@ -1,0 +1,23 @@
+# MATDOG — candidato single-flash, 13 ottobre 2026
+
+**Aggiornamento finale 13 ottobre, 19:29 UTC: [FLASH_SUCCESS / post-flash PASS](FLASH_CLOSEOUT.md).** Candidato originale installato una sola volta APP-ONLY dopo conferma fisica e recupero GitHub verificato. Robot in MAINTENANCE, authority NONE, 13 servo OFF, Motion session OFF; validazione Motion ancora separata. Le precedenti indicazioni NO-GO sono il quadro storico prima del completamento.
+
+Un’unica immagine integra diagnostica, RESTORE, admission locale RAM-only, STAND per segmenti e prima falcata WALK. Non autorizza flash o movimento. Nessuna operazione sul robot è stata eseguita durante lo sviluppo.
+
+[Handoff operativo](HANDOFF.md) · [readiness dei 12 limiti](JOINT_LIMITS.md) · [admission](RUNTIME_ADMISSION.md) · [sessione serale](SUPERVISED_SESSION.md) · [preflight/backup/APP-ONLY](REMOTE_PREFLIGHT.md) · [48 azioni](DASHBOARD_ACTIONS.md) · [galleria](visuals/README.md).
+
+La route originale è preservata: 242 campioni/251 segmenti/17 STL, 12 adiacenti continui e 120 non adiacenti, bound nominale ≥3,0064599155 mm. La prona originale a −92° non è ammessa dalle proposte operative. Il suffisso canonico con tube ±6 mrad è provato da knot ≥114; il trasferimento autonomo dalla prona resta NO-GO.
+
+La variante finale su fixture usa LOWER front −88,5° / rear −89°: `fixture_final_margin_route_6mrad.json`, recipe `ba83dbcb38483d03a9a6054927dc01810ce901bad29e5d1f3c970a831846e70c`, tutti i 251 segmenti e dodici adiacenti PASS con tube ±6 mrad. La posa iniziale viene misurata, non assegnata. Gli intermedi sono ammessi solo nel corridoio comune verificato; HIP nominali neutrali dopo PRE_ALIGN, coppie speculari posteriori prioritarie. Le varianti precedenti rimangono artifact storici.
+
+WALK finale conserva G4/FeedbackWalk: advance/lift 5 mm, sway **30 mm**, duty .8, periodo/rampa 90 s, ingresso/uscita 8 s, clock ≥9, vy/yaw zero, una falcata per start esplicito. `first_stride_30mm_qualified_clock_swept_6mrad.json`: 19.080 box continui indipendenti + tube ±6 mrad, dodici adiacenti PASS, clearance minima certificata 12,879979 mm. Il parametro ridotto chiude il superamento RF LOWER del precedente sway 40 mm; nessun limite viene allargato. Le derivate vengono dall’adapter STL smoothed e la tabella contiene i target effettivi, in memoria flash bounded. STOP/expiry interrompono le scritture; nuovi parametri o un’altra falcata richiedono admission esplicita.
+
+Il firmware usa `MotionService → Coordinator → AdaptiveStand/FeedbackWalk → Executor → Safe Actuator Layer → ServoBus`. Prime verifica GoalPosition/GoalSpeed/ACC prima del torque; arm attende nuovi readback dei dodici servo. Ownership locale fino al disarmo, anche fra due comandi; nessuna authority dalla Web UI. Boot/reconnect/RESTORE/caricamento profilo non concedono torque. `MOTION_AUTHORIZED=0` a startup e `OTA_INGEST=0` invarianti; capability compilata subordinata a review corrente, nonce, presenza locale e scadenza.
+
+LED: SOC verde proporzionale, ambra/rosso breathing con isteresi, stale/assente UNKNOWN; charging barra verde + segmento successivo raised-cosine 3 s quasi-off→luminoso senza flicker; allarmi prioritari e FULL distinto da SOC100. GPIO47, 12 WS2812, mappa oraria/RMT DMA e KEY/MOS/politica di ricarica invariati.
+
+Rete: MAINTENANCE LAN read-only esplicita RAM-only con cinque GET, ADMIN_AP WPA2 su 192.168.4.1, RUN_STA TLS/autenticato separato. Listener/socket/ruoli/generazioni/sessioni segregati, recovery AP e STA_STOP preservati, nessun AP+STA simultaneo. Nomi/scan redatti fuori dall’admin AP autenticato, nessun grant/OTA/config dalla LAN. Identità TLS propria del dispositivo: chiave privata locale ignorata da Git, certificato pubblico qui; trust/DNS e credenziali reali richiedono provisioning separato.
+
+Software release **READY/PASS**, clean source `b147f3884b227ec819e98a6f00c214a0aac2278e`, app 3643120 byte, SHA `5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914`. [Build receipt](BUILD_RECEIPT.json), [test receipt](TEST_RECEIPT.json), [verification](VERIFICATION.md) e [candidato unico](designated_candidate.json) identificano i byte finali. Flash e hardware Motion restano NO-GO pending gate correnti. Il sorgente compilato clean resta distinto dal successivo HEAD documentale, dall’app installata storica `b08322d…` e dalla build precedente `f62e89b…`. Prove fisiche attuali, dodici limiti approvati, timing/tracking/rates/ceiling e supporto/carico/dinamica non sono dichiarati PASS offline.
+
+[Archivio cifrato corrente e recupero indipendente verificato](RECOVERY_ARCHIVE.md) · [receipt GitHub](RECOVERY_ARCHIVE_RECEIPT.json).

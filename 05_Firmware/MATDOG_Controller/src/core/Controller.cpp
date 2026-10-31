@@ -1,10 +1,13 @@
 #include "Controller.h"
-
+#include "../simple/MotionTiming.h"
+#include <esp_timer.h>
+#include <esp_task_wdt.h>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
-#include <string.h>
-
+#include <cstring>
+#include <cmath>
 #include "../config/BuildConfig.h"
+#include "../config/InstallationAttestation.h"
 #include "../config/OtaCredentials.h"
 #include "../config/Pins.h"
 
@@ -20,7 +23,6 @@
 
 namespace matdog {
 namespace core {
-
 namespace {
 const char* resetReasonName(esp_reset_reason_t reason) {
   switch (reason) {
@@ -51,6 +53,13 @@ void Controller::begin() {
   Serial.setTxBufferSize(build::kUsbTxRingBytes);
   Serial.setTxTimeoutMs(build::kUsbTxTimeoutMs);
   Serial.begin(build::kUsbSerialBaud);
+  // De-escalate before USB enumeration, NVS, SPI or network initialization.
+  // In particular a watchdog reboot must not wait for those services to
+  // command torque OFF. Readback verification continues in the main loop.
+  servo_bus_.begin();
+  simple_port_.owner=this;
+  simple_motion_.begin(&simple_port_,build::kServoPowerAvailable);
+  if(build::kServoPowerAvailable)simple_motion_.update(esp_timer_get_time());
   delay(1500);  // let native USB CDC enumerate, matching every proven bring-up sketch.
 
   system_state_.beginBoot(millis());
@@ -103,6 +112,8 @@ void Controller::begin() {
   // model; binding it authorises nothing without a live session + permit.
   actuator_policy_.bindSequencePlan(&actuator::sequence_plan_data::kPlan);
   actuator_runtime_.begin(&actuator_policy_, &actuator_backend_);
+  motion_service_.begin(&simple_motion_,[](void* context){return static_cast<Controller*>(context)->prepareSimpleMotion();},this);
+
   calibration_execution_.begin(&actuator_policy_, &actuator_runtime_, &geometry_profile_,
                                &actuator::geometry_data::kProvenance);
   // A reboot/default construction always starts revoked (CalibrationMotionPermit.h)
@@ -163,7 +174,7 @@ void Controller::begin() {
   // Init order: transports that cannot interfere with each other first.
   // No module's begin() may command motion, enable torque, or write
   // EEPROM/DCD/BMS config (handoff sections 5/10/28).
-  servo_bus_.begin();
+  servo_bus_.setStopPreempt(&Controller::stopPreempt,this);
   system_state_.setServoHealth(servo_bus_.health());
 
   // Bind the ONE canonical census service to the ONE ServoBus.
@@ -175,22 +186,15 @@ void Controller::begin() {
   servo_preflight_.begin(&servo_bus_);
 
   if (build::kServoPowerAvailable) {
-    startup_servo_census_pending_ = servo_census_.start();
-    if (startup_servo_census_pending_) {
-      system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
-      Serial.printf("STARTUP_SERVO_CENSUS=RUNNING canonical=%u expected_now=%u range=%d..%d\n",
-                    (unsigned)servo::canonicalAllocatedCount(),
-                    (unsigned)servo::expectedNowCount(),
-                    servo::kCanonicalScanLo, servo::kCanonicalScanHi);
-    } else {
-      // A powered robot that cannot even start its required population
-      // self-test must fail closed rather than remain BOOTING forever.
-      system_state_.setServoHealth(ModuleHealth::FAULT);
-      Serial.println("STARTUP_SERVO_CENSUS=START_FAILED");
-    }
+    startup_servo_census_pending_=true;
+    system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);
   }
 
   imu_.begin();
+  // Core Motion V5: IMU acquisition owns its task (SPI + INT, bounded drain). If the
+  // task cannot be created the Controller falls back to the same bounded service pass
+  // inline - never the library's blocking wait.
+  if(!imu_.startTask())Serial.printf("IMU_TASK=%s\n",imu_.availability().init==InitializationState::INITIALIZED?"START_FAILED_INLINE_FALLBACK":"NOT_STARTED");
   system_state_.setImuHealth(imu_.health());
 
   daly_.begin();
@@ -230,8 +234,11 @@ void Controller::begin() {
       &persistence_,
       &first_motion_safe_off_result_,
       &startup_qualification_,
+      &runtime_restore_,
   };
   service_.begin(modules);
+  service_.bindMotionService(&motion_service_);
+  restore_hook_.owner=this;service_.bindCalibrationRestore(&restore_hook_);
   // Never starts the listening socket here — see network/HttpTransport.h.
   // The secret is passed as raw bytes (strlen of the configured string, or
   // 0 if none was configured); OtaSession fails closed on a zero-length
@@ -253,6 +260,7 @@ void Controller::begin() {
   // the OTA first-boot self-check requires, and it must mean "begin() ran to
   // completion", not "begin() started".
   initialized_ = true;
+  esp_task_wdt_add(nullptr);
 }
 
 void Controller::updateQ0Capture() {
@@ -402,6 +410,100 @@ void Controller::updateStartupQualification() {
       startup_qualification_.nominal() ? "NOMINAL" : "RF_LOWER_MAX_RETURN",
       (unsigned long long)calibration::kStartupReferenceGeometry,startup_qualification_.reason());
   }
+}
+
+// --- Issue #48: conditional RAM-only RESTORE -------------------------------
+calibration::RestoreFacts Controller::gatherRestoreFacts(bool read_live,calibration::RecordInspection* in,
+                                                         calibration::LivePositionEvidence* live) {
+  calibration::RestoreFacts f;
+  f.maintenance=operating_mode_.mode()==OperatingMode::MAINTENANCE;
+  f.runtime_idle=authority_.current()==ActuatorAuthority::NONE&&!simple_motion_.engaged()&&
+    !calibration_.sessionLive()&&simple_motion_.offVerified();
+  f.nvs_ready=persistence_.snapshot().nvs==calibration::NvsInitStatus::READY;
+  f.write_outcome_uncertain=persistence_.writesBlocked();
+  f.record_valid_acknowledged=persistence_.calibrationAvailable()&&persistence_.snapshot().assessment.acknowledged_record_intact;
+  runtime_restore_.inspect(persistence_,geometry_profile_,actuator::geometry_data::kProvenance,in);
+  f.record_inspection_ok=in->ok;f.record_generation=in->generation;f.record_fingerprint=in->fingerprint;
+  const auto& pre=servo_preflight_.result();
+  f.preflight_complete=servo_preflight_.state()==servo::ServoPreflight::State::COMPLETE&&pre.complete;
+  f.preflight_pass=pre.allPass()?12:pre.pass_count>11?11:pre.pass_count;
+  const auto& snap=runtime_restore_.snapshot();
+  f.already_restored=snap.restored;f.restored_generation=snap.restored_generation;
+  *live=calibration::LivePositionEvidence{};
+  if(read_live){
+    // Twelve read-only register reads; nothing is written to the bus.
+    live->present=true;
+    for(unsigned i=0;i<12;++i){
+      const auto* servo=actuator::slotServo(i);servo::ServoBus::RuntimeState st;
+      const bool ok=servo&&servo_bus_.readRuntimeState(servo->bus_id,&st);
+      if(ok&&st.torque_enable==0)++f.torque_off;
+      live->raw[i]=ok&&st.present_position>=0&&st.present_position<4096?static_cast<uint16_t>(st.present_position):4096;
+    }
+    const uint8_t bad=calibration::firstLivePositionMismatch(*in,*live);
+    f.live_positions_inside_record=bad==calibration::kRecordJointCount;f.live_position_failed_joint=bad;
+  }
+  return f;
+}
+
+calibration::RestoreVerdict Controller::requestCalibrationRestore(const calibration::RestoreRequestFacts& q) {
+  if(simple_motion_.engaged()||calibration_.sessionLive()||q0_capture_.active()||first_motion_.active()||full_leg_calibration_.active()){
+    calibration::RestoreVerdict v;v.decision=calibration::RestoreDecision::REFUSED;v.reason=calibration::RestoreReason::RUNTIME_NOT_IDLE;return v;
+  }
+  const bool manual=q.trigger==calibration::RestoreTrigger::OPERATOR_MANUAL;
+  const auto attestation=config::installationAttestation(auto_restore_suspended_);
+  calibration::RecordInspection in;calibration::LivePositionEvidence live;
+  // Twelve read-only register reads (torque + position) back every decision.
+  const bool read_live=manual||attestation.auto_restore_enabled;
+  const auto facts=gatherRestoreFacts(read_live,&in,&live);
+  auto verdict=calibration::evaluateRestore(facts,attestation,q);
+  if(verdict.decision==calibration::RestoreDecision::ALLOW_AUTOMATIC||verdict.decision==calibration::RestoreDecision::ALLOW_OPERATOR){
+    calibration::RuntimeRestoreRequest request;
+    request.expected_generation=facts.record_generation;
+    request.current_installation_confirmed=true;  // live evidence (boot) or present operator, decided above
+    request.executor_idle=facts.runtime_idle;request.torque_off_confirmed=facts.torque_off==12;
+    request.motion_permit_revoked=!simple_motion_.engaged();
+    const auto result=runtime_restore_.restore(persistence_,geometry_profile_,actuator::geometry_data::kProvenance,
+        request,actuator_policy_.transforms(),actuator_policy_.limits(),&live);
+    installation_live_verified_=result==calibration::RuntimeRestoreStatus::RESTORED;
+    if(result!=calibration::RuntimeRestoreStatus::RESTORED){
+      verdict.decision=calibration::RestoreDecision::REFUSED;
+      verdict.reason=result==calibration::RuntimeRestoreStatus::REJECT_LIVE_POSITION?calibration::RestoreReason::LIVE_POSITION_OUTSIDE_RECORD:
+                     result==calibration::RuntimeRestoreStatus::REJECT_UNSAFE_RUNTIME?calibration::RestoreReason::RUNTIME_NOT_IDLE:
+                     calibration::RestoreReason::RECORD_REJECTED;
+      verdict.failed_joint=runtime_restore_.snapshot().failed_joint;
+    }
+  }
+  last_restore_verdict_=verdict;last_restore_trigger_=manual?"OPERATOR":"BOOT";
+  last_restore_fingerprint_=facts.record_fingerprint;last_restore_generation_=facts.record_generation;
+  const auto& snap=runtime_restore_.snapshot();
+  {using R=calibration::RestoreReason;const R r=verdict.reason;
+   const bool ok=verdict.decision==calibration::RestoreDecision::ALLOW_AUTOMATIC||verdict.decision==calibration::RestoreDecision::ALLOW_OPERATOR||
+                 verdict.decision==calibration::RestoreDecision::ALREADY_RESTORED;
+   restore_refused_transient_=!ok&&calibration::restoreRefusalIsTransient(r);
+   restore_refused_permanent_=!ok&&!restore_refused_transient_;
+   restore_refusal_reason_=ok?"":calibration::toString(r);}
+  Serial.printf("CALIBRATION_RESTORE_DECISION trigger=%s decision=%s reason=%s failed_joint=%u generation=%lu fingerprint=%016llx "
+                "auto=%s restored=%u mapped=%u/12 torque=UNCHANGED_OFF\n",
+    last_restore_trigger_,calibration::toString(verdict.decision),calibration::toString(verdict.reason),(unsigned)verdict.failed_joint,
+    (unsigned long)facts.record_generation,(unsigned long long)facts.record_fingerprint,
+    attestation.auto_restore_enabled?"ENABLED":"SUSPENDED",snap.restored?1u:0u,(unsigned)snap.restored_joints);
+  return verdict;
+}
+
+bool Controller::RestoreHook::restoreJson(uint32_t generation,bool operator_confirmed,char* out,size_t cap) {
+  if(!owner||!out||!cap)return false;
+  calibration::RestoreRequestFacts q;q.trigger=calibration::RestoreTrigger::OPERATOR_MANUAL;
+  q.requested_generation=generation;q.operator_confirmed_installation=operator_confirmed;
+  const auto v=owner->requestCalibrationRestore(q);
+  const auto& snap=owner->runtime_restore_.snapshot();
+  const int n=snprintf(out,cap,"{\"version\":1,\"decision\":\"%s\",\"reason\":\"%s\",\"failed_joint\":%d,\"generation\":%lu,"
+    "\"fingerprint\":\"%016llx\",\"restored\":%s,\"mapped_joints\":%u,\"limits_approved\":false,\"motion_authorized\":false,"
+    "\"torque\":\"OFF_UNCHANGED\",\"authority\":\"%s\"}",
+    calibration::toString(v.decision),calibration::toString(v.reason),v.failed_joint<12?(int)v.failed_joint:-1,
+    (unsigned long)owner->last_restore_generation_,(unsigned long long)owner->last_restore_fingerprint_,
+    snap.restored?"true":"false",(unsigned)snap.restored_joints,
+    owner->authority_.current()==ActuatorAuthority::NONE?"NONE":"HELD");
+  return n>0&&static_cast<size_t>(n)<cap;
 }
 
 void Controller::updateCalibrationMotionPermit() {
@@ -870,6 +972,7 @@ void Controller::printBootBanner() {
   Serial.println();
   Serial.println("====================================");
   Serial.printf(" %s %s\n", build::kFirmwareName, build::kFirmwareVersion);
+  Serial.printf(" %s\n", build::kFirmwareDescription);
   Serial.println("====================================");
   Serial.printf("build      : %s\n", build::kBuildId);
   Serial.printf("board      : %s\n", build::kBoardName);
@@ -935,25 +1038,41 @@ void Controller::printBootBanner() {
   Serial.println();
 }
 
+bool Controller::stopPreempt(void* self) {
+  auto* c=static_cast<Controller*>(self);
+  if(c->http_transport_.stopPending())c->http_transport_.serviceStopLane(millis());
+  return c->simple_motion_.stopping();
+}
+
 void Controller::update(uint32_t now_ms) {
+  esp_task_wdt_reset();
+  http_transport_.serviceStopLane(now_ms);
+  updateSimpleMotion(esp_timer_get_time());
   // First, unconditionally: the freshest possible permit/bootstrap state
   // must exist before command_router_.update() can act on it this tick.
+  {simple::timing::Outside services(simple::timing::CONTROLLER_SERVICES);
   updateCalibrationMotionPermit();
 
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
-  command_router_.update(now_ms);
+  {simple::timing::Outside timer(simple::timing::ROUTER);command_router_.update(now_ms);}
   wifi_.setContext(service_.networkCritical(),ota_.status().holds_actuator_inhibit);
   // The radio role follows the operating mode (MAINTENANCE: administrative AP;
   // RUN: router first). One-way: the Wi-Fi owner reads this, it cannot set it.
-  wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);
+  // Radio role follows the OPERATOR's @MODE choice only. Automatic RUN entry
+  // (operational readiness) keeps the AP that serves the Android Dashboard.
+  wifi_.setRunMode(operating_mode_.routerRole());
 
-  imu_.update(now_ms);
+  {simple::timing::Outside timer(simple::timing::IMU_BMS);
+  if(!imu_.taskRunning()&&!simple_motion_.engaged())imu_.service(now_ms);
   system_state_.setImuHealth(imu_.health());
-
+  // Independent 2 s DALY scheduler, non-waiting UART2 TX + bounded RX.
+  // Never make electrical monitoring depend on the IK's remaining slack.
+  now_ms=millis();
   daly_.update(now_ms, operating_mode_.mode());
-  system_state_.setBmsHealth(daly_.health());
+  system_state_.setBmsHealth(daly_.health());}
 
-  led_.update(now_ms);
+  // Presentation can wait for torque OFF; RMT completion can wait up to 20 ms.
+  if(!simple_motion_.engaged())led_.update(now_ms);
   system_state_.setLedHealth(led_.health());
 
   // Advances at most one servo Ping() per tick when a scan is RUNNING —
@@ -963,6 +1082,7 @@ void Controller::update(uint32_t now_ms) {
   // RUNNING -> COMPLETE edge and classifies the raw scan exactly once.
   servo_census_.update();
   servo_preflight_.update();
+
   // CR2-B: advances at most one read-only acquisition action per tick.
   // It never acquires actuator authority and never writes the servo bus.
   updateQ0Capture();
@@ -976,8 +1096,10 @@ void Controller::update(uint32_t now_ms) {
   updateFullLegCalibration(now_ms);
   // Same tick the executor turned terminal: record, complete the session,
   // revoke the permit. See updateFullLegFinalization().
-  updateFullLegFinalization();
+  updateFullLegFinalization();}
+  updateSimpleMotion(esp_timer_get_time());
 
+  {simple::timing::Outside services(simple::timing::CONTROLLER_SERVICES);
   // System-level servo health is a population verdict under ROBOT_POWERED,
   // not the outcome of whichever individual Ping/read happened last.
   //
@@ -1024,12 +1146,8 @@ void Controller::update(uint32_t now_ms) {
 
   system_state_.update();
 
-  // Last among the services, on purpose. Within one pass every
-  // timing-sensitive module (IMU, DALY, the incremental servo scan step)
-  // has already advanced before any network work happens, so a heavy tick
-  // here — the first WiFi.mode() call is the expensive one — cannot sit
-  // between a bus transaction and its follow-up. The cost of this call is
-  // measured, not assumed: @WIFI STATUS reports last_us/max_us.
+  // Zero-wait RAM snapshot only; radio/NVS mutations stay in md_network on
+  // core 0. Keep link/digest/status publication alive during MOVING and HOLD.
   wifi_.update(now_ms);
 
   // Drives the first-boot rollback lifecycle. Bounded, touches no flash, and
@@ -1067,6 +1185,9 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.daly_comm_ok = daly_.lastCommResult() == power::DalyCommResult::OK;
     led_inputs.telemetry_age_ms = led_now_ms - battery.sampled_at_ms;
     led_inputs.soc_percent = battery.soc_percent;
+    led_inputs.sampled_at_ms = battery.sampled_at_ms;
+    led_inputs.cell_min_mv = battery.cell_min_mv;
+    led_inputs.pack_voltage_v = battery.pack_voltage_v;
     led_inputs.battery_charging = strcmp(battery.state_name, "CHARGING") == 0;
     // Presentation only: the one informational KEY-OFF charging bit (word 3,
     // 0x0010) does not show as CHARGING_FAULT; every other bit does. The raw
@@ -1074,7 +1195,7 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.battery_alarm = status::dalyAlarmBlocksChargingPresentation(battery.alarms);
     // No reviewed charge-completion policy exists yet: the reserved
     // charge_complete_verified input stays false, including at 100% SOC.
-    led_status_.update(led_now_ms, led_inputs);
+    if(!simple_motion_.engaged())led_status_.update(led_now_ms, led_inputs);
   }
 
   // Read-only copy of the calibration persistence RAM snapshot for the
@@ -1096,7 +1217,13 @@ void Controller::update(uint32_t now_ms) {
   // started (see @WEB SERVER START). A no-op, bounded check when it was
   // not — see network/HttpTransport.h for the cross-thread handoff this
   // advances.
-  http_transport_.update(now_ms);
+  // Admission/status must use a clock AFTER this loop's completed servo reads.
+  // The loop-entry clock makes the newest joint look future-dated.
+  {simple::timing::Outside timer(simple::timing::HTTP);http_transport_.update(millis());}}
+  updateSimpleMotion(esp_timer_get_time());
+  const uint64_t telemetry_now=esp_timer_get_time();
+  if(!simple_motion_.engaged()||simple_motion_.nextReleaseUs()>telemetry_now+5000)
+    {simple::timing::Outside timer(simple::timing::TELEMETRY);simple_motion_.updateTelemetry(telemetry_now);}
 
   if (power_state_.state() == PowerState::SHUTDOWN_REQUESTED ||
       power_state_.state() == PowerState::SHUTTING_DOWN ||

@@ -1,0 +1,1 @@
+PORTAL_DOM = PASS (167 checks: dashboard values, stale/offline handling, mode and safety display, session resume/logout, STA test outcomes, XSS escaping, no external assets)

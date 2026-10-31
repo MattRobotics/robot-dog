@@ -1,0 +1,2352 @@
+{
+ "schema": "MATDOG_OPERATIONAL_WALK_REGION_CERTIFICATE_V1",
+ "profile": "standard",
+ "scope": "every configuration in the per-joint box of all commanded continuous-WALK targets (20/30/40 mm presets, ramp, cycles, stop) +/- tracking tube",
+ "box_rad": {
+  "lf_hip_joint": [
+   -0.006002,
+   0.006002
+  ],
+  "lf_upper_leg_joint": [
+   0.286039,
+   0.67783
+  ],
+  "lf_lower_leg_joint": [
+   0.033823,
+   0.408696
+  ],
+  "rf_hip_joint": [
+   -0.006002,
+   0.006002
+  ],
+  "rf_upper_leg_joint": [
+   0.254089,
+   0.606151
+  ],
+  "rf_lower_leg_joint": [
+   0.044855,
+   0.427641
+  ],
+  "rh_hip_joint": [
+   -0.006002,
+   0.006002
+  ],
+  "rh_upper_leg_joint": [
+   0.737188,
+   1.073428
+  ],
+  "rh_lower_leg_joint": [
+   -0.261829,
+   0.07347200000000001
+  ],
+  "lh_hip_joint": [
+   -0.006002,
+   0.006002
+  ],
+  "lh_upper_leg_joint": [
+   0.816855,
+   1.089141
+  ],
+  "lh_lower_leg_joint": [
+   -0.242307,
+   0.105892
+  ]
+ },
+ "tracking_tube_rad": 0.006,
+ "clearance_m": 0.003,
+ "ventral_extra_m": 0.003,
+ "nonadjacent_pairs": 120,
+ "nonadjacent_pass": 120,
+ "adjacent_pass": 12,
+ "minimum_centre_distance_m": 0.013787832260131826,
+ "all_pass": true,
+ "distance_calls": 174,
+ "elapsed_s": 63.1,
+ "identity": {
+  "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+  "profile_sha256": "ad7f92fe75324db0cc7f5dc6fcd4c3dd2294b866c1b831e49d4adacb4192f569",
+  "tool_sha256": "22dad46e0c72e352124513d35e91853697c852e2d34dd198fe8fdbbce79ef41c",
+  "meshes": {
+   "base_link": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+   "lf_hip_link": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+   "lf_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+   "lf_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+   "lf_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+   "rf_hip_link": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+   "rf_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+   "rf_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+   "rf_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+   "rh_hip_link": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+   "rh_upper_leg_link": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+   "rh_lower_leg_link": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+   "rh_foot_link": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+   "lh_hip_link": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+   "lh_upper_leg_link": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+   "lh_lower_leg_link": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+   "lh_foot_link": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357"
+  },
+  "python": "3.12.3",
+  "numpy": "1.26.4"
+ },
+ "not_modelled": [
+  "fixture",
+  "cables",
+  "battery",
+  "reprinted cover beyond the ventral allowance",
+  "servo horn hardware"
+ ],
+ "hardware_authorized": false,
+ "motion_eligible": false,
+ "nonadjacent": [
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lf_upper_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint"
+   ],
+   "cells": 4,
+   "minimum_lower_bound_m": 0.007859327569990363,
+   "minimum_centre_distance_m": 0.013787832260131826
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lf_lower_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint"
+   ],
+   "cells": 6,
+   "minimum_lower_bound_m": 0.008096658056642288,
+   "minimum_centre_distance_m": 0.03664243909660402
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lf_foot_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.059671810717266155,
+   "minimum_centre_distance_m": 0.1278239726042734
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rf_upper_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint"
+   ],
+   "cells": 4,
+   "minimum_lower_bound_m": 0.008368841508719468,
+   "minimum_centre_distance_m": 0.013787832260131826
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 4,
+   "minimum_lower_bound_m": 0.006890159771150088,
+   "minimum_centre_distance_m": 0.03941521867854387
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06411853004042467,
+   "minimum_centre_distance_m": 0.1284574589378227
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 4,
+   "minimum_lower_bound_m": 0.00857175448258168,
+   "minimum_centre_distance_m": 0.013787832260131826
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.010363376715290112,
+   "minimum_centre_distance_m": 0.051054166560785014
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06383364389268678,
+   "minimum_centre_distance_m": 0.12342001063329128
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 4,
+   "minimum_lower_bound_m": 0.00939194765224316,
+   "minimum_centre_distance_m": 0.013787832260131826
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.013518809477367978,
+   "minimum_centre_distance_m": 0.051575122589714126
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "base_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.006,
+   "moving_joints": [
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07050551263583227,
+   "minimum_centre_distance_m": 0.12395104995515231
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.012031470854891084,
+   "minimum_centre_distance_m": 0.05661176854681494
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.08407788928897218,
+   "minimum_centre_distance_m": 0.15063569995032788
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rf_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rf_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07160116806186081,
+   "minimum_centre_distance_m": 0.07253518104553222
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rf_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.08936433467415178,
+   "minimum_centre_distance_m": 0.10879563859238625
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05945449569168966,
+   "minimum_centre_distance_m": 0.12339115977247732
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13425153719326596,
+   "minimum_centre_distance_m": 0.1990574725824997
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.18472521534779346,
+   "minimum_centre_distance_m": 0.18565922833146487
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.2003350322295127,
+   "minimum_centre_distance_m": 0.21895468425229833
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.22661877232240468,
+   "minimum_centre_distance_m": 0.28587655813386753
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.23218746730372336,
+   "minimum_centre_distance_m": 0.29224084053616356
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16906598701632858,
+   "minimum_centre_distance_m": 0.16999999999999998
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1698981920085713,
+   "minimum_centre_distance_m": 0.185237071352711
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.21325197027152085,
+   "minimum_centre_distance_m": 0.26643259933904306
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_hip_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.21623267419387412,
+   "minimum_centre_distance_m": 0.2701452180050299
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.059586471347206044,
+   "minimum_centre_distance_m": 0.08351023992981771
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rf_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rf_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.08726397762022219,
+   "minimum_centre_distance_m": 0.10873333729337306
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rf_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.10360985490734578,
+   "minimum_centre_distance_m": 0.1435765055150597
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05381641524692253,
+   "minimum_centre_distance_m": 0.13828842601718966
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.10214113409806828,
+   "minimum_centre_distance_m": 0.1874824161767815
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16687404047884027,
+   "minimum_centre_distance_m": 0.18834340015199116
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.18760828318301448,
+   "minimum_centre_distance_m": 0.22676328189527956
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.174858667913693,
+   "minimum_centre_distance_m": 0.2546518004146353
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.17704972205965616,
+   "minimum_centre_distance_m": 0.2576384419815758
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12260810710735172,
+   "minimum_centre_distance_m": 0.1440774667805026
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1229042463617298,
+   "minimum_centre_distance_m": 0.15877847239534895
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12969786728973953,
+   "minimum_centre_distance_m": 0.2034138430467412
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13072403560815,
+   "minimum_centre_distance_m": 0.2051719261087852
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rf_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.0549460642439151,
+   "minimum_centre_distance_m": 0.12266415989327872
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rf_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05208911076603144,
+   "minimum_centre_distance_m": 0.13830449734995812
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.023369584493288548,
+   "minimum_centre_distance_m": 0.13299999999999998
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.036459982135808866,
+   "minimum_centre_distance_m": 0.16805000019073482
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.10991605516139111,
+   "minimum_centre_distance_m": 0.17763415081075473
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13011261670684152,
+   "minimum_centre_distance_m": 0.21551635139531936
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11460690150169878,
+   "minimum_centre_distance_m": 0.24064876997885382
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11679775492617203,
+   "minimum_centre_distance_m": 0.24363521082430442
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07045588630219315,
+   "minimum_centre_distance_m": 0.13817398195155678
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07056501965336079,
+   "minimum_centre_distance_m": 0.1526879816631927
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06214888231116507,
+   "minimum_centre_distance_m": 0.1821135940443795
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_lower_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06311149177492091,
+   "minimum_centre_distance_m": 0.18380811825176888
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rf_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13067160503781589,
+   "minimum_centre_distance_m": 0.19929077341665882
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rf_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.09722881531030783,
+   "minimum_centre_distance_m": 0.18434527462371383
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.03642818071477563,
+   "minimum_centre_distance_m": 0.16805000019073482
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.041608909597064425,
+   "minimum_centre_distance_m": 0.1741000003814697
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.20855280706989882,
+   "minimum_centre_distance_m": 0.2771719754487418
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.22255739392561136,
+   "minimum_centre_distance_m": 0.3088622013435685
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16524005542194678,
+   "minimum_centre_distance_m": 0.29218299662858116
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16629912146740458,
+   "minimum_centre_distance_m": 0.2940376500950163
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.17602341160171536,
+   "minimum_centre_distance_m": 0.24464257998055833
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.17605275646868077,
+   "minimum_centre_distance_m": 0.259076791207992
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12374579367060187,
+   "minimum_centre_distance_m": 0.24461157813329562
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lf_foot_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12354605394648904,
+   "minimum_centre_distance_m": 0.24514375315281633
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rf_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.01506701514105619,
+   "minimum_centre_distance_m": 0.058004515816562664
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.08769949442054445,
+   "minimum_centre_distance_m": 0.15044399147150922
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16906598701632858,
+   "minimum_centre_distance_m": 0.16999999999999998
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.16648070613296126,
+   "minimum_centre_distance_m": 0.18510035815574688
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.20052175851716642,
+   "minimum_centre_distance_m": 0.25977954432862926
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.20201703709239766,
+   "minimum_centre_distance_m": 0.26207041032483785
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.18472521534779346,
+   "minimum_centre_distance_m": 0.18565922833146487
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.20376060911048385,
+   "minimum_centre_distance_m": 0.21909948845462354
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.23423680377074788,
+   "minimum_centre_distance_m": 0.2874174328382701
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_hip_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.24560839161942852,
+   "minimum_centre_distance_m": 0.2995209354305843
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rf_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05908158096833458,
+   "minimum_centre_distance_m": 0.0835129148431095
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12928237044386215,
+   "minimum_centre_distance_m": 0.14871367436209662
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1263425690087001,
+   "minimum_centre_distance_m": 0.1634595119660488
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11937178817050743,
+   "minimum_centre_distance_m": 0.19712686491653333
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.12015234495765616,
+   "minimum_centre_distance_m": 0.1987030091246594
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.17274818814305515,
+   "minimum_centre_distance_m": 0.19217949206128962
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1964829911174357,
+   "minimum_centre_distance_m": 0.23031916139613845
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.19203493446358383,
+   "minimum_centre_distance_m": 0.2637128544656691
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_upper_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.19431986068093882,
+   "minimum_centre_distance_m": 0.26672969542665764
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07997932216933845,
+   "minimum_centre_distance_m": 0.1439159862501261
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07691117106750242,
+   "minimum_centre_distance_m": 0.1585334741874043
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05385679337026307,
+   "minimum_centre_distance_m": 0.17611723027884216
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.054555704163977495,
+   "minimum_centre_distance_m": 0.17761172849353393
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11793128555529639,
+   "minimum_centre_distance_m": 0.18186794963608405
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1409548658881072,
+   "minimum_centre_distance_m": 0.21929639632936315
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1336258846184507,
+   "minimum_centre_distance_m": 0.24980916478308915
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_lower_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13590176696725337,
+   "minimum_centre_distance_m": 0.2528169618755254
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "rh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1861150341916577,
+   "minimum_centre_distance_m": 0.25092096958089144
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "rh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.18306632845655832,
+   "minimum_centre_distance_m": 0.26555790288490627
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11917985574649816,
+   "minimum_centre_distance_m": 0.24230956396352332
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11871270171743069,
+   "minimum_centre_distance_m": 0.2426379973554332
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.2179226840500577,
+   "minimum_centre_distance_m": 0.28272861943929145
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.23567719246087915,
+   "minimum_centre_distance_m": 0.31488799421058117
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.18952224992592415,
+   "minimum_centre_distance_m": 0.30657480139900867
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rf_foot_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.19076770292686807,
+   "minimum_centre_distance_m": 0.30855216914358613
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "rh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.010992411031043627,
+   "minimum_centre_distance_m": 0.050102740650702915
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07444640448581477,
+   "minimum_centre_distance_m": 0.132438339379986
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.07160116806186081,
+   "minimum_centre_distance_m": 0.07253518104553222
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.09287480128482598,
+   "minimum_centre_distance_m": 0.10821368062896566
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06432546118730859,
+   "minimum_centre_distance_m": 0.1175060902548308
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_hip_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.13152899888415157,
+   "minimum_centre_distance_m": 0.18544154269530733
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_upper_leg_link",
+    "rh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06291983663961882,
+   "minimum_centre_distance_m": 0.08432043822783236
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_upper_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.0896336058266572,
+   "minimum_centre_distance_m": 0.10825325784944283
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_upper_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11055189910229121,
+   "minimum_centre_distance_m": 0.14357641748554512
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06743766906995152,
+   "minimum_centre_distance_m": 0.13830393717658795
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_upper_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11097222767032422,
+   "minimum_centre_distance_m": 0.1825704105205942
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_lower_leg_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05866771270401347,
+   "minimum_centre_distance_m": 0.1179254985154763
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_lower_leg_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06462609391358835,
+   "minimum_centre_distance_m": 0.13828874608551947
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_lower_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.021495598104686334,
+   "minimum_centre_distance_m": 0.13299999999999998
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_lower_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.05581368355178763,
+   "minimum_centre_distance_m": 0.16805000019073482
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_foot_link",
+    "lh_hip_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.1254245795622723,
+   "minimum_centre_distance_m": 0.1854779527947125
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_foot_link",
+    "lh_upper_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.11146991098413815,
+   "minimum_centre_distance_m": 0.18592815057704662
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_foot_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.055750010874443826,
+   "minimum_centre_distance_m": 0.16805000019073482
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "rh_foot_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.061068096321545154,
+   "minimum_centre_distance_m": 0.1741000003814697
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lh_hip_link",
+    "lh_lower_leg_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 2,
+   "minimum_lower_bound_m": 0.01338504141341499,
+   "minimum_centre_distance_m": 0.04986089429992551
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lh_hip_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.08089209938718839,
+   "minimum_centre_distance_m": 0.1327432854808569
+  },
+  {
+   "status": "PASS",
+   "pair": [
+    "lh_upper_leg_link",
+    "lh_foot_link"
+   ],
+   "required_m": 0.003,
+   "moving_joints": [
+    "lh_lower_leg_joint"
+   ],
+   "cells": 1,
+   "minimum_lower_bound_m": 0.06197996703194111,
+   "minimum_centre_distance_m": 0.0842014454971728
+  }
+ ],
+ "adjacent": [
+  {
+   "joint": "lf_hip_joint",
+   "domain_rad": [
+    -0.006002,
+    0.006002
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "base_link",
+    "lf_hip_link"
+   ],
+   "checks": 279795,
+   "candidates": 279795,
+   "minimum_projection_bound_m": 0.00010000020302672277,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "lf_upper_leg_joint",
+   "domain_rad": [
+    0.286039,
+    0.67783
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "lf_hip_link",
+    "lf_upper_leg_link"
+   ],
+   "checks": 226539,
+   "candidates": 224757,
+   "minimum_projection_bound_m": 3.040187618106048e-07,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "lf_lower_leg_joint",
+   "domain_rad": [
+    0.033823,
+    0.408696
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "lf_upper_leg_link",
+    "lf_lower_leg_link"
+   ],
+   "checks": 280815,
+   "candidates": 280815,
+   "minimum_projection_bound_m": 2.0498006016291844e-05,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rf_hip_joint",
+   "domain_rad": [
+    -0.006002,
+    0.006002
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "base_link",
+    "rf_hip_link"
+   ],
+   "checks": 271630,
+   "candidates": 271630,
+   "minimum_projection_bound_m": 0.00010000020302672277,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rf_upper_leg_joint",
+   "domain_rad": [
+    0.254089,
+    0.606151
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "rf_hip_link",
+    "rf_upper_leg_link"
+   ],
+   "checks": 228074,
+   "candidates": 227160,
+   "minimum_projection_bound_m": 2.3131969450399257e-06,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rf_lower_leg_joint",
+   "domain_rad": [
+    0.044855,
+    0.427641
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "rf_upper_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "checks": 285193,
+   "candidates": 285193,
+   "minimum_projection_bound_m": 1.1331429779811747e-05,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rh_hip_joint",
+   "domain_rad": [
+    -0.006002,
+    0.006002
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "base_link",
+    "rh_hip_link"
+   ],
+   "checks": 294353,
+   "candidates": 294353,
+   "minimum_projection_bound_m": 0.00010000079030636436,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rh_upper_leg_joint",
+   "domain_rad": [
+    0.737188,
+    1.073428
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "rh_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "checks": 179019,
+   "candidates": 177591,
+   "minimum_projection_bound_m": 4.7276516402845845e-07,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "rh_lower_leg_joint",
+   "domain_rad": [
+    -0.261829,
+    0.07347200000000001
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "rh_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "checks": 239423,
+   "candidates": 239423,
+   "minimum_projection_bound_m": 3.101234367804076e-05,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "lh_hip_joint",
+   "domain_rad": [
+    -0.006002,
+    0.006002
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "base_link",
+    "lh_hip_link"
+   ],
+   "checks": 306761,
+   "candidates": 306761,
+   "minimum_projection_bound_m": 0.00010000078718952424,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "lh_upper_leg_joint",
+   "domain_rad": [
+    0.816855,
+    1.089141
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "lh_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "checks": 172149,
+   "candidates": 170673,
+   "minimum_projection_bound_m": 1.3707583871551697e-06,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  },
+  {
+   "joint": "lh_lower_leg_joint",
+   "domain_rad": [
+    -0.242307,
+    0.105892
+   ],
+   "status": "PASS_CONTINUOUS",
+   "pair": [
+    "lh_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "checks": 238322,
+   "candidates": 238322,
+   "minimum_projection_bound_m": 1.7906474099077004e-05,
+   "excluded_triangles": 0,
+   "intentional_intersections_assumed": false
+  }
+ ]
+}

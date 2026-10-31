@@ -1,0 +1,231 @@
+{
+  "schema": "MATDOG_MOTION_RECOVERY_FIGURES_V1",
+  "hardware_access": false,
+  "hardware_readiness": false,
+  "measured_initial_pose": false,
+  "initial_pose_provenance": "semantic trace synthetic candidate; no measured 12-joint starting pose",
+  "missing_measurement": "12 current-installation semantic joint observations in real belly rest, body orientation/support plane and contact/load witness",
+  "trace_sha256": "ccedecdd1f792b1703e11ab4452e7fabf6e1f3b058c30017d268a8f4ee47a887",
+  "trace_frames": 2319,
+  "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+  "initial_joint_order": [
+    "lf_hip_joint",
+    "lf_upper_leg_joint",
+    "lf_lower_leg_joint",
+    "rf_hip_joint",
+    "rf_upper_leg_joint",
+    "rf_lower_leg_joint",
+    "rh_hip_joint",
+    "rh_upper_leg_joint",
+    "rh_lower_leg_joint",
+    "lh_hip_joint",
+    "lh_upper_leg_joint",
+    "lh_lower_leg_joint"
+  ],
+  "initial_angles_rad": [
+    0.26,
+    1.9583620871641767,
+    0.5880219582823236,
+    -0.26,
+    1.9583620871641767,
+    0.5880219582823236,
+    0,
+    2.048195210428588,
+    0.4550689358509703,
+    0,
+    2.048195210428588,
+    0.4550689358509703
+  ],
+  "initial_anatomy": {
+    "LF": {
+      "upper_axis_world_base": [
+        -0.08332486095304428,
+        -0.008744395904503516,
+        0.032871006790500625
+      ],
+      "lower_axis_world_base": [
+        -0.11657738318298921,
+        0.0033511748020725474,
+        -0.018432128408093787
+      ],
+      "upper_inclination_deg": 21.42194778184535,
+      "lower_inclination_deg": -8.981047965579403,
+      "directed_upper_lower_angle_deg": 31.314190820979483,
+      "fold_deviation_from_antiparallel_deg": 148.6858091790205
+    },
+    "RF": {
+      "upper_axis_world_base": [
+        -0.08332486095304428,
+        0.008744395904503516,
+        0.032871006790500625
+      ],
+      "lower_axis_world_base": [
+        -0.11657738318298921,
+        -0.0033511748020725474,
+        -0.018432128408093787
+      ],
+      "upper_inclination_deg": 21.42194778184535,
+      "lower_inclination_deg": -8.981047965579403,
+      "directed_upper_lower_angle_deg": 31.314190820979483,
+      "fold_deviation_from_antiparallel_deg": 148.6858091790205
+    },
+    "RH": {
+      "upper_axis_world_base": [
+        -0.07993737559617377,
+        0.0,
+        0.041352339508137166
+      ],
+      "lower_axis_world_base": [
+        -0.11566404452448996,
+        0.0015,
+        -0.023682035474950285
+      ],
+      "upper_inclination_deg": 27.35294117646763,
+      "lower_inclination_deg": -11.570348138041773,
+      "directed_upper_lower_angle_deg": 38.92996092673552,
+      "fold_deviation_from_antiparallel_deg": 141.07003907326447
+    },
+    "LH": {
+      "upper_axis_world_base": [
+        -0.07993737559617377,
+        0.0,
+        0.041352339508137166
+      ],
+      "lower_axis_world_base": [
+        -0.11566404452448996,
+        -0.0015,
+        -0.023682035474950285
+      ],
+      "upper_inclination_deg": 27.35294117646763,
+      "lower_inclination_deg": -11.570348138041773,
+      "directed_upper_lower_angle_deg": 38.92996092673552,
+      "fold_deviation_from_antiparallel_deg": 141.07003907326447
+    }
+  },
+  "urdf_mass_kg": 2.48,
+  "initial_cad_com_world_m": [
+    -0.02481960813948998,
+    -0.0003360080645161269,
+    0.04369828686649184
+  ],
+  "com_uncertainty": "CAD inertials only; as-built battery/electronics/mounting and load distribution unmeasured",
+  "base_link_height_method": "canonical body underside vertex minimum against support plane; trace orientation and height supplied explicitly, not inferred from IMU altitude",
+  "meshes": {
+    "base_link": {
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+      "source_triangle_count": 22044,
+      "displayed_triangle_count": 1161,
+      "stride": 19
+    },
+    "lf_hip_link": {
+      "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+      "source_triangle_count": 6016,
+      "displayed_triangle_count": 1003,
+      "stride": 6
+    },
+    "lf_upper_leg_link": {
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "source_triangle_count": 3802,
+      "displayed_triangle_count": 951,
+      "stride": 4
+    },
+    "lf_lower_leg_link": {
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "source_triangle_count": 12336,
+      "displayed_triangle_count": 1122,
+      "stride": 11
+    },
+    "lf_foot_link": {
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "source_triangle_count": 2248,
+      "displayed_triangle_count": 1124,
+      "stride": 2
+    },
+    "rf_hip_link": {
+      "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+      "source_triangle_count": 6016,
+      "displayed_triangle_count": 1003,
+      "stride": 6
+    },
+    "rf_upper_leg_link": {
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "source_triangle_count": 3806,
+      "displayed_triangle_count": 952,
+      "stride": 4
+    },
+    "rf_lower_leg_link": {
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "source_triangle_count": 12352,
+      "displayed_triangle_count": 1123,
+      "stride": 11
+    },
+    "rf_foot_link": {
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "source_triangle_count": 2248,
+      "displayed_triangle_count": 1124,
+      "stride": 2
+    },
+    "rh_hip_link": {
+      "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+      "source_triangle_count": 6018,
+      "displayed_triangle_count": 1003,
+      "stride": 6
+    },
+    "rh_upper_leg_link": {
+      "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+      "source_triangle_count": 3806,
+      "displayed_triangle_count": 952,
+      "stride": 4
+    },
+    "rh_lower_leg_link": {
+      "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+      "source_triangle_count": 12352,
+      "displayed_triangle_count": 1123,
+      "stride": 11
+    },
+    "rh_foot_link": {
+      "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+      "source_triangle_count": 2248,
+      "displayed_triangle_count": 1124,
+      "stride": 2
+    },
+    "lh_hip_link": {
+      "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+      "source_triangle_count": 6018,
+      "displayed_triangle_count": 1003,
+      "stride": 6
+    },
+    "lh_upper_leg_link": {
+      "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+      "source_triangle_count": 3802,
+      "displayed_triangle_count": 951,
+      "stride": 4
+    },
+    "lh_lower_leg_link": {
+      "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+      "source_triangle_count": 12336,
+      "displayed_triangle_count": 1122,
+      "stride": 11
+    },
+    "lh_foot_link": {
+      "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+      "source_triangle_count": 2248,
+      "displayed_triangle_count": 1124,
+      "stride": 2
+    }
+  },
+  "selected_frames": [
+    0,
+    613,
+    1487,
+    1731,
+    2016,
+    2116,
+    2318
+  ],
+  "final_base_link_height_m": 0.15,
+  "final_pose_geometry_accepted": null,
+  "visualization_is_collision_certificate": false,
+  "contact_position_is_load_proof": false,
+  "geometry_audit_sha256": "0508f324583ab5c8209ab144d3908939555acfe86d51b5864724ec726f988c60"
+}

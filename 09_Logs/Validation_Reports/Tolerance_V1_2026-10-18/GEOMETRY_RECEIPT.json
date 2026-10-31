@@ -1,0 +1,70 @@
+{
+  "schema": "MATDOG_TOLERANCE_GEOMETRY_RECEIPT_V1",
+  "contract": {
+    "result": "PASS",
+    "tracking_rad": 0.02,
+    "max_step_rad": 0.004,
+    "model_uncertainty_candidate_rad": 0.015,
+    "geometry_tube_rad": 0.04,
+    "certificates": {
+      "entry": {
+        "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/TOLERANCE_V1_20261018/entry_region_40mrad_bounded.json",
+        "sha256": "bafcf9f5b5cd19dfa6cc7eb9363634f4ed5071223cfb5c8a9002f8da4704632e",
+        "tube_rad": 0.04,
+        "all_pass": true,
+        "nonadjacent_pass": 120,
+        "adjacent_pass": 12,
+        "entry_adjacent_model_candidate_rad": 0.008,
+        "folded_measured_bounds_rad": [
+          -1.5985,
+          -1.5801,
+          -1.5924,
+          -1.5909
+        ]
+      },
+      "route": {
+        "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/TOLERANCE_V1_20261018/route_boxes_40mrad.json",
+        "sha256": "c44da66c55dd50772143590024a390c2094e2bb610527bfca91271972dca8d61",
+        "tube_rad": 0.04,
+        "all_pass": true,
+        "nonadjacent_pass": 30120,
+        "adjacent_pass": 12
+      },
+      "walk": {
+        "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/TOLERANCE_V1_20261018/walk_region_40mrad.json",
+        "sha256": "3e7054da30deb052fcc5ab104d09fbfbd2ecb62f8edce6ef8fd1ab826bf8466d",
+        "tube_rad": 0.04,
+        "all_pass": true,
+        "nonadjacent_pass": 120,
+        "adjacent_pass": 12
+      },
+      "height": {
+        "path": "/home/matteo-manicardi/MATDOG/verification-artifacts/TOLERANCE_V1_20261018/height_region_40mrad.json",
+        "sha256": "f41bfb184430d2626db6d9ae9e1d74503b425b7c757ad217481455075be003a7",
+        "tube_rad": 0.04,
+        "all_pass": true,
+        "nonadjacent_pass": 120,
+        "adjacent_pass": 12
+      }
+    },
+    "hardware_validated": false
+  },
+  "gen1_restore": {
+    "generation": 1,
+    "fingerprint": "be8d5902bb4e37da",
+    "writes": 0,
+    "pass": true
+  },
+  "compiler_benchmark": {
+    "poses": 500,
+    "distance_calls": 1000,
+    "before_s": 2.973539618003997,
+    "after_s": 2.631281180991209,
+    "speedup": 1.1300729239753307,
+    "bit_identical": true,
+    "scope": "last-pose FCL collision-object cache in the local certificate Region; frozen Geometry Compiler V5 unchanged"
+  },
+  "physical_qualification": false,
+  "frozen_compiler_bundle": "UNCHANGED; canonical export --check PASS",
+  "certificate_cache_provenance": "Proof runs used bit-identical static-origin cache archived as scene_cache_superseded.py; frozen source restored. Delivered bounded FCL object cache has separate bit-identical before/after distance comparison."
+}

@@ -374,6 +374,10 @@ enum class WriteDecision : uint8_t {
   REJECT_SEQUENCE_TARGET         = 35,  // not a plan target of this phase / not a participant
   REJECT_SEQUENCE_PRIME          = 36,  // prime not at a joint the phase energizes, or far from q0
   REJECT_SEQUENCE_PREREQUISITES  = 37,  // a sequence probe before its holds are verified
+  // --- multi-joint frame transaction (Issue #52, 2026-10-15) ----------------
+  // Not exactly the twelve canonical leg joints, each once, all
+  // POSITION_COMMAND with BOUNDED_DEFAULT: a frame is never partial.
+  REJECT_FRAME_SHAPE             = 38,
 };
 
 // How fast a GoalPosition is driven. BOUNDED_DEFAULT is the conservative
@@ -461,6 +465,29 @@ struct ActuatorTransaction {
   bool planned() const { return id != 0 && state == TransactionState::PLANNED; }
 };
 
+// One Motion frame: the twelve leg joints commanded together (Issue #52).
+// The single-joint API stays the one used by calibration, prime and torque.
+// A frame is planned and committed as ONE transaction under the same single
+// outstanding id as a single write: every joint is evaluated at plan AND
+// again at commit, before any byte; one refusal refuses the whole frame.
+// Committing grants nothing beyond these twelve frozen commands, and the
+// frame carries no torque, EEPROM, broadcast or auxiliary operation.
+struct ActuatorFrameCommand {
+  static constexpr unsigned kJoints = 12;
+  ActuatorCommand joints[kJoints]{};
+};
+struct ActuatorFrameTransaction {
+  uint32_t id = 0;
+  TransactionState state = TransactionState::IDLE;
+  ActuatorFrameCommand frame{};
+  core::AuthorityLease lease{};
+  core::OperatingMode mode = core::OperatingMode::MAINTENANCE;
+  uint32_t policy_epoch = 0;
+  WriteDecision last_decision = WriteDecision::REJECT_TRANSACTION_STATE;
+  uint8_t failed_joint = 0xff;  // index of the first refused joint, 0xff = frame-level
+  bool planned() const { return id != 0 && state == TransactionState::PLANNED; }
+};
+
 struct ActuatorPolicyCounters {
   uint32_t plans = 0;
   uint32_t plan_rejections = 0;
@@ -514,6 +541,13 @@ class SafeActuatorPolicy {
   // resumed; a new one must be planned.
   void abort(ActuatorTransaction* transaction);
 
+  // Frame transaction (see ActuatorFrameCommand). Same single outstanding id
+  // as plan()/commit(): a frame and a single write can never both be live.
+  WriteDecision planFrame(const ActuatorFrameCommand& frame, const core::AuthorityLease& lease,
+                          core::OperatingMode mode, ActuatorFrameTransaction* out);
+  WriteDecision commitFrame(ActuatorFrameTransaction* transaction);
+  void abortFrame(ActuatorFrameTransaction* transaction);
+
   // Side-effect-free precheck of admitOperationalLimit(): the same verdict,
   // nothing stored. A caller with several bounds to admit as a set validates
   // them all first, so a late refusal cannot leave a partial set behind.
@@ -563,6 +597,9 @@ class SafeActuatorPolicy {
   // inhibit, mode - is read from the arbiter here, never from the transaction.
   WriteDecision evaluate(const ActuatorCommand& command, const core::AuthorityLease& lease,
                          core::OperatingMode mode) const;
+  // Shape + every joint through evaluate(); first refused joint in *failed.
+  WriteDecision evaluateFrame(const ActuatorFrameCommand& frame, const core::AuthorityLease& lease,
+                              core::OperatingMode mode, uint8_t* failed) const;
 
   WriteDecision record(WriteDecision decision);
 

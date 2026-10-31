@@ -24,6 +24,8 @@ struct TiltedIkResult {
   ContactResult contact{};
   double residualM = 0.0, condition = 0.0;
   unsigned iterations = 0;
+  // Work counters for diagnostics only; no decision reads them.
+  unsigned newtonSteps = 0, fkEvaluations = 0;
 };
 // target and groundNormal are in base_link; the normal points away from the ground (up). Use joints only when status == OK.
 TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& targetBaseM, const Vector3& groundNormalBase,

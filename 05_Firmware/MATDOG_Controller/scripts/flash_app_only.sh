@@ -52,6 +52,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKETCH_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$SKETCH_DIR/../.." && pwd)"
 BUILD_DIR="$SKETCH_DIR/build/esp32.esp32.esp32s3"
+# Explicit designated-candidate path; offline proof still requires a clean tree
+# and byte-identical compiled firmware plus pinned host repairs. HEAD is not source.
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  BUILD_DIR="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field directory)"
+fi
 
 ARDUINO="${ARDUINO_CLI:-$HOME/.local/bin/arduino-cli}"
 ESPTOOL="${ESPTOOL_BIN:-$HOME/.arduino15/packages/esp32/tools/esptool_py/5.3.1/esptool}"
@@ -105,14 +110,25 @@ refuse() {
 echo "== MATDOG Controller — application-only flash =="
 echo
 
-# --- Gate: working tree clean, know the exact source commit ---------------
-if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then
+# An existing final receipt can prove a DIRTY build byte-for-byte; do not
+# require a new firmware build merely to change its Git label.
+RECEIPT_ARGS=()
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ] && python3 -c 'import json,sys; sys.exit(0 if "app" in json.load(open(sys.argv[1])) else 1)' "$MATDOG_FLASH_CANDIDATE_DESIGNATION"; then
+  python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field source >/dev/null
+  RECEIPT_ARGS=(--source-receipt "$MATDOG_FLASH_CANDIDATE_DESIGNATION")
+fi
+# --- Gate: clean tree OR exact compiled source receipt -------------------
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ] && [ "${#RECEIPT_ARGS[@]}" -eq 0 ]; then
   refuse "working tree is not clean — commit or stash before an application-only flash. \
 This is what guarantees the binary we are about to write corresponds to a real, \
 inspectable commit rather than an untracked mix of edits."
 fi
 SOURCE_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 SOURCE_COMMIT_SHORT="$(git -C "$REPO_ROOT" rev-parse --short=12 HEAD)"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  SOURCE_COMMIT="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field source)"
+  SOURCE_COMMIT_SHORT="${SOURCE_COMMIT:0:12}"
+fi
 
 # --- Gate: application binary present and matches this exact commit -------
 [ -f "$APPLICATION_BINARY" ] || refuse "application binary not found: $APPLICATION_BINARY \
@@ -142,8 +158,9 @@ APPLICATION_SIZE="$(stat -c%s "$APPLICATION_BINARY")"
 # equal the recorded ones; the manifest profile is recognized; and it
 # equals the profile the operator asked to flash. Any failure REFUSES — see
 # scripts/build_manifest.py and scripts/tests/test_build_manifest.py.
-TREE_STATE="CLEAN"  # proven by the working-tree gate above
-MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify \
+TREE_STATE="CLEAN"
+if [ -n "$(git -C "$REPO_ROOT" status --porcelain)" ]; then TREE_STATE="DIRTY"; fi
+MANIFEST_INFO="$(python3 "$SCRIPT_DIR/build_manifest.py" verify "${RECEIPT_ARGS[@]}" \
   --manifest "$BUILD_MANIFEST" \
   --binary "$APPLICATION_BINARY" \
   --head "$SOURCE_COMMIT" \
@@ -198,13 +215,22 @@ VERIFIED_BACKUP_SHA256="$(echo "$BACKUP_GATE_INFO" | grep '^VERIFIED_BACKUP_SHA2
 [ -n "$VERIFIED_BACKUP_SHA256" ] || refuse "backup verification produced no VERIFIED_BACKUP_SHA256"
 
 # --- Gate: static safety audit PASS ----------------------------------------
-if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
-  refuse "static safety audit did not PASS"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  # The frozen release already completed its campaign. Reuse only after
+  # proving all compiled source bytes, successful log hashes and the
+  # independently qualified, exact host-only repairs. No generic skip flag.
+  if ! python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field qualification; then
+    refuse "frozen static safety qualification did not PASS"
+  fi
+else
+  if ! python3 "$SCRIPT_DIR/static_audit.py" "$SKETCH_DIR"; then
+    refuse "static safety audit did not PASS"
+  fi
 fi
 
 # --- Gate: serial device present and identity matches ----------------------
 [ -e "$PORT" ] || refuse "expected serial device not present: $PORT"
-DEVICE_MAC="$("$ESPTOOL" --chip esp32s3 --port "$PORT" read-mac 2>/dev/null \
+DEVICE_MAC="$("$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset read-mac 2>/dev/null \
   | grep -oE '([0-9a-f]{2}:){5}[0-9a-f]{2}' | head -1 || true)"
 [ -n "$DEVICE_MAC" ] || refuse "could not read device MAC over $PORT"
 [ "$DEVICE_MAC" = "$EXPECTED_MAC" ] || \
@@ -215,6 +241,9 @@ unexpected board"
 # --- device's own partition table + otadata (never assumed), AND the ------
 # --- real rollback/anti-rollback config of the build being flashed --------
 SDKCONFIG="$BUILD_DIR/sdkconfig"
+if [ -n "${MATDOG_FLASH_CANDIDATE_DESIGNATION:-}" ]; then
+  SDKCONFIG="$(python3 "$SCRIPT_DIR/verify_designated_candidate.py" "$MATDOG_FLASH_CANDIDATE_DESIGNATION" --field sdkconfig)"
+fi
 [ -f "$SDKCONFIG" ] || refuse "sdkconfig not found: $SDKCONFIG (run scripts/build.sh first)"
 
 PARTITION_INFO="$(python3 "$SCRIPT_DIR/verify_application_partition.py" \
@@ -280,7 +309,7 @@ echo
 
 # --- The one and only write: exactly one <offset> <file> pair -------------
 echo "Writing application partition only (no bootloader/partition-table/boot_app0/NVS)..."
-"$ESPTOOL" --chip esp32s3 --port "$PORT" write-flash \
+"$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset write-flash \
   "$APPLICATION_OFFSET" "$APPLICATION_BINARY"
 
 # --- Post-write verification ------------------------------------------------
@@ -294,8 +323,9 @@ echo "Writing application partition only (no bootloader/partition-table/boot_app
 # and reports a clear pass/fail without staging a local copy.
 echo
 echo "Verifying written application partition (esptool verify-flash)..."
-sleep 2  # let the device finish its post-write reset/re-enumeration
-if ! "$ESPTOOL" --chip esp32s3 --port "$PORT" verify-flash \
+# The supervised workflow already entered ROM. No stub, reconnect retry or
+# automatic boot is permitted; retain ROM after independent verification.
+if ! "$ESPTOOL" --chip esp32s3 --port "$PORT" --baud 115200 --no-stub --connect-attempts 1 --before no-reset --after no-reset verify-flash \
     "$APPLICATION_OFFSET" "$APPLICATION_BINARY"; then
   refuse "post-write verify-flash failed — flash may be corrupted, investigate before \
 trusting this device"
@@ -304,3 +334,4 @@ fi
 echo "APPLICATION_ONLY_FLASH = PASS"
 echo "FLASHED_HARDWARE_PROFILE = $VERIFIED_HARDWARE_PROFILE"
 echo "FLASHED_OTA_INGEST_ENABLED = $VERIFIED_OTA_INGEST_ENABLED"
+echo "POST_FLASH_STATE = ROM (boot requires the supervised post-flash procedure)"

@@ -303,3 +303,20 @@ describe('URDF rpy convention', () => {
     expect(Math.abs(rpyToQuaternion([0.3, -0.7, 1.1]).dot(expected))).toBeCloseTo(1, 14);
   });
 });
+
+// Host rendering must not replace the certified collision geometry.
+describe('separate visual geometry',()=>{
+ it('loads visual STLs into their own objects while preserving collisions',async()=>{
+  const host=await buildRobot({model,urdfUrl:TEST_URDF_URL,loadMeshGeometry:createFileStlLoader(TEST_URDF_URL_PREFIX),visualGeometry:true});
+  expect(host.collisionMeshCount).toBe(17);expect(host.visualMeshCount).toBe(17);
+  for(const link of model.links){
+   if(!link.collision||!link.visual)continue;
+   // One canonical STL per link feeds <visual> and <collision>; the viewer still builds separate Mesh objects.
+   expect(link.visual.mesh.filename).toBe(link.collision.mesh.filename);
+   expect(host.visualMesh(link.name)).not.toBe(host.collisionMesh(link.name));
+   expect(host.collisionMesh(link.name)!.visible).toBe(false);
+   expect(host.visualMesh(link.name)!.visible).toBe(true);
+  }
+  host.setCollisionVisible(true);expect(host.collisionMesh('base_link')!.visible).toBe(true);
+ },60000);
+});

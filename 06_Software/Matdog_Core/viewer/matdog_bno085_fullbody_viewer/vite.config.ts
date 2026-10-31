@@ -3,7 +3,7 @@ import { defineConfig } from 'vitest/config';
 /**
  * Standalone MATDOG BNO085 full-body viewer.
  *
- * No backend, no proxy, no framework plugin. Canonical geometry is staged
+ * No motion command backend or framework plugin. An optional read-only status proxy is configured by MATDOG_CONTROLLER_URL. Canonical geometry is staged
  * into public/canonical by scripts/sync_canonical_assets.mjs (npm predev /
  * prebuild), so Vite serves it as ordinary static assets.
  *
@@ -16,6 +16,8 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5183,
     strictPort: false,
+    // Only GET motion status is proxied; the host twin never exposes a command route.
+    ...(process.env.MATDOG_CONTROLLER_URL ? { proxy: { '/api/motion/status': { target: process.env.MATDOG_CONTROLLER_URL, changeOrigin: true } } } : {}),
   },
   preview: {
     host: '127.0.0.1',

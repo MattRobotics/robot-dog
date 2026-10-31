@@ -25,19 +25,30 @@ body { overflow: hidden; }
    from the canvas and let the stage overflow instead of shrinking. */
 #app {
   display: grid;
-  grid-template-columns: 336px minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: 400px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "panel bar" "panel stage";
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
 }
+#live-bar { grid-area: bar; }
+#panel { grid-area: panel; }
+#stage { grid-area: stage; }
+body.panel-collapsed #app { grid-template-columns: 0 minmax(0, 1fr); }
+body.panel-collapsed #panel { display: none; }
 
+/* Phone first: live bar (badge, diagnostics, STOP) on top, 3D view, then the
+   scrollable dashboard. The panel can be collapsed to give the 3D view the
+   whole height. */
 @media (max-width: 860px) {
   #app {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 42dvh) minmax(0, 1fr);
+    grid-template-areas: "bar" "stage" "panel";
   }
-  #panel { max-height: 45vh; border-right: none; border-bottom: 1px solid var(--panel-border); }
+  #panel { border-right: none; border-top: 1px solid var(--panel-border); padding: 10px 12px 24px; }
+  body.panel-collapsed #app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) 0; }
 }
 
 #panel {
@@ -119,3 +130,80 @@ footer { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--panel-
 }
 .overlay.error { color: var(--err); }
 .overlay.hidden { display: none; }
+
+/* ---------------------------------------------------------- live bar --- */
+#live-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px max(10px, env(safe-area-inset-right)) 6px max(10px, env(safe-area-inset-left));
+  background: var(--panel);
+  border-bottom: 1px solid var(--panel-border);
+}
+#live-bar .badge { font-size: 13px; padding: 6px 10px; white-space: nowrap; }
+.bar-spacer { flex: 1 1 0; }
+#live-bar button { flex: 0 0 auto; }
+.bar-btn { padding: 8px 10px; }
+.stop-btn {
+  min-width: 104px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fff;
+  background: #b91c1c;
+  border: 2px solid #fca5a5;
+  border-radius: 8px;
+  touch-action: manipulation;
+}
+.stop-btn:hover:not(:disabled) { background: #dc2626; border-color: #fff; }
+.stop-btn.sent { background: #7f1d1d; }
+.chips { display: inline-flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.chip {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: #3a1e1e;
+  color: var(--err);
+  white-space: nowrap;
+}
+.chip.info { background: #3a3320; color: var(--warn); }
+
+.src-live { background: #16351f; color: var(--ok); }
+.src-fake_device { background: #3b1f4a; color: #e9a8ff; }
+.src-offline_synthetic { background: #3a3320; color: var(--warn); }
+.src-trace { background: #1d2c44; color: #8cc2ff; }
+.src-stale { background: #3a1e1e; color: var(--err); }
+.src-off { background: #2a313a; color: var(--muted); }
+
+/* --------------------------------------------------------- dashboard --- */
+#dashboard-block { margin-top: 10px; }
+#dashboard-block details { margin-top: 10px; }
+#dashboard-block summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 0;
+}
+dl.kv { grid-template-columns: minmax(104px, max-content) minmax(0, 1fr); column-gap: 10px; row-gap: 2px; margin-top: 4px; }
+dl.kv dt { padding-top: 1px; }
+dl.kv dd { margin: 0; word-break: break-word; }
+.mono-inline { margin: 0; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+#dash-stop-result { padding: 6px 8px; border-radius: 4px; background: #222a33; color: var(--text); }
+#dash-stop-result.error { background: #3a1e1e; color: var(--err); }
+
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 4px; }
+#joint-table { border-collapse: collapse; width: 100%; font-size: 11px; font-variant-numeric: tabular-nums; }
+#joint-table th, #joint-table td { padding: 3px 5px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--panel-border); }
+#joint-table th { color: var(--muted); font-weight: 600; }
+#joint-table th:first-child, #joint-table td:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+#joint-table tr.old td { color: var(--warn); }
+#joint-table tr.unmapped td { color: #d6a8ff; }
+#joint-table tr.limit td { color: var(--err); font-weight: 700; }

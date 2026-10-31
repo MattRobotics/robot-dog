@@ -78,7 +78,7 @@ class NetworkAuditTest(unittest.TestCase):
           ('HttpTransport.cpp','Path=/wifi/session; Max-Age=34560000','Path=/; Max-Age=34560000'),
           ('HttpTransport.cpp','if (req.local_authorized && !portal_.current(now, req.peer, req.cookie))','if (!portal_.current(now, req.peer, req.cookie))'),
           ('HttpTransport.cpp','{"/wifi/session", HTTP_POST','{"/wifi/session", HTTP_GET'),
-          ('HttpTransport.cpp','r.remember = read == 81 && memcmp(body + 70, "&remember=1", 11) == 0','r.remember = read > 70'),
+          ('HttpTransport.cpp','r.remember = !motion_auth && read == 81 && memcmp(body + 70, "&remember=1", 11) == 0','r.remember = read > 70'),
           ('HttpTransport.h','WIFI_STATUS,','WIFI_SESSION, WIFI_STATUS,'),
           ('WifiManager.cpp','const bool proven = match && now - test_stable_since_ >= kStaTestHoldMs;','const bool proven = match;'),
           ('WifiManager.cpp','transaction_.update(now, proven, link_up, critical)','transaction_.update(now, link_up, link_up, critical)'),
@@ -87,9 +87,9 @@ class NetworkAuditTest(unittest.TestCase):
         ]
         # Radio role by operating mode.
         mutations += [
-          ('NetworkPolicy.h','if (!i.run)\n    return RoleReason::MAINTENANCE_AP;','if (!i.run && !i.sta_profile)\n    return RoleReason::MAINTENANCE_AP;'),
+          ('NetworkPolicy.h','return i.maintenance_lan && i.sta_profile && !i.recovery ? RoleReason::MAINTENANCE_STA_READONLY : RoleReason::MAINTENANCE_AP;','return i.sta_profile ? RoleReason::RUN_STA : RoleReason::MAINTENANCE_AP;'),
           ('NetworkPolicy.h','return i.recovery ? RoleReason::RUN_RECOVERY_AP : RoleReason::RUN_STA;','return RoleReason::RUN_STA;'),
-          ('NetworkPolicy.h','return r == RoleReason::RUN_STA;','return r != RoleReason::MAINTENANCE_AP;'),
+          ('NetworkPolicy.h','return r == RoleReason::RUN_STA || r == RoleReason::MAINTENANCE_STA_READONLY;','return r != RoleReason::MAINTENANCE_AP;'),
           ('NetworkPolicy.h','bool run = false, sta_profile = false, recovery = false;','bool run = false, sta_profile = false, recovery = false, ap_always = false;'),
           ('NetworkPolicy.h','if (!i.sta_profile)\n    return RoleReason::RUN_NO_PROFILE_AP;','if (!i.sta_profile || i.ap_always)\n    return RoleReason::RUN_NO_PROFILE_AP;'),
           ('WifiManager.cpp','in.recovery = recovery_;','in.recovery = recovery_ || config_.ap_always;'),
@@ -103,10 +103,12 @@ class NetworkAuditTest(unittest.TestCase):
           ('WifiManager.cpp','policy_.counters().connect_attempts - sta_attempt_base_ >= kStaEpisodeAttempts','false'),
           ('WifiManager.cpp','(admin_.phase.load() != NetworkPhase::ADMIN_AP || !WiFi.softAPgetStationNum())','true'),
           ('WifiManager.cpp','role_ = evaluateRole(now);','role_ = RoleReason::RUN_STA;'),
-          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(operating_mode_.mode() != OperatingMode::MAINTENANCE);'),
-          ('Controller.cpp','wifi_.setRunMode(operating_mode_.mode() == OperatingMode::RUN);','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.routerRole());','wifi_.setRunMode(operating_mode_.mode() != OperatingMode::MAINTENANCE);'),
+          ('Controller.cpp','wifi_.setRunMode(operating_mode_.routerRole());','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
           ('WifiManager.h','void setRunMode(bool run) { run_mode_.store(run); }','void setRunMode(bool run) { run_mode_.store(run); } OperatingModeManager *mode_ = nullptr;'),
           ('HttpTransport.cpp','service_->wifiStatus();','service_->wifiStatus(); service_->wifi().setRunMode(true);'),
+          # 2026-10-15: a cookie-only poll (the read-only Twin) must never be the deadman heartbeat.
+          ('HttpTransport.cpp','const bool beat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);','const bool beat=req.ap_socket&&!readonly&&portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie);'),
         ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))

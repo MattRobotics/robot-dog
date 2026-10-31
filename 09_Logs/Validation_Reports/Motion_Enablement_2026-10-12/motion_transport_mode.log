@@ -1,0 +1,1 @@
+MOTION_TRANSPORT_MODE = PASS (31 semantic checks; 2077 total including driver/queue/fence assertions). RUN_STA lacks motion admission; RUN recovery AP is compatible.

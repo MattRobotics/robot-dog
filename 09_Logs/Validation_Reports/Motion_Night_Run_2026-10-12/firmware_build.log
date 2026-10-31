@@ -1,0 +1,38 @@
+== MATDOG Controller build ==
+sketch     : /home/matteo-manicardi/.codex/worktrees/motion-enablement-20261012/robot-dog/05_Firmware/MATDOG_Controller
+fqbn       : esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi
+build_id   : 6ad910a59803
+profile    : ROBOT_POWERED (OVERRIDE — requires G3 authorization)
+ota_ingest : DISABLED (source default)
+fw_version : 0.2.0-dev.4
+git_sha    : 6ad910a5980353f02faa48a9353f35f9f77a1586
+git_dirty  : 0
+build_utc  : 2026-10-12T21:19:10Z (UTC_NOW)
+
+/home/matteo-manicardi/Arduino/libraries/SCServo/src/SMS_STS.cpp: In member function 'virtual int SMS_STS::ReadMode(int)':
+/home/matteo-manicardi/Arduino/libraries/SCServo/src/SMS_STS.cpp:238:67: warning: array subscript -23 is below array bounds of 'u8 [15]' {aka 'unsigned char [15]'} [-Warray-bounds=]
+  238 |                 Mode = Mem[SMS_STS_MODE-SMS_STS_PRESENT_POSITION_L];
+      |                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+In file included from /home/matteo-manicardi/Arduino/libraries/SCServo/src/SMS_STS.cpp:6:
+/home/matteo-manicardi/Arduino/libraries/SCServo/src/SMS_STS.h:80:12: note: while referencing 'SMS_STS::Mem'
+   80 |         u8 Mem[SMS_STS_PRESENT_CURRENT_H-SMS_STS_PRESENT_POSITION_L+1];
+      |            ^~~
+/home/matteo-manicardi/Arduino/libraries/SCServo/src/SCSCL.cpp: In member function 'virtual int SCSCL::WritePosEx(u8, s16, u16, u8)':
+/home/matteo-manicardi/Arduino/libraries/SCServo/src/SCSCL.cpp:31:58: warning: parameter 'ACC' set but not used [-Wunused-but-set-parameter]
+   31 | int SCSCL::WritePosEx(u8 ID, s16 Position, u16 Speed, u8 ACC)
+      |                                                       ~~~^~~
+Sketch uses 1326967 bytes (25%) of program storage space. Maximum is 5242880 bytes.
+Global variables use 128172 bytes (39%) of dynamic memory, leaving 199508 bytes for local variables. Maximum is 327680 bytes.
+
+== Flash layout gate ==
+LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1
+PARTITION_TABLE_SHA256=8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7
+APP_PARTITION_SIZE=5242880
+APPLICATION_SIZE=1327120
+APPLICATION_SIZE_STATUS=OK
+APPLICATION_SLOT_USED_PERCENT=25.3
+BUILD_MANIFEST=/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_NIGHT_RUN_20261012/build/artifacts/ROBOT_POWERED-ota0/matdog_build_manifest.txt
+HARDWARE_PROFILE=ROBOT_POWERED
+OTA_INGEST_ENABLED=0
+LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1
+PARTITION_TABLE_SHA256=8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7

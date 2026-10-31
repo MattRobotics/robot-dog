@@ -6,7 +6,7 @@
  *   1. locates the canonical URDF in the repository;
  *   2. parses it and extracts every <collision> mesh reference;
  *   3. verifies that every referenced collision STL exists;
- *   4. copies the URDF verbatim plus ONLY the collision STLs into
+ *   4. copies the URDF verbatim plus separate collision and visual STLs into
  *      public/canonical/<model>/ so Vite can serve them;
  *   5. writes CANONICAL_PROVENANCE.json (sha256 of every staged file,
  *      counts, source paths) so the staged copy's origin is obvious.
@@ -89,6 +89,8 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
   const urdfDir = dirname(urdfPath);
   const urdfBuffer = readFileSync(urdfPath);
   const references = collisionMeshReferences(urdfBuffer.toString('utf8'));
+  const visualReferences=collisionMeshReferences(urdfBuffer.toString('utf8').replace(/<collision\b[\s\S]*?<\/collision>/g,'').replaceAll('<visual','<collision').replaceAll('</visual>','</collision>'));
+  const allReferences=[...references,...visualReferences];
 
   if (references.length === 0) {
     throw new Error(`No <collision> meshes found in ${urdfPath}`);
@@ -103,7 +105,7 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
 
   const meshes = [];
   const seen = new Set();
-  for (const { linkName, filename } of references) {
+  for (const { linkName, filename } of allReferences) {
     const relativeMeshPath = stripUriScheme(filename);
     const sourcePath = resolve(urdfDir, relativeMeshPath);
     if (!existsSync(sourcePath)) {
@@ -149,8 +151,9 @@ export function syncCanonicalAssets({ quiet = false } = {}) {
       sha256: sha256(urdfBuffer),
       staged_as: stagedUrdfName,
     },
-    collision_mesh_count: meshes.length,
-    collision_meshes: meshes.sort((a, b) => a.link.localeCompare(b.link)),
+    collision_mesh_count: references.length,
+    collision_meshes: meshes.filter(m=>references.some(r=>r.filename===m.urdf_filename)).sort((a,b)=>a.link.localeCompare(b.link)),
+    visual_meshes: meshes.filter(m=>!references.some(r=>r.filename===m.urdf_filename)).sort((a,b)=>a.link.localeCompare(b.link)),
   };
 
   writeFileSync(
@@ -174,6 +177,20 @@ const invokedDirectly =
 if (invokedDirectly) {
   try {
     syncCanonicalAssets();
+    const traceOption = process.argv.indexOf('--motion-trace');
+    if (traceOption !== -1) {
+      const source = process.argv[traceOption + 1];
+      if (!source) throw new Error('--motion-trace requires a JSONL path');
+      const buffer = readFileSync(resolve(source));
+      if (buffer.length > 10 * 1024 * 1024) throw new Error('trace exceeds 10 MiB');
+      const records = buffer.toString('utf8').split(/\r?\n/).filter((line) => line.trim()).map((line) => JSON.parse(line));
+      if (!records.length || records.length > 10000 || records.some((frame) => frame.version !== 1 || !Number.isFinite(frame.now_ms) || !frame.telemetry)) throw new Error('invalid version 1 offline JSONL trace');
+      const traceDir = join(VIEWER_DIR, 'public', 'motion');
+      mkdirSync(traceDir, { recursive: true });
+      writeFileSync(join(traceDir, 'adaptive_motion_synthetic.jsonl'), buffer);
+      writeFileSync(join(traceDir, 'TRACE_PROVENANCE.json'), JSON.stringify({ source: relative(findRepoRoot(), resolve(source)), bytes: buffer.length, frames: records.length, sha256: sha256(buffer), note: 'Offline source evidence only. No hardware qualification.' }, null, 2) + '\n');
+      console.log(`[sync] offline trace staged: ${records.length} frames, sha256 ${sha256(buffer)}`);
+    }
   } catch (error) {
     console.error(`[sync] FAILED: ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

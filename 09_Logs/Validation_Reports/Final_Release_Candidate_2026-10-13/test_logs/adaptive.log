@@ -1,0 +1,4 @@
+Legacy synthetic fixture route (not geometry-approved) -> STAND 150mm: 1425 feedback frames
+WALK forward -> coordinated STOP: 488 feedback frames
+intermediate 117mm -> STAND 150mm: 200 feedback frames
+ADAPTIVE_MOTION_PASS checks=15883 hardware_access=false physical_readiness=false dynamic_stability=false

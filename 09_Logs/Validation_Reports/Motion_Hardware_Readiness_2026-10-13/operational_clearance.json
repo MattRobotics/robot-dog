@@ -1,0 +1,78 @@
+{
+  "schema": "MATDOG_OPERATIONAL_CLEARANCE_V1",
+  "trajectory_changed": false,
+  "reference_m": 0.003,
+  "lower_bound_nonadjacent_m": 0.0030064599155375914,
+  "baseline_coarse_bound_m": 0.000118303,
+  "actual_minimum_exact_m": null,
+  "continuous_certificate": "nonadjacent_3mm.json",
+  "reference_status": "PASS_CONTINUOUS_GEOMETRIC_REFERENCE",
+  "method": "Continuous lower bound is separate from exact clearance; actual canonical surface vertex witness is a rigorous upper bound; convex-hull points are original STL vertices; no whole-link bound is mislabelled exact",
+  "adjacent_fit_is_separate_from_nonadjacent_operational_clearance": true,
+  "physical_loaded_clearance_qualified": false,
+  "witnesses": [
+    {
+      "segment": 0,
+      "phase": "PRE_ALIGN",
+      "pair": [
+        "lh_upper_leg_link",
+        "lh_foot_link"
+      ],
+      "distance_upper_bound_m": 0.0072685943121990025,
+      "canonical_surface_points_base_m": [
+        [
+          -0.10519568824768066,
+          0.09045911652576956,
+          0.013619213644957114
+        ],
+        [
+          -0.10152363613259639,
+          0.08872626240037458,
+          0.0075904730534622
+        ]
+      ]
+    },
+    {
+      "segment": 125,
+      "phase": "CONTACT_LOCKED_RISE",
+      "pair": [
+        "base_link",
+        "lf_upper_leg_link"
+      ],
+      "distance_upper_bound_m": 0.01611150647652321,
+      "canonical_surface_points_base_m": [
+        [
+          0.09480000305175781,
+          0.058,
+          0.059671573638916016
+        ],
+        [
+          0.09961179174125165,
+          0.07203131484985352,
+          0.0533827316044085
+        ]
+      ]
+    },
+    {
+      "segment": 250,
+      "phase": "STAND_150",
+      "pair": [
+        "base_link",
+        "rh_upper_leg_link"
+      ],
+      "distance_upper_bound_m": 0.017643122424017752,
+      "canonical_surface_points_base_m": [
+        [
+          -0.13141802978515627,
+          -0.057902114868164066,
+          0.038
+        ],
+        [
+          -0.1265546349299458,
+          -0.07270406150817871,
+          0.029721743238015054
+        ]
+      ]
+    }
+  ]
+}

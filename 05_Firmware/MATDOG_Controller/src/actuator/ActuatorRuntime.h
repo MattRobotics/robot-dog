@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "ActuatorWritePolicy.h"
+#include "../diagnostics/PrimeDiagnostic.h"
 
 // The runtime adapter from SafeActuatorPolicy toward a real transport —
 // SAFE_ACTUATOR_LAYER.md §7's TO_IMPLEMENT item (I4, V3 handoff §12).
@@ -93,6 +94,8 @@ const char* toString(BackendWriteOutcome outcome);
 class ActuatorBackend {
  public:
   virtual ~ActuatorBackend() = default;
+  // Observation only: copy the last original goal transaction from RAM.
+  virtual bool lastGoalWriteCapture(diagnostics::GoalWriteCapture*) const {return false;}
 
   // APPLY torque only — never removes it. Bus id, not physical-unit label:
   // identity resolution already happened before execute() was called.
@@ -107,7 +110,43 @@ class ActuatorBackend {
   // RAM TorqueLimit := the one compiled calibration value (LF V25
   // TORQUE_LIMIT = 500), verified by readback. No argument selects a value.
   virtual BackendWriteOutcome writeCalibrationTorqueLimit(uint8_t bus_id) = 0;
+
+  // Multi-joint Motion frame (Issue #52): the twelve committed GoalPositions in
+  // ONE bus transaction (no per-joint readback). Not pure: a backend that does
+  // not implement it refuses every frame and sends nothing. The verdict is
+  // about TRANSMISSION, never about the servos having applied it:
+  //   VERIFIED_NOT_APPLIED - provably nothing left the UART (refused before TX)
+  //   UNCERTAIN            - TX started but not completed/confirmed (SAFE_OFF)
+  //   VERIFIED_APPLIED     - NEVER returned for a frame (see FrameTxReport)
+  // A completed transmission is reported through report->tx_complete and is
+  // UNCONFIRMED until measurements follow (MotionExecutor tracking).
+  struct FrameTxReport {
+    bool tx_started = false, tx_complete = false;
+    // True when these are original readings of the Controller's wrapping
+    // micros() clock. False retains duration-only reports (host doubles).
+    bool controller_clock = false;
+    uint32_t tx_started_us = 0, tx_complete_us = 0;
+    uint16_t bytes = 0;
+  };
+  virtual BackendWriteOutcome writeGoalPositionFrame(const uint8_t bus_ids[12], const uint16_t ticks[12],
+                                                     FrameTxReport* report) {
+    (void)bus_ids; (void)ticks; if (report) *report = FrameTxReport{};
+    return BackendWriteOutcome::VERIFIED_NOT_APPLIED;
+  }
 };
+
+// Outcome of one frame. TX_COMPLETE_UNCONFIRMED is NOT "applied": the bus
+// gives no acknowledgement for a SYNC_WRITE; application is confirmed only by
+// the following encoder samples.
+enum class FrameExecuteResult : uint8_t {
+  NOT_EXECUTED = 0,             // commitFrame() refused: zero bytes
+  NO_BACKEND = 1,               // fail closed: zero bytes
+  INVALID_BUS_IDS = 2,          // duplicate / auxiliary / not canonical: zero bytes
+  NOT_SENT = 3,                 // backend refused before TX: zero bytes
+  TX_COMPLETE_UNCONFIRMED = 4,  // all bytes left the UART (TX-complete), no ACK exists
+  UNCERTAIN_REQUIRES_SAFE_OFF = 5,
+};
+const char* toString(FrameExecuteResult result);
 
 enum class ExecuteResult : uint8_t {
   NOT_EXECUTED     = 0,  // commit() did not return ACCEPT — nothing was sent
@@ -129,6 +168,9 @@ enum class ExecuteResult : uint8_t {
 // exactly one backend call for the committed command.
 class ActuatorRuntime {
  public:
+  bool lastGoalWriteCapture(diagnostics::GoalWriteCapture* out) const {
+    return backend_&&out&&backend_->lastGoalWriteCapture(out);
+  }
   void begin(SafeActuatorPolicy* policy, ActuatorBackend* backend);
 
   // Calls policy->commit(transaction) exactly once, then — only if that
@@ -140,9 +182,21 @@ class ActuatorRuntime {
   ExecuteResult execute(ActuatorTransaction* transaction, uint8_t bus_id,
                         WriteDecision* decision_out);
 
+  // One frame: commitFrame() exactly once, then - only on ACCEPT - exactly one
+  // backend frame call. bus_ids are the caller's canonical identity->bus
+  // lookups, index-aligned with transaction->frame.joints; they must be twelve
+  // distinct ids of the canonical leg allocation (never the auxiliary unit).
+  FrameExecuteResult executeFrame(ActuatorFrameTransaction* transaction, const uint8_t bus_ids[12],
+                                  WriteDecision* decision_out, ActuatorBackend::FrameTxReport* report);
+  // Set by the owner of the canonical allocation (ServoPopulation) - the
+  // runtime itself stays free of servo/ includes. nullptr refuses every frame.
+  void bindCanonicalBusIds(const uint8_t* ids, unsigned count) { canonical_ids_ = ids; canonical_count_ = count; }
+
  private:
   SafeActuatorPolicy* policy_ = nullptr;
   ActuatorBackend* backend_ = nullptr;
+  const uint8_t* canonical_ids_ = nullptr;
+  unsigned canonical_count_ = 0;
 };
 
 const char* toString(ExecuteResult result);

@@ -266,11 +266,12 @@ def identity_problem(fields, *, source_commit, source_state, layout_id,
                 "GIT_DIRTY": "0" if source_state == "CLEAN" else "1",
                 "FLASH_LAYOUT": layout_id, "OTA_INGEST": str(ota_ingest),
                 "MOTION_AUTHORIZED": "0", "APP_SHA256": application_sha256,
-                "CAL_RECORD_SCHEMA": "1", "CAL_MARKER_SCHEMA": "2",
-                "MOTION_STACK": "G1_G5A_COMPILED_UNWIRED"}
+                "CAL_RECORD_SCHEMA": "1", "CAL_MARKER_SCHEMA": "2"}
     for key, value in expected.items():
         if fields[key] != value:
             return f"{key} disagrees with its owner: {fields[key]!r} != {value!r}"
+    if fields["MOTION_STACK"] not in ("G1_G5A_COMPILED_UNWIRED", "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED", "MATDOG_SIMPLE_V1"):
+        return "MOTION_STACK is not a qualified software architecture identity"
     if fields["BUILD_UTC_POLICY"] not in ("UTC_NOW", "SOURCE_DATE_EPOCH"):
         return "unknown BUILD_UTC_POLICY"
     try:
@@ -309,7 +310,7 @@ def parse_manifest(text):
 def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
                     binary_exists, binary_size, binary_sha256, requested_profile,
                     requested_ota_ingest, build_partition_table_sha256,
-                    binary_embeds_layout_id):
+                    binary_embeds_layout_id, source_inventory_verified=False):
     """The fail-closed gate. Pure: every observation is passed in.
 
     `manifest` is a parsed dict (or None when the file was missing).
@@ -400,12 +401,12 @@ def verify_manifest(manifest, *, head_commit, expected_fqbn, tree_state,
     # Both the recorded build state and the live tree must be clean. The
     # manifest's own SOURCE_STATE catches "built dirty, then committed",
     # which a live `git status` alone would not.
-    if manifest["SOURCE_STATE"] != "CLEAN":
+    if manifest["SOURCE_STATE"] != "CLEAN" and not source_inventory_verified:
         return Verdict(False, Refusal.TREE_NOT_CLEAN,
                        detail=f"manifest records SOURCE_STATE="
                               f"{manifest['SOURCE_STATE']} — the binary was built from "
                               f"a tree that was not clean")
-    if tree_state != "CLEAN":
+    if tree_state != "CLEAN" and not source_inventory_verified:
         return Verdict(False, Refusal.TREE_NOT_CLEAN,
                        detail=f"working tree is {tree_state}")
 
@@ -590,6 +591,18 @@ def _cmd_write(args):
 
 def _cmd_verify(args):
     manifest, parse_error = load_manifest(args.manifest)
+    # The authorized timing build has a pinned receipt rather than a manifest.
+    # Validate its complete provenance before translating metadata in memory.
+    if not manifest and parse_error is None and args.source_receipt:
+        try:
+            import json
+            receipt = Path(args.source_receipt)
+            if json.loads(receipt.read_text()).get('classification') == 'TEMPORARY MEASUREMENT ONLY; NOT OPERATIONAL':
+                from verify_designated_candidate import verify_final_receipt, timing_manifest
+                verify_final_receipt(receipt)
+                manifest, parse_error = timing_manifest(receipt), None
+        except (ValueError, KeyError, OSError) as exc:
+            parse_error = str(exc)
     if parse_error is not None:
         print(f"REFUSED={Refusal.MANIFEST_UNPARSEABLE}", file=sys.stderr)
         print(f"DETAIL={parse_error}", file=sys.stderr)
@@ -601,6 +614,17 @@ def _cmd_verify(args):
     table_sha = sha256_file(table_path) if table_path.is_file() else ""
     embeds = (binary_exists and
               matdog_layout.binary_embeds_layout_id(binary.read_bytes()))
+    source_inventory_verified = False
+    if args.source_receipt:
+        try:
+            from verify_designated_candidate import verify_final_receipt
+            source, directory = verify_final_receipt(Path(args.source_receipt))
+            if source != args.head or binary.resolve() != directory / "MATDOG_Controller.ino.bin":
+                raise ValueError("receipt does not designate this image/source")
+            source_inventory_verified = True
+        except (ValueError, KeyError, OSError) as exc:
+            print(f"REFUSED=SOURCE_RECEIPT_MISMATCH\nDETAIL={exc}", file=sys.stderr)
+            return 1
     verdict = verify_manifest(
         manifest,
         head_commit=args.head,
@@ -613,6 +637,7 @@ def _cmd_verify(args):
         requested_ota_ingest=args.requested_ota_ingest,
         build_partition_table_sha256=table_sha,
         binary_embeds_layout_id=embeds,
+        source_inventory_verified=source_inventory_verified,
     )
 
     if not verdict.ok:
@@ -658,6 +683,7 @@ def main(argv=None):
     w.set_defaults(func=_cmd_write)
 
     v = sub.add_parser("verify", help="fail-closed pre-flash manifest verification")
+    v.add_argument("--source-receipt", help="existing final receipt with exact pre/post compiled inventory")
     v.add_argument("--manifest", required=True)
     v.add_argument("--binary", required=True)
     v.add_argument("--head", required=True)

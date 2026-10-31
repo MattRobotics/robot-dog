@@ -42,19 +42,37 @@
 #define MATDOG_ACTIVE_HARDWARE_PROFILE ::matdog::config::HardwareProfile::USB_ONLY
 #endif
 
+// Capability only: no authority at boot or from this macro.
+#ifndef MATDOG_SUPERVISED_VALIDATION
+#define MATDOG_SUPERVISED_VALIDATION 0
+#endif
 namespace matdog {
 namespace build {
+// No compile-time feature fence (ADR-006, 2026-10-17): STAND, WALK STANDARD
+// and WALK FAST are exposed whenever the Controller's runtime checks admit them
+// (live limits, certified boxes, feedback, power, presence). Hardware
+// qualification is tracked outside the firmware and reported as such.
 
 constexpr const char* kFirmwareName    = "MATDOG Controller";
+constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Firmware";
 
-// This is a software development candidate, with hardware gates still held.
-constexpr const char* kFirmwareVersion = "0.2.0-dev.3";
+// Release candidate: 1.0.0 is assigned only after hardware qualification.
+// SIMPLE 1.0.0-rc.3 (f838f677) remains the historical predecessor.
+// rc.6 (OP1, 367e2b32, not installed): rc.5 + IK cost reduction + prompt 503.
+// rc.7 (5d208c36, not installed): rc.6 + compensate IK tolerance 1e-6 m + WALK STOP without slack wait.
+// rc.8: rc.7 + bounded HTTPD wait while Motion is engaged + dashboard 503 = paused telemetry.
+// dev.5: dev.4 + held PRONE terminal state (STAND without STOP) + dashboard source freshness.
+constexpr const char* kFirmwareVersion = "1.0.1-dev.7";
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
 constexpr bool kGitDirty              = MATDOG_GIT_DIRTY != 0;
 constexpr const char* kBuildUtc        = MATDOG_BUILD_UTC;
-constexpr const char* kMotionStack     = "G1_G5A_COMPILED_UNWIRED";
+constexpr const char* kMotionStack     = "MATDOG_SIMPLE_V1";
+// A new source review is required for any operationally authorized image.
+// There is deliberately no build override or HTTP authority flag.
+constexpr bool kOperationalMotionAuthorized = false;
+constexpr bool kSupervisedValidationCapable = MATDOG_SUPERVISED_VALIDATION == 1;
 
 // The active profile and everything derived from it. kProfileExpectations
 // is the value every module consults (via core::expectedStateFor*()) to
@@ -94,7 +112,9 @@ constexpr uint32_t kDalyBusBaud   = 9600;     // DALY XY-017 RS485, hardware-pro
 // § DALY KEY.
 // The core default is 256 B.
 constexpr uint32_t kUsbTxTimeoutMs = 0;
-constexpr uint32_t kUsbTxRingBytes = 3072;
+// Complete bounded @TEL record (<6144 B) plus ordinary diagnostics (<2674 B).
+// Timeout remains zero; telemetry is skipped if the whole record cannot fit.
+constexpr uint32_t kUsbTxRingBytes = 12288;
 
 }  // namespace build
 }  // namespace matdog

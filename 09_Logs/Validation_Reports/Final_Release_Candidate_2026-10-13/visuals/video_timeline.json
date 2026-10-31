@@ -1,0 +1,301 @@
+{
+  "hardware": false,
+  "description": "Actual browser acquisition of decimated offline production-planner trace; playback compression is visual only",
+  "fps": 6,
+  "frames": [
+    {
+      "video_frame": 0,
+      "trace_index": 0,
+      "source_now_ms": 1153,
+      "source_sequence": 1,
+      "phase": "STAND_0"
+    },
+    {
+      "video_frame": 1,
+      "trace_index": 56,
+      "source_now_ms": 39046,
+      "source_sequence": 729,
+      "phase": "STAND_15"
+    },
+    {
+      "video_frame": 2,
+      "trace_index": 113,
+      "source_now_ms": 77602,
+      "source_sequence": 1470,
+      "phase": "STAND_30"
+    },
+    {
+      "video_frame": 3,
+      "trace_index": 169,
+      "source_now_ms": 115444,
+      "source_sequence": 2198,
+      "phase": "STAND_44"
+    },
+    {
+      "video_frame": 4,
+      "trace_index": 225,
+      "source_now_ms": 153643,
+      "source_sequence": 2926,
+      "phase": "STAND_65"
+    },
+    {
+      "video_frame": 5,
+      "trace_index": 281,
+      "source_now_ms": 191434,
+      "source_sequence": 3654,
+      "phase": "STAND_78"
+    },
+    {
+      "video_frame": 6,
+      "trace_index": 338,
+      "source_now_ms": 229939,
+      "source_sequence": 4395,
+      "phase": "STAND_92"
+    },
+    {
+      "video_frame": 7,
+      "trace_index": 394,
+      "source_now_ms": 267883,
+      "source_sequence": 5123,
+      "phase": "STAND_108"
+    },
+    {
+      "video_frame": 8,
+      "trace_index": 450,
+      "source_now_ms": 306031,
+      "source_sequence": 5851,
+      "phase": "STAND_128"
+    },
+    {
+      "video_frame": 9,
+      "trace_index": 507,
+      "source_now_ms": 344791,
+      "source_sequence": 6592,
+      "phase": "STAND_147"
+    },
+    {
+      "video_frame": 10,
+      "trace_index": 563,
+      "source_now_ms": 382939,
+      "source_sequence": 7320,
+      "phase": "STAND_167"
+    },
+    {
+      "video_frame": 11,
+      "trace_index": 619,
+      "source_now_ms": 420832,
+      "source_sequence": 8048,
+      "phase": "STAND_182"
+    },
+    {
+      "video_frame": 12,
+      "trace_index": 676,
+      "source_now_ms": 459541,
+      "source_sequence": 8789,
+      "phase": "STAND_200"
+    },
+    {
+      "video_frame": 13,
+      "trace_index": 732,
+      "source_now_ms": 497638,
+      "source_sequence": 9517,
+      "phase": "STAND_219"
+    },
+    {
+      "video_frame": 14,
+      "trace_index": 788,
+      "source_now_ms": 535480,
+      "source_sequence": 10245,
+      "phase": "STAND_233"
+    },
+    {
+      "video_frame": 15,
+      "trace_index": 844,
+      "source_now_ms": 573526,
+      "source_sequence": 44,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 16,
+      "trace_index": 901,
+      "source_now_ms": 611317,
+      "source_sequence": 785,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 17,
+      "trace_index": 957,
+      "source_now_ms": 648445,
+      "source_sequence": 1513,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 18,
+      "trace_index": 1013,
+      "source_now_ms": 685573,
+      "source_sequence": 2241,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 19,
+      "trace_index": 1070,
+      "source_now_ms": 723364,
+      "source_sequence": 2982,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 20,
+      "trace_index": 1126,
+      "source_now_ms": 760492,
+      "source_sequence": 3710,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 21,
+      "trace_index": 1182,
+      "source_now_ms": 797620,
+      "source_sequence": 4438,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 22,
+      "trace_index": 1238,
+      "source_now_ms": 834748,
+      "source_sequence": 5166,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 23,
+      "trace_index": 1295,
+      "source_now_ms": 872539,
+      "source_sequence": 5907,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 24,
+      "trace_index": 1351,
+      "source_now_ms": 909667,
+      "source_sequence": 6635,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 25,
+      "trace_index": 1407,
+      "source_now_ms": 946795,
+      "source_sequence": 7363,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 26,
+      "trace_index": 1464,
+      "source_now_ms": 984586,
+      "source_sequence": 8104,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 27,
+      "trace_index": 1520,
+      "source_now_ms": 1021710,
+      "source_sequence": 8832,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 28,
+      "trace_index": 1576,
+      "source_now_ms": 1058840,
+      "source_sequence": 9560,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 29,
+      "trace_index": 1632,
+      "source_now_ms": 1095970,
+      "source_sequence": 10288,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 30,
+      "trace_index": 1689,
+      "source_now_ms": 1133760,
+      "source_sequence": 11029,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 31,
+      "trace_index": 1745,
+      "source_now_ms": 1170890,
+      "source_sequence": 11757,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 32,
+      "trace_index": 1801,
+      "source_now_ms": 1208020,
+      "source_sequence": 12485,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 33,
+      "trace_index": 1858,
+      "source_now_ms": 1245810,
+      "source_sequence": 13226,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 34,
+      "trace_index": 1914,
+      "source_now_ms": 1282940,
+      "source_sequence": 13954,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 35,
+      "trace_index": 1970,
+      "source_now_ms": 1320060,
+      "source_sequence": 14682,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 36,
+      "trace_index": 2027,
+      "source_now_ms": 1357850,
+      "source_sequence": 15423,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 37,
+      "trace_index": 2083,
+      "source_now_ms": 1394980,
+      "source_sequence": 16151,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 38,
+      "trace_index": 2139,
+      "source_now_ms": 1432110,
+      "source_sequence": 16879,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 39,
+      "trace_index": 2195,
+      "source_now_ms": 1469240,
+      "source_sequence": 17607,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 40,
+      "trace_index": 2252,
+      "source_now_ms": 1507030,
+      "source_sequence": 18348,
+      "phase": "WALK_251"
+    },
+    {
+      "video_frame": 41,
+      "trace_index": 2308,
+      "source_now_ms": 1544160,
+      "source_sequence": 19076,
+      "phase": "WALK_251"
+    }
+  ]
+}

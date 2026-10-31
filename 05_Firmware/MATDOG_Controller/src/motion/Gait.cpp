@@ -22,15 +22,39 @@ Planar nominal(const GaitParameters& p,D s) {
   } else {si=sn(angle)*D(1/p.yawRad);co=(D(1)-cs(angle))*D(1/p.yawRad);}
   return {D(p.advanceXM)*si-D(p.advanceYM)*co,D(p.advanceXM)*co+D(p.advanceYM)*si,angle};
 }
-D sway(const GaitParameters& p,D s) {
-  if(p.type!=GaitType::WALK||p.swayXM==0)return {};
+D swayRegular(const GaitParameters& p,D s) {
   double quarter=std::floor(s.p*4), start=quarter*.25, gap=p.duty-.75;
   double sign=std::fmod(quarter,2)==0?1:-1;
+  if(s.p<gap)return D(p.swayXM)*smooth(s*D(1/gap));  // leave the centred stand
   D u=(s-D(start))*D(1/gap);
   return D(sign*p.swayXM)*(u.p<1?D(-1)+D(2)*smooth(u):D(1));
 }
-void body(CartesianSample& out,Planar b,D height,D shift) {
-  D x=b.x+cs(b.yaw)*shift,y=b.y+sn(b.yaw)*shift;
+// Forward while a hind leg swings, backward while a front leg swings; changes
+// only with four contacts. After the terminal touchdown the held offset
+// recentres with four contacts.
+D sway(const GaitParameters& p,D s,double terminal) {
+  if(p.type!=GaitType::WALK||p.swayXM==0)return {};
+  if(terminal>=0&&s.p>=terminal)return D(swayRegular(p,D(terminal)).p)*(D(1)-smooth((s-D(terminal))*D(1/(p.duty-.75))));
+  return swayRegular(p,s);
+}
+D lateralRegular(const GaitParameters& p,D s) {
+  const double w=p.duty-.75;const D a(p.swayYM),inv(1/w);
+  if(s.p<w)return a*smooth(s*inv);  // leave the centred stand
+  const D f=s-D(std::floor(s.p));
+  if(f.p<w)return a*(D(2)*smooth(f*inv)-D(1));
+  if(f.p<.5)return a;
+  if(f.p<.5+w)return a*(D(1)-D(2)*smooth((f-D(.5))*inv));
+  return D(-1)*a;
+}
+// +Y while the right legs swing, -Y while the left legs swing; changes only
+// with four contacts, recentres after the terminal touchdown.
+D lateral(const GaitParameters& p,D s,double terminal) {
+  if(p.type!=GaitType::WALK||p.swayYM==0)return {};
+  if(terminal>=0&&s.p>=terminal)return D(lateralRegular(p,D(terminal)).p)*(D(1)-smooth((s-D(terminal))*D(1/(p.duty-.75))));
+  return lateralRegular(p,s);
+}
+void body(CartesianSample& out,Planar b,D height,D shift,D side=D()) {
+  D x=b.x+cs(b.yaw)*shift-sn(b.yaw)*side,y=b.y+sn(b.yaw)*shift+cs(b.yaw)*side;
   out.body.translationM={x.p,y.p,height.p};
   out.bodyVelocity={x.v,y.v,height.v};out.bodyAcceleration={x.a,y.a,height.a};
   double c=std::cos(b.yaw.p),s=std::sin(b.yaw.p);
@@ -38,11 +62,30 @@ void body(CartesianSample& out,Planar b,D height,D shift) {
   out.body.rotation[1][0]=s;out.body.rotation[1][1]=c;
   out.yawVelocity=b.yaw.v;out.yawAcceleration=b.yaw.a;
 }
+D ramp(D u){return u*u*u*u*(D(2.5)+u*(D(-3)+u));}  // integral of smooth(u)
+// Geometric stride law: body progress, in cycles of advance. Identity without
+// ramps. The start raises the progress rate 0->1 over startCycles; after the
+// decel cycle S=terminal-stopCycles the rate falls 1->0 at the terminal
+// touchdown. Both are C2 in cycles, so a constant clock starts and stops the
+// body with zero velocity and acceleration.
+D progress(const GaitParameters& p,D s,double terminal,bool decel) {
+  const double a=p.startCycles;
+  D r=a>0?(s.p<a?D(a)*ramp(s*D(1/a)):s-D(.5*a)):s;
+  if(decel&&terminal>=0&&p.stopCycles>0&&s.p>terminal-p.stopCycles){
+    const double S=terminal-p.stopCycles,L=p.stopCycles,base=a>0?S-.5*a:S;
+    if(s.p>=terminal)return D(base+.5*L);
+    const D v=(s-D(S))*D(1/L);r=D(base)+D(L)*(v-ramp(v));
+  }
+  return r;
+}
 Vector3 anchor(const GaitParameters& p,unsigned leg,double td,double terminal) {
   const Vector3 f=canonicalStandDefinition().contactsWorldM[leg];
   if(td<=0)return f;
-  double s=terminal>=0&&td>terminal-1?terminal:td+p.duty*.5;
-  const auto b=nominal(p,D(s));double c=std::cos(b.yaw.p),si=std::sin(b.yaw.p);
+  double s=terminal>=0&&td>terminal-1?terminal+gaitSettleCycles(p):td+p.duty*.5;
+  // A foot that touches down by the decel cycle keeps the regular law: a STOP
+  // request never moves a planted foot or an in-flight swing target.
+  const bool decel=terminal>=0&&td>terminal-p.stopCycles;
+  const auto b=nominal(p,progress(p,D(s),terminal,decel));double c=std::cos(b.yaw.p),si=std::sin(b.yaw.p);
   return {b.x.p+c*f.x-si*f.y,b.y.p+si*f.x+c*f.y,0};
 }
 bool finite(Vector3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
@@ -56,7 +99,7 @@ bool solve3(const double j[3][3],const double b[3],double x[3]) {
   for(unsigned r=0;r<3;++r){x[r]=m[r][3];if(!std::isfinite(x[r]))return false;}return true;
 }
 bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 acceleration,
-                  LegJointAngles& qv,LegJointAngles& qa,double& condition) {
+                  LegJointAngles& qv,LegJointAngles& qa,double& condition,bool derivatives) {
   const auto& m=*legModel(leg);double a=-m.lowerOrigin.z,f=m.footOrigin.x;
   double r=footContactModel().radiusM,g=m.footOrigin.z+r,d=m.upperOrigin.y+m.footOrigin.y;
   double ch=std::cos(q.hip),sh=std::sin(q.hip),su=std::sin(q.upper),cu=std::cos(q.upper);
@@ -68,6 +111,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
   for(unsigned c=0;c<3;++c){double b[3]={0,0,0},x[3];b[c]=1;if(!solve3(j,b,x))return false;for(unsigned k=0;k<3;++k)inverse[k][c]=x[k];}
   for(unsigned k=0;k<3;++k){double n=0,in=0;for(unsigned c=0;c<3;++c){n+=std::abs(j[k][c]);in+=std::abs(inverse[k][c]);}norm=std::fmax(norm,n);inorm=std::fmax(inorm,in);}
   condition=norm*inorm;
+  if(!derivatives)return true;
   double bv[3]={velocity.x,velocity.y,velocity.z},qs[3],qss[3];if(!solve3(j,bv,qs))return false;
   double h=qs[0],u=qs[1],t=u+qs[2],vp=vu*u+vl*qs[2];
   double xpp=a*su*u*u-(f*ct+g*st)*t*t,vpp=a*cu*u*u+(f*st-g*ct)*t*t;
@@ -80,12 +124,15 @@ Vector3 rotateBack(const BodyPose& b,Vector3 v){return {b.rotation[0][0]*v.x+b.r
 Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 }
 bool validGaitParameters(const GaitParameters& p) {
-  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.maxCondition};
+  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition};
   for(double v:values)if(!std::isfinite(v))return false;
   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
     p.duty>=(p.type==GaitType::WALK?.75:.5)&&p.maxCondition>=1&&p.swayXM>=0&&
-    (p.swayXM==0||(p.type==GaitType::WALK&&p.duty>.75));
+    (p.swayXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
+    p.swayYM>=0&&(p.swayYM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
+    p.startCycles>=0&&p.stopCycles>=0;
 }
+double gaitSettleCycles(const GaitParameters& p){return p.type==GaitType::WALK&&(p.swayXM>0||p.swayYM>0)?p.duty-.75:0;}
 bool validGaitPeriod(double t){double v=1/t;return std::isfinite(t)&&t>0&&std::isfinite(v*v)&&v*v>0;}
 double gaitOffset(GaitType t,LegId l){
   const unsigned i=static_cast<unsigned>(l);if(i>3||(t!=GaitType::WALK&&t!=GaitType::TROT))return std::numeric_limits<double>::quiet_NaN();
@@ -105,9 +152,13 @@ LegPhase legPhase(const GaitParameters& p,LegId leg,double cycles){
 CartesianSample gaitCartesian(const GaitParameters& p,double cycles,double rate,double accel,double terminal){
   CartesianSample out;
   if(!validGaitParameters(p)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(rate)||!std::isfinite(accel)||
-     !std::isfinite(terminal)||(terminal!=-1&&(terminal<1||terminal!=std::floor(terminal)||cycles>terminal)))return out;
-  D s(cycles,rate,accel);body(out,nominal(p,s),D(p.heightM),sway(p,s));out.cycles=cycles;
-  for(unsigned i=0;i<4;++i){auto phase=legPhase(p,static_cast<LegId>(i),cycles);out.phases[i]=phase;
+     !std::isfinite(terminal)||(terminal!=-1&&(terminal<1||terminal*4!=std::floor(terminal*4)||cycles>terminal+gaitSettleCycles(p))))return out;
+  if(terminal!=-1&&p.stopCycles>0&&terminal-p.stopCycles<p.startCycles)return out;
+  D s(cycles,rate,accel);body(out,nominal(p,progress(p,s,terminal,true)),D(p.heightM),sway(p,s,terminal),lateral(p,s,terminal));out.cycles=cycles;
+  for(unsigned i=0;i<4;++i){auto phase=legPhase(p,static_cast<LegId>(i),cycles);
+    // After the terminal touchdown all four feet stay down (recentring window).
+    if(terminal>=0&&cycles>=terminal&&!phase.stance){phase.stance=phase.boundary=true;phase.swingProgress=0;}
+    out.phases[i]=phase;
     double k=std::floor(cycles+gaitOffset(p.type,static_cast<LegId>(i))),td=k-gaitOffset(p.type,static_cast<LegId>(i));
     if(phase.phase==0&&cycles+gaitOffset(p.type,static_cast<LegId>(i))-k>.5)td+=1;
     auto a=anchor(p,i,td,terminal);out.feet[i]=a;
@@ -123,7 +174,7 @@ CartesianSample gaitHold(const GaitParameters& p,double cycle,double height,doub
   for(unsigned i=0;i<4;++i){out.feet[i]=cycle==0?canonicalStandDefinition().contactsWorldM[i]:anchor(p,i,cycle,cycle);out.phases[i].stance=true;}
   out.valid=true;return out;
 }
-LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const LocomotionFrame* prev){
+LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const LocomotionFrame* prev,bool derivatives){
   LocomotionFrame out;out.cartesian=s;
   if(!validGaitParameters(p)){out.status=GaitStatus::INVALID_PARAMETER;return out;}
   if(!s.valid||(prev&&!prev->target.valid)){out.status=GaitStatus::STATE_ERROR;return out;}
@@ -146,7 +197,7 @@ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const
     double w=s.yawVelocity,wa=s.yawAcceleration;
     Vector3 velocity={vr.x+w*r.y,vr.y-w*r.x,vr.z};
     Vector3 acceleration={ar.x+2*w*vr.y+wa*r.y-w*w*r.x,ar.y-2*w*vr.x-wa*r.x-w*w*r.y,ar.z};
-    if(!differential(leg,b.joints,velocity,acceleration,out.velocityRadS[i],out.accelerationRadS2[i],out.condition[i])||out.condition[i]>p.maxCondition){out.status=GaitStatus::ILL_CONDITIONED;return out;}
+    if(!differential(leg,b.joints,velocity,acceleration,out.velocityRadS[i],out.accelerationRadS2[i],out.condition[i],derivatives)||out.condition[i]>p.maxCondition){out.status=GaitStatus::ILL_CONDITIONED;return out;}
     out.target.legs[i]=b.joints;out.branches[i]=b.branch;out.maxResidualM=std::fmax(out.maxResidualM,b.residualM);
     const auto& m=*legModel(leg);double q[3]={b.joints.hip,b.joints.upper,b.joints.lower};
     for(unsigned j=0;j<3;++j)out.minJointMarginRad=std::fmin(out.minJointMarginRad,std::fmin(q[j]-m.limits[j].lower,m.limits[j].upper-q[j]));

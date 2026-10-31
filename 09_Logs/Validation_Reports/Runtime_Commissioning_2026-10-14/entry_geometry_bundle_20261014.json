@@ -1,0 +1,228 @@
+{
+  "certificate": {
+    "schema": "MATDOG_COMPUTATIONAL_ENTRY_BUNDLE_V1",
+    "status": "PASS_COMPUTATIONAL_ENTRY",
+    "hardware_authorized": false,
+    "start_rad": [
+      -0.039884,
+      1.398991,
+      -1.601476,
+      0.041417,
+      1.388253,
+      -1.581534,
+      -0.044485,
+      1.440408,
+      -1.59534,
+      0.039884,
+      1.43734,
+      -1.59534
+    ],
+    "head_rad": [
+      -0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.4615259421016524,
+      -1.5446163880149817,
+      0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532,
+      -0.017453292519943295,
+      1.5707963267948966,
+      -1.5533430342749532
+    ],
+    "slot_order": [
+      "lf_hip_joint",
+      "lf_upper_leg_joint",
+      "lf_lower_leg_joint",
+      "rf_hip_joint",
+      "rf_upper_leg_joint",
+      "rf_lower_leg_joint",
+      "rh_hip_joint",
+      "rh_upper_leg_joint",
+      "rh_lower_leg_joint",
+      "lh_hip_joint",
+      "lh_upper_leg_joint",
+      "lh_lower_leg_joint"
+    ],
+    "tube_rad": 0.004,
+    "certificate_domain": "ENTRY_DISENGAGE: four independent LOWER intervals from historical actual to head, each expanded by +/-4mrad; HIP/UPPER independent +/-4mrad around historical actual. ENTRY_ALIGN: straight HIP/UPPER common progress with LOWER held at head, full +/-4mrad tube.",
+    "body_envelope": "Original base-link surfaces at or crossing lowest15mm plus their downward-only extrusion by3mm. No lateral shape enlargement or isotropic3mm enlargement of HIP mounts is claimed.",
+    "coverage": {
+      "baseline_collision_links": 17,
+      "collision_triangles": 119696,
+      "non_adjacent_pairs": 120,
+      "minimum_nonadjacent_required_m": 0.003,
+      "adjacent_revolute_pairs": 12,
+      "adjacent_triangles_excluded": 0,
+      "adjacent_intentional_overlap_exceptions": false,
+      "adjacent_initial_closed_components_non_nested": true,
+      "ventral_boundary_faces_included": true,
+      "ventral_nonadjacent_pre_expansion_clearance_required_m": 0.006,
+      "ventral_directed_envelope_all_16_leg_links": true,
+      "ventral_adjacent_hip_required": "strictly positive; hinge pairs are not subject to3mm nonadjacent margin"
+    },
+    "numerical_bounds": {
+      "independent_lower_minimum_nonadjacent_lower_bound_m": 0.004277695738995838,
+      "ventral_nonadjacent_lower_bounds_before3mm_expansion_m": [
+        0.011044528873156597,
+        0.01101391413647541
+      ],
+      "directed_ventral_adjacent_hip_minimum_lower_bound_m": 0.0009570300822567246,
+      "sampled_and_lipschitz_roundoff_allowance_m": 1e-09
+    },
+    "runtime_domain_conditions": {
+      "tracking_policy_rad": 0.0035,
+      "hip_upper_budget": "start_deviation_rad + tracking_rad + half_command_step_rad + numerical_guard_rad <=0.004; planner must slow the quintic to satisfy this budget",
+      "lower_budget": "independent full intervals cover PRIME and lower progress; all actual LOWER values must remain inside the listed domain",
+      "target_quantization": "actual encoder error is compared against unrounded planner targets; raw command rounding is contained only while those feedback-domain conditions hold",
+      "historical_start_rounding_rad_max": 5e-07
+    },
+    "evidence_provenance": {
+      "kind": "HISTORICAL_2026_10_13_TORQUE_OFF_POSE_PLUS_OFFLINE_GEOMETRY",
+      "joint_log_sha256": "d1c2ecbaa965d5ea66f20b9a2d37a700ff135efd90d32c9a985aa1cc22d076ca",
+      "actual_hardware_freshness_verified": false,
+      "firmware_route_data_sha256": "357c52f351199994a65ea5a1b32da0c567f66538617bb8c6187e0a0127a18e4d",
+      "urdf_sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "collision_meshes": {
+        "base_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/base_link.stl",
+          "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+          "triangles": 22044
+        },
+        "lf_hip_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_hip_link.stl",
+          "sha256": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+          "triangles": 6016
+        },
+        "lf_upper_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_upper_leg_link.stl",
+          "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+          "triangles": 3802
+        },
+        "lf_lower_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_lower_leg_link.stl",
+          "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+          "triangles": 12336
+        },
+        "lf_foot_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lf_foot_link.stl",
+          "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+          "triangles": 2248
+        },
+        "rf_hip_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_hip_link.stl",
+          "sha256": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+          "triangles": 6016
+        },
+        "rf_upper_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_upper_leg_link.stl",
+          "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+          "triangles": 3806
+        },
+        "rf_lower_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_lower_leg_link.stl",
+          "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+          "triangles": 12352
+        },
+        "rf_foot_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rf_foot_link.stl",
+          "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+          "triangles": 2248
+        },
+        "rh_hip_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_hip_link.stl",
+          "sha256": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+          "triangles": 6018
+        },
+        "rh_upper_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_upper_leg_link.stl",
+          "sha256": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+          "triangles": 3806
+        },
+        "rh_lower_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_lower_leg_link.stl",
+          "sha256": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+          "triangles": 12352
+        },
+        "rh_foot_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/rh_foot_link.stl",
+          "sha256": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+          "triangles": 2248
+        },
+        "lh_hip_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_hip_link.stl",
+          "sha256": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+          "triangles": 6018
+        },
+        "lh_upper_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_upper_leg_link.stl",
+          "sha256": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+          "triangles": 3802
+        },
+        "lh_lower_leg_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_lower_leg_link.stl",
+          "sha256": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+          "triangles": 12336
+        },
+        "lh_foot_link": {
+          "path": "03_CAD/URDF/matt_robodog_rev00/meshes/collision/lh_foot_link.stl",
+          "sha256": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+          "triangles": 2248
+        }
+      },
+      "tool_versions": {
+        "python": "3.12.3",
+        "numpy": "1.26.4",
+        "python_fcl": "0.7.0.11"
+      },
+      "proof_tool_sha256": {
+        "/home/matteo-manicardi/MATDOG/worktrees/robot-dog-runtime-commissioning-20261014/06_Software/Matdog_Core/motion/paired_prone/certify_commissioning_entry.py": "8cefce25db75eca8b071b6635322a41cd92512a5e4a5881e28b0ae687a74d0ed",
+        "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/geometry/verify_independent_lower_box.py": "0e911cb17bc6c9e491896bb73e802ec4dc8fe1bba1ee7a3f997bbdfdfd693e0b",
+        "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/geometry/verify_directed_belly_hip.py": "4b851399aa251c2875f5d8be5b033007f533f37aa930a4fdb52a2701df126f0a"
+      },
+      "baseline_proof_source_sha256": {
+        "continuous_pair_path.py": "b33cf93269ba843b8af270985c2f59cc87e2fc5b7fdd3ba73f02f30913c80253",
+        "certify_adjacent_axis.py": "77f8d14b9bd406a36667a96aa02c18791867114dc04224f1aa3dd03e93252658",
+        "check_assembly_nesting.py": "7cd03fb71242860e32c709b8d3b08a03da7427785b198e1465c684745e356b06",
+        "paired_prone_model.py": "f82cf101658c08db46a6db04a573c6823f771b0dd1bcc843998f1ff6d8e4ece2"
+      }
+    },
+    "physical_conditions": {
+      "metrology_installation_encoder_mapping": "UNKNOWN_NOT_CERTIFIED",
+      "actual_cover_contained_in_directed_envelope": "UNKNOWN_REQUIRES_MEASUREMENT",
+      "fixture_and_cable_free_volume": "UNKNOWN_REQUIRES_OPERATOR_INSPECTION",
+      "actual_tracking_electrical_thermal_watchdog_stop": "NOT_PROVEN_BY_GEOMETRY",
+      "ground_support_load_dynamic_stability": "NOT_CERTIFIED"
+    },
+    "references": {
+      "entry_full_tube_4mrad": {
+        "path": "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/entry_certificate_prone_tube_4mrad_20261014.json",
+        "file_sha256": "3ac16168c880c3d875b8102da4d6754bbd8dca899fb1e3a165c34a134db95405",
+        "certificate_sha256": "60a5a175af2a11c56f99cbaa2a7f3f10bc55cd1922d5f30b4652a79412db22d3",
+        "status": "PASS_ENTRY_TUBE"
+      },
+      "independent_lower_box": {
+        "path": "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/geometry/independent_lower_box_certificate.json",
+        "file_sha256": "98b5cd5d0158ac31c4ff8f9eb09254b35e2ad628d16183023b2244aca3329bd9",
+        "certificate_sha256": "635095cbb5c887c79df65a427f589f5bd1ac37a2041622a552eddc46a591ddd5",
+        "status": "PASS_INDEPENDENT_LOWER_BOX"
+      },
+      "directed_belly_hip": {
+        "path": "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/geometry/directed_belly_hip_certificate.json",
+        "file_sha256": "fa5858a296afd1fd268522f586e0b6d27e48576422712b0b824d2f8439e0c765",
+        "certificate_sha256": "abc7851b21ac46455841635e5b66d04cce3001fd627365ccbd361c650b06eae6",
+        "status": "PASS_SURFACE_SEPARATION"
+      },
+      "blocked_full_tube_10mrad": {
+        "path": "09_Logs/Validation_Reports/Runtime_Commissioning_2026-10-14/entry_certificate_prone_tube_10mrad_20261014.json",
+        "file_sha256": "005637081519cbdc041e1538c346fbfbb5f452595463e0d412c91084a4b6e2a7",
+        "certificate_sha256": "807b0d0bd3b978bd8ce4f03f7b34e3f12019b415417c4df236418c176d66a214",
+        "status": "BLOCKED"
+      }
+    },
+    "full_symmetric_10mrad_status": "BLOCKED_LF_UPPER_LOWER_SURFACE_COLLISION",
+    "scope": "Computational rigid-CAD entry certificate for the stated domains and directed ventral envelope. Not a motion permit, physical preflight, hardware qualification or APP flash authorization."
+  },
+  "certificate_sha256": "b823f7a06923408876b31cea1eadc8a1e6fcb652e8aa4a29ffe58c2a4faf3efb"
+}

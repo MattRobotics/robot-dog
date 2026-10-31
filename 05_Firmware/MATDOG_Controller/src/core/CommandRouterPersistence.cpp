@@ -5,6 +5,8 @@
 
 #include "../actuator/ActuatorWritePolicy.h"
 #include "../calibration/CalibrationPersistenceService.h"
+#include "../calibration/CalibrationRuntimeRestore.h"
+#include "../actuator/CalibrationGeometryProfileData.h"
 #include "../calibration/CalibrationSaveGate.h"
 #include "../calibration/CalibrationMotionPermit.h"
 #include "../calibration/FirstMotionExecutor.h"
@@ -12,10 +14,9 @@
 #include "../calibration/FullLegCalibrationFinalizer.h"
 #include "../config/BuildConfig.h"
 
-// @CALIBRATION PERSIST ... (P3a). The only code in the router that talks to
-// the persistence service. It never touches the servo bus, the JointTransform
-// table, the authority arbiter or the motion permit: the SAVE gate reads them,
-// the service writes NVS, and nothing here restores or admits a calibration.
+// Persistent writes retain the P3a explicit-command SAVE gates. The separate
+// local RESTORE command checks all twelve torque registers and restores only
+// RAM transforms; it never writes the bus, NVS, EEPROM or grants motion.
 
 namespace matdog {
 namespace core {
@@ -66,6 +67,37 @@ void printUsage() {
 }
 
 }  // namespace
+
+void CommandRouter::handleRuntimeRestoreCommand(const String& upper) {
+  if(!modules_.runtime_restore || !modules_.persistence || !modules_.geometry_profile || !modules_.servo_bus || !modules_.actuator_policy) {
+    Serial.println("CALIBRATION_RESTORE=REFUSED REASON=NOT_BOUND");return;
+  }
+  char storage[96];const char* tokens[kMaxTokens];
+  const size_t count=tokenize(upper.c_str(),storage,sizeof(storage),tokens);
+  uint32_t generation=0;
+  if(count!=4 || strcmp(tokens[0],"@CALIBRATION") || strcmp(tokens[1],"RESTORE") ||
+     !parseGeneration(tokens[2],&generation) || strcmp(tokens[3],"CONFIRM_CURRENT_INSTALLATION")) {
+    Serial.println("CALIBRATION_RESTORE=REFUSED REASON=USAGE_OR_CONFIRMATION");return;
+  }
+  if(const char* reason=persistenceQuietViolation()) {
+    Serial.printf("CALIBRATION_RESTORE=REFUSED REASON=%s\n",reason);return;
+  }
+  // This local command attests installation currentness. ST3215 has no unique
+  // serial register: a responding bus ID does not prove physical identity.
+  // Read all twelve torque registers; RESTORE writes RAM only, never the bus.
+  bool off=true;
+  for(uint8_t i=0;i<12;i++) {
+    const auto* joint=servo::legServoAt(i);servo::ServoBus::RuntimeState state;
+    if(!joint || !modules_.servo_bus->readRuntimeState(joint->bus_id,&state) || state.torque_enable!=0)off=false;
+  }
+  calibration::RuntimeRestoreRequest request;
+  request.expected_generation=generation;request.current_installation_confirmed=true;
+  request.executor_idle=true;request.torque_off_confirmed=off;request.motion_permit_revoked=true;
+  const auto result=modules_.runtime_restore->restore(*modules_.persistence,*modules_.geometry_profile,
+      actuator::geometry_data::kProvenance,request,modules_.actuator_policy->transforms(),modules_.actuator_policy->limits());
+  Serial.printf("CALIBRATION_RESTORE=%s GENERATION=%lu LIMITS_APPROVED=0 MOTION_AUTHORIZED=0\n",
+    calibration::toString(result),(unsigned long)modules_.runtime_restore->snapshot().restored_generation);
+}
 
 CommandRouter::PersistenceSchemaIdentity CommandRouter::persistenceSchemaIdentity() {
   return {calibration::kCalibrationRecordSchemaV1, calibration::kSaveMarkerSchemaV1};
@@ -187,10 +219,10 @@ void CommandRouter::printPersistenceStatus() {
   if (svc.writesBlocked()) {
     Serial.println("WRITE_BLOCK_NOTE=a write outcome is uncertain; only a reboot re-reads and clears it");
   }
-  Serial.printf("CALIBRATION_AVAILABLE=%u MOTION_AUTHORIZED=0 RESTORE=NOT_IMPLEMENTED\n",
+  Serial.printf("CALIBRATION_AVAILABLE=%u MOTION_AUTHORIZED=0 RESTORE=EXPLICIT_RUNTIME_ONLY\n",
                 svc.calibrationAvailable() ? 1u : 0u);
   Serial.println("CALIBRATION_PERSIST_NOTE available is evidence, not a motion permit; "
-                 "no JointTransform is admitted from storage");
+                 "LOAD admits no JointTransform; explicit verified RESTORE admits RAM transforms only");
 }
 
 void CommandRouter::handlePersistCommand(const String& upper) {

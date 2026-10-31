@@ -9,6 +9,10 @@ struct JointTargetFrame {
   uint32_t sequence = 0;
   bool valid = false;  // all 12 targets must succeed atomically
 };
+// Semantic slot i = leg*3 + {HIP, UPPER, LOWER}, legs LF, RF, RH, LH: the one accessor of a frame's twelve joints
+// (the same slot order as the executor, the feedback vector and the resolver's slotIdentity()).
+inline double jointSlot(const JointTargetFrame& f, unsigned i) { const auto& q = f.legs[i / 3]; return i % 3 == 0 ? q.hip : i % 3 == 1 ? q.upper : q.lower; }
+inline double& jointSlot(JointTargetFrame& f, unsigned i) { auto& q = f.legs[i / 3]; return i % 3 == 0 ? q.hip : i % 3 == 1 ? q.upper : q.lower; }
 struct StandDefinition {
   Vector3 contactsWorldM[4];
   LegJointAngles standSeed[4];

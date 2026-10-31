@@ -215,6 +215,11 @@ def check_forbidden_literals(files):
     ]
     for path, code in files:
         for token in forbidden:
+            # Issue #52: the ONE host test that proves ServoPacket.h byte-equal
+            # to the installed library's sync position packet must name that
+            # library method. Host-only (scripts/tests), never in the firmware.
+            if token == "SyncWritePosEx" and path.name == "test_servo_packet.cpp" and "/scripts/tests/" in str(path):
+                continue
             if token.lower() in code.lower():
                 fail(f"{path}: forbidden token found: {token!r}")
 
@@ -264,6 +269,53 @@ def check_torque_enable(files):
                 fail(f"{path}: enableTorqueOn() appears to condition its verdict on the "
                      f"write's own ACK/status again - the readback alone must decide "
                      f"(CR3 uncertain-write safety)")
+
+
+def check_loop_task_stack(files):
+    """2026-10-16: the Controller loop task needs 16 KB (measured worst call
+    chains 8.5-10 KB; the 8 KB default overflowed into the heap and boot-looped
+    the Issue #52 flash). The sketch must keep the explicit size."""
+    ino = next((c for p, c in files if p.suffix == ".ino"), "")
+    if "SET_LOOP_TASK_STACK_SIZE(16 * 1024);" not in ino:
+        fail("MATDOG_Controller.ino must set SET_LOOP_TASK_STACK_SIZE(16 * 1024) (loop stack budget)")
+
+
+def check_sync_frame_boundary(files):
+    """Issue #52 (2026-10-15): the ONLY multi-ID bus operations are the two
+    SYNC_WRITE packets of src/servo/ServoPacket.h, each to an explicit list of
+    distinct ids (never the all-ID broadcast instruction):
+      buildGoalFrame  - SRAM 41..47 (ACC, GoalPosition 0..4095, GoalTime=0, GoalSpeed)
+      buildTorqueOff  - SRAM 40 TorqueEnable := 0 (de-escalation only)
+    They are built only inside ServoBus.cpp; the goal frame is reachable only
+    through ServoBusActuatorBackend::writeGoalPositionFrame (SafeActuator
+    commitFrame + ActuatorRuntime::executeFrame); torque ON, EEPROM, offsets
+    and RegWrite/Action stay forbidden; the stock library sync READ is unused."""
+    packet = next((c for p, c in files if p.name == "ServoPacket.h"), None)
+    if packet is None:
+        fail("ServoPacket.h missing (Issue #52 frame packet builder)")
+        return
+    for pinned in ("kAddrTorqueEnable = 40", "kAddrAcc = 41", "kGoalWidth = 7", "kInstSync = 0x83",
+                   "ticks[i] > 4095", "distinctIds(ids, n)", "out[k++] = 0; out[k++] = 0;"):
+        if pinned not in packet:
+            fail(f"ServoPacket.h: reviewed frame invariant missing {pinned!r}")
+    if re.search(r"out\[k\+\+\]\s*=\s*1;\s*\}", packet):
+        fail("ServoPacket.h: a multi-ID packet writes a non-zero TorqueEnable")
+    for path, code in files:
+        if path.name in ("ServoPacket.h",) or "/scripts/tests/" in str(path):
+            continue   # host tests exercise the pure builders; they are never linked into the firmware
+        for token in ("buildGoalFrame", "buildTorqueOff"):
+            if token in code and path.name != "ServoBus.cpp":
+                fail(f"{path}: {token} may be used only inside ServoBus.cpp")
+        if "syncWriteGoalPositions(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "ServoBusActuatorBackend.h"):
+            fail(f"{path}: syncWriteGoalPositions may be called only by ServoBusActuatorBackend")
+        if "syncTorqueOff(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "Controller.cpp"):
+            fail(f"{path}: syncTorqueOff is the Controller SAFE_OFF burst only")
+        for token in ("syncReadPacketRx", "syncReadPacketTx", "SyncRead(", "RegWriteAction"):
+            if token in code:
+                fail(f"{path}: {token} (unverified library RX / latent RegWrite target) is not used")
+    backend = next((c for p, c in files if p.name == "ServoBusActuatorBackend.h"), "")
+    if "VERIFIED_APPLIED" in re.sub(r"//.*", "", backend.split("writeGoalPositionFrame", 1)[-1].split("writeCalibrationTorqueLimit", 1)[0]):
+        fail("ServoBusActuatorBackend.h: a frame (no ACK) must never be reported VERIFIED_APPLIED")
 
 
 def check_servo_motion_write_surface(files):
@@ -374,10 +426,12 @@ def check_goal_position_register_boundary(files, sketch_dir):
 
 
 def check_servo_id_write(files):
-    """No raw register write may exist in ServoBus EXCEPT the one reviewed RAM
+    """Only the two specifically reviewed RAM 48 writers may exist in ServoBus.
+    The bounded validation reducer is checked independently below. The original
     TorqueLimit write of the 24-contact Full Calibration sequence (LF V25
     prepare_motor(): TorqueLimit 500 before TorqueEnable). That one write:
-      - is the only writeWord() call, and no writeByte() call exists at all;
+      - is the only fixed-value writer; the second can only reduce RAM 48,
+        and no writeByte() call exists at all;
       - lives inside ServoBus::writeReviewedRamTorqueLimit(int id);
       - targets SMS_STS_TORQUE_LIMIT_L (RAM 48) - never EEPROM Max Torque, an
         ID, an offset, a lock or any other register;
@@ -391,8 +445,8 @@ def check_servo_id_write(files):
         if re.search(r"\bwriteByte\(", code):
             fail(f"{path}: raw writeByte() call found - ServoBus has no reviewed byte write")
         words = [m.start() for m in re.finditer(r"\bwriteWord\(", code)]
-        if len(words) != 1:
-            fail(f"{path}: exactly one raw writeWord() (the reviewed RAM TorqueLimit) may "
+        if len(words) != 2:
+            fail(f"{path}: exactly two reviewed raw writeWord() calls (RAM TorqueLimit) may "
                  f"exist in ServoBus, found {len(words)}")
             continue
         body = re.search(r"ServoWriteVerifyResult ServoBus::writeReviewedRamTorqueLimit\(int id\)"
@@ -412,6 +466,13 @@ def check_servo_id_write(files):
                 fail(f"{path}: writeReviewedRamTorqueLimit() lost {required!r}")
         if re.search(r"\bst_\.Error\b", text):
             fail(f"{path}: writeReviewedRamTorqueLimit() must decide by readback only")
+        reducer = re.search(r"ServoWriteVerifyResult ServoBus::reduceValidationOutputWhileOff\(int id,uint16_t ceiling\)\s*\{(.*?)\n\}", code, re.DOTALL)
+        if not reducer or not (reducer.start() <= words[1] <= reducer.end()):
+            fail(f"{path}: second raw writer must be the reviewed RAM-only output reducer")
+        else:
+            compact=re.sub(r"\s+", "", reducer.group(1))
+            for token in ("id<0||id>253||!ceiling||ceiling>1000", "st_.readByte(id,SMS_STS_TORQUE_ENABLE)!=0", "current<0||current>1023||ceiling>current", "if(current!=ceiling)st_.writeWord(id,SMS_STS_TORQUE_LIMIT_L,ceiling);", "constintfinal_limit=st_.readWord(id,SMS_STS_TORQUE_LIMIT_L);", "returnclassifyServoWriteVerify(final_limit,ceiling);"):
+                if token not in compact:fail(f"{path}: reduceValidationOutputWhileOff() lost {token!r}")
     by_name = {p.name: c for p, c in files}
     header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", ""))
     if header.count("static constexpr uint16_t kReviewedRamTorqueLimit = 500;") != 1:
@@ -443,7 +504,7 @@ DALY_WHITELISTED_READ_FRAMES = {
 }
 DALY_SOURCE_NAMES = {"DalyBms.h", "DalyBms.cpp", "DalyProtocol.h", "DalyProtocol.cpp"}
 DALY_TRANSMIT_CALL = "bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen)"
-DALY_UART_METHODS = {"begin", "available", "read", "write", "flush"}
+DALY_UART_METHODS = {"begin", "available", "availableForWrite", "read", "write", "flush"}
 BMS_COMMANDS_ALLOWED = {"@BMS STATUS", "@BMS STREAM ON", "@BMS STREAM OFF",
                         "@BMS KEY READ", "@BMS KEY STATUS",
                         "@BMS KEY SET DISCHARGE CONFIRM", "@BMS KEY WRITE STATUS"}
@@ -663,7 +724,7 @@ def check_daly_write(files):
                 fail(f"{path}: DALY transmit must be exactly {DALY_TRANSMIT_CALL!r}, "
                      f"found {m.group(0)!r}")
 
-    # 4. bms_uart_ is used only for begin/available/read/write/flush - never
+    # 4. bms_uart_ is used only for transport and read-only FIFO space - never
     #    print*/other writers, never handed to another function as a stream.
     for path, code in files:
         for m in re.finditer(r"\bbms_uart_\b", code):
@@ -1054,20 +1115,11 @@ def check_uncertain_write_propagation(files, sketch_dir):
 
 
 def check_actuator_runtime_boundaries(files):
-    """I4: the Safe Actuator runtime adapter (src/actuator/ActuatorRuntime.*)
-    must stay host-linkable exactly like ActuatorWritePolicy itself, and its
-    mere existence must not make ordinary physical motion reachable. There is
-    CR3-M3 adds exactly one production ServoBusActuatorBackend and two narrow
-    ServoBus write primitives, but Controller remains null-wired until the
-    separately reviewed activation gate.
-
-    2026-09-25 objective change: Controller.{h,cpp} may now own an
-    ActuatorRuntime instance as fail-closed status/lifecycle infrastructure
-    (it must be wired with a null backend - see
-    check_actuator_infrastructure_wired_fail_closed()). Every OTHER file
-    stays excluded, in particular CommandRouter.cpp and ControllerService.h:
-    neither may reference this class by name, which is what keeps "Controller
-    owns one" from silently growing into "a command can reach one"."""
+    """Safe Actuator runtime stays host-linkable. Only the reviewed sole
+    backend, Controller, calibration, Executor and scoped local MotionSession
+    may reference it. Network/command presentation cannot acquire a runtime
+    or authority. Physical calls remain gated independently at plan/execute.
+    """
     names = {p.name for p, _ in files}
     for required in ("ActuatorRuntime.h", "ActuatorRuntime.cpp"):
         if required not in names:
@@ -1083,7 +1135,8 @@ def check_actuator_runtime_boundaries(files):
 
     allowed_dirs = {"actuator", "calibration", "tests"}
     allowed_names = {"ActuatorRuntime.h", "ActuatorRuntime.cpp", "Controller.h", "Controller.cpp",
-                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp"}
+                     "ServoBusActuatorBackend.h", "ServoBusActuatorBackend.cpp",
+                     "MotionExecutor.h", "MotionExecutor.cpp", "MotionSession.h", "MotionSession.cpp"}
     for path, code in files:
         if path.name in allowed_names:
             continue
@@ -1091,7 +1144,7 @@ def check_actuator_runtime_boundaries(files):
             continue
         if re.search(r"\bActuatorRuntime\b", code):
             fail(f"{path}: references ActuatorRuntime - I4's runtime adapter has no production "
-                 f"backend (ServoBus exposes no torque-on/GoalPosition write) and must not be "
+                 f"outside the reviewed Controller/Executor/Session lifecycle and must not be "
                  f"constructed or referenced outside src/actuator/, src/calibration/, "
                  f"Controller.{{h,cpp}} (fail-closed status infrastructure only) or the offline "
                  f"test suite")
@@ -1688,9 +1741,39 @@ def check_thermal_confirmation(files):
         "ServoReadValidation.h": (
             "frame[2] != id", "frame[3] != width + 2", "frame[4] != 0", "return sum == 255"),
         "ValidatedServoRead.h": (
-            "millis() - started < IOTimeOut", "drained < 64", "validServoReadPacket(packet, size, id, width)"),
+            "bus.mayWait()", "BusTransaction::kDrainMaxBytes", "validServoReadPacket(packet, size, id, width)"),
         "ServoBus.h": ("ValidatedServoRead st_;",),
     }
+    # PRIME diagnostics preserve the parser verdict but return a detailed enum
+    # instead of bool. Recognise the exact reviewed parser, ignoring whitespace
+    # only: requiring its COMPLETE body rejects dropped guards, early success,
+    # or altered checksum semantics. Do not infer safety from enum names alone.
+    detailed = "servoReadValidity(" in by_name.get("ServoReadValidation.h", (None, ""))[1]
+    if detailed:
+        required["ServoReadValidation.h"] = ("""
+inline diagnostics::ReadValidity servoReadValidity(const uint8_t* frame, uint8_t size,
+                                 uint8_t id, uint8_t width) {
+  using diagnostics::ReadValidity;
+  if(frame==nullptr)return ReadValidity::INVALID_ARGUMENT;
+  if(size==0)return ReadValidity::NO_RESPONSE;
+  if(size!=width+6)return ReadValidity::SHORT_PACKET;
+  if(frame[0]!=255||frame[1]!=255)return ReadValidity::HEADER;
+  if(frame[2]!=id)return ReadValidity::ID;
+  if(frame[3]!=width+2)return ReadValidity::LENGTH;
+  if(frame[4]!=0)return ReadValidity::STATUS;
+  uint8_t sum = 0;
+  for (uint8_t i = 2; i < size; ++i) sum = static_cast<uint8_t>(sum + frame[i]);
+  return sum==255?ReadValidity::VALID:ReadValidity::CHECKSUM;
+}
+""", "return servoReadValidity(frame,size,id,width)==diagnostics::ReadValidity::VALID;")
+        required["ValidatedServoRead.h"] = (
+            "return ReadCaptured(id,address,data,width,nullptr);",
+            "BusTransaction::kDrainMaxBytes",
+            "auto validity=tx_allowed?servoReadValidity(packet,size,id,width):ReadValidity::NO_RESPONSE;",
+            "while (size < length) { if (!bus.mayWait()) { bus.waitFailed(); break; }",
+            "while (size < width + 6) { if (!bus.mayWait()) { bus.waitFailed(); break; }",
+            "if (validity!=ReadValidity::VALID) return 0; "
+            "for (uint8_t i = 0; i < width; ++i) data[i] = packet[i + 5]; return width;")
     for name, tokens in required.items():
         if name not in by_name:
             fail(f"{name}: missing thermal/UART safety component")
@@ -1698,8 +1781,34 @@ def check_thermal_confirmation(files):
         path, code = by_name[name]
         body = re.sub(r"\s+", " ", code)
         for token in tokens:
-            if token not in body:
+            match = (re.sub(r"\s+", "", token) in re.sub(r"\s+", "", code)
+                     if detailed and name in ("ServoReadValidation.h", "ValidatedServoRead.h")
+                     else token in body)
+            if not match:
                 fail(f"{path}: thermal/UART safety invariant missing: {token}")
+        if name == "ValidatedServoRead.h":
+            # Core Motion V5: both the SDK hook (readSCS) and the direct validated read
+            # must wait ONLY through the absolute-deadline gate; the inter-byte IOTimeOut
+            # may not come back as the bound, and no SCServo write may bypass the gate.
+            if re.sub(r"\s+", "", code).count("bus.mayWait()") < 2:
+                fail(f"{path}: thermal/UART safety invariant missing: absolute deadline gate in every reply wait")
+            if "IOTimeOut" in re.sub(r"const uint32_t us = static_cast<uint32_t>\(IOTimeOut\) \* 1000u;", "", code):
+                fail(f"{path}: thermal/UART safety invariant missing: IOTimeOut may not bound a servo wait")
+            if code.count("bus.allowTx()") < 2:
+                fail(f"{path}: thermal/UART safety invariant missing: TX suppression after the budget is spent")
+        if detailed and name == "ValidatedServoRead.h":
+            # The only successful READ return must be the validated width.
+            # Capture instrumentation may return failure, never early success.
+            compact = re.sub(r"\s+", "", code)
+            read_part = code[code.index("int Read(uint8_t id"):code.index(" private:")]
+            returns = re.findall(r"\breturn\s+([^;]+);", read_part)
+            compact = re.sub(r"\s+", "", read_part)
+            allowed = {"0", "width", "ReadCaptured(id,address,data,width,nullptr)",
+                       "Read(id,address,&data,1)==1?data:-1",
+                       "Read(id,address,data,2)==2?data[0]|(data[1]<<8):-1"}
+            if (compact.count("returnwidth;") != 1 or
+                    any(re.sub(r"\s+", "", value) not in allowed for value in returns)):
+                fail(f"{path}: thermal/UART safety invariant missing: only validated width may succeed")
     # A refuted block-read value must never accumulate into a safety verdict:
     # no transient latch, counter threshold or sticky fault may come back.
     for name in ("ThermalConfirmation.h", "ThermalConfirmation.cpp"):
@@ -2566,11 +2675,23 @@ def check_led_status_boundaries(files):
             r"charge_complete_verified\s*\(\s*(?!false\b)", policy_h):
         fail("LedStatusPolicy.h: reserved verified-full fact must default false")
 
-    # These facts have no battery-policy owner today. Pin their entire
-    # production vocabulary, including read sites, so a new constructor,
-    # alias, compound assignment, or policy-side threshold cannot quietly
-    # become a producer. Only the two false defaults, exact passthrough,
-    # selector read, and read-only @LED STATUS observation are permitted.
+    # 16 Oct post-validation candidate: permit exactly the presentation-only
+    # voltage producer requested by the operator. Pin the whole decision block,
+    # including freshness, plausibility, thresholds, hysteresis and charge mask.
+    # Other aliases/constructors/compound producers remain forbidden below.
+    voltage_advisory = 'constboolvoltage_valid=telemetryFresh(inputs)&&inputs.cell_min_mv>0&&inputs.cell_min_mv<=5000&&std::isfinite(inputs.pack_voltage_v)&&inputs.pack_voltage_v>0;if(voltage_valid){constautocell=inputs.cell_min_mv;constautopack=inputs.pack_voltage_v;constbooldistinct=!voltage_seen_||static_cast<int32_t>(inputs.sampled_at_ms-voltage_stamp_)>0;if(distinct){voltage_seen_=true;voltage_stamp_=inputs.sampled_at_ms;if(cell<=3350||pack<=10.05f){voltage_level_=2;voltage_votes_=0;}else{uint8_tnext=0;if(voltage_level_==2&&(cell<3450||pack<10.35f))next=2;elseif(cell<=3500||pack<=10.50f||(voltage_level_!=0&&(cell<3600||pack<10.80f)))next=1;if(next==voltage_level_)voltage_votes_=0;else{if(next!=voltage_candidate_){voltage_candidate_=next;voltage_votes_=0;}if(++voltage_votes_>=2){voltage_level_=next;voltage_votes_=0;}}}}}else{voltage_votes_=0;voltage_seen_=false;}if(!snapshot_.charging){snapshot_.battery_critical|=voltage_level_==2;snapshot_.battery_warning|=voltage_level_==1;}'
+    voltage_policy = by_name.get("LedStatusPolicy.cpp", (None, ""))[1]
+    if re.sub(r"\s+", "", voltage_policy).count(voltage_advisory) != 1:
+        fail("LedStatusPolicy.cpp: candidate cell/pack advisory must retain exact freshness, thresholds, hysteresis and charging gate")
+    if re.sub(r"\s+", "", policy_h).count("uint8_tvoltage_level_=0;") != 1:
+        fail("LedStatusPolicy.h: voltage advisory latch must initialize to zero")
+    controller_voltage = by_name.get("Controller.cpp", (None, ""))[1]
+    for field in ("sampled_at_ms", "cell_min_mv", "pack_voltage_v"):
+        expected = f"led_inputs.{field} = battery.{field};"
+        copies = re.findall(rf"led_inputs\.{field}\s*=\s*[^;]+;", controller_voltage)
+        if len(copies) != 1 or re.sub(r"\s+", "", copies[0]) != re.sub(r"\s+", "", expected):
+            fail(f"Controller.cpp: voltage advisory must consume exactly the cached battery.{field}")
+
     for fact, state in (("battery_warning", "BATTERY_WARNING"),
                         ("battery_critical", "BATTERY_CRITICAL")):
         declaration = rf"\bbool\s+{fact}\s*=\s*false\s*;"
@@ -2586,20 +2707,32 @@ def check_led_status_boundaries(files):
                 if count != 2:
                     fail(f"{path}: {fact} must have exactly two false defaults")
             elif path.name == "LedStatusPolicy.cpp":
+                voltage_body = re.search(r"\bconst\s+bool\s+voltage_valid\s*=.*?(?=snapshot_\.presentation\s*=\s*selectFromFacts)", remaining, re.DOTALL)
+                if voltage_body and re.sub(r"\s+", "", voltage_body.group(0)) == voltage_advisory:
+                    remaining = remaining[:voltage_body.start()] + remaining[voltage_body.end():]
+                if "voltage_level_" in remaining:
+                    fail(f"{path}: voltage advisory latch has an unreviewed producer/read")
+                level = "2" if fact == "battery_critical" else "1"
+                remaining, count = re.subn(rf"snapshot_\.{fact}\s*=\s*inputs\.{fact}\s*\|\|\s*soc_level_=={level};", "", remaining)
+                if count != 1:
+                    fail(f"{path}: {fact} must consume reviewed hysteretic SOC state and preserve external alarms")
+                compact = re.sub(r"\s+", "", code)
+                for guard in ("if(snapshot_.soc_valid)", "if(!snapshot_.charging)", "if(soc<=15)soc_level_=2;", "soc_level_==2&&soc<18", "soc<=30||(soc_level_!=0&&soc<33)"):
+                    if guard not in compact: fail(f"{path}: missing SOC freshness/hysteresis boundary: {guard}")
                 for allowed in (rf"\bfacts\.{fact}\s*=\s*in\.{fact}\s*;",
                                 rf"\bif\s*\(facts\.{fact}\)\s*return\s+"
                                 rf"LedPresentationState::{state}\s*;"):
                     remaining, count = re.subn(allowed, "", remaining)
                     if count != 1:
                         fail(f"{path}: {fact} requires one exact passthrough and selector read")
-            elif path.name == "CommandRouter.cpp":
+            elif path.name in ("CommandRouter.cpp", "HttpTransport.cpp"):
                 remaining, count = re.subn(rf'\bled\.{fact}\s*\?\s*""\s*:\s*""',
                                           "", remaining)
-                if count != 1 or f"{fact}=%s" not in code:
+                if count != 1 or (f"{fact}=%s" not in code and f"led_{fact}=%s" not in code):
                     fail(f"{path}: @LED STATUS must observe reserved {fact}")
             if re.search(rf"\b{fact}\b", remaining):
-                fail(f"{path}: {fact} has no reviewed production producer; "
-                     "only false defaults, exact cached passthrough and presentation reads are allowed")
+                fail(f"{path}: {fact} has an unreviewed production producer; "
+                     "only pinned SOC/voltage advisory, false defaults, exact cached passthrough and presentation reads are allowed")
 
     manager_path, manager = by_name.get("LedStatusManager.cpp", (None, ""))
     if manager.count("ring_->setFrame(frame)") != 1:
@@ -2690,14 +2823,17 @@ def check_servo_timeout_not_global(files):
             fail(f"{path}: ServoBus::begin() assigns st_.IOTimeOut directly - this makes "
                  f"the servo bus timeout a standing global override instead of a scoped, "
                  f"per-transaction one (see ScopedIOTimeout)")
-        if "ScopedIOTimeout" not in code:
-            fail(f"{path}: expected ScopedIOTimeout guard usage not found")
+        if "BusGuard" not in code:
+            fail(f"{path}: expected BusGuard (absolute-deadline transaction) usage not found")
 
     for path, code in files:
-        if path.name != "ServoBus.h":
+        if path.name != "BusTransaction.h":
             continue
-        if "class ScopedIOTimeout" not in code:
-            fail(f"{path}: ScopedIOTimeout RAII guard not found")
+        if "class BusGuard" not in code:
+            fail(f"{path}: BusGuard RAII transaction guard not found")
+    for path, code in files:
+        if path.name == "ServoBus.cpp" and re.search(r"\bIOTimeOut\b", code):
+            fail(f"{path}: ServoBus may not use the inter-byte IOTimeOut; every transaction is a BusGuard")
 
 
 def check_servo_timeout_categories_finding1(files):
@@ -2728,7 +2864,7 @@ def check_servo_timeout_categories_finding1(files):
                      f"instead (Session 2.3 Finding 1)")
             if "kOperationalTimeoutMs" not in body:
                 fail(f"{path}: {fn_name}() does not use kOperationalTimeoutMs - expected "
-                     f"an explicit ScopedIOTimeout(st_, kOperationalTimeoutMs) guard "
+                     f"an explicit BusGuard sized from kOperationalTimeoutMs "
                      f"(Session 2.3 Finding 1)")
 
     for path, code in files:
@@ -3523,7 +3659,7 @@ def check_safe_actuator_boundaries(files, sketch_dir):
     # in the repository qualifies to: MATDOG_JOINT_CALIBRATION.yaml records
     # {min: null, max: null} for all twelve leg joints.
     for path, code in files:
-        if path.name in policy_units or "/scripts/" in str(path).replace(os.sep, "/"):
+        if path.name in policy_units + ("CalibrationRuntimeRestore.h", "CalibrationRuntimeRestore.cpp") or "/scripts/" in str(path).replace(os.sep, "/"):
             continue
         if re.search(r"\blimits\(\)\.admit\(|\bActuatorLimitTable\b", code):
             fail(f"{path}: populates or holds an ActuatorLimitTable - accepted joint bounds "
@@ -6070,6 +6206,7 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
     # (owner), the router's persistence command file and the SAVE gate may
     # include the persistence headers, and only the ones they need.
     allowed_includers = {
+        sketch_dir / "src" / "calibration" / "CalibrationRuntimeRestore.h": {"CalibrationPersistenceService.h"},
         sketch_dir / "src" / "core" / "Controller.h": {
             "CalibrationPersistenceService.h", "CalibrationRecordNvsBackend.h"},
         sketch_dir / "src" / "core" / "Controller.cpp": {
@@ -6091,11 +6228,9 @@ def check_calibration_persistence_boundaries(files, sketch_dir):
 
 
 def check_calibration_persistence_integration(files, sketch_dir):
-    """P3a: the persistence integration is read/write-to-NVS only. It never
-    admits a JointTransform, never touches the servo bus or a servo EEPROM,
-    never grants a permit or starts a motion, runs before any actuator wiring
-    in Controller::begin(), and every persistent write command is behind its
-    gate."""
+    """P3a persistent writes remain gated. Local runtime RESTORE adds exactly
+    twelve torque-off reads and RAM restore, independently audited below;
+    persistent writes still cannot admit transforms, write actuators or permits."""
     core = sketch_dir / "src" / "core"
     cal = sketch_dir / "src" / "calibration"
     by_path = {p: c for p, c in files}
@@ -6118,6 +6253,22 @@ def check_calibration_persistence_integration(files, sketch_dir):
     )
     for path in integration:
         code = by_path[path]
+        if path.name == "CommandRouterPersistence.cpp":
+            start=code.find("void CommandRouter::handleRuntimeRestoreCommand(")
+            end=code.find("CommandRouter::PersistenceSchemaIdentity",start)
+            if start<0 or end<start:
+                fail("Local RAM RESTORE handler missing")
+            else:
+                restore=code[start:end]
+                for token in ("count!=4", "CONFIRM_CURRENT_INSTALLATION", "persistenceQuietViolation()",
+                              "for(uint8_t i=0;i<12;i++)", "readRuntimeState(joint->bus_id,&state)",
+                              "state.torque_enable!=0", "request.torque_off_confirmed=off",
+                              "request.current_installation_confirmed=true", "modules_.runtime_restore->restore("):
+                    if token not in restore: fail("Local RESTORE invariant missing: "+token)
+                for token in ("safeOff(", "->grant(", ".grant(", "->acquire(", "->arm(", "->save(",
+                              "writeTorque", "writePosition", "writeRegister", "writeEeprom"):
+                    if token in restore:fail("Local RESTORE may only read torque and restore RAM: "+token)
+                code=code[:start]+code[end:]
         for pattern, why in forbidden:
             if re.search(pattern, code):
                 fail(f"{path}: {pattern} - the persistence integration {why} (P3a)")
@@ -6263,7 +6414,7 @@ def check_portal_page_text(page, where="src/network/PortalPage.h"):
             fail(f"{where}: portal section {name!r} missing")
     for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
         if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
-    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",script,re.I):
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",re.sub(r"/api/motion/(?:login|session|logout)", "", script),re.I):
         fail(f"{where}: the portal must not address an actuator or calibration endpoint")
 
 
@@ -6276,7 +6427,9 @@ def check_network_v3_boundaries(files, sketch_dir):
       "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
       "AdminAccess.cpp": ('xSemaphoreTake(static_cast<SemaphoreHandle_t>(mutex_),0)',),
       "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','g==generation_.load()'),
-      "ControllerService.h": ('OperatingMode::MAINTENANCE','bool networkCritical() const','configBusy()','sessionLive()'),
+      # rc.4 boots in RUN with the AP role: motion activity and the operator's
+      # router role (not the default mode) make network mutations critical.
+      "ControllerService.h": ('motionActive()||powerState()!=PowerState::RUN||modules_.operating_mode->routerRole()','bool networkCritical() const','configBusy()','sessionLive()'),
       "CommandRouter.cpp": ('(WIFI command redacted)','NETWORK_CONFIG_BUSY'),
       "PortalSecurity.cpp": ('return ap&&host&&origin','strcmp(host,"192.168.4.1")','portalOrigin','peer==peer_','now-issued_<300000','tokenEqual(cookie,cookie_)','tokenEqual(csrf,csrf_)','seen&(1ull<<field)'),
     }
@@ -6313,8 +6466,11 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
+                             # 2: + handleCalibrationRestore (Issue #48, AP-only, reviewed 2026-10-14)
                              (compact_transport,"self->admitAdmin(r)",2),
-                             (compact_transport,"gate.allowed(req.admin_generation)",2)):
+                             # 3: + serviceStopLane (Issue #52, 2026-10-15): the priority STOP lane runs the
+                             # SAME admission as an AP Motion command (lease + generation + radio), pinned below.
+                             (compact_transport,"gate.allowed(req.admin_generation)",3)):
         if code.count(token)!=count:fail("AP-only fence coverage changed: "+token)
     if re.search(r"\b(?:WIFI_AP_STA|WIFI_MODE_APSTA)\b", manager):
         fail("WifiManager must never restore AP+STA")
@@ -6361,17 +6517,30 @@ def check_network_v3_boundaries(files, sketch_dir):
     for token in ("update::hmac256(digest,32,message,sizeof(message),tag)","!anyByte(digest,32)",
                   "diff|=raw[16+i]^tag[i]","if(!portalDeviceValid(digest,device))",
                   "if(!device||!device[0])returnfalse;",
-                  "returncurrent(now,peer,cookie)&&tokenEqual(csrf,csrf_);"):
+                  # rc.4: the idle expiry is renewed only after cookie, peer AND CSRF proof.
+                  "if(!current(now,peer,cookie)||!tokenEqual(csrf,csrf_))returnfalse;issued_=now;returntrue;"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",1),("portal_.resume(",1),
-                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/wifi/",4),
+    # portal_.authorize 4: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof)
+    # + the operator heartbeat (2026-10-15): only a poll proving session AND CSRF (the Dashboard,
+    # which holds STOP) keeps the deadman alive; the read-only Twin and anonymous polls never do.
+    # 2026-10-17: the same proof is computed once and also reported to the
+    # Dashboard ("heartbeat":true|false) so a lapsed session is visible.
+    if "constboolbeat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);if(beat)service_->operatorHeartbeat(now_ms);" not in compact_transport:
+        fail("Operator heartbeat must require the AP admin session and its CSRF token")
+    # 5th portal_.authorize: the Issue #52 STOP lane (same session + CSRF proof as a Motion
+    # command, after the admin lease/generation/radio admission, AP socket only).
+    if "constbooladmitted=lease&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio();" not in compact_transport or \
+       "if(admitted&&req.local_authorized&&req.ap_socket&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){" not in compact_transport:
+        fail("STOP lane must require the admin lease/generation/radio AND the AP session + CSRF proof")
+    for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",5),("portal_.resume(",1),
+                        ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
         if compact_transport.count(token)!=count:fail("Portal credential surface changed: "+token)
     for token in ("if(req.remember)portalDeviceIssue(gate.digest(),random+64,resp.device)",
                   "if(req.local_authorized&&!portal_.current(now,req.peer,req.cookie))",
                   "resp.ok=req.local_authorized&&portal_.current(",
                   '{"/wifi/session",HTTP_POST','{"/wifi/logout",HTTP_POST',
-                  "r.remember=read==81&&memcmp(body+70,\"&remember=1\",11)==0",
+                  "r.remember=!motion_auth&&read==81&&memcmp(body+70,\"&remember=1\",11)==0",
                   "Path=/wifi/session;Max-Age=34560000"):
         if token not in compact_transport:fail("Remembered-device transport invariant missing: "+token)
     for token in ("httpd_req_get_url_query","httpd_query_key_value","Serial.","ESP_LOG","log_e(","log_i(","log_d("):
@@ -6400,9 +6569,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     # network/ that owns the radio can name the mode manager, the authority
     # arbiter, a permit or an actuator.
     policy=re.sub(r"\s+","",by_name.get("NetworkPolicy.h",(None,""))[1])
-    for token in ("if(!i.run)returnRoleReason::MAINTENANCE_AP;",
+    for token in ("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;",
                   "returni.recovery?RoleReason::RUN_RECOVERY_AP:RoleReason::RUN_STA;",
-                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA;}",
+                  "inlineboolroleIsSta(RoleReasonr){returnr==RoleReason::RUN_STA||r==RoleReason::MAINTENANCE_STA_READONLY;}",
                   "returndwell>cap_ms?cap_ms:static_cast<uint32_t>(dwell);"):
         if token not in policy:fail("Radio role policy invariant missing: "+token)
     # The stored "AP always" preference of earlier firmware is carried, never
@@ -6410,9 +6579,9 @@ def check_network_v3_boundaries(files, sketch_dir):
     role_unit=policy[policy.find("enumclassRoleReason"):policy.find("constexpruint32_tkRecoveryDwellInitialMs")]
     if not role_unit or "ap_always" in role_unit or "FORCED" in role_unit:
         fail("The legacy AP-always preference must not be an input of the radio role decision")
-    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;};" not in policy:
-        fail("The radio role decision takes exactly: run, sta_profile, recovery")
-    if policy.find("if(!i.run)returnRoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
+    if "structRoleInputs{boolrun=false,sta_profile=false,recovery=false;boolmaintenance_lan=false;};" not in policy:
+        fail("The radio role decision takes run, sta_profile, recovery and RAM-only maintenance_lan")
+    if policy.find("if(!i.run)returni.maintenance_lan&&i.sta_profile&&!i.recovery?RoleReason::MAINTENANCE_STA_READONLY:RoleReason::MAINTENANCE_AP;")>policy.find("if(!i.sta_profile)"):
         fail("MAINTENANCE must outrank everything stored")
     if sorted(re.findall(r"[^;{}]*ap_always[^;{}]*;",compact_manager))!=["c.ap_always=p.config.ap_always;","w.ap_always=config_.ap_always;"]:
         fail("WifiManager may only carry the stored ap_always (form -> record, record -> status), never act on it")
@@ -6443,8 +6612,17 @@ def check_network_v3_boundaries(files, sketch_dir):
     if forwards!=["Controller.cpp"]:
         fail(f"The operating mode is forwarded to the Wi-Fi owner only by the Controller; call sites: {forwards}")
     controller=re.sub(r"\s+","",by_name.get("Controller.cpp",(None,""))[1])
-    if "wifi_.setRunMode(operating_mode_.mode()==OperatingMode::RUN);" not in controller:
-        fail("The Controller must forward exactly `mode == RUN`; any other mode keeps the maintenance AP")
+    # 2026-10-14 (operator directive): the radio role follows the OPERATOR's
+    # @MODE choice only (routerRole); automatic RUN entry by operational
+    # readiness keeps the administrative AP that serves the Android Dashboard.
+    if "wifi_.setRunMode(operating_mode_.routerRole());" not in controller:
+        fail("The Controller must forward exactly the operator's router role; automatic RUN keeps the AP")
+    autorun=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)enterRunAutomatic\s*\(",c2)]
+    if autorun!=["Controller.cpp"]:
+        fail(f"Automatic RUN entry belongs to operational readiness only; call sites: {autorun}")
+    raw_controller=by_name.get("Controller.cpp",(None,""))[1]
+    if "enterRunAutomatic" in raw_controller and "case core::ReadinessAction::ENTER_RUN:" not in raw_controller:
+        fail("enterRunAutomatic must be driven by OperationalReadiness ENTER_RUN")
     page_path=sketch_dir/"src"/"network"/"PortalPage.h"
     check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 
@@ -6464,6 +6642,45 @@ def check_motion_convergence_gate(sketch_dir):
         print(result.stdout.strip())
 
 
+def check_stand_release_scope(files):
+    by_name={p.name:c for p,c in files if "scripts" not in p.parts}
+    # ADR-006 (2026-10-17): availability is decided by runtime checks, never
+    # by a compile-time validation fence; qualification is reported, not gated.
+    if any('kStandOnlyCandidate' in c for p,c in files if "scripts" not in p.parts):
+        fail('ADR-006: compile-time STAND-only fence reintroduced')
+    if 'if(operational){unsigned joint=12;' not in by_name.get('Commissioning.cpp',''):
+        fail('ADR-006: operational WALK binding must depend on live limits only')
+    if '\\"hardware_qualified\\":{' not in by_name.get('MotionService.cpp',''):
+        fail('ADR-006: capabilities must report hardware qualification separately')
+    arm=by_name.get('Controller.cpp','').split('const char* Controller::armOperationalSession(')[-1].split('bool Controller::RestoreHook')[0]
+    if 'Serial.printf' in arm or 'writeAdmissionTrace(Serial,trace,trace_bytes)' not in arm:
+        fail('Admission diagnostics must use bounded nonallocating writes')
+    # The legacy comment stripper removes // even inside URL literals. Inspect
+    # only the real quoted CSP lines here; do not weaken other audit rules.
+    policy_path=next((p for p,c in files if p.name=='TwinHostPolicy.h'),None)
+    policy=''.join(re.findall(r'^\s*"([^"]*)"',policy_path.read_text(),re.MULTILINE)) if policy_path else ''
+    # rc.4: the Digital Twin is served by the Controller (/twin/); the Dashboard
+    # frames and fetches its own origin only, never a wildcard or another host.
+    expected="connect-src 'self'; frame-src 'self'; img-src 'self'; "
+    if expected not in policy or '*' in policy or 'http' in policy:fail('Twin CSP allowlist drift')
+
+
+def check_operational_session_boundaries(files):
+    by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
+    session=by_name.get("MotionSession.cpp",(None,""))[1]
+    # Core Motion V6: request() refuses torque ON itself and admits limits only through the shared planPrime().
+    for token in ('if(!image)', 'gate(e,input,fb,now)', 'policy_->plan(', 'runtime_->execute(',
+                  'if(fb.torque_on[i])', 'planPrime(fb.actual_rad', 'executor_->arm(', 'policy_->epoch()!=epoch_',
+                  'e.scope==TrialScope::FIXTURE_MICRO', 'AUTONOMOUS_SUPPORT_LOAD_REQUIRED', 'WALK_DYNAMICS_REQUIRED'):
+        if token not in session:fail("MotionSession operational invariant missing: "+token)
+    config=by_name.get("BuildConfig.h",(None,""))[1]
+    if not re.search(r'constexpr bool kOperationalMotionAuthorized\s*=\s*false\s*;',config):
+        fail("Operational image must retain MOTION_AUTHORIZED=0")
+    for path,code in files:
+        if path.parent.name=="network" and any(t in code for t in ('requestLocalMotionTrial(', 'requestFixtureMicro(', 'bindReviewedMotionRuntime(', '.request(core::ActuatorAuthority::MOTION')):
+            fail(str(path)+": network may not grant operational authority or trial evidence")
+
+
 def main():
     files = [(p, strip_comments(p.read_text(encoding="utf-8"))) for p in iter_source_files()]
 
@@ -6471,8 +6688,12 @@ def main():
         fail(f"no source files found under {SKETCH_DIR}")
 
     check_forbidden_literals(files)
+    check_stand_release_scope(files)
+    check_operational_session_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
+    check_sync_frame_boundary(files)
+    check_loop_task_stack(files)
     check_servo_id_write(files)
     check_daly_write(files)
     check_bms_command_surface(files)

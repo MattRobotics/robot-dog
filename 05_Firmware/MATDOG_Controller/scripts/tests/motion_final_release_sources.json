@@ -1,0 +1,11 @@
+{
+  "schema": "MATDOG_ORIGINAL_EXTENSION_REVIEW_V1",
+  "approved_original_source_changes": [
+    {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
+      "original_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
+      "current_sha256": "a91e936afec276b1e4c10c3fe60fd8caa5a89b33227dffc0912ab0950d0aebf8",
+      "reason": "Bounded complete STL reference smoothing derivatives; G4 scheduler unchanged"
+    }
+  ]
+}

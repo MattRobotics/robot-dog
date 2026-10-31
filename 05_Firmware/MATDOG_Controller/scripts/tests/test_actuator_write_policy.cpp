@@ -1108,13 +1108,13 @@ static void test_tostring_is_total() {
   }
   CHECK(std::strcmp(toString(static_cast<ActuatorOperation>(99)), "UNKNOWN") == 0);
 
-  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_SEQUENCE_PREREQUISITES;
+  for (uint8_t raw = 0; raw <= (uint8_t)WriteDecision::REJECT_FRAME_SHAPE;
        ++raw) {
     CHECK(std::strcmp(toString(static_cast<WriteDecision>(raw)), "UNKNOWN") != 0);
   }
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(99)), "UNKNOWN") == 0);
   CHECK(std::strcmp(toString(static_cast<WriteDecision>(
-                        (uint8_t)WriteDecision::REJECT_SEQUENCE_PREREQUISITES + 1)),
+                        (uint8_t)WriteDecision::REJECT_FRAME_SHAPE + 1)),
                     "UNKNOWN") == 0);
 
   for (uint8_t raw = 0; raw <= (uint8_t)TransactionState::ABORTED; ++raw) {

@@ -35,6 +35,7 @@ export interface UrdfCollision {
 export interface UrdfLink {
   readonly name: string;
   readonly collision: UrdfCollision | null;
+  readonly visual?: UrdfCollision | null;
 }
 
 export type UrdfJointType =
@@ -127,35 +128,35 @@ function firstChildElement(parent: Element, tagName: string): Element | null {
   return childElements(parent, tagName)[0] ?? null;
 }
 
-function parseCollision(linkNode: Element, linkName: string): UrdfCollision | null {
-  const collisions = childElements(linkNode, 'collision');
+function parseMeshElement(linkNode: Element, linkName: string, kind: 'collision' | 'visual'): UrdfCollision | null {
+  const collisions = childElements(linkNode, kind);
   if (collisions.length === 0) return null;
   if (collisions.length > 1) {
     throw new UrdfParseError(
-      `${linkName}: this viewer supports exactly one <collision> per link, found ${collisions.length}`,
+      `${linkName}: this viewer supports exactly one <${kind}> per link, found ${collisions.length}`,
     );
   }
   const collision = collisions[0] as Element;
   const geometry = firstChildElement(collision, 'geometry');
   if (!geometry) {
-    throw new UrdfParseError(`${linkName}: <collision> without <geometry>`);
+    throw new UrdfParseError(`${linkName}: <${kind}> without <geometry>`);
   }
   const mesh = firstChildElement(geometry, 'mesh');
   if (!mesh) {
     throw new UrdfParseError(
-      `${linkName}: <collision> geometry is not a <mesh>; primitive collision shapes are not supported`,
+      `${linkName}: <${kind}> geometry is not a <mesh>; primitive collision shapes are not supported`,
     );
   }
   const filename = mesh.getAttribute('filename');
   if (!filename) {
-    throw new UrdfParseError(`${linkName}: <collision> mesh has no filename`);
+    throw new UrdfParseError(`${linkName}: <${kind}> mesh has no filename`);
   }
-  const scale = parseVec3(mesh.getAttribute('scale'), UNIT_SCALE, `${linkName}.collision.mesh.scale`);
+  const scale = parseVec3(mesh.getAttribute('scale'), UNIT_SCALE, `${linkName}.${kind}.mesh.scale`);
   if (scale.some((value) => value === 0)) {
-    throw new UrdfParseError(`${linkName}: <collision> mesh scale contains zero: ${scale.join(' ')}`);
+    throw new UrdfParseError(`${linkName}: <${kind}> mesh scale contains zero: ${scale.join(' ')}`);
   }
   return {
-    origin: parseOrigin(collision, `${linkName}.collision`),
+    origin: parseOrigin(collision, `${linkName}.${kind}`),
     mesh: { filename, scale },
   };
 }
@@ -222,7 +223,7 @@ export function parseUrdf(xml: string, parseXml: XmlDocumentParser = browserXmlP
     if (!name) throw new UrdfParseError('<link> without a name attribute');
     if (linkNames.has(name)) throw new UrdfParseError(`duplicate link name: ${name}`);
     linkNames.add(name);
-    links.push({ name, collision: parseCollision(linkNode, name) });
+    links.push({ name, collision: parseMeshElement(linkNode, name, 'collision'), visual: parseMeshElement(linkNode, name, 'visual') });
   }
   if (links.length === 0) throw new UrdfParseError('URDF contains no <link>');
 

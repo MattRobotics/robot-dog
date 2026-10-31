@@ -1,3 +1,5 @@
+Current Motion Digital Twin extension: [MOTION_TWIN.md](docs/MOTION_TWIN.md) documents actual/target joints, Controller telemetry, synthetic and verified trace playback, stale handling, Dashboard integration and asset budget. The historical BNO085 hardware results below retain their original scope.
+
 # MATDOG — BNO085 full-body viewer
 
 Standalone, local, browser-based 3D viewer that renders the **complete MATDOG

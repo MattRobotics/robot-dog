@@ -1,0 +1,2 @@
+CalibrationRuntimeRestore: 884 checks, 0 failures (offline; no hardware or approved production bounds)
+test_calibration_persistence_service: 500 checks, 0 failures

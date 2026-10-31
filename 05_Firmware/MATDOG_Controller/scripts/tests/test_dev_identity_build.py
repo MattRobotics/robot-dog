@@ -21,9 +21,9 @@ import build_manifest as bm  # noqa: E402
 import matdog_layout as layout  # noqa: E402
 
 HEAD = "aee49bf306f88d56562634aeba08b767f92b247c"
-IDENTITY = {"FW_VERSION": "0.2.0-dev.3", "BUILD_UTC": "2026-10-05T00:00:00Z",
+IDENTITY = {"FW_VERSION": "0.2.0-dev.5", "BUILD_UTC": "2026-10-05T00:00:00Z",
             "BUILD_UTC_POLICY": "SOURCE_DATE_EPOCH", "CAL_RECORD_SCHEMA": "1",
-            "CAL_MARKER_SCHEMA": "2", "MOTION_STACK": "G1_G5A_COMPILED_UNWIRED"}
+            "CAL_MARKER_SCHEMA": "2", "MOTION_STACK": "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED"}
 
 
 def file_hashes(root):
@@ -141,9 +141,9 @@ def macro(name):
     m = re.search(r"-D" + name + r'=\"([^\"]+)\"', flags)
     assert m, (name, flags)
     return m.group(1)
-payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + "0.2.0-dev.3\\0" +
+payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + "0.2.0-dev.5\\0" +
            macro("MATDOG_GIT_SHA") + "\\0" + macro("MATDOG_BUILD_UTC") + "\\0" +
-           "G1_G5A_COMPILED_UNWIRED\\0" + flags).encode()
+           "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED\\0" + flags).encode()
 (out / "MATDOG_Controller.ino.bin").write_bytes(payload)
 shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partitions.bin")
 (out / "MATDOG_Controller.ino.elf").write_bytes(b"fake ELF")
@@ -161,6 +161,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
                         SOURCE_DATE_EPOCH="1791158400", PYTHONDONTWRITEBYTECODE="1")
         for name in ("MATDOG_BUILD_DIR", "MATDOG_OUTPUT_DIR", "MATDOG_BUILD_CACHE_DIR",
                      "MATDOG_BUILD_TMP_DIR", "MATDOG_PROFILE", "MATDOG_OTA_INGEST_VALIDATION",
+                     "MATDOG_TLS_IDENTITY_FILE",
                      "FAKE_STATUS", "FAKE_FAIL", "FAKE_OTHER_WORKTREE"):
             self.env.pop(name, None)
         self.before = file_hashes(self.repo)
@@ -182,7 +183,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         fields = self.manifest()
-        self.assertEqual(fields["FW_VERSION"], "0.2.0-dev.3")
+        self.assertEqual(fields["FW_VERSION"], "0.2.0-dev.5")
         self.assertEqual(fields["GIT_SHA"], HEAD)
         self.assertEqual(fields["GIT_DIRTY"], "0")
         self.assertEqual(fields["BUILD_ID"], HEAD[:12])
@@ -241,6 +242,25 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         for changes in ({"SOURCE_DATE_EPOCH": "-1"}, {"SOURCE_DATE_EPOCH": "invalid"},
                         {"MATDOG_PROFILE": "typo"}, {"MATDOG_OTA_INGEST_VALIDATION": "2"}):
             self.assertNotEqual(self.run_build(**changes).returncode, 0)
+        self.assertFalse(self.capture.exists())
+
+    def test_external_private_tls_bound_without_exporting_header(self):
+        private = self.base / "private-identity.h"
+        private.write_text('#define MATDOG_TLS_CERT_PEM "test-only-cert"\n'
+                           '#define MATDOG_TLS_KEY_PEM "test-only-key"\n')
+        result = self.run_build(MATDOG_TLS_IDENTITY_FILE=str(private))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.manifest()["PRIVATE_TLS_CONFIGURATION_SHA256"], bm.sha256_file(private))
+        args = json.loads(self.capture.read_text())
+        flags = next(value for value in args if value.startswith("compiler.cpp.extra_flags="))
+        self.assertIn('-DMATDOG_TLS_IDENTITY_HEADER="' + str(private) + '"', flags)
+        self.assertFalse(any(p.name == private.name for p in self.root.rglob("*")))
+
+    def test_private_tls_missing_unsafe_or_inside_worktree_refused(self):
+        for path in (self.base / "missing.h", self.sketch / "src/config/BuildConfig.h",
+                     self.base / "unsafe name.h", Path("relative.h")):
+            with self.subTest(path=path):
+                self.assertNotEqual(self.run_build(MATDOG_TLS_IDENTITY_FILE=str(path)).returncode, 0)
         self.assertFalse(self.capture.exists())
 
 

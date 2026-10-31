@@ -8,6 +8,9 @@
 #include "../config/Pins.h"
 #include "../core/Availability.h"
 #include "../core/SystemState.h"
+#include "ImuFeed.h"
+
+struct sh2_SensorEvent;   // vendored SH-2 stack (see ImuFeed.h); only a pointer crosses this header
 
 namespace matdog {
 namespace imu {
@@ -33,38 +36,75 @@ namespace imu {
 // missing/failed IMU must degrade only the IMU module (handoff section 33).
 // begin() therefore returns false and update() stops touching the sensor;
 // the rest of the controller (servo/DALY/LED/USB) keeps running.
+//
+// Core Motion V5: acquisition runs in its OWN task (startTask()), never in the
+// Motion/Controller thread. The library blocks with delay(1) polls (up to 500 ms,
+// then a hardware reset) when INT is high, and keeps one event per call; both are
+// avoided here - see ImuFeed.h. The Motion thread only reads orientationSnapshot().
 class Bno085Imu {
  public:
   bool begin();
-  void update(uint32_t now_ms);
+  // One bounded service pass: drains the SH-2 stack only while INT says data is
+  // pending, one callback per report. Called by the task; also usable inline
+  // (tests, or the Controller if the task could not be created).
+  void service(uint32_t now_ms);
+  void update(uint32_t now_ms) { service(now_ms); }
+  bool startTask();
+  bool taskRunning() const { return task_ != nullptr; }
   core::ModuleHealth health() const { return core::toModuleHealth(core::classify(availability())); }
   core::AvailabilityStatus availability() const;
 
-  bool streamEnabled() const { return stream_enabled_; }
+  bool streamEnabled() const { return stream_enabled_.load(); }
   void setStreamEnabled(bool enabled) { stream_enabled_ = enabled; }
 
-  uint32_t rvCount() const { return rv_count_; }
-  uint32_t runtimeResetCount() const { return runtime_reset_count_; }
+  // sampled_at_ms = host time the Rotation Vector was RECEIVED (cargo read), not
+  // the start of a Controller loop. sensor_age_us is the sample's age at the
+  // interrupt according to the SH-2 stack (0 if unknown); never an absolute clock.
+  struct OrientationSnapshot { bool valid=false;uint32_t sampled_at_ms=0;double wxyz[4]{1,0,0,0};uint32_t seq=0;uint32_t rx_us=0;int32_t sensor_age_us=0;float accuracy_rad=0; };
+  OrientationSnapshot orientationSnapshot() const {
+    OrientationSnapshot o;RotationSample s;
+    if(!feed_.snapshot(&s)||!s.valid){if(feed_.rvCount())snapshot_failures_.fetch_add(1);return o;}
+    o.valid=true;o.sampled_at_ms=s.rx_ms;o.seq=s.seq;o.rx_us=s.rx_us;o.sensor_age_us=s.sensor_age_us;o.accuracy_rad=s.accuracy_rad;
+    for(unsigned i=0;i<4;++i){o.wxyz[i]=s.wxyz[i];}
+    return o;
+  }
+  uint32_t rvCount() const { return feed_.rvCount(); }
+  // Reads that found no completed sample although one had been published (expected 0 with the two-slot snapshot).
+  uint32_t snapshotReadFailures() const { return snapshot_failures_.load(); }
+  uint32_t runtimeResetCount() const { return runtime_reset_count_.load(); }
+  // Service statistics for the first-stop trace (single writer: the IMU task; torn
+  // reads are possible and harmless for diagnostics).
+  const ImuServiceStats& serviceStats() const { return feed_.stats(); }
 
  private:
   bool configureCalibrationSession();
   void printTelemetryBlock();
   void printSaveGate();
+  static void onSensorEvent(void* cookie, struct sh2_SensorEvent* event);
+  static void taskEntry(void* self);
+  void consume(const sh2_SensorValue_t& value, int32_t sensor_age_us, uint32_t now_ms);
+  bool dataReady() const;
 
   Adafruit_BNO08x bno08x_{pins::kBnoRst};
   sh2_SensorValue_t sensor_value_{};
 
-  core::InitializationState init_ = core::InitializationState::NOT_INITIALIZED;
-  core::DetectedState detected_ = core::DetectedState::UNKNOWN;
-  bool stream_enabled_ = true;  // must default true: the viewer sends no commands.
+  sh2_SensorValue_t decoded_{};
+  // Written by the IMU task, read by the Controller thread: single-byte state.
+  std::atomic<core::InitializationState> init_{core::InitializationState::NOT_INITIALIZED};
+  std::atomic<core::DetectedState> detected_{core::DetectedState::UNKNOWN};
+  std::atomic<bool> stream_enabled_{true};  // must default true: the viewer sends no commands.
+  ImuFeed feed_;
+  mutable std::atomic<uint32_t> snapshot_failures_{0};
+  void* task_ = nullptr;
+  uint32_t last_service_us_ = 0;
+  bool have_service_ = false;
 
   uint32_t mag_count_ = 0;
   uint32_t game_count_ = 0;
-  uint32_t rv_count_ = 0;
   uint32_t acc_count_ = 0;
   uint32_t gyr_count_ = 0;
 
-  uint32_t runtime_reset_count_ = 0;
+  std::atomic<uint32_t> runtime_reset_count_{0};
   bool startup_reset_observed_ = false;
 
   float mag_x_ = 0, mag_y_ = 0, mag_z_ = 0;

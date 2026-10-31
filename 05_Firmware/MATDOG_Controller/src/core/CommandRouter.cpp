@@ -1,3 +1,4 @@
+#include <cmath>
 #include "CommandRouter.h"
 
 #include <esp_ota_ops.h>
@@ -22,6 +23,7 @@
 #include "../config/Pins.h"
 #include "../network/HttpTransport.h"
 #include "ControllerService.h"
+#include "../simple/MotionTiming.h"
 
 namespace matdog {
 namespace core {
@@ -99,6 +101,7 @@ bool CommandRouter::motionExecutorBusy() const {
     startup->phase()!=calibration::StartupQualificationPhase::READY &&
     startup->phase()!=calibration::StartupQualificationPhase::COMPLETE &&
     startup->phase()!=calibration::StartupQualificationPhase::REFUSED;
+  if(modules_.service && modules_.service->motionActive())return true;
   return modules_.first_motion->active() || modules_.full_leg_calibration->active() || observing;
 }
 
@@ -110,7 +113,8 @@ bool CommandRouter::servoDiagnosticBusy() const {
 }
 
 void CommandRouter::update(uint32_t now_ms) {
-  while (Serial.available()) {
+  unsigned serial_bytes=0;
+  while (serial_bytes++<64 && Serial.available()) {
     char c = static_cast<char>(Serial.read());
 
     if (c == '\r') continue;
@@ -139,7 +143,7 @@ void CommandRouter::update(uint32_t now_ms) {
     line_buf_[line_len_++] = c;
   }
 
-  if (bms_stream_enabled_ && (now_ms - last_bms_stream_ms_ >= 2000)) {
+  if (bms_stream_enabled_ && !(modules_.service&&modules_.service->motionEngaged()) && (now_ms - last_bms_stream_ms_ >= 2000)) {
     last_bms_stream_ms_ = now_ms;
     printBmsStatus();
   }
@@ -221,6 +225,79 @@ void CommandRouter::handleLine(String line) {
 
   String upper = line;
   upper.toUpperCase();
+  // LOADDIAG: read-only RAM evidence, allowed during Motion like @MOTION STATUS.
+  // No servo transaction: commanded goals, the latest dated feedback (incl.
+  // RAM 48 of the existing control read), the latest DALY sample, and the
+  // first-exit record frozen before SAFE_OFF.
+  if(upper=="@MOTION DIAG"){
+    const auto* m=modules_.service?modules_.service->motionDiagnostic():nullptr;
+    if(!m){Serial.println("MOTION_DIAG=UNAVAILABLE");return;}
+    simple::timing::Outside timer(simple::timing::USB_SERIAL);
+    const uint64_t us=esp_timer_get_time();const auto d=m->commandedDrive();
+    const auto& b=modules_.daly->sample();
+    Serial.printf("MOTION_DIAG live us=%llu ms=%lu state=%s phase=%s reason=%s energized=%u releases=%lu missed=%lu max_gap_us=%llu drive=%u/%u goal_sent_us=%llu settle_us=%llu deadline_us=%llu bms_valid=%u bms_ms=%lu pack_v=%.2f pack_a=%.2f loaded_phase=%s loaded_mask=0x%03x loaded_since_us=%llu temp_spikes=%lu hot_pending=0x%03x\n",
+      (unsigned long long)us,(unsigned long)millis(),simple::name(m->state()),m->phase(),m->reason(),unsigned(m->energized()),(unsigned long)m->releases(),(unsigned long)m->missed(),
+      (unsigned long long)m->maxGapUs(),unsigned(d.speed),unsigned(d.acc),(unsigned long long)m->goalSentUs(),(unsigned long long)m->settleUs(),(unsigned long long)m->deadlineUs(),
+      unsigned(b.valid),(unsigned long)b.sampled_at_ms,b.pack_voltage_v,b.pack_current_a,
+      *m->loadedPhase()?m->loadedPhase():"NONE",unsigned(m->loadedMask()),(unsigned long long)m->loadedSinceUs(),
+      (unsigned long)m->tempSpikes(),unsigned(m->hotPendingMask()));
+    auto joint=[](const char* tag,unsigned i,uint16_t cmd,const simple::Feedback& f,uint64_t at){
+      Serial.printf("MOTION_DIAG %s s=%u cmd=%u raw=%u err=%d spd=%d load=%d cur=%d v=%d t=%d st=%d tq=%d tlim=%d goal=%d gs=%d acc=%d valid=%u age_us=%lld cage_us=%lld\n",
+        tag,i,unsigned(cmd),unsigned(f.raw),int(cmd)-int(f.raw),f.speed,f.load,f.current,f.voltage,f.temp,f.status,f.torque,f.torqueLimit,f.goal,f.goalSpeed,f.acc,unsigned(f.valid),
+        f.stampUs?(long long)(at-f.stampUs):-1LL,f.controlStampUs?(long long)(at-f.controlStampUs):-1LL);};
+    for(unsigned i=0;i<12;++i)joint("live_j",i,m->commandedRaw()[i],m->feedback()[i],us);
+    const auto& e=m->exitSnapshot();
+    Serial.printf("MOTION_DIAG exit valid=%u fault=%u reason=%s phase=%s state=%s at_us=%llu now_us=%llu energized=%u releases=%lu missed=%lu max_gap_us=%llu drive=%u/%u goal_sent_us=%llu settle_us=%llu deadline_us=%llu last_polled=%u loaded_phase=%s loaded_mask=0x%03x\n",
+      unsigned(e.valid),unsigned(e.fault),e.reason,e.phase,simple::name(e.state),(unsigned long long)e.atUs,(unsigned long long)e.nowUs,unsigned(e.energized),(unsigned long)e.releases,(unsigned long)e.missed,
+      (unsigned long long)e.maxGapUs,unsigned(e.drive.speed),unsigned(e.drive.acc),(unsigned long long)e.goalSentUs,(unsigned long long)e.settleUs,(unsigned long long)e.deadlineUs,e.lastPolled,
+      *e.loadedPhase?e.loadedPhase:"NONE",unsigned(e.loadedMask));
+    if(e.valid)for(unsigned i=0;i<12;++i)joint("exit_j",i,e.commandedRaw[i],e.fb[i],e.atUs);
+    return;
+  }
+  if(upper=="@MOTION TIMING"){
+    if(!modules_.service||modules_.service->motionEngaged()){Serial.println("MOTION_TIMING=REFUSED reason=MOTION_ACTIVE");return;}
+    const auto& t=simple::timing::state;
+    for(unsigned i=0;i<2;++i){const auto& r=i?t.maximum:t.firstMiss;
+      Serial.printf("MOTION_TIMING record=%s valid=%u phase=%s previous_phase=%s stamp_us=%llu release=%lu lateness_us=%llu missed=%lu skipped=%lu work_us=%lu visit_gap_us=%llu outside_visit_us=%llu fast_reads=%lu control_reads=%lu frames=%lu",
+        i?"MAX_WORK":"FIRST_MISS",r.valid,r.phase,r.previousPhase,(unsigned long long)r.stampUs,(unsigned long)r.release,(unsigned long long)r.latenessUs,(unsigned long)r.missed,(unsigned long)r.skipped,(unsigned long)r.workUs,(unsigned long long)r.visitGapUs,(unsigned long long)r.outsideVisitUs,(unsigned long)r.fastReads,(unsigned long)r.controlReads,(unsigned long)r.frames);
+      const char* parts[]={"read","nominal","compensate","convert","frame","rest"};
+      for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" %s_us=%lu previous_%s_us=%lu",parts[k],(unsigned long)r.us[k],parts[k],(unsigned long)r.previousUs[k]);
+      for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_us=%lu",k,(unsigned long)r.externalUs[k]);
+      const char* works[]={"solves","ik","newton","fk"};
+      for(unsigned k=0;k<simple::timing::WORKS;++k)Serial.printf(" %s=%lu previous_%s=%lu",works[k],(unsigned long)r.work[k],works[k],(unsigned long)r.previousWork[k]);Serial.println();
+    }
+    Serial.printf("MOTION_TIMING totals max_visit_gap_us=%llu max_outside_visit_us=%llu",(unsigned long long)t.maxVisitGap,(unsigned long long)t.maxOutside);
+    for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_max_us=%lu",k,(unsigned long)t.externalMax[k]);
+    for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();return;
+  }
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
+    if(upper=="@MOTION STATUS"){
+      static char out[6144];MotionStatusSnapshot snapshot;bool ok;
+      {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
+      if(ok){simple::timing::Outside timer(simple::timing::USB_FORMAT);ok=MotionService::formatStatus(snapshot,out,sizeof(out));}
+      if(ok){simple::timing::Outside timer(simple::timing::USB_SERIAL);Serial.println(out);}return;
+    }
+    motion::MotionCommand c;c.owner=motion::ClientOwner::LOCAL;c.sequence=++simple_sequence_;c.issued_at_ms=millis();c.ttl_ms=1000;
+    snprintf(c.id,sizeof(c.id),"usb-%lu",(unsigned long)c.sequence);
+    c.intent=motion::Intent::STOP;
+    if(upper.startsWith("@MOTION STAND ")){char* end=nullptr;const char* value=upper.c_str()+14;
+      const double mm=strtod(value,&end);if(end==value||*end||!std::isfinite(mm)){Serial.println("MOTION=REJECTED REASON=INVALID_HEIGHT_MM");return;}
+      c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
+    }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=simple::kStrideM[1]/simple::kWalkPeriodS;}
+    else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
+    else if(upper=="@MOTION PRONE")c.intent=motion::Intent::LIE_DOWN;
+    const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
+  }
+  // Keep slow diagnostic and persistent operations out of the active motion
+  // chain. STOP above is independent of this exclusion and of HTTP.
+  if(modules_.service&&modules_.service->motionEngaged()){
+    Serial.println("COMMAND=REFUSED REASON=MOTION_ACTIVE_USE_STOP");return;
+  }
+  if (upper == "@WIFI LAN ON" || upper == "@WIFI LAN OFF") {
+    if (modules_.authority->current()!=ActuatorAuthority::NONE || modules_.operating_mode->mode()!=OperatingMode::MAINTENANCE) { Serial.println("LAN=REJECT_MODE_OR_OWNER"); return; }
+    modules_.wifi->setMaintenanceLan(upper == "@WIFI LAN ON");
+    Serial.println("LAN=REQUESTED_READ_ONLY_ROLE; ASUS_TRANSPORT_MUST_BE_INDEPENDENT"); return;
+  }
   // Network flash transactions reserve the quiet window before enqueueing.
   // Existing STOP/ABORT and read-only status commands remain available.
   if (modules_.wifi && modules_.wifi->configBusy() && upper.startsWith("@CALIBRATION") &&
@@ -371,6 +448,8 @@ void CommandRouter::handleLine(String line) {
       Serial.println("REASON=NETWORK_REQUEST_BUSY_OR_UNAVAILABLE");
     }
     printWifiStatus();
+  } else if (upper.startsWith("@CALIBRATION RESTORE")) {
+    handleRuntimeRestoreCommand(upper);
   } else if (isPersistCommand(upper)) {
     handlePersistCommand(upper);
   } else if (upper == "@CALIBRATION Q0 STATUS") {
@@ -1943,7 +2022,12 @@ void CommandRouter::printSourceSignature() {
                 update::kLayoutId, (unsigned)schemas.record_schema,
                 (unsigned)schemas.marker_schema,
                 update::OtaManager::ingestEnabled() ? 1U : 0U, build::kMotionStack);
-  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=NOT_IMPLEMENTED\n",
+  Serial.printf("  SUPERVISED_VALIDATION_CAPABLE=%u BOOT_MOTION_AUTHORIZED=0 LOCAL_PROFILE=RAM_ONLY\n",build::kSupervisedValidationCapable?1u:0u);
+  // 2026-10-14: no compile-time grant (MOTION_AUTHORIZED=0) and no motion at
+  // boot; MOTION authority is granted/revoked at runtime by operational
+  // readiness (census, RESTORE, feedback, limits, IMU, BMS, power, RUN).
+  Serial.println("  MOTION_AUTHORITY=RUNTIME_GOVERNED AUTO_RESTORE=LIVE_EVIDENCE TWIN=/twin/");
+  Serial.printf("  BUILD_UTC=%s APP_SHA256=ASSOCIATED_MANIFEST RESTORE=LOCAL_EXPLICIT_RAM_ONLY\n",
                 build::kBuildUtc);
   Serial.printf("  ota_running_build_id=%s ota_running_image_state=%s reset_reason=%s\n",
                 o.running_build_id, update::toString(o.policy.running_image_state),
@@ -1999,6 +2083,16 @@ void CommandRouter::printLedStatus() {
                 led.charge_complete_verified ? "YES" : "NO",
                 led.battery_warning ? "YES" : "NO", led.battery_critical ? "YES" : "NO",
                 status::toString(s->ledDiagnostic()));
+  const status::LedStatusManager& manager = s->ledManager();
+  const uint32_t count = manager.transitionCount();
+  Serial.printf("  presentation_transitions=%lu (newest first, at most %u)\n", (unsigned long)count,
+                (unsigned)status::LedStatusManager::kTransitionHistory);
+  for (uint8_t i = 0; i < status::LedStatusManager::kTransitionHistory && i < count; ++i) {
+    const auto& t = manager.transition(i);
+    Serial.printf("  LED_TRANSITION at_ms=%lu from=%s to=%s wifi_connecting=%s firmware_update=%s\n",
+                  (unsigned long)t.at_ms, status::toString(t.from), status::toString(t.to),
+                  t.wifi_connecting ? "YES" : "NO", t.firmware_update ? "YES" : "NO");
+  }
 }
 
 void CommandRouter::printServoScanResult() {
@@ -2107,6 +2201,18 @@ void CommandRouter::printServoRead(int id) {
                 id, state.present_position, state.present_speed, state.present_load,
                 state.present_voltage, state.present_temperature, state.torque_enable,
                 state.present_current);
+  // Read-only evidence for torque sufficiency, only through the existing
+  // MAINTENANCE/idle-gated @SERVO READ. Raw C018 values, -1 means UNKNOWN.
+  // 18 is UnloadCondition; 19 is LedAlarm. Never write a diagnostic default.
+  const uint8_t address[]={16,48,18,19,28,34,35,36,38,65};
+  const uint8_t width[]={2,2,1,1,2,1,1,1,1,1};
+  int32_t value[10];unsigned known=0;
+  for(unsigned i=0;i<10;++i){value[i]=-1;
+    if(modules_.servo_bus->readProfileRegister(id,address[i],width[i],&value[i]))known|=1u<<i;
+    else value[i]=-1;
+  }
+  Serial.printf("SERVO_LIMITS id=%d sampled_ms=%lu max_torque=%ld torque_limit=%ld unload_condition=%ld led_alarm=%ld protection_current=%ld protection_torque=%ld protection_time=%ld overload_torque=%ld overcurrent_time=%ld servo_status=%ld known_mask=%u source=READ_ONLY_REGISTERS eeprom=16,18,19,28,34,35,36,38 ram=48,65 unknown=-1\n",
+    id,(unsigned long)millis(),(long)value[0],(long)value[1],(long)value[2],(long)value[3],(long)value[4],(long)value[5],(long)value[6],(long)value[7],(long)value[8],(long)value[9],known);
 }
 
 void CommandRouter::printServoSafeOff(int id) {

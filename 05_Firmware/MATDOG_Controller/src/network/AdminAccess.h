@@ -78,9 +78,17 @@ public:
   void setDigest(const uint8_t digest[32]) { memcpy(digest_, digest, 32); }
   const uint8_t *digest() const { return digest_; }
   uint32_t generation() const { return generation_.load(); }
-  bool allowed(uint32_t g) const {
-    return g && admitted_.load() && !closing.load() && !radio_fault.load() &&
-           phase.load() == NetworkPhase::ADMIN_AP && g == generation_.load();
+  bool allowed(uint32_t g,const char** failure=nullptr) const {
+    // Report the failing observation itself, never rerun an asynchronous gate
+    // solely for diagnostics. Ordering and admission predicates are unchanged.
+    auto deny=[&](const char* why){if(failure)*failure=why;return false;};
+    if(!g)return deny("GATE_GENERATION_ZERO");
+    if(!admitted_.load())return deny("GATE_NOT_ADMITTED");
+    if(closing.load())return deny("GATE_CLOSING");
+    if(radio_fault.load())return deny("GATE_RADIO_FAULT");
+    if(phase.load()!=NetworkPhase::ADMIN_AP)return deny("GATE_NOT_ADMIN_AP");
+    if(g!=generation_.load())return deny("GATE_GENERATION_CHANGED");
+    return true;
   }
   void revoke() {
     admitted_.store(false);

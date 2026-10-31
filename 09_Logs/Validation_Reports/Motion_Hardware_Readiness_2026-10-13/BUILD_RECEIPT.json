@@ -1,0 +1,63 @@
+{
+  "schema": "MATDOG_HARDWARE_READINESS_BUILD_V1",
+  "candidate_binary_local": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/candidates/f62e89b1f482ebb2aee6cca5f5ec148d7509b383/ROBOT_POWERED-ota0/MATDOG_Controller.ino.bin",
+  "candidate_sha256": "772b2658c63878b0d98ee8046cf3bd4bbb158460b0c79eb0af8b4361e4b0499f",
+  "manifest_local": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/candidates/f62e89b1f482ebb2aee6cca5f5ec148d7509b383/ROBOT_POWERED-ota0/matdog_build_manifest.txt",
+  "manifest_sha256": "0e36c4b1161cd037c124e8fda71c7eb2e84c1cf9ab299a2146fca6d96e461baf",
+  "compiled_source_commit": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+  "compiled_source_state": "CLEAN",
+  "identity_and_layout_verification": "PASS",
+  "manifest": {
+    "MATDOG_MANIFEST_VERSION": "2",
+    "SOURCE_COMMIT": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+    "BUILD_ID": "f62e89b1f482",
+    "SOURCE_STATE": "CLEAN",
+    "HARDWARE_PROFILE": "ROBOT_POWERED",
+    "OTA_INGEST_ENABLED": "0",
+    "FQBN": "esp32:esp32:esp32s3:USBMode=hwcdc,CDCOnBoot=cdc,UploadMode=default,CPUFreq=240,FlashMode=qio,FlashSize=16M,PartitionScheme=custom,DebugLevel=none,PSRAM=opi",
+    "APPLICATION_BINARY": "MATDOG_Controller.ino.bin",
+    "APPLICATION_SIZE": "1690304",
+    "APPLICATION_SHA256": "772b2658c63878b0d98ee8046cf3bd4bbb158460b0c79eb0af8b4361e4b0499f",
+    "LAYOUT_ID": "MATDOG_16M_2x5M_NVS_V1",
+    "PARTITION_TABLE_SHA256": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
+    "APP_PARTITION_SIZE": "5242880",
+    "FW_VERSION": "0.2.0-dev.4",
+    "GIT_SHA": "f62e89b1f482ebb2aee6cca5f5ec148d7509b383",
+    "GIT_DIRTY": "0",
+    "FLASH_LAYOUT": "MATDOG_16M_2x5M_NVS_V1",
+    "CAL_RECORD_SCHEMA": "1",
+    "CAL_MARKER_SCHEMA": "2",
+    "OTA_INGEST": "0",
+    "MOTION_STACK": "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED",
+    "MOTION_AUTHORIZED": "0",
+    "APP_SHA256": "772b2658c63878b0d98ee8046cf3bd4bbb158460b0c79eb0af8b4361e4b0499f",
+    "BUILD_UTC": "2026-10-13T05:36:46Z",
+    "BUILD_UTC_POLICY": "UTC_NOW"
+  },
+  "source_default_operational_authority": false,
+  "flash_authorized": false,
+  "ota_authorized": false,
+  "torque_authorized": false,
+  "installed_source_identity_baseline": "b08322dedc5564c080f691dc98047511ef2b953f",
+  "installed_hardware_re_read": false,
+  "binary_bytes": 1690304,
+  "compiler_program_bytes": 1690159,
+  "static_ram_bytes": 131116,
+  "compiler_report_ram_remaining_bytes": 196564,
+  "runtime_wcet_heap_and_stack_qualified": false,
+  "compiler_core": "esp32:esp32@3.3.11",
+  "dependency_warnings": [
+    "SCServo SCSCL.cpp unused ACC parameter",
+    "SCServo SMS_STS.cpp cached ReadMode(-1) negative index warning; this Controller reads explicit registers for control feedback and does not call ReadMode(-1); library not modified"
+  ],
+  "obsolete_attempts": [
+    {
+      "commit": "b4060f08c2eb40efd7f8fe60f4d2ae668da001cb",
+      "status": "COMPILE_FAILED_ESP_WIFI_DECLARATIONS",
+      "candidate": false
+    }
+  ],
+  "post_build_documentation_commit_must_not_be_misrepresented_as_compiled_head": true,
+  "build_output_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/build-final/artifacts/ROBOT_POWERED-ota0",
+  "sealed_partition_table_local": "/home/matteo-manicardi/MATDOG/verification-artifacts/MOTION_HARDWARE_READINESS_20261013/candidates/f62e89b1f482ebb2aee6cca5f5ec148d7509b383/ROBOT_POWERED-ota0/MATDOG_Controller.ino.partitions.bin"
+}

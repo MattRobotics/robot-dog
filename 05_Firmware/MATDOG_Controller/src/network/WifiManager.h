@@ -102,7 +102,7 @@ public:
 }
   bool configure(const ConfigPatch &patch, uint32_t generation = 0);
   AdminAccess &adminAccess() { return admin_; }
-  static bool verifyAdminRadio();
+  static bool verifyAdminRadio(const char** failure=nullptr);
   bool configBusy() const { return config_busy_.load(); }
   // The operating mode chooses the radio role (network/NetworkPolicy.h). The
   // "AP always" flag of older records is kept in storage and status but is not
@@ -111,6 +111,7 @@ public:
   // by the Controller every tick. This is a one-way input: this class holds no
   // reference to the mode manager, the authority arbiter or any actuator, so
   // nothing here can change the mode, grant authority or move a servo.
+  void setMaintenanceLan(bool enabled) { maintenance_lan_.store(enabled); }
   void setRunMode(bool run) { run_mode_.store(run); }
   void setContext(bool critical, bool ota) {
     context_.store((critical ? 1u : 0u) | (ota ? 2u : 0u));
@@ -163,6 +164,8 @@ private:
   void refuseStaTest(bool storage_error);
   RoleReason evaluateRole(uint32_t now);
   RoleReason role_ = RoleReason::MAINTENANCE_AP;
+  std::atomic<bool> maintenance_lan_{false};
+  bool last_maintenance_lan_=false;
   std::atomic<bool> run_mode_{false};
   bool last_run_ = false, recovery_ = false, link_was_up_ = false;
   uint8_t recovery_level_ = 0;

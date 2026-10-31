@@ -84,14 +84,17 @@ DalyKeyWriteGate DalyBms::requestKeyLogicDischarge(core::OperatingMode mode) {
 // KEY write); scripts/static_audit.py requires this to be the only
 // bms_uart_ write in the firmware.
 void DalyBms::startTransaction(DalyRequest request) {
-  while (bms_uart_.available()) {
+  // Bounded stale drain. This UART has one owner and no queued TX: update()
+  // checks room for the complete eight-byte frame before selecting it.
+  for (size_t n=0; n<kDalyMaxResponseLen && bms_uart_.available(); ++n) {
     bms_uart_.read();
   }
   if (request == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE) {
     key_write_.markTransmitted();  // before the bytes: a power loss mid-frame still counts
   }
   bms_uart_.write(dalyRequestFrame(request), kDalyRequestLen);
-  bms_uart_.flush();
+  // XY-017 manages RS485 direction. Leave the 8.34 ms wire transmission to
+  // UART2; neither Motion nor the cooperative scheduler waits for the shifter.
 
   rx_len_ = 0;
   bus_.markSent(millis());
@@ -135,6 +138,7 @@ void DalyBms::handleKeyLogicWriteResponse() {
 
 void DalyBms::update(uint32_t now_ms, core::OperatingMode mode) {
   if (!bus_.inFlight()) {
+    if (bms_uart_.availableForWrite() < static_cast<int>(kDalyRequestLen)) return;
     // Last look before the one write can leave: every precondition again,
     // with the operating mode as it is on THIS update. Nothing below can
     // change the mode before startTransaction(), so the FC06 frame leaves

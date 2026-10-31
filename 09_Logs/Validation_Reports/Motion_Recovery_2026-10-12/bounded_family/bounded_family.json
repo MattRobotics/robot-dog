@@ -1,0 +1,950 @@
+{
+  "schema": "MATDOG_PRONE_BOUNDED_GEOMETRIC_FAMILY_V1",
+  "hardware_access": false,
+  "physical_readiness": false,
+  "search_dimensions": "one disclosed fold margin; mirrored HIP roots; prescribed rear/front clocks and bounded belly pitch",
+  "upper_horizontal_constraint_rad": 1.5707963267948966,
+  "recipes": 2,
+  "initial_folds": 3,
+  "maximum_frames_per_recipe": 52,
+  "angles_are_measured": false,
+  "candidate_acceptance_requires_ik_rates_continuity_full_collision_and_support": true,
+  "candidates": [
+    {
+      "id": "rear_first_fold_margin_0.03",
+      "fold_margin_rad": 0.03,
+      "initial_angles_rad": [
+        0.06651081085363081,
+        1.5707963267948966,
+        -1.5757029118349999,
+        -0.06665968507769685,
+        1.5707963267948966,
+        -1.5757029118349999,
+        -0.45106345548318955,
+        1.5707963267948966,
+        -1.5757029118349999,
+        0.45090304651579804,
+        1.5707963267948966,
+        -1.5757029118349999
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            3.662649525505093e-19,
+            -5.498725814535199e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            0.0017848270671823648,
+            -0.049364921314845336
+          ],
+          "upper_inclination_deg": -3.500597576361142e-15,
+          "lower_inclination_deg": -24.713917461731516,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -3.670835670276132e-19,
+            -5.498671226189187e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            -0.0017921762117330074,
+            -0.04936465505305103
+          ],
+          "upper_inclination_deg": -3.5005628243407297e-15,
+          "lower_inclination_deg": -24.713775228878614,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -2.4023319820177555e-18,
+            -4.95973150957562e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            -0.020173452905090424,
+            -0.045090052805100124
+          ],
+          "upper_inclination_deg": -3.157463144630352e-15,
+          "lower_inclination_deg": -22.45033643990901,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            2.401536365703931e-18,
+            -4.9601168013570176e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            0.020166219796769417,
+            -0.04509328822772857
+          ],
+          "upper_inclination_deg": -3.1577084289965205e-15,
+          "lower_inclination_deg": -22.45203520847129,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 16,
+      "failure": {
+        "frame": 15,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.06992341482276031,
+        "base_link_z_m": 0.009138531809428344,
+        "q_rad": {
+          "lf_hip_joint": 0.0,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.5757029118349999,
+          "rf_hip_joint": -0.0,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.5757029118349999,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6511666116347743,
+          "rh_lower_leg_joint": -1.2369315216481058,
+          "lh_hip_joint": 0.45090304651579804,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.5757029118349999
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014591811283703236,
+              "lowest_world_vertex_m": [
+                -0.14072488308493594,
+                -0.048201645898313654,
+                0.014591811283703236
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.0362323977666848,
+              "lowest_world_vertex_m": [
+                -0.1997155807157958,
+                -0.07243362834399057,
+                0.0362323977666848
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.002484348493609378,
+              "lowest_world_vertex_m": [
+                -0.12075692500252834,
+                -0.12981194942625351,
+                -0.002484348493609378
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0023929975373977123,
+              "lowest_world_vertex_m": [
+                -0.11952288813216753,
+                -0.13418285948211267,
+                -0.0023929975373977123
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "rear_first_fold_margin_0.03.jsonl",
+      "trace_sha256": "c368fe041cdf49c83a46cc5933ea39791f5f90d9ba1c517bac588a6bdf2810a7",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    },
+    {
+      "id": "coordinated_fold_margin_0.03",
+      "fold_margin_rad": 0.03,
+      "initial_angles_rad": [
+        0.06651081085363081,
+        1.5707963267948966,
+        -1.5757029118349999,
+        -0.06665968507769685,
+        1.5707963267948966,
+        -1.5757029118349999,
+        -0.45106345548318955,
+        1.5707963267948966,
+        -1.5757029118349999,
+        0.45090304651579804,
+        1.5707963267948966,
+        -1.5757029118349999
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            3.662649525505093e-19,
+            -5.498725814535199e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            0.0017848270671823648,
+            -0.049364921314845336
+          ],
+          "upper_inclination_deg": -3.500597576361142e-15,
+          "lower_inclination_deg": -24.713917461731516,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -3.670835670276132e-19,
+            -5.498671226189187e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            -0.0017921762117330074,
+            -0.04936465505305103
+          ],
+          "upper_inclination_deg": -3.5005628243407297e-15,
+          "lower_inclination_deg": -24.713775228878614,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -2.4023319820177555e-18,
+            -4.95973150957562e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            -0.020173452905090424,
+            -0.045090052805100124
+          ],
+          "upper_inclination_deg": -3.157463144630352e-15,
+          "lower_inclination_deg": -22.45033643990901,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            2.401536365703931e-18,
+            -4.9601168013570176e-18
+          ],
+          "lower_axis_world_base": [
+            0.1072435496238323,
+            0.020166219796769417,
+            -0.04509328822772857
+          ],
+          "upper_inclination_deg": -3.1577084289965205e-15,
+          "lower_inclination_deg": -22.45203520847129,
+          "directed_upper_lower_angle_deg": 155.26885102736472,
+          "fold_deviation_from_antiparallel_deg": 24.731148972635282
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 16,
+      "failure": {
+        "frame": 15,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.06992341482276031,
+        "base_link_z_m": 0.009138531809428344,
+        "q_rad": {
+          "lf_hip_joint": 0.0,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.5757029118349999,
+          "rf_hip_joint": -0.0,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.5757029118349999,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6511666116347743,
+          "rh_lower_leg_joint": -1.2369315216481058,
+          "lh_hip_joint": 0.45090304651579804,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.5757029118349999
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014591811283703236,
+              "lowest_world_vertex_m": [
+                -0.14072488308493594,
+                -0.048201645898313654,
+                0.014591811283703236
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.0362323977666848,
+              "lowest_world_vertex_m": [
+                -0.1997155807157958,
+                -0.07243362834399057,
+                0.0362323977666848
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.002484348493609378,
+              "lowest_world_vertex_m": [
+                -0.12075692500252834,
+                -0.12981194942625351,
+                -0.002484348493609378
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0023929975373977123,
+              "lowest_world_vertex_m": [
+                -0.11952288813216753,
+                -0.13418285948211267,
+                -0.0023929975373977123
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "coordinated_fold_margin_0.03.jsonl",
+      "trace_sha256": "c368fe041cdf49c83a46cc5933ea39791f5f90d9ba1c517bac588a6bdf2810a7",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    },
+    {
+      "id": "rear_first_fold_margin_0.08",
+      "fold_margin_rad": 0.08,
+      "initial_angles_rad": [
+        0.17745167957462732,
+        1.5707963267948966,
+        -1.5257029118349998,
+        -0.17762585496687427,
+        1.5707963267948966,
+        -1.5257029118349998,
+        -0.5289027246811466,
+        1.5707963267948966,
+        -1.5257029118349998,
+        0.5290126629748036,
+        1.5707963267948966,
+        -1.5257029118349998
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            9.72796110796381e-19,
+            -5.4243712378230575e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            0.00817446940471056,
+            -0.05407887843481793
+          ],
+          "upper_inclination_deg": -3.4532619826601704e-15,
+          "lower_inclination_deg": -27.258886519054723,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -9.737408880237543e-19,
+            -5.424201718399983e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            -0.008183888490531881,
+            -0.05407745382311287
+          ],
+          "upper_inclination_deg": -3.453154063243641e-15,
+          "lower_inclination_deg": -27.258108856527077,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -2.7807299882142765e-18,
+            -4.757906717407188e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            -0.026292020839359644,
+            -0.04795911470199427
+          ],
+          "upper_inclination_deg": -3.0289774913819504e-15,
+          "lower_inclination_deg": -23.965187528157873,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            2.781253047554567e-18,
+            -4.7576009799447294e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            0.02629729322369635,
+            -0.04795622391226502
+          ],
+          "upper_inclination_deg": -3.028782852868196e-15,
+          "lower_inclination_deg": -23.963652423514663,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 15,
+      "failure": {
+        "frame": 14,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.058965437286211855,
+        "base_link_z_m": 0.007708210755452974,
+        "q_rad": {
+          "lf_hip_joint": 0.0,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.5257029118349998,
+          "rf_hip_joint": -0.0,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.5257029118349998,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6385714633841668,
+          "rh_lower_leg_joint": -1.2465734541505713,
+          "lh_hip_joint": 0.5290126629748036,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.5257029118349998
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014703192072345182,
+              "lowest_world_vertex_m": [
+                -0.14065667852139038,
+                -0.048201645898313654,
+                0.014703192072345182
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03624096774070211,
+              "lowest_world_vertex_m": [
+                -0.19926255785351252,
+                -0.07318874046151029,
+                0.03624096774070211
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0019962206045378494,
+              "lowest_world_vertex_m": [
+                -0.1190917428470657,
+                -0.1293236663305039,
+                -0.0019962206045378494
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0018944098039854048,
+              "lowest_world_vertex_m": [
+                -0.11778973680877494,
+                -0.13367458135474494,
+                -0.0018944098039854048
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "rear_first_fold_margin_0.08.jsonl",
+      "trace_sha256": "5f5631395d2b9696e68392a7a36c2c9edd089cb7baf18e080b8f59590b924dea",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    },
+    {
+      "id": "coordinated_fold_margin_0.08",
+      "fold_margin_rad": 0.08,
+      "initial_angles_rad": [
+        0.17745167957462732,
+        1.5707963267948966,
+        -1.5257029118349998,
+        -0.17762585496687427,
+        1.5707963267948966,
+        -1.5257029118349998,
+        -0.5289027246811466,
+        1.5707963267948966,
+        -1.5257029118349998,
+        0.5290126629748036,
+        1.5707963267948966,
+        -1.5257029118349998
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            9.72796110796381e-19,
+            -5.4243712378230575e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            0.00817446940471056,
+            -0.05407887843481793
+          ],
+          "upper_inclination_deg": -3.4532619826601704e-15,
+          "lower_inclination_deg": -27.258886519054723,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -9.737408880237543e-19,
+            -5.424201718399983e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            -0.008183888490531881,
+            -0.05407745382311287
+          ],
+          "upper_inclination_deg": -3.453154063243641e-15,
+          "lower_inclination_deg": -27.258108856527077,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -2.7807299882142765e-18,
+            -4.757906717407188e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            -0.026292020839359644,
+            -0.04795911470199427
+          ],
+          "upper_inclination_deg": -3.0289774913819504e-15,
+          "lower_inclination_deg": -23.965187528157873,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            2.781253047554567e-18,
+            -4.7576009799447294e-18
+          ],
+          "lower_axis_world_base": [
+            0.10464183177479087,
+            0.02629729322369635,
+            -0.04795622391226502
+          ],
+          "upper_inclination_deg": -3.028782852868196e-15,
+          "lower_inclination_deg": -23.963652423514663,
+          "directed_upper_lower_angle_deg": 152.40525472134647,
+          "fold_deviation_from_antiparallel_deg": 27.594745278653534
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 15,
+      "failure": {
+        "frame": 14,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.058965437286211855,
+        "base_link_z_m": 0.007708210755452974,
+        "q_rad": {
+          "lf_hip_joint": 0.0,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.5257029118349998,
+          "rf_hip_joint": -0.0,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.5257029118349998,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6385714633841668,
+          "rh_lower_leg_joint": -1.2465734541505713,
+          "lh_hip_joint": 0.5290126629748036,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.5257029118349998
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014703192072345182,
+              "lowest_world_vertex_m": [
+                -0.14065667852139038,
+                -0.048201645898313654,
+                0.014703192072345182
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03624096774070211,
+              "lowest_world_vertex_m": [
+                -0.19926255785351252,
+                -0.07318874046151029,
+                0.03624096774070211
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0019962206045378494,
+              "lowest_world_vertex_m": [
+                -0.1190917428470657,
+                -0.1293236663305039,
+                -0.0019962206045378494
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0018944098039854048,
+              "lowest_world_vertex_m": [
+                -0.11778973680877494,
+                -0.13367458135474494,
+                -0.0018944098039854048
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "coordinated_fold_margin_0.08.jsonl",
+      "trace_sha256": "5f5631395d2b9696e68392a7a36c2c9edd089cb7baf18e080b8f59590b924dea",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    },
+    {
+      "id": "rear_first_fold_margin_0.13",
+      "fold_margin_rad": 0.13,
+      "initial_angles_rad": [
+        0.27380398140040674,
+        1.5707963267948966,
+        -1.475702911835,
+        -0.27371714550905757,
+        1.5707963267948966,
+        -1.475702911835,
+        -0.5972625436619583,
+        1.5707963267948966,
+        -1.475702911835,
+        0.5973037255373487,
+        1.5707963267948966,
+        -1.475702911835
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            1.4901263330623866e-18,
+            -5.3056252327521835e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            0.01473478988819482,
+            -0.058010946458949456
+          ],
+          "upper_inclination_deg": -3.3776659279423907e-15,
+          "lower_inclination_deg": -29.426968607919395,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -1.489665608748587e-18,
+            -5.3057546091969166e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            -0.014729752400403745,
+            -0.05801222574884668
+          ],
+          "upper_inclination_deg": -3.377748291545187e-15,
+          "lower_inclination_deg": -29.427681350341793,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -3.099231634548194e-18,
+            -4.556851860036526e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            -0.03240931386502913,
+            -0.0503191843824041
+          ],
+          "upper_inclination_deg": -2.900981993849243e-15,
+          "lower_inclination_deg": -25.22472476901756,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            3.099419291625547e-18,
+            -4.556724224001493e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            0.032411386075927286,
+            -0.050317849663410075
+          ],
+          "upper_inclination_deg": -2.9009007382256745e-15,
+          "lower_inclination_deg": -25.224008818770812,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 14,
+      "failure": {
+        "frame": 13,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.048938891576953004,
+        "base_link_z_m": 0.006398652308933844,
+        "q_rad": {
+          "lf_hip_joint": 0.020161239522254192,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.475702911835,
+          "rf_hip_joint": -0.02029201415811405,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.475702911835,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6270469070298212,
+          "rh_lower_leg_joint": -1.24947457881437,
+          "lh_hip_joint": 0.5973037255373487,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.475702911835
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014803559007032532,
+              "lowest_world_vertex_m": [
+                -0.1405794740340484,
+                -0.048201645898313654,
+                0.014803559007032532
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03624362809851494,
+              "lowest_world_vertex_m": [
+                -0.19882971531349175,
+                -0.07387883945351151,
+                0.03624362809851494
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0019360917226511386,
+              "lowest_world_vertex_m": [
+                -0.11804309034016952,
+                -0.12920450172163617,
+                -0.0019360917226511386
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0018316608710088307,
+              "lowest_world_vertex_m": [
+                -0.11669685411620889,
+                -0.13354187292289887,
+                -0.0018316608710088307
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "rear_first_fold_margin_0.13.jsonl",
+      "trace_sha256": "cb4bbc45a39ac96909e54040b2c9b287f42e0d71fad512fc16a2c126575ebabf",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    },
+    {
+      "id": "coordinated_fold_margin_0.13",
+      "fold_margin_rad": 0.13,
+      "initial_angles_rad": [
+        0.27380398140040674,
+        1.5707963267948966,
+        -1.475702911835,
+        -0.27371714550905757,
+        1.5707963267948966,
+        -1.475702911835,
+        -0.5972625436619583,
+        1.5707963267948966,
+        -1.475702911835,
+        0.5973037255373487,
+        1.5707963267948966,
+        -1.475702911835
+      ],
+      "initial_anatomy": {
+        "LF": {
+          "upper_axis_world_base": [
+            -0.09,
+            1.4901263330623866e-18,
+            -5.3056252327521835e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            0.01473478988819482,
+            -0.058010946458949456
+          ],
+          "upper_inclination_deg": -3.3776659279423907e-15,
+          "lower_inclination_deg": -29.426968607919395,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "RF": {
+          "upper_axis_world_base": [
+            -0.09,
+            -1.489665608748587e-18,
+            -5.3057546091969166e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            -0.014729752400403745,
+            -0.05801222574884668
+          ],
+          "upper_inclination_deg": -3.377748291545187e-15,
+          "lower_inclination_deg": -29.427681350341793,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "RH": {
+          "upper_axis_world_base": [
+            -0.09,
+            -3.099231634548194e-18,
+            -4.556851860036526e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            -0.03240931386502913,
+            -0.0503191843824041
+          ],
+          "upper_inclination_deg": -2.900981993849243e-15,
+          "lower_inclination_deg": -25.22472476901756,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        },
+        "LH": {
+          "upper_axis_world_base": [
+            -0.09,
+            3.099419291625547e-18,
+            -4.556724224001493e-18
+          ],
+          "lower_axis_world_base": [
+            0.101778563842725,
+            0.032411386075927286,
+            -0.050317849663410075
+          ],
+          "upper_inclination_deg": -2.9009007382256745e-15,
+          "lower_inclination_deg": -25.224008818770812,
+          "directed_upper_lower_angle_deg": 149.54145002888288,
+          "fold_deviation_from_antiparallel_deg": 30.458549971117122
+        }
+      },
+      "initial_pose_measured": false,
+      "body_height_from_underside_m": 1.0928757898653885e-16,
+      "initial_ground_feasible": true,
+      "contact_load_proven": false,
+      "runtime_approved": false,
+      "trajectory_geometric_pass": false,
+      "evaluated_frames": 14,
+      "failure": {
+        "frame": 13,
+        "phase": "C1_REAR_DEPLOY",
+        "failed_leg": "rh",
+        "reason": "No outward ground-clear HIP root within URDF range",
+        "pitch_rad": -0.048938891576953004,
+        "base_link_z_m": 0.006398652308933844,
+        "q_rad": {
+          "lf_hip_joint": 0.020161239522254192,
+          "lf_upper_leg_joint": 1.5707963267948966,
+          "lf_lower_leg_joint": -1.475702911835,
+          "rf_hip_joint": -0.02029201415811405,
+          "rf_upper_leg_joint": 1.5707963267948966,
+          "rf_lower_leg_joint": -1.475702911835,
+          "rh_hip_joint": -0.785398163397,
+          "rh_upper_leg_joint": 1.6270469070298212,
+          "rh_lower_leg_joint": -1.24947457881437,
+          "lh_hip_joint": 0.5973037255373487,
+          "lh_upper_leg_joint": 1.5707963267948966,
+          "lh_lower_leg_joint": -1.475702911835
+        },
+        "ground_witness": {
+          "support_plane": "world Z=0",
+          "hip_at_urdf_limit_rad": -0.785398163397,
+          "link_plane_distances": {
+            "rh_hip_link": {
+              "minimum_z_m": 0.014803559007032532,
+              "lowest_world_vertex_m": [
+                -0.1405794740340484,
+                -0.048201645898313654,
+                0.014803559007032532
+              ]
+            },
+            "rh_upper_leg_link": {
+              "minimum_z_m": 0.03624362809851494,
+              "lowest_world_vertex_m": [
+                -0.19882971531349175,
+                -0.07387883945351151,
+                0.03624362809851494
+              ]
+            },
+            "rh_lower_leg_link": {
+              "minimum_z_m": -0.0019360917226511386,
+              "lowest_world_vertex_m": [
+                -0.11804309034016952,
+                -0.12920450172163617,
+                -0.0019360917226511386
+              ]
+            },
+            "rh_foot_link": {
+              "minimum_z_m": -0.0018316608710088307,
+              "lowest_world_vertex_m": [
+                -0.11669685411620889,
+                -0.13354187292289887,
+                -0.0018316608710088307
+              ]
+            }
+          },
+          "assessment": "FAILED at limiting HIP; not an exhaustive signed-HIP search"
+        }
+      },
+      "trace_file": "coordinated_fold_margin_0.13.jsonl",
+      "trace_sha256": "cb4bbc45a39ac96909e54040b2c9b287f42e0d71fad512fc16a2c126575ebabf",
+      "failure_frame_accepted": false,
+      "signed_hip_space_exhaustively_tested": false
+    }
+  ]
+}

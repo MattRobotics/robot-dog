@@ -1,0 +1,414 @@
+#include "CalibrationRuntimeRestore.h"
+
+#include "../actuator/CalibrationTargetResolver.h"
+
+#include <string.h>
+
+namespace matdog {
+namespace calibration {
+namespace {
+
+bool runtimeSafe(const RuntimeRestoreRequest& request) {
+  return request.executor_idle && request.torque_off_confirmed && request.motion_permit_revoked;
+}
+
+bool validSha(const char* text) {
+  if (text == nullptr) return false;
+  bool nonzero = false;
+  for (uint8_t i = 0; i < 64; ++i) {
+    const char c = text[i];
+    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) return false;
+    nonzero |= c != '0';
+  }
+  return text[64] == '\0' && nonzero;
+}
+
+void fnv(uint64_t& h, const void* data, size_t n) {
+  const uint8_t* p = static_cast<const uint8_t*>(data);
+  for (size_t i = 0; i < n; ++i) { h ^= p[i]; h *= 1099511628211ull; }
+}
+
+}  // namespace
+
+uint64_t calibrationRecordFingerprint(const CalibrationRecord& r) {
+  uint64_t h = 14695981039346656037ull;
+  fnv(h, &r.schema, sizeof(r.schema));
+  fnv(h, &r.generation, sizeof(r.generation));
+  fnv(h, &r.geometry_tag, sizeof(r.geometry_tag));
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const CalibrationRecordJointV1& j = r.joint[i];
+    fnv(h, &j.leg, 1); fnv(h, &j.joint, 1); fnv(h, j.unit, sizeof(j.unit));
+    fnv(h, &j.bus_id, 1); fnv(h, &j.encoder_direction, 1); fnv(h, &j.q0_tick, sizeof(j.q0_tick));
+    for (uint8_t s = 0; s < kContactSideCount; ++s) {
+      fnv(h, &j.contact[s].fine_tick_2, sizeof(j.contact[s].fine_tick_2));
+      fnv(h, &j.contact[s].repeatability_ticks, sizeof(j.contact[s].repeatability_ticks));
+    }
+  }
+  return h;
+}
+
+uint8_t firstLivePositionMismatch(const RecordInspection& r, const LivePositionEvidence& live) {
+  if (!r.ok || !live.present) return 0;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const int32_t lo = r.contact_min[i], hi = r.contact_max[i], raw = live.raw[i];
+    const int32_t margin = static_cast<int32_t>(r.repeatability[i]) + live.extra_margin_ticks;
+    // A span across the 0/4095 seam is not modelled: fail closed.
+    if (raw >= 4096 || hi < lo || hi - lo > 2048 || raw < lo - margin || raw > hi + margin) return i;
+  }
+  return kRecordJointCount;
+}
+
+RuntimeRestoreStatus CalibrationRuntimeRestore::inspect(
+    CalibrationPersistenceService& persistence, const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance, RecordInspection* out) const {
+  if (out == nullptr) return RuntimeRestoreStatus::REJECT_ADMISSION;
+  *out = RecordInspection{};
+  auto done = [&](RuntimeRestoreStatus status) { out->status = status; return status; };
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      profile.jointCount() != kRecordJointCount) return done(RuntimeRestoreStatus::REJECT_GEOMETRY);
+  CalibrationRecord record;
+  const ServiceRecordReadResult read = persistence.readAcknowledgedRecord(profile, &record);
+  if (read.guard == ServiceGuard::NVS_NOT_READY) return done(RuntimeRestoreStatus::REJECT_NVS_UNAVAILABLE);
+  if (read.guard == ServiceGuard::WRITES_BLOCKED) return done(RuntimeRestoreStatus::REJECT_UNCERTAIN_WRITE);
+  if (read.load_status != LoadStatus::OK) return done(RuntimeRestoreStatus::REJECT_LOAD);
+  if (read.generation == 0 || record.generation != read.generation) return done(RuntimeRestoreStatus::REJECT_GENERATION);
+  if (validateCalibrationRecord(record, profile) != CalibrationRecordStatus::OK) return done(RuntimeRestoreStatus::REJECT_RECORD);
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const CalibrationRecordJointV1& j = record.joint[i];
+    if (j.leg * 3u + j.joint != i) return done(RuntimeRestoreStatus::REJECT_RECORD);
+    const uint16_t a = j.contact[0].fine_tick_2, b = j.contact[1].fine_tick_2;
+    out->contact_min[i] = a < b ? a : b;
+    out->contact_max[i] = a > b ? a : b;
+    const uint16_t ra = j.contact[0].repeatability_ticks, rb = j.contact[1].repeatability_ticks;
+    out->repeatability[i] = ra > rb ? ra : rb;
+    memcpy(out->unit[i], j.unit, kPhysicalUnitLabelBytes);
+  }
+  out->generation = record.generation;
+  out->fingerprint = calibrationRecordFingerprint(record);
+  out->calibration_accepted = record.calibration_accepted == 1;
+  out->ok = true;
+  return done(RuntimeRestoreStatus::RESTORED);  // "would restore"; nothing published
+}
+
+void CalibrationRuntimeRestore::invalidate(actuator::JointTransformTable& transforms,
+                                          actuator::ActuatorLimitTable& limits) {
+  transforms.clear();
+  limits.clear();
+  snapshot_.restored = false;
+  snapshot_.calibration_accepted = false;
+  snapshot_.operational_limits_approved = false;
+  snapshot_.restored_generation = 0;
+  snapshot_.geometry = actuator::kNoGeometryProvenance;
+  snapshot_.restored_joints = 0;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.motion_permit = false;
+}
+
+void CalibrationRuntimeRestore::revokeLimits(actuator::ActuatorLimitTable& limits) {
+  limits.clear();
+  snapshot_.operational_limits_approved = false;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.limits_status = OperationalAdmissionStatus::NOT_RUN;
+}
+
+RuntimeRestoreStatus CalibrationRuntimeRestore::restore(
+    CalibrationPersistenceService& persistence,
+    const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance,
+    const RuntimeRestoreRequest& request, actuator::JointTransformTable& transforms,
+    actuator::ActuatorLimitTable& limits, const LivePositionEvidence* live) {
+  ++snapshot_.restore_attempts;
+  auto reject = [&](RuntimeRestoreStatus status) {
+    snapshot_.restore_status = status;
+    return status;
+  };
+  // A running executor must be stopped/revoked by its owner before mutation.
+  if (!runtimeSafe(request)) return reject(RuntimeRestoreStatus::REJECT_UNSAFE_RUNTIME);
+  invalidate(transforms, limits);
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.limits_status = OperationalAdmissionStatus::NOT_RUN;
+  snapshot_.record_status = CalibrationRecordStatus::OK;
+  if (!request.current_installation_confirmed) return reject(RuntimeRestoreStatus::REJECT_CURRENTNESS);
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      profile.jointCount() != kRecordJointCount) return reject(RuntimeRestoreStatus::REJECT_GEOMETRY);
+  if (request.expected_generation == 0) return reject(RuntimeRestoreStatus::REJECT_GENERATION);
+
+  CalibrationRecord record;
+  const ServiceRecordReadResult read = persistence.readAcknowledgedRecord(profile, &record);
+  snapshot_.persistence = persistence.snapshot().verdict;
+  if (read.guard == ServiceGuard::NVS_NOT_READY) return reject(RuntimeRestoreStatus::REJECT_NVS_UNAVAILABLE);
+  if (read.guard == ServiceGuard::WRITES_BLOCKED) return reject(RuntimeRestoreStatus::REJECT_UNCERTAIN_WRITE);
+  if (read.load_status != LoadStatus::OK) return reject(RuntimeRestoreStatus::REJECT_LOAD);
+  if (read.generation != request.expected_generation || record.generation != read.generation) {
+    return reject(RuntimeRestoreStatus::REJECT_GENERATION);
+  }
+  snapshot_.record_status = validateCalibrationRecord(record, profile);
+  if (snapshot_.record_status != CalibrationRecordStatus::OK) return reject(RuntimeRestoreStatus::REJECT_RECORD);
+
+  actuator::JointTransformTable staged;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    const CalibrationRecordJointV1& joint = record.joint[i];
+    actuator::JointTransform transform;
+    transform.identity.leg = static_cast<Leg>(joint.leg);
+    transform.identity.joint = static_cast<JointKind>(joint.joint);
+    setPhysicalUnit(&transform.identity, joint.unit);
+    // Preserve the recorded provenance; RESTORE does not masquerade as a fresh
+    // capture. validateCalibrationRecord already recomputed its acceptance.
+    transform.state = static_cast<EvidenceState>(joint.q0_state);
+    transform.origin = static_cast<CalibrationOrigin>(joint.q0_origin);
+    transform.geometry = record.geometry_tag;
+    transform.q0_tick = joint.q0_tick;
+    transform.present = true;
+    if (!staged.admit(transform)) {
+      snapshot_.failed_joint = i;
+      return reject(RuntimeRestoreStatus::REJECT_ADMISSION);
+    }
+    identity_[i] = transform.identity;
+    q0_[i] = transform.q0_tick;
+    const uint16_t a = joint.contact[0].fine_tick_2;
+    const uint16_t b = joint.contact[1].fine_tick_2;
+    contact_min_[i] = a < b ? a : b;
+    contact_max_[i] = a > b ? a : b;
+    const uint16_t repeat_a = joint.contact[0].repeatability_ticks;
+    const uint16_t repeat_b = joint.contact[1].repeatability_ticks;
+    contact_uncertainty_[i] = repeat_a > repeat_b ? repeat_a : repeat_b;
+  }
+  if (staged.size() != kRecordJointCount) return reject(RuntimeRestoreStatus::REJECT_ADMISSION);
+  if (live != nullptr) {
+    // Checked on the staged copy, before the one publication: never partial.
+    RecordInspection spans;
+    spans.ok = true;
+    for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+      if (record.joint[i].leg * 3u + record.joint[i].joint != i) return reject(RuntimeRestoreStatus::REJECT_RECORD);
+      spans.contact_min[i] = contact_min_[i];
+      spans.contact_max[i] = contact_max_[i];
+      spans.repeatability[i] = contact_uncertainty_[i];
+    }
+    const uint8_t bad = live->present ? firstLivePositionMismatch(spans, *live) : 0;
+    if (bad < kRecordJointCount) {
+      snapshot_.failed_joint = bad;
+      return reject(RuntimeRestoreStatus::REJECT_LIVE_POSITION);
+    }
+  }
+  transforms = staged;  // one Controller-thread publication, never partial
+  snapshot_.restored = true;
+  snapshot_.calibration_accepted = record.calibration_accepted == 1;
+  snapshot_.restored_generation = record.generation;
+  snapshot_.geometry = record.geometry_tag;
+  snapshot_.restored_joints = staged.size();
+  snapshot_.restore_status = RuntimeRestoreStatus::RESTORED;
+  return snapshot_.restore_status;
+}
+
+OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyOperationalLimits(
+    const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance,
+    const OperationalWorkspaceEvidence* evidence, const char* pinned_artifact_sha256,
+    const RuntimeRestoreRequest& facts, const actuator::JointTransformTable& transforms,
+    actuator::ActuatorLimitTable& limits,const char* pinned_route_sha256) {
+  auto reject = [&](OperationalAdmissionStatus status) {
+    snapshot_.limits_status = status;
+    return status;
+  };
+  if (!runtimeSafe(facts)) return reject(OperationalAdmissionStatus::REJECT_UNSAFE_RUNTIME);
+  limits.clear();
+  snapshot_.operational_limits_approved = false;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.envelope_status = actuator::EnvelopeBuildStatus::NOT_EVALUATED;
+  if (!snapshot_.restored || !snapshot_.calibration_accepted || transforms.size() != kRecordJointCount) {
+    return reject(OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  }
+  if (!facts.current_installation_confirmed) return reject(OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  if (evidence == nullptr) return reject(OperationalAdmissionStatus::REJECT_MISSING_EVIDENCE);
+  if (evidence->schema != 1 || !validSha(evidence->artifact_sha256) ||
+      !validSha(pinned_artifact_sha256) ||
+      strcmp(evidence->artifact_sha256, pinned_artifact_sha256) != 0) {
+    return reject(OperationalAdmissionStatus::REJECT_ARTIFACT_IDENTITY);
+  }
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      !profile.provenanceMatches(evidence->provenance) || profile.provenanceTag() != snapshot_.geometry) {
+    return reject(OperationalAdmissionStatus::REJECT_GEOMETRY);
+  }
+  if (evidence->calibration_generation != snapshot_.restored_generation ||
+      facts.expected_generation != snapshot_.restored_generation) return reject(OperationalAdmissionStatus::REJECT_GENERATION);
+  if(evidence->scope==OperationalLimitScope::CERTIFIED_ROUTE){
+    if(!pinned_route_sha256||!validSha(pinned_route_sha256)||!validSha(evidence->route_sha256)||
+       strcmp(pinned_route_sha256,evidence->route_sha256)||!validSha(evidence->corridor_proof_sha256))
+      return reject(OperationalAdmissionStatus::REJECT_ARTIFACT_IDENTITY);
+  }else if(evidence->scope!=OperationalLimitScope::FULL_JOINT_BOX)return reject(OperationalAdmissionStatus::REJECT_WORKSPACE_EVIDENCE);
+  if (!evidence->workspace_reviewed) return reject(OperationalAdmissionStatus::REJECT_WORKSPACE_EVIDENCE);
+  if (!evidence->simultaneous_configuration_checked) return reject(OperationalAdmissionStatus::REJECT_CONFIGURATION_EVIDENCE);
+  if (!evidence->collision_clearance_checked) return reject(OperationalAdmissionStatus::REJECT_COLLISION_EVIDENCE);
+  if (!evidence->margins_reviewed || evidence->contact_inset_ticks == 0) return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+
+  actuator::ActuatorLimitTable staged;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    snapshot_.failed_joint = i;
+    const auto& workspace = evidence->joint[i];
+    if (!identityPermitsEvidenceReuse(identity_[i], workspace.joint)) {
+      return reject(OperationalAdmissionStatus::REJECT_JOINT_IDENTITY);
+    }
+    if (workspace.safety_margin_urad <= 0 ||
+        evidence->contact_inset_ticks <= contact_uncertainty_[i]) {
+      return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+    }
+    const actuator::JointTransform* transform = transforms.find(identity_[i], snapshot_.geometry);
+    if (transform == nullptr || transform->q0_tick != q0_[i]) return reject(OperationalAdmissionStatus::REJECT_TRANSFORM);
+    actuator::OperationalEnvelope envelope;
+    snapshot_.envelope_status = actuator::buildGeometryDerivedEnvelope(
+        profile, expected_provenance, *transform, workspace, &envelope);
+    if (snapshot_.envelope_status != actuator::EnvelopeBuildStatus::READY) {
+      return reject(OperationalAdmissionStatus::REJECT_ENVELOPE);
+    }
+    // Checked q->raw uses nearest-tick rounding. Inset one raw count on each
+    // side so quantization cannot expand the approved micro-radian interval.
+    // This is a conservative integer conversion, not an invented safety margin.
+    if (static_cast<int32_t>(envelope.max_tick) - envelope.min_tick <= 2) {
+      return reject(OperationalAdmissionStatus::REJECT_ENVELOPE);
+    }
+    ++envelope.min_tick;
+    --envelope.max_tick;
+    const int32_t lower = static_cast<int32_t>(contact_min_[i]) + evidence->contact_inset_ticks;
+    const int32_t upper = static_cast<int32_t>(contact_max_[i]) - evidence->contact_inset_ticks;
+    // Never silently clip the reviewed workspace: that can omit the targets
+    // it was meant to cover. Require the whole derived envelope to fit inside
+    // the confirmed physical contacts with an explicitly reviewed inset.
+    if (lower > upper || envelope.min_tick < lower || envelope.max_tick > upper) {
+      return reject(OperationalAdmissionStatus::REJECT_CONTACT_CLEARANCE);
+    }
+    actuator::JointLimit limit;
+    limit.identity = identity_[i];
+    limit.state = EvidenceState::PROMOTED;
+    limit.origin = CalibrationOrigin::LIVE_SESSION;
+    limit.geometry = snapshot_.geometry;
+    limit.min_tick = envelope.min_tick;
+    limit.max_tick = envelope.max_tick;
+    limit.present = true;
+    if (!staged.admit(limit)) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  }
+  if (staged.size() != kRecordJointCount) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  limits = staged;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.approved_joints = staged.size();
+  snapshot_.operational_limits_approved = true;
+  snapshot_.limits_status = OperationalAdmissionStatus::APPROVED;
+  return snapshot_.limits_status;
+}
+
+OperationalAdmissionStatus CalibrationRuntimeRestore::qualifyCommissioningLimits(
+    const actuator::CalibrationGeometryProfile& profile,
+    const actuator::GeometryProvenance& expected_provenance, uint16_t inset,
+    const RuntimeRestoreRequest& facts, const actuator::JointTransformTable& transforms,
+    actuator::ActuatorLimitTable& limits) {
+  auto reject = [&](OperationalAdmissionStatus status) {
+    snapshot_.limits_status = status;
+    return status;
+  };
+  if (!runtimeSafe(facts)) return reject(OperationalAdmissionStatus::REJECT_UNSAFE_RUNTIME);
+  limits.clear();
+  snapshot_.operational_limits_approved = false;
+  snapshot_.approved_joints = 0;
+  snapshot_.commissioning_limits_active = false;
+  snapshot_.commissioning_joints = 0;
+  snapshot_.commissioning_inset_ticks = 0;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.envelope_status = actuator::EnvelopeBuildStatus::NOT_EVALUATED;
+  if (!snapshot_.restored || !snapshot_.calibration_accepted || transforms.size() != kRecordJointCount ||
+      !facts.current_installation_confirmed) {
+    return reject(OperationalAdmissionStatus::REJECT_NOT_RESTORED);
+  }
+  if (!profile.bound() || !profile.provenanceMatches(expected_provenance) ||
+      profile.provenanceTag() != snapshot_.geometry) {
+    return reject(OperationalAdmissionStatus::REJECT_GEOMETRY);
+  }
+  if (facts.expected_generation != snapshot_.restored_generation) {
+    return reject(OperationalAdmissionStatus::REJECT_GENERATION);
+  }
+  if (inset < kCommissioningMinInsetTicks || inset > kCommissioningMaxInsetTicks) {
+    return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+  }
+  actuator::ActuatorLimitTable staged;
+  for (uint8_t i = 0; i < kRecordJointCount; ++i) {
+    snapshot_.failed_joint = i;
+    // The inset must exceed the recorded contact repeatability, exactly as
+    // for a reviewed workspace: otherwise the limit could reach the stop.
+    if (inset <= contact_uncertainty_[i]) return reject(OperationalAdmissionStatus::REJECT_MARGIN_EVIDENCE);
+    const actuator::JointTransform* transform = transforms.find(identity_[i], snapshot_.geometry);
+    if (transform == nullptr || transform->q0_tick != q0_[i]) return reject(OperationalAdmissionStatus::REJECT_TRANSFORM);
+    const actuator::GeometryJointRecord* joint = profile.findJoint(identity_[i]);
+    if (joint == nullptr) return reject(OperationalAdmissionStatus::REJECT_JOINT_IDENTITY);
+    uint16_t urdf_a = 0, urdf_b = 0;
+    if (actuator::resolveUrdfQToRaw(profile, expected_provenance, *transform, joint->urdf_lower, &urdf_a) !=
+            actuator::TargetResolveStatus::OK ||
+        actuator::resolveUrdfQToRaw(profile, expected_provenance, *transform, joint->urdf_upper, &urdf_b) !=
+            actuator::TargetResolveStatus::OK) {
+      return reject(OperationalAdmissionStatus::REJECT_ENVELOPE);
+    }
+    // Nearest-tick rounding of the URDF endpoints: inset one raw count so the
+    // limit cannot exceed the model interval, as qualifyOperationalLimits does.
+    int32_t lower = (urdf_a < urdf_b ? urdf_a : urdf_b) + 1;
+    int32_t upper = (urdf_a > urdf_b ? urdf_a : urdf_b) - 1;
+    const int32_t contact_lower = static_cast<int32_t>(contact_min_[i]) + inset;
+    const int32_t contact_upper = static_cast<int32_t>(contact_max_[i]) - inset;
+    if (contact_lower > lower) lower = contact_lower;
+    if (contact_upper < upper) upper = contact_upper;
+    if (upper - lower <= 2 || lower < 0 || upper > 4095) {
+      return reject(OperationalAdmissionStatus::REJECT_CONTACT_CLEARANCE);
+    }
+    actuator::JointLimit limit;
+    limit.identity = identity_[i];
+    limit.state = EvidenceState::PROMOTED;
+    limit.origin = CalibrationOrigin::LIVE_SESSION;
+    limit.geometry = snapshot_.geometry;
+    limit.min_tick = static_cast<uint16_t>(lower);
+    limit.max_tick = static_cast<uint16_t>(upper);
+    limit.present = true;
+    if (!staged.admit(limit)) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  }
+  if (staged.size() != kRecordJointCount) return reject(OperationalAdmissionStatus::REJECT_ADMISSION);
+  limits = staged;
+  snapshot_.failed_joint = kRecordJointCount;
+  snapshot_.commissioning_limits_active = true;
+  snapshot_.commissioning_joints = staged.size();
+  snapshot_.commissioning_inset_ticks = inset;
+  snapshot_.limits_status = OperationalAdmissionStatus::APPROVED;
+  return snapshot_.limits_status;
+}
+
+const char* toString(RuntimeRestoreStatus status) {
+  switch (status) {
+#define CASE(s) case RuntimeRestoreStatus::s: return #s
+    CASE(NOT_RUN); CASE(RESTORED); CASE(REJECT_UNSAFE_RUNTIME); CASE(REJECT_CURRENTNESS);
+    CASE(REJECT_GEOMETRY); CASE(REJECT_NVS_UNAVAILABLE); CASE(REJECT_UNCERTAIN_WRITE);
+    CASE(REJECT_LOAD); CASE(REJECT_GENERATION); CASE(REJECT_RECORD); CASE(REJECT_ADMISSION);
+    CASE(REJECT_LIVE_POSITION);
+#undef CASE
+  }
+  return "UNKNOWN";
+}
+
+const char* toString(OperationalAdmissionStatus status) {
+  switch (status) {
+#define CASE(s) case OperationalAdmissionStatus::s: return #s
+    CASE(NOT_RUN); CASE(APPROVED); CASE(REJECT_UNSAFE_RUNTIME); CASE(REJECT_NOT_RESTORED);
+    CASE(REJECT_MISSING_EVIDENCE); CASE(REJECT_ARTIFACT_IDENTITY); CASE(REJECT_GEOMETRY);
+    CASE(REJECT_GENERATION); CASE(REJECT_WORKSPACE_EVIDENCE); CASE(REJECT_CONFIGURATION_EVIDENCE);
+    CASE(REJECT_COLLISION_EVIDENCE); CASE(REJECT_MARGIN_EVIDENCE); CASE(REJECT_JOINT_IDENTITY);
+    CASE(REJECT_TRANSFORM); CASE(REJECT_ENVELOPE); CASE(REJECT_CONTACT_CLEARANCE); CASE(REJECT_ADMISSION);
+#undef CASE
+  }
+  return "UNKNOWN";
+}
+
+}  // namespace calibration
+}  // namespace matdog

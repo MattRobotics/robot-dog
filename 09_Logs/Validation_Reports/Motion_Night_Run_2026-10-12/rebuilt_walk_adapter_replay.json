@@ -1,0 +1,8 @@
+{
+  "result": "PASS",
+  "saved_samples_replayed": 214,
+  "max_joint_difference_rad": 0.0,
+  "max_derivative_difference": 3.3306690738754696e-16,
+  "mesh_audit_reused_same_joint_geometry": true,
+  "hardware_access": false
+}

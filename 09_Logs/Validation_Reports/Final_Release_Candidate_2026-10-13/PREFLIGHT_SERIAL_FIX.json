@@ -1,0 +1,100 @@
+{
+  "purpose": "PREFLIGHT_SERIAL_RESPONSE_FRAMING_FIX",
+  "status": "PASS",
+  "created_utc": "2026-10-13T16:54:24.347297+00:00",
+  "compiled_source_commit": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+  "application_sha256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+  "application_size_bytes": 3643120,
+  "firmware_manifest_sha256_unchanged": "1be4d3775cc7285addd6f942737f9358285154ae55e492fbe64c5b707d0948be",
+  "files": {
+    "05_Firmware/MATDOG_Controller/scripts/release/motion_remote_preflight.py": {
+      "compiled_source_file_sha256": "aec141b656afa41afd270d850e1b053ca560c03c4b6178746ae03b5c62e285d7",
+      "current_file_sha256": "044bfe8e359feed32b593dd3328efa8339038ab493866a5e65cd7679f11b5f4b"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/release/review_preflash.py": {
+      "compiled_source_file_sha256": "ffb7ddc07a9258692f69989edb729198f10a215a109f0ff2fa1f6d991f59b1dd",
+      "current_file_sha256": "9404171cd214dbca4871aec5ea4cbe71ba160b988c3bcf293a06487631f94c5f"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py": {
+      "compiled_source_file_sha256": "3e65b017c983b114a150ce2536ad0159b7972d509c55afa54df4f586d65504ce",
+      "current_file_sha256": "9ab8c632d0fb1c63e0993089804c443fafa4a715ba353d0b75329e24797556c4"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/verify_designated_candidate.py": {
+      "compiled_source_file_sha256": "424a10e0c9c850a13d2e6a89d421903bdebbd903e32cec8e32d14fef402748b2",
+      "current_file_sha256": "70aff8be5ce0e2129255f1e69258fa93d1a08c8e556676e56b727e398fd945fb"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/flash_app_only.sh": {
+      "compiled_source_file_sha256": "11f6fb385d887fa018fdfe92b711b102b1e5dae499f58cd54efa5353454f190d",
+      "current_file_sha256": "6f3ad2abeec7ffc87a4c6ee6b5ddf901ac815eb11ef3d116e16dfdd256e90142"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/verify_application_partition.py": {
+      "compiled_source_file_sha256": "26ce0711571adabf11e9e3a2e700bd99bb076881addec8903d4cb18c59ceeac7",
+      "current_file_sha256": "bd1260fa3c056a4aac657b7dfabc23566a0499a35a56189a43d55726c00542b5"
+    },
+    "05_Firmware/MATDOG_Controller/scripts/tests/test_matdog_layout.py": {
+      "compiled_source_file_sha256": "3fdeb8c672a2dbed317bb6cda7ac90f80d5e450b4e90ae5b8e02c6a12f89b9d2",
+      "current_file_sha256": "6040faf93547a3fd0ecef2346480f01e4dd16f166ba4175e81fae7d2125d9c05"
+    }
+  },
+  "tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 05_Firmware/MATDOG_Controller/scripts/tests/test_remote_preflight.py -v",
+    "count": 23,
+    "result": "PASS",
+    "log": "test_logs/preflight_rom_backup_fix.log",
+    "log_sha256": "71529203e32b1a7ed1ab348ac5100d0e0d67e143ea0299ac33420e0a4be3d49c",
+    "existing_private_capture_contracts": "10/10 PASS; offline parsing of already acquired capture; capture remains private",
+    "fresh_hardware_evidence": false,
+    "targeted_app_only_audit": {
+      "result": "PASS",
+      "checks": 4,
+      "log": "test_logs/frozen_qualification_targeted_audit.log",
+      "log_sha256": "67a8b650d598e4db90d9e9273038f54b3556a0eeafac94cec58dde3c2f5514dc"
+    },
+    "full_static_audit": "Stopped to avoid unrelated firmware suite repeats; not claimed PASS. Frozen firmware qualification remains unchanged.",
+    "frozen_qualification_gate": {
+      "result": "PASS",
+      "count": 1,
+      "negative_cases": [
+        "changed_current_source",
+        "changed_compiled_inventory",
+        "changed_or_failed_audit_log",
+        "failed_test_status",
+        "unqualified_host_gate"
+      ],
+      "log": "test_logs/frozen_qualification_reuse.log",
+      "log_sha256": "1ff3aaa6b14fa26700d940fd7674c878bc8499ec166fbac495fcbb9e019a317c"
+    }
+  },
+  "serial_deadlines_seconds": {
+    "status_reads": 20,
+    "servo_preflight": 60
+  },
+  "robot_port_opened": true,
+  "designation_or_firmware_changed": false,
+  "repairs": [
+    "SEMANTIC_SERIAL_RESPONSE_FRAMING",
+    "ROM_NOSTUB_115200_BOUNDED_STREAMED_BACKUP_AND_RESUME",
+    "CANONICAL_APP_ONLY_ROM_TRANSPORT_NO_STUB_NO_AUTOMATIC_BOOT",
+    "FROZEN_QUALIFICATION_REUSE_EXACT_SOURCE_AND_RECEIPT_LOG_IDENTITIES"
+  ],
+  "updated_utc": "2026-10-13T19:18:27.342493+00:00",
+  "rom_backup": {
+    "baud": 115200,
+    "stub": false,
+    "read_timeout_seconds": 3600,
+    "connect_attempts": 1,
+    "retry": false,
+    "stream_partial_output_to_log": true,
+    "resume_diagnostics": "HISTORICAL_NOT_FRESH; continuity and physical-supervision review required"
+  },
+  "offline_qualification_scope": "Host code/tests only; subsequent hardware operations are in REMOTE_BACKUP_CLOSEOUT.json",
+  "subsequent_hardware_operations": {
+    "receipt": "REMOTE_BACKUP_CLOSEOUT.json",
+    "initial_usb_rom_reset_count": 1,
+    "fullflash_reads": 2,
+    "flash": false,
+    "motion": false,
+    "torque_on": false,
+    "nvs_eeprom_bms_write": false
+  }
+}

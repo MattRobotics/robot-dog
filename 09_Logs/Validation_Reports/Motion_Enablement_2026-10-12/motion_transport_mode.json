@@ -1,0 +1,64 @@
+{
+  "test_result": "PASS",
+  "semantic_checks": 31,
+  "total_checks_including_doubles": 2077,
+  "sanitizers": [
+    "address",
+    "undefined"
+  ],
+  "gate": "TRANSPORT_MOTION_RUN_STA",
+  "gate_status": "OPEN_SOFTWARE_REQUIREMENT",
+  "scope": "Dashboard/Jetson semantic motion over normal RUN_STA router connection",
+  "universal_run_ap_incompatibility": false,
+  "cases": [
+    {
+      "mode": "MAINTENANCE",
+      "network_role": "MAINTENANCE_AP",
+      "motion_transport_admitted": true,
+      "motion_mode_gate": "MODE_RUN_REQUIRED"
+    },
+    {
+      "mode": "RUN",
+      "network_role": "RUN_STA",
+      "motion_transport_admitted": false,
+      "motion_mode_gate": "passed; EXECUTOR_NOT_BOUND isolates remaining facts"
+    },
+    {
+      "mode": "RUN",
+      "network_role": "RUN_NO_PROFILE_AP",
+      "motion_transport_admitted": true,
+      "motion_mode_gate": "passed; EXECUTOR_NOT_BOUND isolates remaining facts"
+    },
+    {
+      "mode": "RUN",
+      "network_role": "RUN_RECOVERY_AP",
+      "motion_transport_admitted": true,
+      "motion_mode_gate": "passed; EXECUTOR_NOT_BOUND isolates remaining facts"
+    }
+  ],
+  "production_code": [
+    "network/WifiManager.cpp",
+    "network/NetworkPolicy.h",
+    "network/AdminAccess.cpp",
+    "network/HttpTransport.cpp:admitAdmin body",
+    "core/MotionService.cpp"
+  ],
+  "doubles": [
+    "Wi-Fi driver/events",
+    "scheduler/queues",
+    "NVS",
+    "hypothetical readiness facts isolating the mode gate; no executor/actuator bound"
+  ],
+  "evidence": [
+    "NetworkPolicy.h:69 selectRole permits RUN recovery/no-profile AP",
+    "WifiManager.cpp:884 evaluateRole reads Controller run_mode",
+    "Controller.cpp:1014 passes OperatingMode RUN to WifiManager",
+    "MotionService.cpp:27 refuses non-RUN",
+    "HttpTransport.cpp:181 filters Motion routes from non-admin TLS listener",
+    "ControllerService.h:193 retains MAINTENANCE condition for network mutations"
+  ],
+  "configuration_mutations_in_run": "refused; zero NVS-double writes after initial fixture seeding",
+  "minimum_future_change": "Add an independently authenticated operational transport reachable in RUN_STA that delegates the existing versioned semantic contract to Controller/MotionService. Keep Wi-Fi/config mutations under current MAINTENANCE AdminAccess, keep admitAdmin unchanged, and grant no actuator authority from transport authentication. STOP/watchdog/TTL/revocation require qualification on the chosen channel.",
+  "firmware_changed": false,
+  "hardware_writes": 0
+}

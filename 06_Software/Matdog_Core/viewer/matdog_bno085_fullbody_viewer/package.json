@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "pretest": "npm run sync:assets",
     "test": "vitest run",
-    "verify": "npm run sync:assets && npm run typecheck && vitest run && vite build"
+    "verify": "npm run sync:assets && npm run typecheck && vitest run && vite build",
+    "build:twin": "npm run sync:assets && vite build --config vite.mobile.config.ts && python3 -I scripts/build_mobile_twin_assets.py --urdf public/canonical/matt_robodog_rev00/matt_robodog_rev00.urdf --out dist-mobile/.mtw-work --cells 3 && python3 -I scripts/package_mobile_twin.py --urdf public/canonical/matt_robodog_rev00/matt_robodog_rev00.urdf --mtw dist-mobile/.mtw-work/matdog_collision_3mm.mtw"
   },
   "dependencies": {
     "three": "^0.185.1"

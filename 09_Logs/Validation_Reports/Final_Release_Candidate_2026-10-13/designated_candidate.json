@@ -1,0 +1,20 @@
+{
+  "schema": "MATDOG_SINGLE_APP_ONLY_DESIGNATION_V1",
+  "release_ready": "PASS",
+  "meaning": "Software release ready for read-only preflight; no flash or physical Motion authorization",
+  "source_commit": "b147f3884b227ec819e98a6f00c214a0aac2278e",
+  "artifact_directory": "/home/matteo-manicardi/MATDOG/verification-artifacts/FINAL_RC_20261013/final_candidate/artifacts/ROBOT_POWERED-ota0",
+  "application_binary": "MATDOG_Controller.ino.bin",
+  "application_sha256": "5577bd3c8da5f6c44d8fb9ca9b3d049399e73ccf37d218e716b773e3a87b5914",
+  "application_size_bytes": 3643120,
+  "layout_id": "MATDOG_16M_2x5M_NVS_V1",
+  "partition_table_sha256": "8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7",
+  "manifest_sha256": "1be4d3775cc7285addd6f942737f9358285154ae55e492fbe64c5b707d0948be",
+  "supervised_validation_capable": true,
+  "boot_motion_authorized": false,
+  "ota_ingest_enabled": false,
+  "hardware_validation": "BLOCKED_CURRENT_MEASUREMENTS_AND_OPERATOR_REVIEW",
+  "flash_authorized": false,
+  "supersedes_application_sha256": "772b2658c63878b0d98ee8046cf3bd4bbb158460b0c79eb0af8b4361e4b0499f",
+  "installed_historical_source_commit": "b08322dedc5564c080f691dc98047511ef2b953f"
+}

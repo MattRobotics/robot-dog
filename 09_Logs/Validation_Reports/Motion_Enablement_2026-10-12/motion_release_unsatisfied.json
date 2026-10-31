@@ -1,0 +1,63 @@
+{
+  "schema": "MATDOG_MOTION_RELEASE_UNSATISFIED_V1",
+  "hardware_access": false,
+  "physical_readiness": false,
+  "motion_authorized": false,
+  "unsatisfied_requirements": [
+    {
+      "id": "CONTROLLER_PHYSICAL_FACT_PRODUCERS",
+      "kind": "software_integration",
+      "reason": "Production Controller intentionally supplies hardware_approved=false and support_observable=false. It does not configure/arm MotionExecutor/Coordinator or supply measured 12-joint, contact/height observations and independent per-segment assessments. The host-wired path does not establish a production physical execution path. Reviewed local producers must be implemented before a motion trial; changing boolean guards is insufficient."
+    },
+    {
+      "id": "TRANSPORT_MOTION_RUN_STA",
+      "kind": "software_integration",
+      "reason": "Production Motion HTTP routes reuse verified AdminAccess AP admission. RUN_NO_PROFILE_AP and RUN_RECOVERY_AP are compatible with RUN MotionService while maintenance configuration mutations remain blocked. In normal RUN_STA the router association revokes AdminAccess and Motion HTTP cannot be admitted. A separate authenticated operational transport with the same Controller semantic contract is still required; weakening AP-only configuration or authority gates is not a solution."
+    },
+    {
+      "id": "OPERATIONAL_ENVELOPE_ARTIFACT",
+      "kind": "evidence_and_integration",
+      "reason": "No production approved/pinned simultaneous-configuration workspace artifact is available or admitted by Controller. Restore supplies verified transforms, never converts mechanical contacts into operational permission. Geometry, collision, configuration margins and current installation must qualify every approved limit."
+    },
+    {
+      "id": "PRONE_SUPPORT_AND_CONTINUOUS_CLEARANCE",
+      "kind": "physical_and_geometric_qualification",
+      "reason": "Actual natural folded initial joint vector is not captured. Preserved G35 fixture route has 212 self-intersecting frames of 2319; its extended starting links do not model natural strong folding. Six bounded anatomical recipes plus two rock-first correction recipes reach an outward RH HIP/floor conflict; corrected frame 24 lower/foot penetrate 3.539/3.396 mm. No complete geometric prone-to-150mm path or C3 load-transfer/C4 bridge is qualified. Independent contact/load, operational IK branches/rates, swept clearance and current installation evidence remain required. These failures apply to the tested family, not all possible MATDOG trajectories."
+    },
+    {
+      "id": "LOADED_TRACKING_AND_SEQUENTIAL_BUS_TIMING",
+      "kind": "hardware_qualification",
+      "reason": "Loaded rates, tracking, feedback freshness, torque prime, sequential 12-joint bus timing, watchdog/revocation/SAFE_OFF timing and heap/stack/Wi-Fi behavior are not hardware validated. Offline backend doubles cannot supply that qualification."
+    },
+    {
+      "id": "WALK_SUPPORT_AND_STABILITY",
+      "kind": "hardware_qualification",
+      "reason": "Flat-terrain WALK IK/contact and coordinated STOP are software tested. Physical support transfer, friction, COM/stability and dynamic stability remain unvalidated; physical assessment requires a separate dynamicStabilityQualified witness."
+    },
+    {
+      "id": "LIVE_NONZERO_VELOCITY_TRANSITION",
+      "kind": "software_feature",
+      "reason": "Repeated same-velocity leases and zero/STOP are implemented. A different nonzero vx/vy/yaw requests a coordinated stop and rejects the command; a fresh command after STAND is required. Continuous joystick direction/speed transitions are not yet implemented."
+    },
+    {
+      "id": "PLANNED_CATALOG_ACTIONS",
+      "kind": "future_software_and_qualification",
+      "reason": "41 of 48 visible catalog entries remain planned and backend-disabled: LIE_DOWN, TROT and future gaits, body translations/orientations, presets and independent leg actions. Seven have software implementations; physical state enables only STOP/status."
+    },
+    {
+      "id": "REAL_TELEMETRY_AND_EMBEDDED_3D",
+      "kind": "integration_and_capacity",
+      "reason": "No real telemetry was accessed. The synthetic/read-only host twin works, but full 3D assets exceed existing embedded partition capacity. Host serving with a reachable address remains required; embedding the full viewer is not part of this candidate."
+    },
+    {
+      "id": "REVIEW_COMMIT_CLEAN_REBUILD",
+      "kind": "release_provenance",
+      "reason": "The review candidate remains uncommitted. Source inventory and dirty-image receipt verify its bytes, while the production flash gate still refuses TREE_NOT_CLEAN. Review, commit and a clean source rebuild with a fresh verified manifest are required before an APP-ONLY authorization request."
+    },
+    {
+      "id": "PHYSICAL_TRIAL_GO",
+      "kind": "operator_authorization",
+      "reason": "No hardware GO is granted. A later trial needs an appropriate fixture, measured conditions, physical stop, local assistance and explicit operator GO after software/evidence blockers close."
+    }
+  ]
+}

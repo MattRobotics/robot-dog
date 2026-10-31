@@ -1,10 +1,12 @@
 #ifndef MATDOG_NETWORK_PORTAL_PAGE_H
 #define MATDOG_NETWORK_PORTAL_PAGE_H
+#include "MotionDashboard.h"
 // The AP-local portal: one self-contained document, no external resource.
 //
 // Data model. The Dashboard renders two existing read-only endpoints and
-// nothing else: GET /status (controller telemetry, key=value) and
-// GET /wifi/status (network state, JSON). Every value shown is a cached
+// GET /status (controller telemetry, key=value) and
+// GET /wifi/status (network state, JSON). MotionDashboard adds the Controller
+// semantic /api/motion service. Every value shown is a cached
 // controller value; the page never causes a BMS, IMU or servo-bus transaction.
 //
 // Refresh. POLL_MS = 4000: the two requests are issued one after the other on
@@ -42,7 +44,7 @@ section{margin:12px 0}section.page{background:var(--card);padding:16px;border-ra
 dl{display:grid;grid-template-columns:minmax(36%,1fr) auto;gap:4px 12px;margin:0;align-items:baseline}dt{color:var(--muted);font-size:14px}dd{margin:0;text-align:right;overflow-wrap:anywhere;min-width:0}dd.ok{color:var(--ok)}dd.warn{color:var(--warn)}dd.bad{color:var(--bad)}dd.na{color:var(--na)}dd.lock{color:var(--lock)}
 .mods{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}.note{font-size:13px;color:var(--muted);margin:8px 0 0}.sub{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}.sub.first{margin:0;padding:0;border:0}.sub>b{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
 details{margin-top:10px}summary{cursor:pointer;color:var(--accent);font-size:14px}details dl{margin-top:8px}
-.stale .card,.stale .mode{opacity:.5}#staleNote{display:none;margin-top:12px;padding:10px;border-radius:8px;background:#4a2326;border-left:5px solid var(--bad)}.stale #staleNote{display:block}
+.stale .card:not(#simple-motion),.stale .mode{opacity:.5}#staleNote{display:none;margin-top:12px;padding:10px;border-radius:8px;background:#4a2326;border-left:5px solid var(--bad)}.stale #staleNote{display:block}
 label{display:block;margin:12px 0;font-size:14px;color:var(--muted)}input,select{display:block;width:100%;margin-top:4px;padding:11px;background:var(--bg);color:#fff;border:1px solid #456075;border-radius:6px;font:inherit}input[type=checkbox]{display:inline;width:auto;margin:0 6px 0 0}label.check{color:var(--text)}
 fieldset{border:1px solid #456075;margin:14px 0;border-radius:8px;padding:6px 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 18px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{color:var(--accent)}.result{white-space:pre-line;margin:12px 0;padding:12px;border-radius:8px;border-left:5px solid var(--na);background:#111c26}.result.ok{border-color:var(--ok)}.result.bad{border-color:var(--bad)}.result.warn{border-color:var(--warn)}
@@ -51,20 +53,20 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{
 <div class="link" role="status"><span id="linkDot" class="dot"></span><span id="linkText">Connessione al dispositivo…</span></div>
 <div id="message" role="status" hidden></div>
 <nav><button data-page="dashboard" class="on">Dashboard</button><button data-page="wifi">Wi-Fi</button><button data-page="ap">Access Point</button><button data-page="performance">Performance</button><button data-page="ota">OTA</button><button data-page="diagnostics">Diagnostics</button></nav>
-<section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, l'accesso dura 5 minuti.</p><button>Accedi</button></form></section>
-<section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">MOVIMENTO NON AUTORIZZATO<span id="motionWhy"></span></div></div>
+<section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, la sessione termina 5 minuti dopo l'ultimo utilizzo; la Dashboard aperta la mantiene attiva. La sessione serve solo per inviare comandi: STAND e WALK già accettati non dipendono da essa.</p><button>Accedi</button></form></section>
+<section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">STATO MOTION IN ATTESA<span id="motionWhy"></span></div></div>
 <div id="staleNote">Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.</div>
 <div class="cards">
 <div class="card"><h3>Stato generale</h3><div class="kpis"><div><small>Sistema</small><b id="health">—</b></div><div><small>Alimentazione</small><b id="power">—</b></div><div><small>Authority</small><b id="authority">—</b></div></div><div class="mods" id="mods"></div><dl id="sysList"></dl><p class="note" id="safety"></p></div>
-<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><div class="big"><b id="soc">N/D</b><span id="packV"></span></div><div id="socBar" class="bar" role="meter" aria-label="Stato di carica" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
+<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><p id="energyState" class="note">Disponibilità energetica non verificata</p><small>SOC BMS stimato · non calibrato</small><div class="big"><b id="soc">N/D</b><span id="packV"></span></div><div id="socBar" class="bar" role="meter" aria-label="Stato di carica" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
 <div class="card"><h3>IMU BNO085<span id="imuBadge" class="chip">N/D</span></h3><dl id="imuList"></dl></div>
 <div class="card"><h3>Servo e attuatori<span id="servoBadge" class="chip">N/D</span></h3><dl id="servoList"></dl></div>
 <div class="card"><h3>Calibrazione<span id="calBadge" class="chip">N/D</span></h3><dl id="calList"></dl><p class="note">La calibrazione disponibile è un'evidenza salvata, non un'autorizzazione al movimento.</p></div>
 <div class="card"><h3>LED<span id="ledBadge" class="chip">N/D</span></h3><dl id="ledList"></dl></div>
 <div class="card"><h3>Rete</h3><div class="sub first"><b>Access Point<span id="apBadge" class="chip">N/D</span></b><dl id="apList"></dl></div><div class="sub"><b>Client STA (router)<span id="staBadge" class="chip">N/D</span></b><dl id="staList"></dl><p class="note" id="staNote"></p></div></div>
 </div><details><summary>Diagnostica avanzata · /status completo</summary><pre id="rawStatus"></pre></details></section>
-<section id="wifi" class="page" hidden><h2>Wi-Fi · router di casa</h2><p class="muted">In MAINTENANCE il MATDOG resta sul proprio access point: il router salvato qui viene usato da solo soltanto in RUN. «Prova e salva» è una verifica temporanea: la radio è una sola, quindi l'AP si chiude (fino a circa 40 secondi), il telefono viene scollegato e al termine l'AP torna da solo, anche se la prova fallisce. La configurazione salvata cambia solo se il router accetta le credenziali e assegna un indirizzo. Solo reti a 2,4 GHz con WPA2.</p><p class="note" id="lockNote" hidden>Il controller non è in MAINTENANCE: la configurazione di rete non è modificabile adesso.</p><div id="testResult" class="result" hidden></div><button id="scan" disabled>Scan indisponibile in ADMIN_AP</button><pre id="scanResults" hidden></pre><form id="wifiForm"><div class="grid" id="profiles"></div><label>Profilo da provare<select name="test_profile"><option value="0">Primary</option><option value="1">Secondary</option></select></label><button>Prova e salva</button></form></section>
-<section id="ap" class="page" hidden><h2>Access Point</h2><p class="muted">La modalità del controller decide il ruolo della radio. In MAINTENANCE l'AP e questo portale sono sempre attivi, senza timeout. In RUN il MATDOG passa al router configurato e apre l'AP solo come recupero: nessun profilo, oppure router che non risponde o rifiuta le credenziali. Dall'AP di recupero riprova il router dopo 60 secondi, raddoppiando l'attesa a ogni fallimento fino al limite qui sotto, e mai mentre qualcuno è collegato. Quando è sul router il portale non è raggiungibile: si torna qui passando a MAINTENANCE. Ogni modifica qui sotto passa dalla prova di connessione al router della sezione Wi-Fi.</p><form id="apForm"><label>Nome AP (vuoto: MAC dispositivo)<input name="ap_name" maxlength="32"></label><label>Nuova password WPA2 (vuoto: conserva)<input name="ap_password" type="password" maxlength="63" autocomplete="new-password"></label><label>Attesa massima sull'AP di recupero prima di riprovare il router (millisecondi)<input name="ap_timeout_ms" type="number" min="60000" max="3600000" value="900000"></label><input name="ap_always" type="hidden" value="0"><p class="note" id="legacyNote" hidden>In memoria è presente la vecchia preferenza «AP sempre disponibile». Non ha più effetto: in RUN il router configurato viene comunque usato. Viene conservata così com'è.</p><input name="test_profile" type="hidden" value="0"><button>Prova e salva</button></form></section>
+<section id="wifi" class="page" hidden><h2>Wi-Fi · router di casa</h2><p class="muted">Con il ruolo radio predefinito il MATDOG resta sul proprio access point: il router salvato qui viene usato da solo soltanto dopo @MODE RUN via USB. «Prova e salva» è una verifica temporanea: la radio è una sola, quindi l'AP si chiude (fino a circa 40 secondi), il telefono viene scollegato e al termine l'AP torna da solo, anche se la prova fallisce. La configurazione salvata cambia solo se il router accetta le credenziali e assegna un indirizzo. Solo reti a 2,4 GHz con WPA2.</p><p class="note" id="lockNote" hidden>Motion o manutenzione attiva: la configurazione di rete non è modificabile adesso.</p><div id="testResult" class="result" hidden></div><button id="scan" disabled>Scan indisponibile in ADMIN_AP</button><pre id="scanResults" hidden></pre><form id="wifiForm"><div class="grid" id="profiles"></div><label>Profilo da provare<select name="test_profile"><option value="0">Primary</option><option value="1">Secondary</option></select></label><button>Prova e salva</button></form></section>
+<section id="ap" class="page" hidden><h2>Access Point</h2><p class="muted">Il ruolo della radio si sceglie via USB. Con il ruolo predefinito (anche durante il RUN operativo) e con @MODE MAINTENANCE l'AP e questo portale sono sempre attivi, senza timeout. Con @MODE RUN il MATDOG passa al router configurato e apre l'AP solo come recupero: nessun profilo, oppure router che non risponde o rifiuta le credenziali. Dall'AP di recupero riprova il router dopo 60 secondi, raddoppiando l'attesa a ogni fallimento fino al limite qui sotto, e mai mentre qualcuno è collegato. Quando è sul router il portale non è raggiungibile: si torna qui passando a MAINTENANCE. Ogni modifica qui sotto passa dalla prova di connessione al router della sezione Wi-Fi.</p><form id="apForm"><label>Nome AP (vuoto: MAC dispositivo)<input name="ap_name" maxlength="32"></label><label>Nuova password WPA2 (vuoto: conserva)<input name="ap_password" type="password" maxlength="63" autocomplete="new-password"></label><label>Attesa massima sull'AP di recupero prima di riprovare il router (millisecondi)<input name="ap_timeout_ms" type="number" min="60000" max="3600000" value="900000"></label><input name="ap_always" type="hidden" value="0"><p class="note" id="legacyNote" hidden>In memoria è presente la vecchia preferenza «AP sempre disponibile». Non ha più effetto: in RUN il router configurato viene comunque usato. Viene conservata così com'è.</p><input name="test_profile" type="hidden" value="0"><button>Prova e salva</button></form></section>
 <section id="performance" class="page" hidden><h2>Performance</h2><p class="muted">Roaming disattivato di default. Scansioni sospese in calibrazione, RUN e OTA. Con la policy attuale la STA è attiva stabilmente solo in RUN, dove le scansioni sono sospese: roaming e scan non hanno quindi effetto pratico. Il modem sleep resta OFF perché HWCDC non prova l'apertura di una sessione USB.</p><form id="performanceForm"><label>Roaming<select name="roam_enabled"><option value="0">Disattivo</option><option value="1">Attivo</option></select></label><label>Soglia RSSI<input name="roam_threshold" type="number" min="-95" max="-50" value="-80"></label><label>Isteresi dB<input name="roam_hysteresis" type="number" min="3" max="30" value="8"></label><label>Intervallo scansioni ms<input name="scan_interval_ms" type="number" min="30000" max="3600000" value="60000"></label><label>Dwell ms<input name="roam_dwell_ms" type="number" min="60000" max="3600000" value="120000"></label><label>Larghezza banda STA<select name="bandwidth_mhz"><option value="20">HT20</option><option value="40">HT40 · da validare sul router</option></select></label><input name="test_profile" type="hidden" value="0"><button>Prova e salva</button></form></section>
 <section id="ota" class="page" hidden><h2>OTA</h2><p class="muted">L'upload usa esclusivamente TLS con identità verificata e HMAC, dopo i gate di sicurezza. Il riavvio remoto resta bloccato; nessun aggiornamento è attivato da questa pagina.</p><dl id="otaList"></dl><pre id="firmware"></pre></section>
 <section id="diagnostics" class="page" hidden><h2>Diagnostics</h2><p class="muted">Risposta completa di /wifi/status.</p><pre id="details"></pre></section>
@@ -73,9 +75,16 @@ const POLL_MS=4000,STALE_MS=12000,BAT_LOW=30,BAT_CRIT=15,SESSION_MS=300000;
 const PAGES=['dashboard','wifi','ap','performance','ota','diagnostics'];
 const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
-let csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
+let authReady=Promise.resolve();
+let budget=false,csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
+// One read at a time for the WHOLE page (portal + Motion): the AP listener has
+// two sockets with LRU purge, and two independent pollers plus any third
+// request forced purges of in-flight sockets (14 Oct HTTP_TIMEOUT). Motion
+// commands/STOP do not use this lane, so the second socket stays free for them.
+let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const message=$('#message');
+function formatDiagnosticTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return 'N/D';try{const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'longOffset'}).formatToParts(d).map(x=>[x.type,x.value]));const off=p.timeZoneName.replace('GMT','')||'+00:00';return d.toISOString()+' · '+p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+off+' Europe/Rome '+(off==='+02:00'?'CEST':'CET')+' · fonte browser, non sincronizza il robot'}catch(e){return d.toISOString()+' · Europe/Rome non disponibile · fonte browser'}}
 function show(text,kind){message.textContent=text;message.className=kind||'';message.hidden=!text}
 message.onclick=()=>show('');
 function page(name){PAGES.forEach(p=>$('#'+p).hidden=p!==name);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===name))}
@@ -88,42 +97,38 @@ const yn=v=>v==='YES'?'sì':v==='NO'?'no':'N/D';
 // ---- Dashboard -------------------------------------------------------------
 function renderStatus(){
  const s=st;if(!s)return;
- $('#build').textContent='firmware '+(s.build_id||'N/D')+(s.uptime_ms?' · acceso da '+dur(+s.uptime_ms):'');
- $('#lockNote').hidden=s.mode==='MAINTENANCE';
+ $('#build').textContent=(s.firmware_name||'firmware')+' '+(s.firmware_version||'')+' · build '+(s.build_id||'N/D')+(s.uptime_ms?' · acceso da '+dur(+s.uptime_ms):'');
+ $('#lockNote').hidden=s.authority==='NONE';
  const mode=s.mode||'UNKNOWN',faulty=s.system_health==='FAULT'||(s.power_state&&s.power_state!=='RUN');
  $('#mode').textContent=mode;$('#modeBar').className='mode '+(faulty?'bad':mode==='MAINTENANCE'?'maint':mode==='RUN'?'run':'');
- // Movement is reported as possible only when every gate says so.
- const why=[];
- if(s.calibration_hardware_motion_authorized!=='YES')why.push('motion hardware NO');
- if(s.authority==='NONE')why.push('authority NONE');
- if(s.authority_inhibited==='YES')why.push('inibizione '+s.authority_inhibit_reason);
- if(s.actuator_readiness_torque_enable!=='READY')why.push('torque '+(s.actuator_readiness_torque_enable||'N/D'));
- if(s.actuator_readiness_position_command!=='READY')why.push('posizione '+(s.actuator_readiness_position_command||'N/D'));
- const m=$('#motion');m.className='motion'+(why.length?'':' live');
- m.firstChild.textContent=why.length?'MOVIMENTO NON AUTORIZZATO':'MOVIMENTO ABILITATO';$('#motionWhy').textContent=why.join(' · ');
+ // Operational Motion status is rendered from /api/motion/status by
+ // MotionDashboard, not from the historical calibration authorization.
  const h=$('#health');h.textContent=s.system_health||'N/D';h.style.color=s.system_health==='READY'?'var(--ok)':s.system_health==='FAULT'?'var(--bad)':'var(--warn)';
  const p=$('#power');p.textContent=s.power_state||'N/D';p.style.color=s.power_state==='RUN'?'':'var(--warn)';
  $('#authority').textContent=s.authority||'N/D';
  const mods=$('#mods');mods.textContent='';
  for(const [k,label] of [['imu','IMU'],['bms','BMS'],['servo','SERVO'],['led','LED']]){const v=s[k+'_availability']||'UNKNOWN';mods.append(E('span','chip '+(CLASS[v]||''),label+' '+v))}
  rows('#sysList',[['Calibrazione in corso',yn(s.calibration_holds_authority)],['Inibizione attuatori',s.authority_inhibited==='YES'?'ATTIVA · '+s.authority_inhibit_reason:'non attiva'],['Stato OTA',s.ota_state],['Memoria libera',s.heap_free?Math.round(s.heap_free/1024)+' kB (minimo '+Math.round(s.heap_min_free/1024)+' kB)':null],['Stack controller libero (minimo)',s.loop_stack_min_free?s.loop_stack_min_free+' B':null]]);
- $('#safety').textContent=why.length?'Stato di sicurezza: attuatori bloccati (fail-closed). Questa pagina non contiene comandi di movimento.':'Stato di sicurezza: gli attuatori possono essere comandati dal controller.';
+ $('#safety').textContent='Disponibilità, avanzamento ed errori dei comandi sono riportati nello stato Motion del Controller.';
  // Battery: a value is shown as current only when the controller calls it fresh.
  const valid=s.bms_valid==='YES',fresh=s.bms_fresh==='YES',soc=parseFloat(s.bms_soc_percent),bar=$('#socBar');
  const crit=s.led_battery_critical==='YES'||soc<=BAT_CRIT,low=s.led_battery_warning==='YES'||soc<=BAT_LOW;
- if(valid&&fresh&&isFinite(soc)){
-  $('#soc').textContent=soc.toFixed(0)+' %';$('#packV').textContent=s.bms_pack_v+' V · 3S';
-  bar.className='bar '+(crit?'bad':low?'warn':'ok');bar.firstChild.style.width=Math.max(0,Math.min(100,soc))+'%';bar.setAttribute('aria-valuenow',soc.toFixed(0));
-  chip('#bmsBadge',crit?'CRITICA':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',crit?'bad':low?'warn':'ok');
+ const unavailable=crit||s.led_charging_fault==='YES'||['FAULT','PROTECTED'].includes(s.bms_state)||(fresh&&s.bms_discharge_mos==='OFF'&&s.bms_state!=='CHARGING');
+ $('#energyState').textContent=!valid||!fresh?'Disponibilità energetica non verificata · dati assenti/stale'+(crit?' · ultimo allarme BATTERY_CRITICAL':''):unavailable?(crit?'BATTERY_CRITICAL':'PROTEZIONE BMS')+' · energia operativa esaurita · autonomia utilizzabile non stimata':low?'BATTERY_WARNING · energia operativa limitata · SOC non prova autonomia':'Energia operativa senza allarmi noti · autonomia utilizzabile non stimata';
+ if(valid&&fresh){
+  const socKnown=isFinite(soc);$('#soc').textContent=socKnown?soc.toFixed(0)+' %':'N/D';$('#packV').textContent=s.bms_pack_v+' V · 3S';
+  bar.className='bar '+(crit?'bad':low?'warn':'ok');bar.hidden=unavailable||!socKnown;bar.firstChild.style.width=bar.hidden?'0%':Math.max(0,Math.min(100,soc))+'%';if(bar.hidden)bar.removeAttribute('aria-valuenow');else bar.setAttribute('aria-valuenow',soc.toFixed(0));
+  chip('#bmsBadge',crit?'CRITICA':unavailable?'INDISPONIBILE':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',unavailable?'bad':low?'warn':'ok');
  }else{
   $('#soc').textContent=valid?'STALE':'N/D';$('#packV').textContent='';bar.className='bar';bar.firstChild.style.width='0';bar.removeAttribute('aria-valuenow');
   chip('#bmsBadge',valid?'DATO VECCHIO':s.bms_comm==='NEVER_POLLED'?'IN ATTESA':'OFFLINE',valid?'warn':'bad');
  }
  rows('#bmsList',[['Comunicazione',s.bms_comm,s.bms_comm==='OK'?'ok':'bad'],['Età ultimo dato valido',valid?dur(+s.bms_sample_age_ms):'nessun dato',fresh?'':'warn'],
   valid&&!fresh&&isFinite(soc)?['Ultimo valore (non attuale)',soc.toFixed(0)+' % · '+s.bms_pack_v+' V','na']:null,
-  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null]);
+  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null,valid?['Cella minima',s.bms_cell_min_mv+' mV']:null,
+  valid&&parseFloat(s.bms_remaining_ah)>0?['Capacità residua (DALY)',s.bms_remaining_ah+' Ah · valore BMS']:null,valid&&s.bms_remaining_estimate_ah!=null?['Capacità residua STIMA',s.bms_remaining_estimate_ah+' Ah · STIMA = SOC × '+s.bms_capacity_config_ah+' Ah','na']:null,valid&&s.bms_capacity_config_ah?['Capacità nominale configurata',s.bms_capacity_config_ah+' Ah (3S)','na']:null]);
  const alarms=s.bms_alarms||'',clear=/^[0 ]+$/.test(alarms);
- rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Soglie colore barra','bassa ≤ '+BAT_LOW+' % · critica ≤ '+BAT_CRIT+' %','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
+ rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Avvisi energia','SOC stimato ≤30/15%; cella ≤3500/3350 mV; pacco ≤10,50/10,05 V. SOC non prova autonomia.','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
  // IMU: the rotation-vector counter must advance between two polls.
  const count=+s.imu_rv_count,now=Date.now();let rate=null;
  if(rv&&isFinite(count)&&now>rv.t&&count>=rv.c)rate=(count-rv.c)*1000/(now-rv.t);
@@ -137,7 +142,7 @@ function renderStatus(){
  rows('#servoList',[['Bus servo',s.servo_detected,s.servo_detected==='ONLINE'?'ok':s.servo_detected==='NO_RESPONSE'?'bad':'na'],['Popolazione attesa',s.servo_expected_now?s.servo_expected_now+' servo ('+s.servo_canonical+' ID canonici)':null],
   ['Popolazione rilevata',census==='NOT_RUN'?'non verificata dal boot':s.servo_census_present+' presenti · '+s.servo_census_missing+' mancanti · '+census,census==='PASS'?'ok':census==='NOT_RUN'?'na':'bad'],
   ['Autorità di controllo',s.authority],['Torque enable',s.actuator_readiness_torque_enable,gate(s.actuator_readiness_torque_enable)],['Position command',s.actuator_readiness_position_command,gate(s.actuator_readiness_position_command)],
-  ['Movimento',why.length?'INIBITO':'ABILITATO',why.length?'lock':'bad']]);
+  ['Movimento operativo','Vedi stato Motion']]);
  const avail=s.calibration_available;
  chip('#calBadge',avail==='YES'?'DISPONIBILE':avail==='NO'?'NON DISPONIBILE':'N/D',avail==='YES'?'ok':avail==='NO'?'warn':'');
  rows('#calList',[['Record persistente',s.calibration_persist_verdict,s.calibration_persist_verdict==='VALID_ACKNOWLEDGED'?'ok':'warn'],['Generazione acknowledged',s.calibration_ack_generation],['Record integro',yn(s.calibration_record_intact),s.calibration_record_intact==='YES'?'ok':'warn'],
@@ -148,7 +153,7 @@ function renderStatus(){
  rows('#otaList',[['Build in esecuzione',s.ota_running_build_id],['Stato',s.ota_state],['Ingest compilato',yn(s.ota_ingest_compiled)],['Rollback possibile',yn(s.ota_rollback_possible)]]);
 }
 // ---- Network ---------------------------------------------------------------
-const ROLE={MAINTENANCE_AP:['','MAINTENANCE · AP amministrativo, sempre attivo'],RUN_STA:['','RUN · router'],RUN_NO_PROFILE_AP:['warn','RUN · AP di recupero: nessun router configurato'],RUN_RECOVERY_AP:['warn','RUN · AP di recupero: router non raggiungibile']};
+const ROLE={MAINTENANCE_STA_READONLY:['lock','MAINTENANCE · LAN sola lettura, nessuna autorità Motion'],MAINTENANCE_AP:['','MAINTENANCE · AP amministrativo, sempre attivo'],RUN_STA:['','RUN · router'],RUN_NO_PROFILE_AP:['warn','RUN · AP di recupero: nessun router configurato'],RUN_RECOVERY_AP:['warn','RUN · AP di recupero: router non raggiungibile']};
 const TEST={CONNECTED:['ok','Connessione riuscita: il router ha accettato le credenziali e ha assegnato un indirizzo IP.'],AUTH_REJECTED:['bad','Credenziali rifiutate dal router: password errata, oppure handshake WPA2 non completato.'],AP_NOT_FOUND:['bad','Router non trovato: nessuna rete con questo nome e sicurezza compatibile a portata (solo 2,4 GHz).'],NO_IP:['bad','Associazione riuscita, ma nessun indirizzo IP: DHCP del router non ha risposto, o IP statico non valido.'],TIMEOUT:['bad','Tempo scaduto: la connessione non si è completata entro 30 secondi.'],ABORTED:['warn','Prova interrotta prima del termine (contesto critico o fault radio).'],STORAGE_ERROR:['bad','Errore di memoria: la configurazione non è stata scritta in NVS.'],RUNNING:['warn','Prova in corso…']};
 const CONFIG_ERR={4:'indirizzo IP statico rifiutato dal driver',5:'richiesta non ammessa (amministrazione chiusa o controller occupato)',6:'cambiando SSID serve anche la nuova password',8:'configurazione non valida, oppure il profilo da provare non è attivo',9:'scrittura NVS fallita',10:'lettura NVS fallita',11:'fault radio',12:'profilo AP non coerente'};
 const REASON={2:'autenticazione scaduta',3:'uscita volontaria',8:'uscita volontaria',15:'handshake WPA2 non completato',200:'segnale del router perso',201:'rete non trovata',202:'autenticazione rifiutata',203:'associazione rifiutata',204:'handshake WPA2 non completato',205:'connessione fallita',210:'rete non trovata con sicurezza compatibile',211:'rete non trovata con sicurezza compatibile',212:'segnale troppo debole'};
@@ -159,6 +164,10 @@ function testText(t){const d=TEST[t.outcome];if(!d)return null;let x='Ultima pro
  return [d[0],x]}
 function renderWifi(){
  const s=wf;if(!s)return;
+ const readonly=s.read_only===true;
+ for(const form of document.querySelectorAll('#wifiForm,#apForm,#performanceForm'))for(const control of form.elements)control.disabled=readonly;
+ if(readonly){csrf='';authUi();$('#loginOpen').hidden=true;$('#login').hidden=true;$('#staNote').textContent='LAN MAINTENANCE · sola consultazione. Amministrazione tramite AP protetto; STOP attraverso console USB locale.';}
+
  chip('#apBadge',s.ap_active?'ATTIVO':'NON ATTIVO',s.ap_active?'ok':'warn');
  const pol=s.policy||{},why=ROLE[pol.role]||['',pol.role||'N/D'];
  rows('#apList',[['SSID',s.ap_ssid],['Indirizzo',s.ap_ip],['Client collegati',s.ap_clients],['Amministrazione',s.network_phase],['Policy radio',why[1],why[0]],
@@ -170,7 +179,7 @@ function renderWifi(){
   ['IP assegnato',s.connected?s.ip:'—','na'],['RSSI',s.connected?s.rssi+' dBm':'—','na'],s.disconnect_reason?['Ultima disconnessione STA',reason(s.disconnect_reason),admin?'na':'warn']:null,
   s.sta_test.seq?['Ultima prova router',s.sta_test.outcome+(s.sta_test.outcome==='CONNECTED'?' · '+s.sta_test.ip:''),(TEST[s.sta_test.outcome]||[''])[0]]:null]);
  $('#legacyNote').hidden=!s.ap_always;
- $('#staNote').textContent=admin?(pol.run?'Il router viene riprovato dall\'AP di recupero secondo la policy; qui sopra lo stato.':'In MAINTENANCE il client STA è sospeso di proposito, anche con un router salvato: «non connesso» e 0.0.0.0 non indicano un guasto. Il router verrà usato in RUN.'):'';
+ $('#staNote').textContent=readonly?'LAN MAINTENANCE · sola lettura. Amministrazione via AP protetto; STOP tramite USB locale.':admin?(pol.run?'Il router viene riprovato dall\'AP di recupero secondo la policy; qui sopra lo stato.':'In MAINTENANCE il client STA è sospeso di proposito, anche con un router salvato: «non connesso» e 0.0.0.0 non indicano un guasto. Il router verrà usato in RUN.'):'';
  const r=$('#testResult'),t=s.sta_test.seq?testText(s.sta_test):null;r.hidden=!t;if(t){r.className='result '+t[0];r.textContent=t[1]}
  $('#details').textContent=JSON.stringify(s,null,2);$('#scanResults').textContent=JSON.stringify(s.scan,null,2);$('#scanResults').hidden=!s.scan.length;
  $('#firmware').textContent='Build '+s.build_id+' · ingest '+s.ota_ingest+' · TLS '+s.tls;
@@ -178,7 +187,7 @@ function renderWifi(){
  if(!editing){s.profiles.forEach((p,i)=>{for(const key of ['ssid','enabled','dhcp','ip','mask','gateway','dns'])$('[name=p'+i+'_'+key+']').value=typeof p[key]==='boolean'?(p[key]?'1':'0'):p[key]});$('[name=ap_name]').value=s.ap_ssid;$('#wifiForm').elements.test_profile.value=s.active_profile;
   for(const key of ['roam_enabled','roam_threshold','roam_hysteresis','scan_interval_ms','roam_dwell_ms','bandwidth_mhz','ap_timeout_ms','ap_always']){const el=$('[name='+key+']');if(el)el.value=typeof s[key]==='boolean'?(s[key]?'1':'0'):s[key]}syncStatic()}
  // A new AP generation ends the old session; a remembered device reopens it.
- if(generation&&s.admin_generation!==generation&&csrf){csrf='';if(store.get('md_remember'))resume();else authUi()}
+ if(!readonly&&generation&&s.admin_generation!==generation&&csrf){csrf='';if(store.get('md_remember'))resume();else authUi()}
  generation=s.admin_generation;
  if(watch){
   const done=text=>{watch=null;store.set('md_watch',null);return text};
@@ -188,36 +197,45 @@ function renderWifi(){
  }else if(s.ap_reload_pending)show('Transizione AP in corso: il portale si chiuderà e riaprirà.','warn');
  // A remembered device that lost its session is reopened quietly, at most
  // once every 30 s; a write also retries on demand.
- if(!csrf&&store.get('md_remember')&&Date.now()-resumeAt>30000)resume();
+ if(!readonly&&!csrf&&store.get('md_remember')&&Date.now()-resumeAt>30000)resume();
 }
 function link(){
  const age=lastOk?Date.now()-lastOk:0,dot=$('#linkDot'),text=$('#linkText');
  if(watch&&(fails||age>2*POLL_MS)){dot.className='dot warn';text.textContent='Prova del router in corso da '+dur(Date.now()-watch.t)+': AP chiuso (previsto). Se il telefono non si ricollega da solo, riconnettilo a «'+watch.ap+'».'}
+ else if(budget){dot.className='dot warn';text.textContent=(window.mdMotionHealth?.fresh?'Motion disponibile · snapshot '+window.mdMotionHealth.age+' ms. ':'Motion: consultare stato ed età nella scheda dedicata. ')+'Diagnostica generale sospesa durante il movimento (MOTION_BUDGET_UNAVAILABLE)'+(lastOk?' · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa), non aggiornati':'')}
  else if(!lastOk){dot.className='dot '+(fails>1?'bad':'');text.textContent=fails>1?'Dispositivo non raggiungibile. Collega il telefono al Wi-Fi MATDOG e apri http://192.168.4.1':'Connessione al dispositivo…'}
- else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+new Date(lastOk).toLocaleTimeString('it-IT')}
- else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+new Date(lastOk).toLocaleTimeString('it-IT')+' ('+dur(age)+' fa)'}
- else{dot.className='dot ok';text.textContent='Aggiornato alle '+new Date(lastOk).toLocaleTimeString('it-IT')+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
- document.body.classList.toggle('stale',!!lastOk&&(fails>=2||age>STALE_MS));
- // A temporary session ends on the controller after SESSION_MS.
+ else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+formatDiagnosticTime(lastOk)}
+ else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa)'}
+ else{dot.className='dot ok';text.textContent='Aggiornato alle '+formatDiagnosticTime(lastOk)+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
+ document.body.classList.toggle('stale',!!lastOk&&(budget||fails>=2||age>STALE_MS));
+ $('#staleNote').textContent=budget?'Dati non aggiornati: durante il movimento il dispositivo sospende la diagnostica generale. La scheda Motion ha telemetria ed età indipendenti. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.':'Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.';
+ // A temporary session ends on the controller SESSION_MS after its last
+ // authenticated use; the Motion poll refreshes sessionAt on each one.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}
 }
-async function get(path){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok)throw Error(path);return await r.text()}finally{clearTimeout(t)}}
+// Diagnostics get 800 ms: the 3 s deadman budget minus a 1 s poll and
+// the Controller's 1200 ms Motion-read budget. STOP has a separate socket.
+async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),800);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok){const e=Error(path);e.status=r.status;try{e.code=JSON.parse(await r.text()).error}catch(x){}throw e}return await r.text()}finally{clearTimeout(t)}})}
 async function refresh(){
- if(busy)return;busy=true;clearTimeout(timer);let ok=false;
+ if(busy)return;busy=true;clearTimeout(timer);let ok=false;budget=false;
  // Sequential on purpose: one keep-alive connection, never two at once.
- try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){}
- if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else fails++;
+ try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){budget=e.status===503&&e.code==='MOTION_BUDGET_UNAVAILABLE'}
+ if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else if(!budget)fails++;   // Motion budget: telemetry paused, not a lost link
  link();busy=false;
- if(!document.hidden)timer=setTimeout(refresh,ok?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
+ if(!document.hidden)timer=setTimeout(refresh,ok||budget?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(timer);else refresh()});
 // ---- Administrator session ---------------------------------------------------
 function authUi(){const on=!!csrf;chip('#adminState',on?'Amministratore connesso':'Sola lettura',on?'ok':'');$('#logout').hidden=!on;$('#loginOpen').hidden=on;if(on)$('#login').hidden=true}
 function needLogin(){$('#login').hidden=false;$('#login').scrollIntoView&&$('#login').scrollIntoView();const t=$('#loginForm').elements.token;t.focus&&t.focus()}
-async function send(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
+async function send(path,body){return window.mdNet(()=>sendNow(path,body))}
+async function sendNow(path,body){const r=await fetch(path,{method:'POST',cache:'no-store',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Csrf-Token':csrf},body});const t=await r.text();if(!r.ok){const e=Error(t);e.status=r.status;throw e}return t}
 // Reopens the session without the token: the live session cookie, or the
 // remembered-device cookie, is sent by the browser only to /wifi/session.
-async function resume(){resumeAt=Date.now();try{csrf='';csrf=await send('/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){csrf='';authUi();return false}}
+// Only an authoritative refusal (401/403) drops the CSRF token; a timeout,
+// network error or 500/503 budget answer keeps it, so STOP is still sent.
+let resumePending=null;
+function resume(){if(resumePending)return resumePending;resumePending=(async()=>{resumeAt=Date.now();try{csrf=await send(location.protocol==='https:'?'/api/motion/session':'/wifi/session','');sessionAt=Date.now();authUi();return true}catch(e){if(e.status===401||e.status===403){csrf='';authUi()}return false}finally{resumePending=null}})();return resumePending}
 async function adminPost(path,body){
  if(!csrf&&!(await resume())){needLogin();throw Error('Serve l\'accesso amministratore per modificare la configurazione.')}
  try{return await send(path,body)}catch(e){if(e.message!=='AUTH_FAILED')throw e;if(await resume())return send(path,body);needLogin();throw Error('Sessione scaduta: accedi di nuovo.')}
@@ -225,9 +243,9 @@ async function adminPost(path,body){
 $('#loginOpen').onclick=async()=>{if(store.get('md_remember')&&await resume())show('Amministratore connesso: dispositivo riconosciuto.','ok');else needLogin()};
 $('#loginForm').onsubmit=async e=>{e.preventDefault();const f=e.target,token=f.elements.token.value.trim(),remember=f.elements.remember.checked;
  if(!/^[0-9a-fA-F]{64}$/.test(token)){show('Il token deve avere esattamente 64 cifre esadecimali.','bad');return}
- try{csrf=await send('/wifi/login','token='+token+(remember?'&remember=1':''));sessionAt=Date.now();store.set('md_remember',remember?'1':null);store.set('md_login',String(sessionAt));authUi();show(remember?'Amministratore connesso. Questo dispositivo verrà riconosciuto senza reinserire il token.':'Amministratore connesso per 5 minuti (dispositivo non ricordato).','ok')}
+ try{csrf=await send(location.protocol==='https:'?'/api/motion/login':'/wifi/login','token='+token+(remember&&location.protocol!=='https:'?'&remember=1':''));sessionAt=Date.now();store.set('md_remember',remember?'1':null);store.set('md_login',String(sessionAt));authUi();show(remember?'Amministratore connesso. Questo dispositivo verrà riconosciuto senza reinserire il token.':'Amministratore connesso per 5 minuti (dispositivo non ricordato).','ok')}
  catch(x){csrf='';authUi();show(x.message==='AUTH_FAILED'?'Token rifiutato. Dopo un errore attendi qualche secondo prima di riprovare (60 s dopo cinque errori).':'Accesso non riuscito: '+x.message,'bad')}finally{f.reset()}};
-$('#logout').onclick=async()=>{try{await send('/wifi/logout','')}catch(e){}csrf='';store.set('md_remember',null);store.set('md_login',null);authUi();show('Disconnesso. Questo dispositivo non è più ricordato.','ok')};
+$('#logout').onclick=async()=>{try{await send(location.protocol==='https:'?'/api/motion/logout':'/wifi/logout','')}catch(e){}csrf='';store.set('md_remember',null);store.set('md_login',null);authUi();show('Disconnesso. Questo dispositivo non è più ricordato.','ok')};
 // ---- Forms -----------------------------------------------------------------
 for(let i=0;i<2;i++){const f=E('fieldset');f.append(E('legend','',['Primary','Secondary'][i]));
  const add=(key,label,type,extra)=>{const l=E('label','',label);let c;if(type==='select'){c=E('select');for(const [v,t] of extra)c.append(Object.assign(E('option','',t),{value:v}))}else{c=E('input');c.type=type;Object.assign(c,extra||{})}c.name='p'+i+'_'+key;l.append(c);l.dataset.key=key;f.append(l);return c};
@@ -245,13 +263,13 @@ for(const id of ['wifiForm','apForm','performanceForm'])document.getElementById(
  try{const seq=wf?wf.sta_test.seq:0,ap=wf?wf.ap_ssid:'MATDOG';await adminPost('/wifi/config',body);
   watch={seq,t:Date.now(),ap};store.set('md_watch',JSON.stringify(watch));editing=false;f.querySelectorAll('input[type=password]').forEach(p=>p.value='');
   show('Richiesta accettata. L\'AP si chiude tra un secondo per la prova: resta su questa pagina, l\'esito compare quando l\'AP ritorna.','warn')}
- catch(x){show(x.message==='REFUSED_BUSY_OR_RECOVERY'?'Richiesta rifiutata: la configurazione di rete si modifica solo in MAINTENANCE, a controller non occupato.':x.message,'bad')}};
+ catch(x){show(x.message==='REFUSED_BUSY_OR_RECOVERY'?'Richiesta rifiutata: la configurazione di rete si modifica solo con Motion fermo e controller non occupato.':x.message,'bad')}};
 $('#scan').onclick=async()=>{try{show(await adminPost('/wifi/scan',''))}catch(x){show(x.message,'bad')}};
 document.querySelectorAll('form').forEach(f=>{if(f.id!=='loginForm')f.addEventListener('input',()=>editing=true)});
 // ---- Start -----------------------------------------------------------------
 try{const w=JSON.parse(store.get('md_watch'));if(w&&Date.now()-w.t<600000)watch=w;else store.set('md_watch',null)}catch(e){}
 authUi();setInterval(link,1000);
-(async()=>{if(store.get('md_remember')||Date.now()-(+store.get('md_login')||0)<SESSION_MS)await resume();refresh()})();
-</script></html>)MATDOG";
+authReady=(async()=>{if(store.get('md_remember')||store.get('md_login'))await resume();refresh()})();
+</script>)MATDOG" MATDOG_MOTION_DASHBOARD "</html>";
 } }
 #endif

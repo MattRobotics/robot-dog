@@ -34,6 +34,8 @@ export interface BuildRobotOptions {
   /** Absolute or app-relative URL of the URDF; mesh filenames resolve against it. */
   readonly urdfUrl: string;
   readonly loadMeshGeometry: MeshGeometryLoader;
+  /** Display geometry only; collision remains a separate immutable scene layer. */
+  readonly visualGeometry?: boolean;
   readonly styleForLink?: (linkName: string) => LinkStyle;
 }
 
@@ -75,8 +77,8 @@ export function resolveMeshUrl(urdfUrl: string, filename: string): string {
 }
 
 /**
- * The assembled robot. `setJointAngle` is the integration point for future
- * ST3215 joint-state telemetry; nothing in this class talks to any bus.
+ * The assembled robot. `setJointAngle` accepts semantic Controller radians;
+ * nothing in this class talks to any bus.
  */
 export class MatdogRobot {
   readonly rootObject: Object3D;
@@ -84,6 +86,11 @@ export class MatdogRobot {
   private readonly links = new Map<string, Object3D>();
   private readonly joints = new Map<string, JointHandle>();
   private readonly collisionMeshes = new Map<string, Mesh>();
+  private readonly visualMeshes = new Map<string, Mesh>();
+  visualMesh(linkName: string): Mesh | undefined { return this.visualMeshes.get(linkName); }
+  get visualMeshCount(): number { return this.visualMeshes.size; }
+  setCollisionVisible(visible: boolean): void { for(const mesh of this.collisionMeshes.values())mesh.visible=visible; }
+  registerVisualMesh(linkName: string, mesh: Mesh): void { this.visualMeshes.set(linkName,mesh); }
 
   constructor(model: UrdfModel, rootObject: Object3D) {
     this.model = model;
@@ -121,6 +128,11 @@ export class MatdogRobot {
     return this.collisionMeshes.size;
   }
 
+  /** The collision mesh of one link (display state only; geometry untouched). */
+  collisionMesh(linkName: string): Mesh | undefined {
+    return this.collisionMeshes.get(linkName);
+  }
+
   get collisionLinkNames(): readonly string[] {
     return [...this.collisionMeshes.keys()];
   }
@@ -135,9 +147,10 @@ export class MatdogRobot {
    * Sets one joint, in radians, clamped to the URDF limits.
    * Fixed joints are rejected. Returns the value actually applied.
    *
-   * FUTURE ST3215 INTEGRATION POINT: a joint-state consumer converts servo
-   * counts to radians (MATDOG_JOINT_CALIBRATION.yaml semantics) and calls
-   * this method. This viewer never writes to a servo bus.
+   * Calibration and runtime mapping belong to the Controller. The viewer
+   * receives radians and never converts encoder ticks or writes a servo bus.
+   * MotionTwinController rejects invalid measured channels before this
+   * low-level display setter can clamp them.
    */
   setJointAngle(jointName: string, radians: number): number {
     const handle = this.joints.get(jointName);
@@ -304,6 +317,28 @@ export async function buildRobot(options: BuildRobotOptions): Promise<MatdogRobo
       `collision mesh count mismatch: URDF declares ${collisionLinks.length}, ` +
         `scene contains ${robot.collisionMeshCount}`,
     );
+  }
+
+  // Visual STL is read independently from <visual>. Never substitute it for
+  // the collision pack, collision origins or any geometry certificate input.
+  if(options.visualGeometry){
+    for(const link of model.links){
+      if(!link.visual)continue;
+      const visual=link.visual;
+      const geometry=await loadMeshGeometry(resolveMeshUrl(urdfUrl,visual.mesh.filename));
+      if(!geometry.getAttribute('position'))throw new RobotBuildError(`${link.name}: empty visual mesh`);
+      const style=styleForLink(link.name);
+      const mesh=new Mesh(geometry,new MeshStandardMaterial(style));
+      mesh.name=`${link.name}__visual`;mesh.userData.urdfLink=link.name;
+      mesh.scale.set(...visual.mesh.scale);
+      const origin=new Object3D();origin.name=`${link.name}__visual_origin`;
+      applyOrigin(origin,visual.origin.xyz,visual.origin.rpy);origin.add(mesh);
+      linkObjects.get(link.name)!.add(origin);robot.registerVisualMesh(link.name,mesh);
+      const collision=robot.collisionMesh(link.name);if(collision){
+        collision.visible=false;const overlay=collision.material as MeshStandardMaterial;
+        overlay.wireframe=true;overlay.transparent=true;overlay.opacity=.35;overlay.color.setHex(0xcc66ff);
+      }
+    }
   }
 
   rootObject.updateMatrixWorld(true);

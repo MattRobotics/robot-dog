@@ -1,0 +1,1 @@
+FIXTURE_PIPELINE PASS checks=9415631 stand_frames=10929 walk_frames=19080 mapped_raw_writes=360120 prime_torque_enables=12 hardware=false

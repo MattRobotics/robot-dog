@@ -183,6 +183,23 @@ for fact in ("battery_warning", "battery_critical"):
              f"bool {fact} = false;", f"bool {fact};", struct),
         ])
 
+# The voltage advisory is admitted only as the exact bounded cached producer.
+STATIC_MUTATIONS.extend([
+    ("voltage ignores freshness", "LedStatusPolicy.cpp", "voltage_valid=telemetryFresh(inputs)&&", "voltage_valid=true&&"),
+    ("cell critical threshold drifts", "LedStatusPolicy.cpp", "if(cell<=3350||pack<=10.05f)", "if(cell<=3200||pack<=10.05f)"),
+    ("pack critical threshold drifts", "LedStatusPolicy.cpp", "if(cell<=3350||pack<=10.05f)", "if(cell<=3350||pack<=9.60f)"),
+    ("voltage loses hysteresis", "LedStatusPolicy.cpp", "voltage_level_==2&&(cell<3450||pack<10.35f)", "voltage_level_==2&&false"),
+    ("voltage presented while charging", "LedStatusPolicy.cpp", "if(!snapshot_.charging){snapshot_.battery_critical|=", "if(true){snapshot_.battery_critical|="),
+    ("cell advisory substitutes SOC", "Controller.cpp", "led_inputs.cell_min_mv = battery.cell_min_mv;", "led_inputs.cell_min_mv = battery.soc_percent;"),
+    ("pack advisory substitutes constant", "Controller.cpp", "led_inputs.pack_voltage_v = battery.pack_voltage_v;", "led_inputs.pack_voltage_v = 12.6f;"),
+])
+
+STATIC_MUTATIONS.extend([
+    ("duplicate sample advances debounce", "LedStatusPolicy.cpp", "if(distinct){", "if(true){"),
+    ("warning debounce disabled", "LedStatusPolicy.cpp", "++voltage_votes_>=2", "++voltage_votes_>=1"),
+    ("sample identity from paint clock", "Controller.cpp", "led_inputs.sampled_at_ms = battery.sampled_at_ms;", "led_inputs.sampled_at_ms = led_now_ms;"),
+])
+
 # Compile-valid semantic changes prove the suite checks behavior, rather
 # than merely grepping matching production expressions.
 POLICY_MUTATIONS = [
@@ -267,18 +284,13 @@ POLICY_MUTATIONS = [
     ("critical uses wrong RGB", "LedStatusPolicy.cpp",
      "case LedPresentationState::BATTERY_CRITICAL:\n      return {255, 0, 0,",
      "case LedPresentationState::BATTERY_CRITICAL:\n      return {255, 140, 0,"),
-    ("critical uses 2 second period", "LedStatusPolicy.cpp",
-     "case LedPresentationState::BATTERY_CRITICAL:\n"
-     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs,",
-     "case LedPresentationState::BATTERY_CRITICAL:\n"
-     "      return {255, 0, 0, triangleBrightness(now_ms, kBreathePeriodMs,"),
-    ("critical brightness rises to 60", "LedStatusPolicy.cpp",
-     "case LedPresentationState::BATTERY_CRITICAL:\n"
-     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,\n"
-     "                                           max_brightness / 2)};",
-     "case LedPresentationState::BATTERY_CRITICAL:\n"
-     "      return {255, 0, 0, triangleBrightness(now_ms, kSubtleBreathePeriodMs, kBreatheMinBrightness,\n"
-     "                                           max_brightness)};"),
+    ("critical flashes too slowly", "LedStatusPolicy.cpp",
+     "now_ms%500<250?max_brightness:0", "now_ms%2000<1000?max_brightness:0"),
+    ("critical never turns off", "LedStatusPolicy.cpp",
+     "now_ms%500<250?max_brightness:0", "now_ms%500<250?max_brightness:6"),
+    ("critical loses brightness", "LedStatusPolicy.cpp",
+     "now_ms%500<250?max_brightness:0", "now_ms%500<250?max_brightness/2:0"),
+
 ]
 
 # The reviewed dev.1 presentation order must not fall back to waiting for
