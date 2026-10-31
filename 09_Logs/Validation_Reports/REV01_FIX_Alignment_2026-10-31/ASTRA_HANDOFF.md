@@ -14,7 +14,8 @@ Classi di prova: **VH** = verificato su hardware, **VO** = verificato offline, *
 | Base (`origin/main`, intatto) | `9b2c42ff6a2867d4fa986edcd3a0a02d29634385` |
 | Commit precedenti del branch | `aa89dd4` geometria REV01-FIX · `0f8f7ff` base di calibrazione storica · `820d80b` proprietà fisiche · `7d04939` chiusura |
 | **Commit di contenuto di questo intervento (su remoto, verificato con `git ls-remote`)** | `423de3a` workbook approvato (byte esatti) + rimozione archivio URDF Studio · `bfdf7b83380ec2d75021bb759a2338b92a1d9312` allineamento tabella del workbook |
-| Questo documento | Il commit che lo aggiunge è la punta del branch; il suo SHA è nel messaggio di chiusura della sessione (un file non può contenere il proprio hash). Verifica: `git ls-remote origin refs/heads/geometry/rev01-fix-integration-20261030` |
+| **Integrazione in `main`** | PR #57 unita il 2026-10-31 con merge commit **`887103e501a4a02be89e204b77a5301af6d15905`** (genitori `9b2c42ff…` e `bd6939c47a0b534432474b7b66e7608a485804e8`, quest'ultimo il commit sorgente integrato, che include questo documento e la correzione del generatore di `LegGeometryData.h`). L'albero di `main` è identico a quello di `bd6939c`. Il merge **non** è una validazione hardware della nuova geometria. |
+| Questo documento | In `main` dal merge `887103e`; i riferimenti a questo punto sono stati allineati da un commit documentale successivo. Branch di lavoro della PR: `geometry/rev01-fix-integration-20261030` (punta `bd6939c`). |
 | Branch remoti esistenti | `main`, `geometry/rev01-fix-integration-20261030`, `matdog/rc5-source-checkpoint-20261026`. **Non esiste alcun branch `dev5` sul remoto.** |
 
 ## 2. Modello canonico (URDF e manifest)
@@ -148,7 +149,7 @@ Sul branch PR (cioè su `main`) non c'è Motion. Su dev5 (`df43feb`) i dati segu
 Non esiste ancora un ramo che unisca REV01-FIX e dev5. L'ordine proposto (decisioni di Astra/operatore):
 
 **A. Preparazione (offline)**
-1. Decidere la base: attendere il merge di PR #57 su `main`, oppure partire dal commit di questo branch. Integrare in dev5 tramite una nuova branch (non modificare `dev5/prone-stand-20261030`): la sonda `9cfd86b` mostra i file toccati. File con pin dell'URDF REV00 da aggiornare con gli strumenti ufficiali: `LegGeometryData.h` (generatore corretto `matdog_motion_geometry_export.py`, recuperato dal blob storico verificato `5406f73` come strumento esterno, non presente in `main`/`dev5`; `matdog_calibration_geometry_export.py` genera invece `CalibrationGeometryProfileData.h`), `scripts/tests/motion_integration_manifest_pr2.json`, `test_twin_assets.py`, `docs/MOTION_ASSET_BUDGET.json`, `kinematics/*.yaml`, `matdog_urdf_fk.py`, `paired_prone/test_frozen_geometry.py`, `TwinAssets.h` (rigenerato da `npm run build:twin` + `generate_twin_assets.py`). **Non** toccare i file della catena di calibrazione né il tag `3713f4ddc43b204e`.
+1. Base: `main` (PR #57 già unita, `887103e`); partire da lì. Integrare in dev5 tramite una nuova branch (non modificare `dev5/prone-stand-20261030`): la sonda `9cfd86b` mostra i file toccati. File con pin dell'URDF REV00 da aggiornare con gli strumenti ufficiali: `LegGeometryData.h` (generatore corretto `matdog_motion_geometry_export.py`, recuperato dal blob storico verificato `5406f73` come strumento esterno, non presente in `main`/`dev5`; `matdog_calibration_geometry_export.py` genera invece `CalibrationGeometryProfileData.h`), `scripts/tests/motion_integration_manifest_pr2.json`, `test_twin_assets.py`, `docs/MOTION_ASSET_BUDGET.json`, `kinematics/*.yaml`, `matdog_urdf_fk.py`, `paired_prone/test_frozen_geometry.py`, `TwinAssets.h` (rigenerato da `npm run build:twin` + `generate_twin_assets.py`). **Non** toccare i file della catena di calibrazione né il tag `3713f4ddc43b204e`.
 2. Decidere i limiti di velocità: 29 RPM, 40 RPM o altro, con la curva come stima da qualificare (§6). Ricordare che 40 RPM non vale insieme a 9,2 kg·cm (≈ 27,8 RPM) e che il Motion di dev5 usa già limiti propri molto più bassi. Se si modifica l'URDF, estendere esplicitamente il delta del controllo di base (§6, riga 3).
 3. Rieseguire la stima di coppia (`leg_torque_estimate.py`) con le nuove inerzie.
 
@@ -180,9 +181,9 @@ Calibrazioni dei 12 servo; record NVS gen-1 e tag `3713f4ddc43b204e`; offset, di
 | Workbook: OpenXML, formule, grafico, tabella (`tools/check_workbook_openxml.py`) | PASS sul canonico; **FAIL sull'approvato verbatim** per il difetto della tabella (3 colonne), corretto in `bfdf7b8` |
 | Workbook vs URDF (16 giunti, 17 link) | 0 differenze |
 | Manifest `SHA256SUMS.txt` (`sha256sum -c`) | 19/19 OK |
-| `test_matdog_geometry_v5_immutability` + `test_matdog_calibration_basis` | 19/19 OK sul commit `423de3a`; rieseguiti sul commit finale (vedi messaggio di chiusura) |
+| `test_matdog_geometry_v5_immutability` + `test_matdog_calibration_basis` | 19/19 OK sul commit `423de3a`; rieseguiti sul commit `f3876bf` e, per i controlli economici (manifest 19/19, basis `--check`, immutabilità e basis test), sul branch `bd6939c` prima del merge |
 | `matdog_calibration_basis.py --check` | PASS |
-| `static_audit.py` | `STATIC_AUDIT = PASS` (exit 0) sul commit `423de3a`; rieseguito sul commit finale (vedi messaggio di chiusura) |
+| `static_audit.py` | `STATIC_AUDIT = PASS` (exit 0) sul commit `423de3a` e sull'albero di `f3876bf`; `bd6939c` e il merge `887103e` differiscono da `f3876bf` solo per una riga di documentazione, quindi l'evidenza è riutilizzata, non rieseguita |
 | Test cinematici (urdf_fk, IK, contatto, stance) | OK; `test_matdog_leg_fk_live` fallisce come prima di PR #57 (richiede dati fuori dal repo) |
 | Staging del viewer da URDF canonico | URDF staged `ce63034e…`, 17 mesh |
 | Decimazione con lo strumento ufficiale su 17 STL canoniche | OK (§3) |

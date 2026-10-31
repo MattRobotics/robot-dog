@@ -1,5 +1,25 @@
 # Open items and blockers
 
+## Update 2026-10-31 — REV01-FIX integrated in `main` (separate from the dated sections below)
+
+PR [#57](https://github.com/MattRobotics/robot-dog/pull/57) is merged (`887103e501a4a02be89e204b77a5301af6d15905`, source commit `bd6939c`). It closes the CAD/URDF, workbook and physical-properties phase: operational URDF REV01-FIX, 17 canonical STL shared by visual and collision, Solid Edge inertials, 7-sheet workbook, REV00 calibration basis preserved, NVS gen-1 and tag `3713f4ddc43b204e` unchanged. **Offline verification only; the merge is not a hardware validation of the new geometry.** Reports: [integration](Validation_Reports/REV01_FIX_Integration_2026-10-30/REPORT.md), [physical properties](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md), [alignment and **Astra handoff**](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md).
+
+Still open (Motion and related; none of them is resolved by the merge):
+
+| Item | State |
+|---|---|
+| Motion certifications on REV00 | Collision boxes (`CollisionData.h`), PRONE tables, first-stride, walk regions and the Startup Recovery CAD certificate are bound to REV00. On the local probe `stand(0.15)` is refused with REV01-FIX (fail-closed). Recertify with the official FCL tools. Lives on the local `dev5` lineage, not on `main` |
+| STAND 150 mm, return-to-PRONE, WALK STANDARD | Not qualified. Only partial hardware evidence from local, unpublished runs (28–30/10). Unplanned dev.5 dashboard sequence: 41 missed releases; WALK timing unresolved (USB-only supervised test prepared, not run) |
+| ST3215 speed limit | 40 RPM design reference (workbook, preliminary estimate, not measured) vs 29 RPM in the URDF; neither confirmed as final. Changing the URDF limit needs an explicit extension of the calibration-basis delta |
+| Installed firmware vs sources | Installed: `1.0.1-dev.5` `c8b27d67…` (last hardware check 2026-10-30); source `df43feb` is local only. No build of `main` is the installed firmware; flashing from `main` stays forbidden |
+| Workbook | Never opened in Excel or a compatible application (structural OpenXML check only) |
+| Physical data | 9 g residual (links 2.928 kg vs assembly 2.937 kg) unallocated; rear hips inherit LF properties; no inertial data for the weighed configuration without Jetson; no dynamic hardware validation |
+| Pre-existing test failure | `test_matdog_leg_fk_live` (needs data outside the repository) |
+
+Local hardware logs of `dev5` (checkpoint, runs of 2026-10-30) are not imported here; they are local evidence only.
+
+---
+
 ## Closeout 2026-10-11 — fase successiva
 
 Aggiornamento della sola baseline non-motion sulla branch di lavoro:
