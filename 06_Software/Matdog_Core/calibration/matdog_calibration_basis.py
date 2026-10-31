@@ -13,8 +13,11 @@ only by a closed, declared delta. It computes no geometry and validates nothing 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
+import math
+import struct
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -99,6 +102,74 @@ def _manifest_entries(path: Path) -> dict[str, str]:
     return out
 
 
+INERTIA_ATTRS = ("ixx", "ixy", "ixz", "iyy", "iyz", "izz")
+
+
+def _stl_aabb(path: Path):
+    """Axis-aligned bounds (mm) of a binary STL, read without any geometry kernel."""
+    data = path.read_bytes()
+    count = struct.unpack_from("<I", data, 80)[0]
+    if 84 + 50 * count != len(data):
+        raise BasisError(f"{path.name}: not a binary STL")
+    vertices = []
+    for i in range(count):
+        values = struct.unpack_from("<12f", data, 84 + 50 * i)
+        vertices.extend((values[3:6], values[6:9], values[9:12]))
+    xs, ys, zs = zip(*vertices)
+    return (min(xs), min(ys), min(zs)), (max(xs), max(ys), max(zs))
+
+
+def _check_inertial(link: ET.Element, rules: dict, live_dir: Path) -> list[str]:
+    """Structure and physical plausibility of one <inertial> block (SI, link frame)."""
+    name = link.get("name")
+    inertials = link.findall("inertial")
+    if len(inertials) != 1:
+        return [f"{name}: expected exactly one <inertial>, found {len(inertials)}"]
+    inertial = inertials[0]
+    if sorted(child.tag for child in inertial) != sorted(rules["children"]) or inertial.attrib:
+        return [f"{name}: <inertial> must contain exactly {rules['children']} and no attributes"]
+    origin, mass_el, inertia_el = (inertial.find(tag) for tag in rules["children"])
+    problems: list[str] = []
+    if origin.get("rpy", "").split() != rules["origin_rpy"].split() or set(origin.attrib) != {"xyz", "rpy"}:
+        problems.append(f"{name}: inertial origin rpy must be {rules['origin_rpy']}")
+    if set(mass_el.attrib) != {"value"} or set(inertia_el.attrib) != set(INERTIA_ATTRS):
+        return problems + [f"{name}: unexpected <mass>/<inertia> attributes"]
+    try:
+        com = [float(v) for v in origin.get("xyz").split()]
+        mass = float(mass_el.get("value"))
+        ixx, ixy, ixz, iyy, iyz, izz = (float(inertia_el.get(a)) for a in INERTIA_ATTRS)
+    except (TypeError, ValueError):
+        return problems + [f"{name}: non-numeric inertial value"]
+    values = com + [mass, ixx, ixy, ixz, iyy, iyz, izz]
+    if len(com) != 3 or not all(math.isfinite(v) for v in values):
+        return problems + [f"{name}: inertial values must be 3 finite CoM coordinates and finite numbers"]
+    if not 0.0 < mass <= rules["max_link_mass_kg"]:
+        problems.append(f"{name}: mass {mass} kg outside (0, {rules['max_link_mass_kg']}]")
+    matrix = [[ixx, ixy, ixz], [ixy, iyy, iyz], [ixz, iyz, izz]]
+    # positive definite (Sylvester) and physically realizable (triangle inequality of the
+    # principal moments, checked on the eigenvalues of the symmetric 3x3).
+    minors = (ixx, ixx * iyy - ixy * ixy,
+              ixx * (iyy * izz - iyz * iyz) - ixy * (ixy * izz - iyz * ixz) + ixz * (ixy * iyz - iyy * ixz))
+    if not all(m > 0.0 for m in minors):
+        problems.append(f"{name}: inertia tensor is not positive definite")
+    else:
+        import numpy as np
+        eig = sorted(np.linalg.eigvalsh(np.array(matrix)))
+        if eig[0] + eig[1] < eig[2] * (1.0 - 1e-6):
+            problems.append(f"{name}: principal moments violate the triangle inequality")
+        mesh = link.find("collision/geometry/mesh")
+        lo, hi = _stl_aabb(live_dir / mesh.get("filename"))
+        scale = [float(v) for v in mesh.get("scale").split()]
+        lo = [a * s for a, s in zip(lo, scale)]
+        hi = [a * s for a, s in zip(hi, scale)]
+        if rules["com_inside_collision_mesh_aabb"] and not all(l <= c <= h for l, c, h in zip(lo, com, hi)):
+            problems.append(f"{name}: CoM {com} lies outside the link collision-mesh bounds")
+        diagonal = math.dist(lo, hi)
+        if mass > 0.0 and math.sqrt(eig[2] / mass) > diagonal:
+            problems.append(f"{name}: gyration radius exceeds the link size (unit error?)")
+    return problems
+
+
 def verify_delta(repo_root: Path = DEFAULT_REPO_ROOT) -> list[str]:
     """Empty list = the operational model is REV00 plus exactly the declared delta."""
     problems: list[str] = []
@@ -137,6 +208,24 @@ def verify_delta(repo_root: Path = DEFAULT_REPO_ROOT) -> list[str]:
     if seen != set(delta["hip_origin_z_m"]):
         problems.append(f"declared hip joints not found in the operational URDF: "
                         f"{sorted(set(delta['hip_origin_z_m']) - seen)}")
+
+    # <inertial>: dynamic properties of exactly the declared links; checked, then neutralised.
+    declared = delta["inertial_links"]
+    rev00_links = {l.get("name"): l for l in rev00.findall("link")}
+    live_links = {l.get("name"): l for l in live.findall("link")}
+    if sorted(declared) != sorted(live_links) or sorted(declared) != sorted(rev00_links):
+        problems.append("declared inertial links differ from the URDF link set")
+    for link_name in declared:
+        if link_name not in live_links or link_name not in rev00_links:
+            continue
+        try:
+            problems += _check_inertial(live_links[link_name], delta["inertial_rules"], live_dir)
+        except (BasisError, OSError, struct.error) as exc:
+            problems.append(f"{link_name}: collision mesh unreadable for the inertial check ({exc})")
+        live_link = live_links[link_name]
+        live_inertial = live_link.find("inertial")
+        if live_inertial is not None:       # replaced in place: element order must still match REV00
+            live_link[list(live_link).index(live_inertial)] = copy.deepcopy(rev00_links[link_name].find("inertial"))
 
     for link in live.findall("link"):
         visual = link.find("visual")

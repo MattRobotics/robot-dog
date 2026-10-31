@@ -5,7 +5,7 @@
 #define MATDOG_MOTION_LEG_GEOMETRY_DATA_H
 #include "LegKinematics.h"
 namespace matdog { namespace motion { namespace generated {
-constexpr char kUrdfSha256[] = "5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73";
+constexpr char kUrdfSha256[] = "ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7";
 constexpr LegModel kLegs[4] = {
   // LF: lf_hip_joint -> lf_upper_leg_joint -> lf_lower_leg_joint -> lf_foot_joint
   {{0.1125, 0.047500000000000001, 0.0487}, {0, 0.048000000000000001, 0}, {0, 0, -0.089999999999999997}, {0.107, -0.0015, -0.0499}, {{-0.78539816339699997, 0.78539816339699997}, {-0.91629785729699997, 2.1380283336930002}, {-1.6057029118349999, 0.65449846949799995}}},

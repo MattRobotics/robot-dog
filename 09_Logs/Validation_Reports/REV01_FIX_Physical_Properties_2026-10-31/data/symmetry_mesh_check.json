@@ -1,0 +1,74 @@
+{
+ "rf_hip": {
+  "map": "Y-reflection",
+  "dCoM_mm": 0.0001367155959076772,
+  "dI_rel": 4.004376148145785e-06,
+  "dVol_rel": 1.7538517417188839e-06
+ },
+ "rh_hip": {
+  "map": "Y-reflection",
+  "dCoM_mm": 0.20819680581677716,
+  "dI_rel": 0.0077977619179463165,
+  "dVol_rel": -0.0035300415660022046
+ },
+ "lh_hip": {
+  "map": "identity",
+  "dCoM_mm": 0.20831597632238055,
+  "dI_rel": 0.00779536027237229,
+  "dVol_rel": -0.0035317954051654033
+ },
+ "rf_upper_leg": {
+  "map": "Y-reflection",
+  "dCoM_mm": 1.0300472493036753e-05,
+  "dI_rel": 3.682048723107698e-07,
+  "dVol_rel": 1.9413183480287787e-07
+ },
+ "rh_upper_leg": {
+  "map": "Y-reflection",
+  "dCoM_mm": 1.0300472493036753e-05,
+  "dI_rel": 3.682048723107698e-07,
+  "dVol_rel": 1.9413183480287787e-07
+ },
+ "lh_upper_leg": {
+  "map": "identity",
+  "dCoM_mm": 0.0,
+  "dI_rel": 0.0,
+  "dVol_rel": 0.0
+ },
+ "rf_lower_leg": {
+  "map": "Y-reflection",
+  "dCoM_mm": 0.00022754311059270782,
+  "dI_rel": 7.64069322990187e-06,
+  "dVol_rel": 5.412749522755711e-06
+ },
+ "rh_lower_leg": {
+  "map": "Y-reflection",
+  "dCoM_mm": 0.00022754311059270782,
+  "dI_rel": 7.64069322990187e-06,
+  "dVol_rel": 5.412749522755711e-06
+ },
+ "lh_lower_leg": {
+  "map": "identity",
+  "dCoM_mm": 0.0,
+  "dI_rel": 0.0,
+  "dVol_rel": 0.0
+ },
+ "rf_foot": {
+  "map": "identity",
+  "dCoM_mm": 1.0658173102285439e-14,
+  "dI_rel": 2.811312793625465e-15,
+  "dVol_rel": 1.910567541680754e-16
+ },
+ "rh_foot": {
+  "map": "identity",
+  "dCoM_mm": 1.0658173102285439e-14,
+  "dI_rel": 2.811312793625465e-15,
+  "dVol_rel": 1.910567541680754e-16
+ },
+ "lh_foot": {
+  "map": "identity",
+  "dCoM_mm": 0.0,
+  "dI_rel": 0.0,
+  "dVol_rel": 0.0
+ }
+}

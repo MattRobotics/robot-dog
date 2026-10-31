@@ -115,16 +115,15 @@ historical 472,020-triangle collision set by 74.64%.
   0.250 mm axial and 0.250 mm radial by vertex distance (0.203-0.204 mm
   minimum surface distance because the two cylinders are tessellated
   differently).
-- Not updated here and still historical: the link mass/inertia blocks of
-  `base_link` (REV00 CAD values) and `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx`
-  (it still lists the REV00 HIP Z coordinates). Updated Solid Edge values are
-  required for both.
+- Physical properties (2026-10-31): see "Physical Data Status" below.
 
 ## Physical Data Status
 
-Mass and material references are maintained in the Excel workbook.
+Single nominal configuration, including the Jetson Orin (175 g, inside `base_link`). The 17 `<inertial>` blocks come from the Solid Edge physical-property reports of 2026-10-30: 17 link masses sum to 2.928 kg against 2.937 kg for the Solid Edge assembly (the 9 g difference lies at the 1 g resolution of the per-link mass reports; it is not missing geometry and is not allocated). CoM origins are in the link frames; tensors are about the CoMs, rebuilt from principal axes and radii of gyration; RF/RH are Y reflections of LF and LH uses the LF frame (verified on the meshes; the rear hip meshes differ slightly, see the report).
 
-Link center-of-mass coordinates and inertia tensors are not yet authoritative. They must be extracted from Solid Edge before dynamic simulation is considered valid.
+The robot weighed on 2026-10-30 (2.807 kg) did not carry the Jetson: it is historical evidence of the hardware assembled that day, not a second configuration. No dynamic hardware validation has been performed on these properties.
+
+Provenance, derivation tools, input hashes and the reconciliation are in `09_Logs/Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/`. The single canonical workbook `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx` holds the current data (sheets `Inertial_Properties` — the one source of the masses, read by formula elsewhere —, `Mass_Reconciliation`, `Mass_Summary`, `CAD_Source_Data`, `Weight_Evidence_2026-10-30`, `Physical_Evidence_Log`; hip Z 48.7/28.7 mm in `Joint_Parameters`). Its previous version is kept by Git (commit `0f8f7ff`); there is no second workbook.
 
 ## Mechanical Segment and Foot-Contact Frame
 

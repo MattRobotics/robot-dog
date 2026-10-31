@@ -147,7 +147,7 @@ Design decisions worth knowing:
 
 ```
 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
-sha256 5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73
+sha256 ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7
 ```
 
 Verified facts (asserted by the test suite, not assumed):

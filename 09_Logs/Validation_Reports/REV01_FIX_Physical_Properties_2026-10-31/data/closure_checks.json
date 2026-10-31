@@ -1,0 +1,165 @@
+{
+ "volume": {
+  "sum_links_mm3": 1970534.7880000002,
+  "assembly_mm3": 1970535.851,
+  "difference_mm3": 1.0629999998491257
+ },
+ "mass": {
+  "sum_links_kg": 2.928,
+  "assembly_kg": 2.937,
+  "residual_g": 8.999999999999897,
+  "max_rounding_bound_g_if_legs_identical": 8.5,
+  "max_truncation_bound_g_if_legs_identical": 17.0,
+  "note": "base 1 value + 4 distinct leg values replicated x4 legs: rounding error <= 0.5 g + 4*4*0.5 g = 8.5 g; truncation error < 1 g + 16*1 g"
+ },
+ "density_g_cm3": {
+  "base_link": 1.5515514249582392,
+  "lf_hip_link": 1.4192027844077415,
+  "lf_upper_leg_link": 1.4832714547287256,
+  "lf_lower_leg_link": 1.1504098481322511,
+  "lf_foot_link": 1.5390534821085031
+ },
+ "moment_crosscheck": {
+  "base_link": {
+   "max_abs_error_kg_m2": 2.7205512315669035e-06,
+   "report_resolution_kg_m2": 5e-06,
+   "axes_det": 1.0000685230000002,
+   "axes_orthogonality_error": 0.0009329999999999616,
+   "principal_I_printed_vs_mK2": [
+    [
+     0.01406,
+     0.01405967812
+    ],
+    [
+     0.01361,
+     0.013608067795200003
+    ],
+    [
+     0.00188,
+     0.0018800703972000003
+    ]
+   ]
+  },
+  "lf_hip_link": {
+   "max_abs_error_kg_m2": 4.8115467002114025e-06,
+   "report_resolution_kg_m2": 5e-06,
+   "axes_det": 0.999556574,
+   "axes_orthogonality_error": 0.000660000000000105,
+   "principal_I_printed_vs_mK2": [
+    [
+     5e-05,
+     4.6299244999999995e-05
+    ],
+    [
+     4e-05,
+     4.018612500000001e-05
+    ],
+    [
+     2e-05,
+     1.8126079999999998e-05
+    ]
+   ]
+  },
+  "lf_upper_leg_link": {
+   "max_abs_error_kg_m2": 2.4389532947352577e-06,
+   "report_resolution_kg_m2": 5e-06,
+   "axes_det": 1.000121,
+   "axes_orthogonality_error": 0.00012100000000003774,
+   "principal_I_printed_vs_mK2": [
+    [
+     0.00017999999999999998,
+     0.00017934822000000003
+    ],
+    [
+     0.00017,
+     0.00017365087999999997
+    ],
+    [
+     3e-05,
+     2.8445644799999997e-05
+    ]
+   ]
+  },
+  "lf_lower_leg_link": {
+   "max_abs_error_kg_m2": 4.037806129790994e-06,
+   "report_resolution_kg_m2": 5e-06,
+   "axes_det": 0.9994880499999999,
+   "axes_orthogonality_error": 0.0007180000000001074,
+   "principal_I_printed_vs_mK2": [
+    [
+     0.00010999999999999999,
+     0.00010671925310000002
+    ],
+    [
+     0.0001,
+     0.0001016617259
+    ],
+    [
+     2e-05,
+     1.8068750000000002e-05
+    ]
+   ]
+  },
+  "lf_foot_link": {
+   "max_abs_error_kg_m2": 4.351756658993798e-06,
+   "report_resolution_kg_m2": 5e-06,
+   "axes_det": 0.9993220000000002,
+   "axes_orthogonality_error": 0.0006779999999999564,
+   "principal_I_printed_vs_mK2": [
+    [
+     0.0,
+     8.982414000000001e-07
+    ],
+    [
+     0.0,
+     8.870624000000001e-07
+    ],
+    [
+     0.0,
+     8.430463999999999e-07
+    ]
+   ]
+  }
+ },
+ "mass_resolution_relative": {
+  "base_link": 0.0002735229759299781,
+  "lf_hip_link": 0.01,
+  "lf_upper_leg_link": 0.0032894736842105266,
+  "lf_lower_leg_link": 0.00847457627118644,
+  "lf_foot_link": 0.03571428571428571
+ },
+ "aggregate": {
+  "mass_kg": 2.928,
+  "com_mm": [
+   0.6875956284152976,
+   -0.2746994535519126,
+   17.286461748633894
+  ],
+  "assembly_com_mm": [
+   0.78,
+   -0.59,
+   17.02
+  ],
+  "com_deviation_mm": 0.42303057332001287,
+  "K_mm_model": [
+   115.38997878346267,
+   106.75881747845997,
+   73.73610209723729
+  ],
+  "K_mm_assembly": [
+   115.56,
+   106.96,
+   73.98
+  ],
+  "principal_moment_rel_dev": [
+   -0.005995738027955494,
+   -0.006811124077453415,
+   -0.009626927846415612
+  ],
+  "implied_9g_position_mm_if_single_mass": [
+   30.93462659380788,
+   -103.48307832422584,
+   -69.93535063752743
+  ]
+ }
+}

@@ -1,0 +1,44 @@
+﻿Rapporto proprietà fisiche
+
+	 volume= 102476.185 mm^3
+	 massa= 0.152 kg
+	 Massa quantità utente= 0.152 kg
+
+Rispetto al sistema di coordinate Globale.
+
+	 Centro della massa:
+		 X= 1.22 mm
+		 Y= 0.14 mm
+		 Z= -45.03 mm
+
+	 Centro del volume:
+		 X= 1.83 mm
+		 Y= 0.00 mm
+		 Z= -45.03 mm
+
+	 Momento di inerzia:
+		 Ixx= 0.049 kg*dm^2
+		 Iyy= 0.048 kg*dm^2
+		 Izz= 0.003 kg*dm^2
+
+		 Ixy= 0.000 kg*dm^2
+		 Ixz= -0.001 kg*dm^2
+		 Iyz= 0.000 kg*dm^2
+
+	 Orientamento asse principale:
+		 1= 1.000 	-0.011 	0.000 	
+		 2= 0.011 	1.000 	0.000 	
+		 3= 0.000 	0.000 	1.000 	
+
+Rispetto agli assi principali
+
+	 Momento di inerzia principale:
+		 I1= 0.018 kg*dm^2
+		 I2= 0.017 kg*dm^2
+		 I3= 0.003 kg*dm^2
+
+	 Raggio giratore:
+		 K1= 34.35 mm
+		 K2= 33.80 mm
+		 K3= 13.68 mm
+

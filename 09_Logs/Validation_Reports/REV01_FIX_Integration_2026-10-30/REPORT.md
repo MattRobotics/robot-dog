@@ -54,6 +54,6 @@ Su `dev5` (sonda locale, non pubblicata): build firmware esterna OK (1582608 B, 
 
 1. **Catena di calibrazione: risolta con la separazione base storica / modello operativo** (2026-10-31, `calibration_chain/CALIBRATION_BASIS_DECISION.md`). I file della catena, il tag `3713f4ddc43b204e` e il record gen-1 sono invariati; `static_audit` torna verde. Vincolo residuo documentato: certificato CAD del Startup Recovery emesso su REV00, non riemesso.
 2. **Motion certificato di `dev5`.** Con la nuova geometria, `SimpleMotion::stand(0.15)` viene rifiutato (l'IK a 150 mm esce dal box certificato `collision::kHeight`, calcolato su REV00); `PairedProneData.h`, first-stride e box `kEntry/kWalk/kLift` sono pure certificati su REV00. Serve la ricertificazione con gli strumenti FCL ufficiali (non disponibili qui). Il comportamento è fail-closed.
-3. **Dati dinamici storici di `base_link`** (massa 1.282 kg, CoM, inerzia) e `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx` (quote HIP REV00): servono i valori aggiornati di Solid Edge; non sono stati inventati.
+3. **Dati dinamici di `base_link` e workbook: aggiornati il 2026-10-31** con i report Solid Edge del 2026-10-30 (vedi `../REV01_FIX_Physical_Properties_2026-10-31/REPORT.md`). Residuo di 9 g tra somma dei link e assieme documentato e non allocato.
 4. **Smoke test browser del viewer non ripetuto** (atteso 134 484 + 20 = 134 504 triangoli, non misurato).
 5. Distanza minima di superficie perno/sede 0.203 mm vs 0.25 nominale (sezione B).

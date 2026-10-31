@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Evidenze peso e calcoli.xlsx",
+    "bytes": 16352,
+    "sha256": "a3b1fc77e9d9b4d49b22714d9adae554e33155379f7c88815c30cfbdffda76a3"
+  },
+  {
+    "name": "PESO REALE DEL ROBOT AL 30_10_2026.docx",
+    "bytes": 301222,
+    "sha256": "9eda346ccf028afab08fac93ebca437d3414376b8ea3317508fdbde399c16b09"
+  },
+  {
+    "name": "base_link__physprop.txt",
+    "bytes": 813,
+    "sha256": "5aac79cfb3f1ecd0ad2be7f4a789e76b44b348e8c5bd28c9a4b9c809e3e489a0"
+  },
+  {
+    "name": "matdog_urdf_assembly__physprop.txt",
+    "bytes": 795,
+    "sha256": "cc3bc10bfd358d77d937cd4590574b75bb8fb6cdcef4329073f3a0efb7c0c53c"
+  },
+  {
+    "name": "lf_hip_link__physprop.txt",
+    "bytes": 802,
+    "sha256": "79b12a9aaccc08979f0640053c362a75ee953223bf83ca9490be052f3a2354f5"
+  },
+  {
+    "name": "lf_upper_leg_link__physprop.txt",
+    "bytes": 804,
+    "sha256": "70cc00fcafe6d370dfdacc68f9d9437646ae3356e532fc9e7f364ac07749c597"
+  },
+  {
+    "name": "lf_lower_leg_link__physprop.txt",
+    "bytes": 808,
+    "sha256": "039eeb8b54c65f1a63d119438277ecea01a89b0ceaed86af02ed96f7963381b5"
+  },
+  {
+    "name": "lf_foot_link__physprop.txt",
+    "bytes": 797,
+    "sha256": "cd976bbcde4d48d2b3628fe59017be7ff68a23cce938551b20941a3678ca67fd"
+  }
+]

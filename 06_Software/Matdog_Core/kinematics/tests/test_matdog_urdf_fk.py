@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import xml.etree.ElementTree as ET
 from pathlib import Path
 import unittest
 
@@ -34,25 +35,19 @@ class TestMatdogUrdfFk(unittest.TestCase):
         self.assertTrue(self.urdf.is_file())
         self.assertEqual(sha256_file(self.urdf), CANONICAL_URDF_SHA256)
 
-    def test_collision_path_separation_is_the_only_urdf_text_change(self):
-        # REV01-FIX: every <visual> and <collision> uses meshes/collision/, and
-        # the four hip_joint origins are 2.2 mm higher in Z. Undoing exactly
-        # those two intentional changes must reproduce the historical digest,
-        # so nothing else in the URDF text may have changed.
-        current = self.urdf.read_text(encoding="utf-8")
-        normalized = current.replace("meshes/collision/", "meshes/")
-        for revised, historical in (
-            ('xyz="0.1125 0.0475 0.0487"', 'xyz="0.1125 0.0475 0.0465"'),
-            ('xyz="0.1125 -0.0475 0.0487"', 'xyz="0.1125 -0.0475 0.0465"'),
-            ('xyz="-0.1125 -0.0475 0.0287"', 'xyz="-0.1125 -0.0475 0.0265"'),
-            ('xyz="-0.1125 0.0475 0.0287"', 'xyz="-0.1125 0.0475 0.0265"'),
-        ):
-            self.assertEqual(normalized.count(revised), 1, revised)
-            normalized = normalized.replace(revised, historical)
-        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    def test_everything_except_inertial_is_the_validated_rev01_fix_model(self):
+        # The 2026-10-30 physical-property update rewrote only the <inertial> blocks.
+        # With them removed, the canonical (comment-free) URDF must still be the exact
+        # REV01-FIX model validated by Geometry Compiler V5: joints, axes, limits, motor
+        # metadata, hip origins (+2.2 mm), mesh paths, scales. The relation of this model to
+        # the REV00 calibration basis is checked by matdog_calibration_basis.py.
+        root = ET.parse(self.urdf).getroot()
+        for link in root.findall("link"):
+            link.remove(link.find("inertial"))
+        canonical = ET.canonicalize(ET.tostring(root, encoding="unicode"), strip_text=True)
         self.assertEqual(
-            digest,
-            "5e28da3dba10fd3f2ea6ebf6f5d6271157bda0b12b82d92aedbe3031643089ef",
+            hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+            "d66fa1cc84a39da41a5e3a20e2dd16a98658d017a539c7f615843ded2509c2e7",
         )
 
     def test_lf_chain_matches_canonical_joint_order(self):

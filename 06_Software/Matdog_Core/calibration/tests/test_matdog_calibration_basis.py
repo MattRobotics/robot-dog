@@ -107,6 +107,58 @@ class CalibrationBasisTests(unittest.TestCase):
         path.write_text(text.replace(marker, '<mesh filename="meshes/base_link.stl"', 1), encoding="utf-8")
         self.assertTrue(basis.verify_delta(self.tree))
 
+    # ---- <inertial> delta: allowed only for the 17 declared links and only if physically plausible
+    def edit_inertial(self, link, fn):
+        path = self.tree / MODEL / basis.URDF_NAME
+        text = path.read_text(encoding="utf-8")
+        start = text.index(f'<link name="{link}">')
+        a = text.index("<inertial>", start)
+        b = text.index("</inertial>", a) + len("</inertial>")
+        path.write_text(text[:a] + fn(text[a:b]) + text[b:], encoding="utf-8")
+
+    def problems_for(self, link, fn):
+        self.edit_inertial(link, fn)
+        return basis.verify_delta(self.tree)
+
+    def test_plausible_inertial_change_is_accepted(self):
+        self.assertEqual(self.problems_for("lf_foot_link", lambda b: b.replace('value="0.014000"', 'value="0.015000"')), [])
+
+    def test_every_declared_link_has_a_checked_inertial(self):
+        self.assertEqual(len(basis.load_basis(REPO)["allowed_urdf_delta"]["inertial_links"]), 17)
+
+    def test_inertial_implausible_values_are_rejected(self):
+        import re
+        mass = lambda v: (lambda b: re.sub(r'<mass value="[^"]*"', f'<mass value="{v}"', b))
+        inertia = lambda **kw: (lambda b: re.sub(r'(%s)="[^"]*"' % "|".join(kw), lambda m: f'{m.group(1)}="{kw[m.group(1)]}"', b))
+        cases = {
+            "negative mass": ("lf_hip_link", mass("-0.05"), "mass"),
+            "grams instead of kg": ("base_link", mass("1828"), "mass"),
+            "not positive definite": ("lf_upper_leg_link", inertia(ixx="-1e-4"), "positive definite"),
+            "triangle inequality": ("lf_lower_leg_link", inertia(ixx="1e-3", iyy="1e-6", izz="1e-6"), "triangle"),
+            "non finite": ("lf_hip_link", inertia(ixx="nan"), "finite"),
+            "CoM outside the link": ("lf_hip_link", lambda b: re.sub(r'xyz="[^"]*"', 'xyz="1.0 0 0"', b), "outside"),
+            "gyration radius (unit error)": ("lf_hip_link", inertia(ixx="1.0", iyy="1.0", izz="1.0", ixy="0", ixz="0", iyz="0"), "gyration"),
+            "inertial rpy": ("lf_hip_link", lambda b: b.replace('rpy="0 0 0"', 'rpy="0 0 0.1"'), "rpy"),
+            "extra child": ("lf_hip_link", lambda b: b.replace("</inertial>", "<extra/></inertial>"), "exactly"),
+        }
+        for label, (link, fn, needle) in cases.items():
+            with self.subTest(label):
+                self.setUp()
+                problems = self.problems_for(link, fn)
+                self.assertTrue(any(needle in p for p in problems), (label, problems))
+
+    def test_missing_inertial_is_rejected(self):
+        problems = self.problems_for("lf_hip_link", lambda b: "")
+        self.assertTrue(any("exactly one <inertial>" in p for p in problems), problems)
+
+    def test_inertial_allowance_does_not_cover_other_link_content(self):
+        path = self.tree / MODEL / basis.URDF_NAME
+        text = path.read_text(encoding="utf-8")
+        marker = '<link name="lf_foot_link">'
+        self.assertEqual(text.count(marker), 1)
+        path.write_text(text.replace(marker, marker + "<unexpected/>"), encoding="utf-8")
+        self.assertTrue(any("beyond the declared delta" in p for p in basis.verify_delta(self.tree)))
+
 
 if __name__ == "__main__":
     unittest.main()

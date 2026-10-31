@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <!-- MATDOG MESH UNIT CONVENTION | STL vertex coordinates are exported from CAD in millimetres. Every visual and collision mesh applies scale="0.001 0.001 0.001" so the URDF remains SI-consistent: joint origins and CoM are metres; mass is kg; inertia is kg·m². -->
 <robot name="matt_robodog_rev00">
-  <!-- MATDOG DYNAMIC PROPERTIES REV00 | 17-link CAD baseline mass: 2.480 kg | Per-link standard URDF <inertial> blocks are populated from Solid Edge physical-property reports. CoM origins are expressed in each local link frame; inertia tensors are about those CoMs and expressed in link axes. Detailed provenance, symmetry derivation and aggregate validation are recorded in Coordinate_Cinematiche_matt_robodog_rev00.xlsx / Inertial_Properties. No standalone neck yaw actuator link is represented in REV00. -->
+  <!-- MATDOG DYNAMIC PROPERTIES REV01-FIX | 17-link CAD nominal mass: 2.928 kg (Solid Edge assembly report: 2.937 kg; the 9 g difference is the 1 g resolution of the per-link mass reports, the 17 link volumes close on the assembly volume within 1.1 mm3) | Single nominal configuration INCLUDING the Jetson Orin (175 g, inside base_link). The robot weighed on 2026-10-30 (2.807 kg) did not carry the Jetson: it is historical evidence, not a second configuration. Standard URDF <inertial> blocks come from Solid Edge physical-property reports of 2026-10-30; CoM origins are in each local link frame; inertia tensors are about those CoMs, in link axes, reconstructed from principal axes + radii of gyration. No hardware dynamic validation. Provenance: 09_Logs/Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/ and Coordinate_Cinematiche_matt_robodog_rev00.xlsx / Inertial_Properties. -->
   <link name="base_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=1.282000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__base_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=1.828000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | source=base_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="0.00584 -0.00065 0.02773" rpy="0 0 0" />
-      <mass value="1.282000" />
-      <inertia ixx="0.00147265728657" ixy="1.42294028465e-05" ixz="-0.000443609672652" iyy="0.00887012995059" iyz="-7.70141299896e-06" izz="0.00949906085204" />
+      <origin xyz="-0.00693 -0.00044 0.03657" rpy="0 0 0" />
+      <mass value="1.828000" />
+      <inertia ixx="0.00188547125067" ixy="-1.42614690873e-05" ixz="-0.000255990774032" iyy="0.0136083325749" iyz="-1.15982178242e-05" izz="0.0140540124868" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -26,7 +26,7 @@
     </collision>
   </link>
   <link name="lf_hip_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | source=lf_hip_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.00366 0.02982 0.00694" rpy="0 0 0" />
       <mass value="0.050000" />
@@ -49,11 +49,11 @@
     </collision>
   </link>
   <link name="lf_upper_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.152000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | source=lf_upper_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="0.00108 0.00015 -0.04503" rpy="0 0 0" />
-      <mass value="0.172500" />
-      <inertia ixx="0.000205436660094" ixy="-5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+      <origin xyz="0.00122 0.00014 -0.04503" rpy="0 0 0" />
+      <mass value="0.152000" />
+      <inertia ixx="0.000179347530705" ixy="-6.26631577579e-08" ixz="0" iyy="0.000173651569295" iyz="0" izz="2.84456448e-05" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -72,11 +72,11 @@
     </collision>
   </link>
   <link name="lf_lower_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | source=lf_lower_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.03075 -0.00118 -0.01958" rpy="0 0 0" />
-      <mass value="0.059500" />
-      <inertia ixx="2.15172642767e-05" ixy="6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="-3.71953235117e-07" izz="0.000104321477439" />
+      <mass value="0.059000" />
+      <inertia ixx="2.13364469298e-05" ixy="6.04179984123e-07" ixz="1.66888006237e-05" iyy="0.000101668455702" iyz="-3.6882757768e-07" izz="0.000103444826368" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -95,11 +95,11 @@
     </collision>
   </link>
   <link name="lf_foot_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | symmetry=direct CAD export | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.014000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD direct: principal axes + radii of gyration | source=lf_foot_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
-      <mass value="0.017500" />
-      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+      <origin xyz="-0.00074 0 0.01572" rpy="0 0 0" />
+      <mass value="0.014000" />
+      <inertia ixx="8.92099058994e-07" ixy="0" ixz="-5.56209286796e-09" iyy="8.430464e-07" iyz="0" izz="8.93204741006e-07" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -118,7 +118,7 @@
     </collision>
   </link>
   <link name="rf_hip_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF hip | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF | source=lf_hip_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.00366 -0.02982 0.00694" rpy="0 0 0" />
       <mass value="0.050000" />
@@ -141,11 +141,11 @@
     </collision>
   </link>
   <link name="rf_upper_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF upper | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.152000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF | source=lf_upper_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="0.00108 -0.00015 -0.04503" rpy="0 0 0" />
-      <mass value="0.172500" />
-      <inertia ixx="0.000205436660094" ixy="5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+      <origin xyz="0.00122 -0.00014 -0.04503" rpy="0 0 0" />
+      <mass value="0.152000" />
+      <inertia ixx="0.000179347530705" ixy="6.26631577579e-08" ixz="0" iyy="0.000173651569295" iyz="0" izz="2.84456448e-05" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -164,11 +164,11 @@
     </collision>
   </link>
   <link name="rf_lower_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF lower | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF | source=lf_lower_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.03075 0.00118 -0.01958" rpy="0 0 0" />
-      <mass value="0.059500" />
-      <inertia ixx="2.15172642767e-05" ixy="-6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="3.71953235117e-07" izz="0.000104321477439" />
+      <mass value="0.059000" />
+      <inertia ixx="2.13364469298e-05" ixy="-6.04179984123e-07" ixz="1.66888006237e-05" iyy="0.000101668455702" iyz="3.6882757768e-07" izz="0.000103444826368" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -187,11 +187,11 @@
     </collision>
   </link>
   <link name="rf_foot_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.014000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry (LF copied) | source=lf_foot_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
-      <mass value="0.017500" />
-      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+      <origin xyz="-0.00074 0 0.01572" rpy="0 0 0" />
+      <mass value="0.014000" />
+      <inertia ixx="8.92099058994e-07" ixy="0" ixz="-5.56209286796e-09" iyy="8.430464e-07" iyz="0" izz="8.93204741006e-07" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -210,7 +210,7 @@
     </collision>
   </link>
   <link name="rh_hip_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF hip | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF (rear hip mesh differs from LF by 0.21 mm CoM / 0.8 % inertia: mesh estimate, not CAD) | source=lf_hip_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.00366 -0.02982 0.00694" rpy="0 0 0" />
       <mass value="0.050000" />
@@ -233,11 +233,11 @@
     </collision>
   </link>
   <link name="rh_upper_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF upper | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.152000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF | source=lf_upper_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="0.00108 -0.00015 -0.04503" rpy="0 0 0" />
-      <mass value="0.172500" />
-      <inertia ixx="0.000205436660094" ixy="5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+      <origin xyz="0.00122 -0.00014 -0.04503" rpy="0 0 0" />
+      <mass value="0.152000" />
+      <inertia ixx="0.000179347530705" ixy="6.26631577579e-08" ixz="0" iyy="0.000173651569295" iyz="0" izz="2.84456448e-05" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -256,11 +256,11 @@
     </collision>
   </link>
   <link name="rh_lower_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: local Y reflection | symmetry=Y mirror of LF lower | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: Y reflection of LF | source=lf_lower_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.03075 0.00118 -0.01958" rpy="0 0 0" />
-      <mass value="0.059500" />
-      <inertia ixx="2.15172642767e-05" ixy="-6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="3.71953235117e-07" izz="0.000104321477439" />
+      <mass value="0.059000" />
+      <inertia ixx="2.13364469298e-05" ixy="-6.04179984123e-07" ixz="1.66888006237e-05" iyy="0.000101668455702" iyz="3.6882757768e-07" izz="0.000103444826368" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -279,11 +279,11 @@
     </collision>
   </link>
   <link name="rh_foot_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.014000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry (LF copied) | source=lf_foot_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
-      <mass value="0.017500" />
-      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+      <origin xyz="-0.00074 0 0.01572" rpy="0 0 0" />
+      <mass value="0.014000" />
+      <inertia ixx="8.92099058994e-07" ixy="0" ixz="-5.56209286796e-09" iyy="8.430464e-07" iyz="0" izz="8.93204741006e-07" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -302,7 +302,7 @@
     </collision>
   </link>
   <link name="lh_hip_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_hip_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.050000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side frame as LF (rear hip mesh differs from LF by 0.21 mm CoM / 0.8 % inertia: mesh estimate, not CAD) | source=lf_hip_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.00366 0.02982 0.00694" rpy="0 0 0" />
       <mass value="0.050000" />
@@ -325,11 +325,11 @@
     </collision>
   </link>
   <link name="lh_upper_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.172500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_upper_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.152000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side frame as LF | source=lf_upper_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="0.00108 0.00015 -0.04503" rpy="0 0 0" />
-      <mass value="0.172500" />
-      <inertia ixx="0.000205436660094" ixy="-5.63507198417e-08" ixz="0" iyy="0.000199175976156" iyz="0" izz="3.111294525e-05" />
+      <origin xyz="0.00122 0.00014 -0.04503" rpy="0 0 0" />
+      <mass value="0.152000" />
+      <inertia ixx="0.000179347530705" ixy="-6.26631577579e-08" ixz="0" iyy="0.000173651569295" iyz="0" izz="2.84456448e-05" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -348,11 +348,11 @@
     </collision>
   </link>
   <link name="lh_lower_leg_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side local geometry | symmetry=same left-side local frame as LF | source=physprop__lf_lower_leg_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.059000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: same left-side frame as LF | source=lf_lower_leg_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
       <origin xyz="0.03075 -0.00118 -0.01958" rpy="0 0 0" />
-      <mass value="0.059500" />
-      <inertia ixx="2.15172642767e-05" ixy="6.0930015348e-07" ixz="1.68302311374e-05" iyy="0.000102530052784" iyz="-3.71953235117e-07" izz="0.000104321477439" />
+      <mass value="0.059000" />
+      <inertia ixx="2.13364469298e-05" ixy="6.04179984123e-07" ixz="1.66888006237e-05" iyy="0.000101668455702" iyz="-3.6882757768e-07" izz="0.000103444826368" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
@@ -371,11 +371,11 @@
     </collision>
   </link>
   <link name="lh_foot_link">
-    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.017500 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry | symmetry=identical foot geometry; LF local inertia copied | source=physprop__lf_foot_link.txt + weight_breakdown_summary.txt -->
+    <!-- MATDOG_DYNAMIC_PROPERTIES | mass_kg=0.014000 | coM_frame=local_link | tensor_frame=local_link_at_com | method=CAD symmetry-derived from LF: identical foot geometry (LF copied) | source=lf_foot_link__physprop.txt (Solid Edge 2026-10-30, nominal configuration incl. Jetson Orin) -->
     <inertial>
-      <origin xyz="-0.00052 0 0.01548" rpy="0 0 0" />
-      <mass value="0.017500" />
-      <inertia ixx="1.14526961866e-06" ixy="0" ixz="-1.55064671079e-08" iyy="1.20267175e-06" iyz="0" izz="1.14835213134e-06" />
+      <origin xyz="-0.00074 0 0.01572" rpy="0 0 0" />
+      <mass value="0.014000" />
+      <inertia ixx="8.92099058994e-07" ixy="0" ixz="-5.56209286796e-09" iyy="8.430464e-07" iyz="0" izz="8.93204741006e-07" />
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0" />
