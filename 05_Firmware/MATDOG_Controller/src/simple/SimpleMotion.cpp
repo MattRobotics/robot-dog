@@ -107,7 +107,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
-  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
+  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -532,14 +532,23 @@ void SimpleMotion::startWalk(uint64_t now){
 }
 void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   timing::Section section(timing::COMPENSATE);
-  imuLimited_=false;Attitude a;
+  Attitude a;
   if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000||
-     !tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a)){imuLimited_=true;return;}
+     !tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a)){imuLimited_=true;walkOffset_.valid=false;return;}
+  // WALK budget: every other release keeps the joint offset of the last solved
+  // correction on the new nominal target; the same limits and box still decide.
+  const bool walk=phase_==Phase::WALK;
+  if(walk&&walkOffset_.valid){
+    auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(walkOffset_,i);
+    walkOffset_.valid=false;
+    if(pointSafe(q)&&contains(collision::kWalk,q)){f.target=q;return;}
+  }
+  imuLimited_=false;
   // A small proportional BODY correction, slew limited, no servo PID or
   // integral loop. The same target generator owns nominal + correction.
   // One slew step per Motion release: a group boundary regenerates the
   // reference in the same release and must not advance the correction twice.
-  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
+  const double slew=now==compensatedUs_?0:.020*(walk?2:1)*kPeriodUs/1e6;compensatedUs_=now;
   auto step=[slew](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);return old+std::clamp(desired-old,-slew,slew);};
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
   const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
@@ -547,6 +556,8 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // PRONE_HEIGHT hands over to kLift, whose margin at 53 mm is 2.6 mrad: once the
   // nominal target is inside it, the correction stays inside it too.
   const auto& box=phase_==Phase::WALK?collision::kWalk:phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
+  const auto nominal=f.target;
+  auto keep=[&](const JointTargetFrame& q){f.target=q;if(!walk)return;walkOffset_=q;for(unsigned i=0;i<12;++i)jointSlot(walkOffset_,i)-=jointSlot(nominal,i);};
   auto solve=[&](double scale){
     timing::count(timing::SOLVES);
     auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);
@@ -583,10 +594,10 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
   if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
-    f.target=probe;rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;return;}
+    keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;return;}
   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
     const auto q=solve(scale);
-    if(pointSafe(q)&&contains(box,q)){f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;return;}
+    if(pointSafe(q)&&contains(box,q)){keep(q);rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;return;}
   }
   // If no in-workspace correction exists, the nominal safe target survives.
   rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;

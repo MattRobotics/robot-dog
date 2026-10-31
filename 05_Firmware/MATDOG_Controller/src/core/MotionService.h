@@ -8,6 +8,8 @@ constexpr size_t kMotionStatusJsonBytes=5120; // fixed HTTPD buffer, including t
 struct MotionStatusSnapshot {
   uint64_t capturedUs=0,imuStampUs=0,maxGapUs=0,offVerifiedUs=0;
   uint32_t capturedMs=0,releases=0,missed=0,bmsAgeMs=0,maxReleaseWorkUs=0;
+  uint32_t commandMissed=0,firstMissLatenessUs=0,commandMaxWorkUs=0,commandMaxCompensateUs=0,commandMaxSolves=0;
+  const char* firstMissPhase="";const char* commandMaxWorkPhase="";
   simple::State state=simple::State::STOPPED;
   const char *phase="IDLE",*poseRegion="UNKNOWN",*reason="BOOTING",*readinessReason="BOOTING",*powerReason="POWER_NOT_READY";
   char activeId[49]{};

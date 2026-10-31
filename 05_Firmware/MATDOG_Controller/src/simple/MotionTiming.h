@@ -32,6 +32,7 @@ struct State {
   uint32_t sectionMax[PARTS]{};
   uint32_t previous[PARTS]{},external[EXTERNALS]{},externalMax[EXTERNALS]{};
   uint32_t previousWork[WORKS]{};
+  uint32_t missed=0;  // release periods lost since the command armed this record
 };
 inline State state{};
 inline void arm() { state=State{};state.armed=true; }
@@ -70,6 +71,7 @@ struct Release {
   Release(uint32_t& m,uint64_t stamp,const char* phase,uint32_t number,
           uint64_t lateness,uint32_t missed,uint32_t skipped):start(esp_timer_get_time()),maximum(m) {
     if(!state.armed)return;
+    state.missed+=skipped;
     state.working=Record{};auto& r=state.working;r.valid=true;r.phase=phase;
     r.stampUs=stamp;r.release=number;r.latenessUs=lateness;r.missed=missed;r.skipped=skipped;
     r.visitGapUs=state.visitGap;r.outsideVisitUs=state.outside;r.previousPhase=state.previousPhase;

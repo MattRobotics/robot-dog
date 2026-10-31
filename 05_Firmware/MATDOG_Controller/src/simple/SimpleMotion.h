@@ -221,5 +221,6 @@ class SimpleMotion {
   double cycles_=0,stopCycle_=-1;
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
+  motion::JointTargetFrame walkOffset_;
 };
 } }
