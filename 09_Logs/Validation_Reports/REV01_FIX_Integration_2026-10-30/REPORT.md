@@ -10,7 +10,7 @@ Data: 2026-10-30. Solo offline: nessun flash, NVS, calibrazione servo, offset EE
 | Modello canonico (URDF, mesh, manifest) | VERIFIED OFFLINE | 17/17 link con una sola STL per visual e collision |
 | `LegGeometryData.h` / FK-IK C++ vs URDF | VERIFIED OFFLINE | coerenti (scarto FK 2.8e-17 m su 16 pose) |
 | Viewer / Digital Twin | VERIFIED OFFLINE | test e typecheck verdi; twin rigenerato sul ramo `dev5` (sonda locale) |
-| Catena di calibrazione firmware (`Calibration*Data.h`, yaml, audit) | IMPLEMENTED NOT VALIDATED | NON aggiornata, ancora legata all'URDF REV00 (vedi criticità) |
+| Catena di calibrazione firmware (`Calibration*Data.h`, yaml, audit) | VERIFIED OFFLINE (provenienza storica) | Invariata e legata alla base REV00 preservata in `03_CAD/URDF/historical_calibration_basis/rev00/`; delta verificato a macchina; nessuna validazione hardware su REV01-FIX (vedi `calibration_chain/CALIBRATION_BASIS_DECISION.md`) |
 | Motion certificato di `dev5` (box/tabelle) | UNKNOWN | richiede ricertificazione, non eseguibile offline qui |
 
 ## Input
@@ -52,7 +52,7 @@ Su `dev5` (sonda locale, non pubblicata): build firmware esterna OK (1582608 B, 
 
 ## Criticità aperte
 
-1. **Catena di calibrazione firmware non aggiornata.** `Calibration{GeometryProfile,Q0Evidence,SequencePlan}Data.h`, `MATDOG_JOINT_CALIBRATION.yaml`, `matdog_full_calibration_sequence_geometry_v5.py` e il pin in `static_audit.py` restano legati all'URDF REV00 (3890a3f0…) e alle evidenze del robot. Rigenerarli riassocierebbe calibrazione e record NVS a un URDF senza evidenza hardware, fuori mandato. La static audit segnala 3 problemi (export del piano di sequenza «computed on another URDF / mesh set», export del profilo geometrico «input drift», mutation test collegato). Decisione e riqualificazione necessarie prima di compilare un firmware da questo modello per il robot.
+1. **Catena di calibrazione: risolta con la separazione base storica / modello operativo** (2026-10-31, `calibration_chain/CALIBRATION_BASIS_DECISION.md`). I file della catena, il tag `3713f4ddc43b204e` e il record gen-1 sono invariati; `static_audit` torna verde. Vincolo residuo documentato: certificato CAD del Startup Recovery emesso su REV00, non riemesso.
 2. **Motion certificato di `dev5`.** Con la nuova geometria, `SimpleMotion::stand(0.15)` viene rifiutato (l'IK a 150 mm esce dal box certificato `collision::kHeight`, calcolato su REV00); `PairedProneData.h`, first-stride e box `kEntry/kWalk/kLift` sono pure certificati su REV00. Serve la ricertificazione con gli strumenti FCL ufficiali (non disponibili qui). Il comportamento è fail-closed.
 3. **Dati dinamici storici di `base_link`** (massa 1.282 kg, CoM, inerzia) e `reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx` (quote HIP REV00): servono i valori aggiornati di Solid Edge; non sono stati inventati.
 4. **Smoke test browser del viewer non ripetuto** (atteso 134 484 + 20 = 134 504 triangoli, non misurato).

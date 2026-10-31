@@ -39,6 +39,9 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import matdog_calibration_basis as basis  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 BUNDLE_DIR = REPO_ROOT / "09_Logs/Validation_Reports/Geometry_Compiler"
@@ -50,8 +53,12 @@ PATH_PARKING = BUNDLE_DIR / f"{BUNDLE_ID}_PATH_PARKING.json"
 SAFETY_POLICY = (BUNDLE_DIR /
                  "2026-08-11_132758_MATDOG_GEOMETRY_V5_G12_FINAL_EXTERNAL_SAFETY_POLICY.json")
 
-URDF = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf"
-MESH_MANIFEST = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/SHA256SUMS.txt"
+# The calibration chain is bound to the REV00 inputs it was produced and measured on. They are
+# read from the preserved historical basis (hash-verified on use), never from the operational
+# model, which is REV01-FIX; matdog_calibration_basis.verify_delta() proves the two differ only
+# by the declared delta.
+URDF = REPO_ROOT / basis.BASIS_DIR / basis.URDF_NAME
+MESH_MANIFEST = REPO_ROOT / basis.BASIS_DIR / basis.MANIFEST_NAME
 ALLOCATION = REPO_ROOT / "06_Software/Matdog_Core/config/MATDOG_SERVO_ALLOCATION.yaml"
 
 OUTPUT = (REPO_ROOT /
@@ -165,11 +172,17 @@ def load_allocation() -> dict[str, dict]:
 
 
 def verify_bundle_provenance(manifest: dict) -> None:
-    """Every input the canonical run was gated on must still hash the same."""
+    """Every input the canonical run was gated on must still hash the same: the live file, or
+    for the closed set of declared superseded files the preserved REV00 copy."""
+    problems = basis.verify_delta(REPO_ROOT)
+    if problems:
+        raise ExportError("operational model vs REV00 calibration basis:\n  " +
+                          "\n  ".join(problems))
     for rel, expected in manifest["provenance"]["input_file_sha256"].items():
-        actual = sha256_file(REPO_ROOT / rel)
-        if actual != expected:
-            raise ExportError(f"input drift: {rel}\n  manifest {expected}\n  actual   {actual}")
+        try:
+            basis.resolve_recorded_input(REPO_ROOT, rel, expected)
+        except basis.BasisError as exc:
+            raise ExportError(str(exc))
 
     calibration_dir = Path(__file__).resolve().parent
     for name, expected in manifest["provenance"]["canonical_semantic_source_file_sha256"].items():

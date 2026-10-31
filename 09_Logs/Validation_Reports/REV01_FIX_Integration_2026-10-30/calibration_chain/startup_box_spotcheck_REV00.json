@@ -1,0 +1,38 @@
+{
+ "LOWER_PHASE": {
+  "min_clearance_mm": 0.7622475433716885,
+  "pair": [
+   "rf_lower_leg_link",
+   "rh_lower_leg_link"
+  ],
+  "at_ticks": {
+   "rf_lower_leg_joint": 367,
+   "rf_upper_leg_joint": 1034,
+   "rh_upper_leg_joint": 388
+  },
+  "poses": 52
+ },
+ "UPPER_PHASE": {
+  "min_clearance_mm": 7.207376788108337,
+  "pair": [
+   "base_link",
+   "rf_lower_leg_link"
+  ],
+  "at_ticks": {
+   "rf_upper_leg_joint": 512.0,
+   "rh_upper_leg_joint": 398.0
+  },
+  "poses": 34
+ },
+ "REAR_PHASE": {
+  "min_clearance_mm": 12.57348519056032,
+  "pair": [
+   "base_link",
+   "lf_upper_leg_link"
+  ],
+  "at_ticks": {
+   "rh_upper_leg_joint": 408
+  },
+  "poses": 28
+ }
+}

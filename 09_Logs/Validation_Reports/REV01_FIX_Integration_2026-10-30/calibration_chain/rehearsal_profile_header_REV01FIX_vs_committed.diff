@@ -1,0 +1,70 @@
+--- 05_Firmware/MATDOG_Controller/src/actuator/CalibrationGeometryProfileData.h	2026-10-30 22:10:47.976530292 +0100
++++ <local path> 09:05:43.871101156 +0100
+@@ -2,7 +2,7 @@
+ //
+ // Produced by 06_Software/Matdog_Core/calibration/matdog_calibration_geometry_export.py
+ // from the canonical Geometry Compiler V5 bundle
+-//   2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4
++//   REHEARSAL_REV01FIX_C_W1
+ //
+ // Every geometric value below is COPIED from that bundle and converted to
+ // integer micro-radians. No geometry is computed here and none is computed on
+@@ -27,16 +27,16 @@
+ namespace geometry_data {
+ 
+ constexpr char kSchemaVersion[] = "matdog.calibration_geometry_profile.bootstrap.v1";
+-constexpr char kBundleId[] = "2026-08-11_131818_MATDOG_GEOMETRY_V5_REMEDIATION_BENCHMARK_D_W4";
++constexpr char kBundleId[] = "REHEARSAL_REV01FIX_C_W1";
+ 
+ // The immutable inputs the canonical V5 run was gated on. The Controller
+ // refuses to act on a profile whose provenance it cannot match.
+ constexpr GeometryProvenance kProvenance = {
+-    "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+-    "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1",
+-    "de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e",
+-    "67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
+-    "e5cb2a4c33082c59c6f5d381f90fcc19680cc899e326d13c9c9129932bde5d08",
++    "5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73",
++    "46bd1d1fa2aa2cf69f3f8445059978a7d15fe035769f1b363864f78d7bf45050",
++    "d61ecce59bf3133cef1d4fa7c3276c43e4c80d8eaeb23baf881586b2d1ded1bf",
++    "cdf0bd4f68026854776255adf43911d64bd3a22cef27ed3504dddac1bed062d6",
++    "24c52cf43ab7656a1c1965311b25faa134651fe90e57f7b032d536e574deb8b5",
+     "d9c66134357acbc95c13aae81180f50843cef5cef2613a2ede7927691884e769",
+ };
+ 
+@@ -49,7 +49,7 @@
+     // lf_upper_leg_joint  unit ELR01  bus 12  encoder_direction +1 (CURRENT_HARDWARE_WITNESS; URDF spec motorDirection +1, not used)
+     {{calibration::Leg::LF, calibration::JointKind::UPPER, "ELR01"}, 12, 1, EncoderDirectionSource::CURRENT_HARDWARE_WITNESS, -916298, 2138028, 909821, 2048, 0},
+     // lh_hip_joint  unit M43  bus 43  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+-    {{calibration::Leg::LH, calibration::JointKind::HIP, "M43"}, 43, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 788057, 2049, 1},
++    {{calibration::Leg::LH, calibration::JointKind::HIP, "M43"}, 43, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 787989, 2049, 1},
+     // lh_lower_leg_joint  unit M41  bus 41  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection +1 DISAGREES, not used)
+     {{calibration::Leg::LH, calibration::JointKind::LOWER, "M41"}, 41, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -1605703, 654498, 666293, 2049, 1},
+     // lh_upper_leg_joint  unit M42  bus 42  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection +1, not used)
+@@ -61,7 +61,7 @@
+     // rf_upper_leg_joint  unit ELR03  bus 22  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1, not used)
+     {{calibration::Leg::RF, calibration::JointKind::UPPER, "ELR03"}, 22, -1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -916298, 2138028, 909821, 2049, 1},
+     // rh_hip_joint  unit NEW06  bus 33  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+-    {{calibration::Leg::RH, calibration::JointKind::HIP, "NEW06"}, 33, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 788057, 2047, -1},
++    {{calibration::Leg::RH, calibration::JointKind::HIP, "NEW06"}, 33, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -785398, 785398, 787989, 2047, -1},
+     // rh_lower_leg_joint  unit NEW05  bus 31  encoder_direction +1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1 DISAGREES, not used)
+     {{calibration::Leg::RH, calibration::JointKind::LOWER, "NEW05"}, 31, 1, EncoderDirectionSource::HISTORICAL_SLOT_UNCHANGED, -1605703, 654498, 666293, 2049, 1},
+     // rh_upper_leg_joint  unit ELR02  bus 32  encoder_direction -1 (HISTORICAL_SLOT_UNCHANGED; URDF spec motorDirection -1, not used)
+@@ -83,7 +83,7 @@
+     // lf_upper_leg_joint:min  EXECUTABLE_URDF_DOMAIN  NOT_NEEDED  PASS  [GEOMETRIC_CONTACT_BRACKET]
+     {calibration::Leg::LF, calibration::JointKind::UPPER, calibration::ContactSide::MIN_SIDE, TargetDomain::EXECUTABLE_URDF_DOMAIN, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, -909889, -909821, -916298, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // lh_hip_joint:max  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  PASS  [GEOMETRIC_CONTACT_BRACKET]
+-    {calibration::Leg::LH, calibration::JointKind::HIP, calibration::ContactSide::MAX_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, 788125, 788057, 785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
++    {calibration::Leg::LH, calibration::JointKind::HIP, calibration::ContactSide::MAX_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, 788057, 787989, 785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // lh_hip_joint:min  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD  [GEOMETRIC_CONTACT_BRACKET]
+     {calibration::Leg::LH, calibration::JointKind::HIP, calibration::ContactSide::MIN_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD, -803056, -802988, -785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // lh_lower_leg_joint:max  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  PASS  [GEOMETRIC_CONTACT_BRACKET]
+@@ -109,7 +109,7 @@
+     // rh_hip_joint:max  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD  [GEOMETRIC_CONTACT_BRACKET]
+     {calibration::Leg::RH, calibration::JointKind::HIP, calibration::ContactSide::MAX_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD, 803056, 802988, 785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // rh_hip_joint:min  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  PASS  [GEOMETRIC_CONTACT_BRACKET]
+-    {calibration::Leg::RH, calibration::JointKind::HIP, calibration::ContactSide::MIN_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, -788125, -788057, -785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
++    {calibration::Leg::RH, calibration::JointKind::HIP, calibration::ContactSide::MIN_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, -788057, -787989, -785398, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // rh_lower_leg_joint:max  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  NOT_NEEDED  PASS  [GEOMETRIC_CONTACT_BRACKET]
+     {calibration::Leg::RH, calibration::JointKind::LOWER, calibration::ContactSide::MAX_SIDE, TargetDomain::DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS, ParkingOutcome::NOT_NEEDED, ClearancePolicyResult::PASS, 666361, 666293, 654498, false, calibration::Leg::LF, calibration::JointKind::HIP, 0},
+     // rh_lower_leg_joint:min  DIAGNOSTIC_GEOMETRY_OUTSIDE_URDF_LIMITS  FEASIBLE_1DOF_PLAN_FOUND  UNRESOLVED_LOWER_BOUND_BELOW_THRESHOLD  [PATH_OBSTRUCTION_BRACKET]

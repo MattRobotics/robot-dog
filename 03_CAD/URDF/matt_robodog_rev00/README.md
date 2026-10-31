@@ -150,3 +150,7 @@ All twelve revolute leg joints currently use:
 These are conservative MATDOG nominal-operation limits for the intended 3S
 operating point. They are not an official Feetech torque-speed curve at
 exactly 11.1 V.
+
+### Calibration provenance (2026-10-31)
+
+The hardware calibration chain (Geometry V5 bundle, `CalibrationGeometryProfileData.h`, sequence plan, startup reference, gen-1 NVS record) stays bound to the REV00 inputs it was measured on. Those inputs are preserved in `../historical_calibration_basis/rev00/` and are not the operational model. `06_Software/Matdog_Core/calibration/matdog_calibration_basis.py --check` (run by `static_audit.py`) proves this model equals REV00 plus the declared delta only (hip origin Z, visual paths, `base_link` collision mesh).
