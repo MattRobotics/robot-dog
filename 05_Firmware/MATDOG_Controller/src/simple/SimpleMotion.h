@@ -15,13 +15,14 @@ constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
 constexpr double kWalkSwayXM=.010, kWalkSwayYM=.0035, kWalkStartCycles=1, kWalkStopCycles=1;
 constexpr double kStrideM[]={.030,.045,.060};
 constexpr double kMinStandM=.050;
-// Operator height: the base_link height of the historical CAD, where the front
-// HIP axes sat 46.5 mm above the base_link plane. REV01-FIX corrected the model
-// to the built robot (48.7 mm); the robot and its qualified poses did not move.
-// A commanded or reported height stays in this datum. The body plane is lower
-// by the model correction, converted only at the IK and FK boundary.
-constexpr double kHeightDatumFrontHipZM=.0465;
-double bodyHeightFromOperatorM(double operatorHeightM);
+// Nominal height, the height of commands, status and route tables: the front HIP
+// axes stand 46.5 mm above it. STAND 150 is that operating reference, the pose
+// qualified on the robot. base_link, the ventral plane, follows from the canonical
+// geometry (48.7 mm below those axes: 147.8 mm at nominal 150) and is reported
+// apart. Converted only here, at the IK and FK boundary.
+constexpr double kFrontHipAboveNominalM=.0465;
+double baseLinkHeightFromNominalM(double nominalM);
+double nominalHeightFromBaseLinkM(double baseLinkM);
 // STAND reference ceilings, below the STAND RAM profile 480/13 (0.736 rad/s,
 // 1.994 rad/s^2) with room for the IMU correction. rc.10: x1.57 of rc.9
 // (0.35, 0.70); 0.55 rad/s is 12% of the C018 no-load speed (4.72 rad/s at
