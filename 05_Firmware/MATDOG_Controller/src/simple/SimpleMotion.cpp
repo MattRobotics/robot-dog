@@ -532,7 +532,9 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
   const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
   if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=correctionScale_=0;return;}
-  const auto& box=phase_==Phase::WALK?collision::kWalk:segmentBox_?*segmentBox_:collision::kHeight;
+  // PRONE_HEIGHT hands over to kLift, whose margin at 53 mm is 2.6 mrad: once the
+  // nominal target is inside it, the correction stays inside it too.
+  const auto& box=phase_==Phase::WALK?collision::kWalk:phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
   auto solve=[&](double scale){
     timing::count(timing::SOLVES);
     auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);

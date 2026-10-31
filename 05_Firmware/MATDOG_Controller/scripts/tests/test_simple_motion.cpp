@@ -403,5 +403,13 @@ int main(){
      assert(r.p.enables==before+12&&r.m.state()==simple::State::MOVING);assert(r.reachStand());}
     std::puts("PRONE 24/10 re-sent reference: byte-identical packet with 7 servos ON, no SAFE_OFF; slots 0/5/11 recover 1-2, fault on 3 before torque; STOP during re-send; counters reset per STAND");
   }
+  // PRONE from above 53 mm on a tilted floor: the correction carried to the
+  // PRONE_LIFT handover must stay inside kLift (2.6 mrad rear UPPER margin).
+  for(double roll:{0.,.0175,-.0175})for(double pitch:{0.,-.0175}){Rig r;
+    r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
+    assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());for(unsigned i=0;i<100;++i)r.tick();
+    assert(!r.m.prone(r.p.now));for(unsigned i=0;i<6000&&r.m.state()!=simple::State::PRONE;++i){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::PRONE);}
+  std::puts("PRONE from STAND100 under +-1 deg roll/pitch: handover inside kLift, no fault");
   std::puts("PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION");
 }
