@@ -9,6 +9,7 @@ static int64_t test_clock_us=1000000;
 extern "C" int64_t esp_timer_get_time(){return test_clock_us;}
 #include "../../src/motion/PairedProneData.h"
 #include "../../src/motion/GaitTiming.h"
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <chrono>
