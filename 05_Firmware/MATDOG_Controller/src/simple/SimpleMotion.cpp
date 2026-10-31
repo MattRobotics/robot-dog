@@ -107,7 +107,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
-  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=0;
+  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -531,7 +531,7 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   auto step=[slew](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);return old+std::clamp(desired-old,-slew,slew);};
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
   const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
-  if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=0;return;}
+  if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=correctionScale_=0;return;}
   const auto& box=phase_==Phase::WALK?collision::kWalk:segmentBox_?*segmentBox_:collision::kHeight;
   auto solve=[&](double scale){
     timing::count(timing::SOLVES);
@@ -549,10 +549,13 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // IK perturbation measures local joint sensitivity; reserve half the joint
   // room. This avoids normal corrections jumping from full to half amplitude
   // as the nominal trajectory approaches a limit. No encoder tracking loop.
+  // The last accepted scale is the probe: while the attenuation stays within 2%
+  // of it, the probe is already the target and the release needs one solve.
   constexpr double probeScale=1./32;
-  const auto probe=solve(probeScale);double sum=0;
+  const double trialScale=correctionScale_>0?correctionScale_:probeScale;
+  const auto probe=solve(trialScale);double sum=0;
   if(probe.valid)for(unsigned i=0;i<12;++i){const auto& lim=legModel(static_cast<LegId>(i/3))->limits[i%3];
-    const double q=jointSlot(f.target,i),delta=(jointSlot(probe,i)-q)/probeScale;
+    const double q=jointSlot(f.target,i),delta=(jointSlot(probe,i)-q)/trialScale;
     const double lo=std::fmax(box.lo[i],std::fmax(input_.minRad[i],lim.lower));
     const double hi=std::fmin(box.hi[i],std::fmin(input_.maxRad[i],lim.upper));
     // The smallest recovered CAD reserve is 25 mrad. A fixed symmetric
@@ -565,12 +568,14 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // same Motion epoch, not a second timer or a servo acceleration controller.
   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
+  if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
+    f.target=probe;rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;return;}
   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
     const auto q=solve(scale);
-    if(pointSafe(q)&&contains(box,q)){f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999||trial!=0;return;}
+    if(pointSafe(q)&&contains(box,q)){f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;return;}
   }
   // If no in-workspace correction exists, the nominal safe target survives.
-  rollCorrection_=pitchCorrection_=0;imuLimited_=true;
+  rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;
 }
 void SimpleMotion::generateWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);

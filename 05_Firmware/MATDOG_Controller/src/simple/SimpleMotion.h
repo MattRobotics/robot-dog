@@ -218,6 +218,6 @@ class SimpleMotion {
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1;
   bool walkStopping_=false,imuLimited_=false;
-  double rollCorrection_=0,pitchCorrection_=0;
+  double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
 };
 } }
