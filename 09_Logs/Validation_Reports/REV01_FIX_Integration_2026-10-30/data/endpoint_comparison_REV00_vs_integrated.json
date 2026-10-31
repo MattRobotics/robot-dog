@@ -1,0 +1,197 @@
+{
+ "resolution_rad": 0.0001,
+ "rows": [
+  {
+   "endpoint": "lf_hip_joint:min",
+   "contact_rad_REV00": -0.803055986689,
+   "contact_rad_integrated": -0.803055986689,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lf_hip_joint:max",
+   "contact_rad_REV00": 0.78928424806,
+   "contact_rad_integrated": 0.78928424806,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lf_upper_leg_joint:min",
+   "contact_rad_REV00": -0.90988922645,
+   "contact_rad_integrated": -0.90988922645,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lf_upper_leg_joint:max",
+   "contact_rad_REV00": 2.127120025868,
+   "contact_rad_integrated": 2.127120025868,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "lf_lower_leg_joint:min",
+   "contact_rad_REV00": -1.606998273389,
+   "contact_rad_integrated": -1.606998273389,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "lf_lower_leg_joint:max",
+   "contact_rad_REV00": 0.666361254258,
+   "contact_rad_integrated": 0.666361254258,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rf_hip_joint:min",
+   "contact_rad_REV00": -0.78928424806,
+   "contact_rad_integrated": -0.78928424806,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rf_hip_joint:max",
+   "contact_rad_REV00": 0.803055986689,
+   "contact_rad_integrated": 0.803055986689,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rf_upper_leg_joint:min",
+   "contact_rad_REV00": -0.90988922645,
+   "contact_rad_integrated": -0.90988922645,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rf_upper_leg_joint:max",
+   "contact_rad_REV00": 2.127120025868,
+   "contact_rad_integrated": 2.127120025868,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "rf_lower_leg_joint:min",
+   "contact_rad_REV00": -1.606998273389,
+   "contact_rad_integrated": -1.606998273389,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "rf_lower_leg_joint:max",
+   "contact_rad_REV00": 0.666361254258,
+   "contact_rad_integrated": 0.666361254258,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rh_hip_joint:min",
+   "contact_rad_REV00": -0.788125240354,
+   "contact_rad_integrated": -0.78805706343,
+   "delta_rad": 6.8176923999963e-05,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rh_hip_joint:max",
+   "contact_rad_REV00": 0.803055986689,
+   "contact_rad_integrated": 0.803055986689,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rh_upper_leg_joint:min",
+   "contact_rad_REV00": -0.90988922645,
+   "contact_rad_integrated": -0.90988922645,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rh_upper_leg_joint:max",
+   "contact_rad_REV00": 2.127120025868,
+   "contact_rad_integrated": 2.127120025868,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "rh_lower_leg_joint:min",
+   "contact_rad_REV00": -1.606998273389,
+   "contact_rad_integrated": -1.606998273389,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "rh_lower_leg_joint:max",
+   "contact_rad_REV00": 0.666361254258,
+   "contact_rad_integrated": 0.666361254258,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lh_hip_joint:min",
+   "contact_rad_REV00": -0.803055986689,
+   "contact_rad_integrated": -0.803055986689,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lh_hip_joint:max",
+   "contact_rad_REV00": 0.788125240354,
+   "contact_rad_integrated": 0.78805706343,
+   "delta_rad": -6.8176923999963e-05,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lh_upper_leg_joint:min",
+   "contact_rad_REV00": -0.90988922645,
+   "contact_rad_integrated": -0.90988922645,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lh_upper_leg_joint:max",
+   "contact_rad_REV00": 2.127120025868,
+   "contact_rad_integrated": 2.127120025868,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  },
+  {
+   "endpoint": "lh_lower_leg_joint:min",
+   "contact_rad_REV00": -1.606998273389,
+   "contact_rad_integrated": -1.606998273389,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "PATH_OBSTRUCTION",
+   "path_obstruction_integrated": "PATH_OBSTRUCTION"
+  },
+  {
+   "endpoint": "lh_lower_leg_joint:max",
+   "contact_rad_REV00": 0.666361254258,
+   "contact_rad_integrated": 0.666361254258,
+   "delta_rad": 0.0,
+   "path_obstruction_REV00": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN",
+   "path_obstruction_integrated": "NO_PATH_OBSTRUCTION_IN_SEARCH_DOMAIN"
+  }
+ ]
+}

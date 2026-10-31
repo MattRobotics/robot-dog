@@ -1,0 +1,20 @@
+PASS 17 links
+PASS 17/17 visual == collision (same file, meshes/collision/<link>.stl)
+PASS scale 0.001 on all visual+collision
+PASS visual/collision origin identical (0 0 0 / 0 0 0)
+PASS exactly 17 STL in model dir  [17 files]
+PASS no STL outside meshes/collision
+PASS no LFS pointer used as mesh; all binary STL well-formed  [[]]
+PASS total triangles 134484  [134484]
+PASS base_link SHA == REV01-FIX
+PASS base_link 36832 triangles
+PASS SHA256SUMS: 19 entries, all match
+PASS other 16 collision STL identical to origin/main
+PASS HIP origins  [{'lf_hip_joint': '0.1125 0.0475 0.0487', 'rf_hip_joint': '0.1125 -0.0475 0.0487', 'rh_hip_joint': '-0.1125 -0.0475 0.0287', 'lh_hip_joint': '-0.1125 0.0475 0.0287'}]
+PASS 16 joints, 12 revolute
+PASS LegGeometryData.h embeds new URDF SHA
+PASS LegGeometryData.h hip Z 0.0487/0.0287
+PASS LegGeometryData.h has no old hip Z
+URDF sha256 5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73
+LegGeometryData.h sha256 114d261c12ca563dcedba6e4b896a16d2f6fd68f91686074084eeeec2588a5cc
+OVERALL PASS

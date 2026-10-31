@@ -1,0 +1,34 @@
+    LF /segments/1/clearance/at_rad -0.4396048053460617 -0.40578905108867236
+    LF /segments/2/clearance/at_rad -0.42658446345286005 -0.7378193739481181
+    LF /segments/7/clearance/at_rad -0.7476386363106531 -0.37381931815532654
+    LF /segments/7/clearance/min_clearance_m 3.224316716949927e-05 3.854720870221512e-05
+    LF /segments/8/clearance/min_clearance_m 7.497151518050352e-05 0.00018687364780909516
+LF collision_free old/new: True True segments 15 verdicts identical: True numeric diffs: 9 max|d|=3.738e-01 non-numeric diffs: [('/segments/7/clearance/pair/1', 'lf_foot_link', 'lf_lower_leg_link'), ('/segments/8/clearance/pair/1', 'lf_foot_link', 'lf_upper_leg_link')]
+    RF /segments/1/clearance/at_rad -0.4396048053460617 -0.40578905108867236
+    RF /segments/11/clearance/at_rad 0.7476386363106531 0.37381931815532654
+    RF /segments/11/clearance/min_clearance_m 2.597132811221514e-05 3.781150651142873e-05
+    RF /segments/12/clearance/min_clearance_m 6.848417999553053e-05 0.00018687364780909516
+    RF /segments/2/clearance/at_rad -0.42658446345286005 -0.7378193739481181
+RF collision_free old/new: True True segments 16 verdicts identical: True numeric diffs: 10 max|d|=3.738e-01 non-numeric diffs: [('/segments/11/clearance/pair/1', 'rf_foot_link', 'rf_lower_leg_link'), ('/segments/12/clearance/pair/1', 'rf_foot_link', 'rf_upper_leg_link')]
+    RH /segments/0/clearance/at_rad -0.5748678223756192 -0.5410520681182298
+    RH /segments/10/clearance/at_rad 0.9773843811168245 1.5707963267948966
+    RH /segments/10/clearance/min_clearance_m 0.012581885378996802 0.0085
+    RH /segments/2/clearance/min_clearance_m 0.013787832260131826 0.0085
+    RH /segments/6/clearance/at_rad -0.7476386363106531 -0.5437371900441114
+    RH /segments/6/clearance/min_clearance_m 0.00030705551346393856 0.00013739163353607836
+    RH /segments/7/clearance/at_rad 0.744973257928084 -0.5370737440876885
+    RH /segments/7/clearance/min_clearance_m 0.0003691399460722042 0.0002651170941576561
+    RH /segments/8/clearance/at_rad 0.7512504171623478 0.204886477407913
+    RH /segments/8/clearance/min_clearance_m 0.00018687364780909516 8.849934502552087e-05
+RH collision_free old/new: True True segments 11 verdicts identical: True numeric diffs: 10 max|d|=1.282e+00 non-numeric diffs: [('/segments/2/clearance/pair/1', 'rh_upper_leg_link', 'rh_lower_leg_link'), ('/segments/6/clearance/pair/1', 'rh_upper_leg_link', 'rh_lower_leg_link'), ('/segments/7/clearance/pair/1', 'rh_upper_leg_link', 'rh_lower_leg_link'), ('/segments/8/clearance/pair/1', 'rh_upper_leg_link', 'rh_lower_leg_link')]
+    LH /segments/0/clearance/at_rad -0.5748678223756192 -0.5410520681182298
+    LH /segments/10/clearance/at_rad 0.9773843811168245 1.5707963267948966
+    LH /segments/10/clearance/min_clearance_m 0.012581885378996802 0.0085
+    LH /segments/2/clearance/min_clearance_m 0.013787832260131826 0.0085
+    LH /segments/6/clearance/at_rad -0.7476386363106531 -0.20390144626654177
+    LH /segments/6/clearance/min_clearance_m 0.0002917987726459917 0.00020082226911128515
+    LH /segments/7/clearance/at_rad -0.744973257928084 0.5370737440876884
+    LH /segments/7/clearance/min_clearance_m 0.0003691399460722042 0.0002651170941576561
+    LH /segments/8/clearance/at_rad 0.7512504171623478 0.5463639397544348
+    LH /segments/8/clearance/min_clearance_m 0.00021398278101768253 8.691177958910362e-05
+LH collision_free old/new: True True segments 11 verdicts identical: True numeric diffs: 12 max|d|=1.282e+00 non-numeric diffs: [('/segments/2/clearance/pair/1', 'lh_upper_leg_link', 'lh_lower_leg_link'), ('/segments/6/clearance/pair/1', 'lh_upper_leg_link', 'lh_lower_leg_link'), ('/segments/7/clearance/pair/1', 'lh_upper_leg_link', 'lh_lower_leg_link'), ('/segments/8/clearance/pair/1', 'lh_upper_leg_link', 'lh_lower_leg_link')]

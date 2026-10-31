@@ -45,7 +45,7 @@ class TestMatdogLegIk(unittest.TestCase):
         cls.urdf = canonical_urdf_path(cls.repo)
 
     def test_visual_zero_target_solves_to_zero(self):
-        target = (0.2195, 0.0940, -0.0934)
+        target = (0.2195, 0.0940, -0.0912)
 
         result = solve_lf_position_ik(
             repo_root=self.repo,
@@ -107,7 +107,7 @@ class TestMatdogLegIk(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "fuori dai limiti"):
             solve_lf_position_ik(
                 repo_root=self.repo,
-                target_position_m=(0.2195, 0.0940, -0.0934),
+                target_position_m=(0.2195, 0.0940, -0.0912),
                 initial_guess_rad=(2.0, 0.0, 0.0),
             )
 

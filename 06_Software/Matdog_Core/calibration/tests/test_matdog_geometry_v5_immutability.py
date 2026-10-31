@@ -45,7 +45,7 @@ PROTECTED_SHA256 = {
 }
 
 MODEL_SHA256SUMS_SHA256 = (
-    "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1"
+    "ff0b858f38dae8cd531e658a8ce69bb1ec8c6e040d38e77cc7b7f4454795ce49"
 )
 
 
@@ -61,14 +61,14 @@ class TestGeometryV5Immutability(unittest.TestCase):
                 self.assertTrue(path.is_file(), f"protected file missing: {relative_path}")
                 self.assertEqual(_sha256(path), expected_sha, relative_path)
 
-    def test_approved_model_manifest_and_all_36_entries_match(self):
+    def test_approved_model_manifest_and_all_19_entries_match(self):
         manifest_path = MODEL_DIR / "SHA256SUMS.txt"
         self.assertEqual(_sha256(manifest_path), MODEL_SHA256SUMS_SHA256)
         entries = []
         for line in manifest_path.read_text(encoding="utf-8").splitlines():
             expected_sha, relative_path = line.split(maxsplit=1)
             entries.append((expected_sha, relative_path))
-        self.assertEqual(len(entries), 36)
+        self.assertEqual(len(entries), 19)
         for expected_sha, relative_path in entries:
             with self.subTest(path=relative_path):
                 self.assertEqual(_sha256(MODEL_DIR / relative_path), expected_sha)

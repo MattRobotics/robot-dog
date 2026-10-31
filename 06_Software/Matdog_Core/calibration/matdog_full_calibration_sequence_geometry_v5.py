@@ -38,6 +38,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 
+import matdog_calibration_basis as basis  # noqa: E402
 from matdog_geometry_scene_v5 import RobotSceneV5  # noqa: E402
 
 URDF = REPO / "03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf"
@@ -375,7 +376,9 @@ def validate_plan(checker: Checker, leg: str, upper_for_lower: float, upper_for_
 
 
 def mesh_manifest_sha256() -> str:
-    return sha256(URDF.parent / "SHA256SUMS.txt")
+    # The mesh manifest the REV00-pinned validation artifacts were produced under: the preserved
+    # REV00 basis copy (hash-verified), not the operational REV01-FIX manifest.
+    return sha256(basis.basis_file(REPO, basis.MANIFEST_NAME))
 
 
 def urad(rad: float) -> int:

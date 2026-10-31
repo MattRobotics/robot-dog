@@ -1,0 +1,4 @@
+LF collision_free old/new: True True segments 15 verdicts identical: True numeric diffs: 0 max|d|=0.000e+00 non-numeric diffs: []
+RF collision_free old/new: True True segments 16 verdicts identical: True numeric diffs: 0 max|d|=0.000e+00 non-numeric diffs: []
+RH collision_free old/new: True True segments 11 verdicts identical: True numeric diffs: 0 max|d|=0.000e+00 non-numeric diffs: []
+LH collision_free old/new: True True segments 11 verdicts identical: True numeric diffs: 0 max|d|=0.000e+00 non-numeric diffs: []

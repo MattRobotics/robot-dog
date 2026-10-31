@@ -4,7 +4,7 @@ status: DESIGN_INTENT_CONFIRMED
 
 canonical_urdf:
   path: 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
-  sha256: 3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59
+  sha256: ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7
 
 frame_contract:
   root_frame: base_link

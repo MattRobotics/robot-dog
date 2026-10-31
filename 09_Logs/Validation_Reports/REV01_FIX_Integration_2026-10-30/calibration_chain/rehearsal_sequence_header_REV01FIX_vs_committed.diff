@@ -1,0 +1,30 @@
+--- 05_Firmware/MATDOG_Controller/src/actuator/CalibrationSequencePlanData.h	2026-10-30 22:10:47.977413059 +0100
++++ <local path> 08:02:55.397819786 +0100
+@@ -2,10 +2,10 @@
+ //
+ // Produced by 06_Software/Matdog_Core/calibration/matdog_full_calibration_sequence_geometry_v5.py
+ //   --export-header from the geometry validation artifact(s) (sha256):
+-//   7fd5f4e0eb23526e01358391e6d0eae2ebb4943bacd05e60bfbac04dc252ecbf
+-//   c4c5a7de6632bf619ae6e68f45b1b9c363cf9430932be4bee64635279cb91d35
+-//   dc06b0193acca201ec7649bff037f3b7f6b3ef7409cff8033d5213e5aec87dc2
+-//   dcf2bb9ef2633259cf0c9fc3f9a957878128b2c63c317fed94713c2841fecadb
++//   6461fd21fe1206269560080a91a9ee0542c70b4fa11d605771d04ead2a8735e2
++//   6badad64aee7bf55bbbf2b7c1ebadf50858f108ff5cd0afd54bf756ea4dd10e7
++//   b0776dcce16fd45b533daa27cae2b04029cb8ac1bec081c663bd261adb4931ae
++//   e36b7419cb7b592081b2937f87be9f30ba871204b71eda6b3864ebccb28d8ec8
+ // Every pose below was evaluated, with every segment of its leg's 24-contact sequence up to the
+ // calibration guard (URDF limit + 64 ticks), on the SHA-pinned URDF and collision meshes.
+ // Regenerate with the tool; never patch a value (static_audit.py re-derives this file).
+@@ -20,9 +20,9 @@
+ namespace sequence_plan_data {
+ 
+ constexpr char kSchema[] = "matdog.full_calibration_sequence_geometry.v1";
+-constexpr char kArtifactSha256[] = "45a9c1e6ff889b7900bc382d84e38c369f106edc74a8bd1ff6429b1fda7b25e4";
+-constexpr char kUrdfSha256[] = "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59";
+-constexpr char kMeshManifestSha256[] = "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1";
++constexpr char kArtifactSha256[] = "19cceda676bc918bb7bbb85e704a29eaaf42424d50cc7e7eda75167ee37e9bd0";
++constexpr char kUrdfSha256[] = "5677babd320aa990a70709d12027fcac64723fe1dc3fd756108972f24ad0eb73";
++constexpr char kMeshManifestSha256[] = "46bd1d1fa2aa2cf69f3f8445059978a7d15fe035769f1b363864f78d7bf45050";
+ 
+ // {leg, geometry_validated, has_rear_park, park_leg, park_joint, park_target,
+ //  upper_for_lower, upper_for_hip_min, upper_for_hip_max, lower_folded} - URDF q, micro-radians.

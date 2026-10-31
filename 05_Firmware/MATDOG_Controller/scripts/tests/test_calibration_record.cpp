@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "calibration_record_golden.h"
+#include "../../src/motion/LegGeometryData.h"
 
 using namespace matdog;
 using namespace matdog::calibration;
@@ -243,6 +244,65 @@ void test_malformed_fields_refused_by_decoder() {
       std::printf("  FAIL [%s] %s: got %s, expected MALFORMED\n", g_case, c.what, toString(st));
     }
   }
+}
+
+// The gen-1 record on the robot carries the six REV00 digests and tag 3713f4ddc43b204e. They are
+// written out here, NOT read from the shipped profile, so this test fails if the profile is ever
+// rebound, and it shows the operational geometry (REV01-FIX) is a different, independent identity.
+void test_gen1_identity_is_independent_of_operational_geometry() {
+  g_case = "gen-1 identity vs operational geometry";
+  static const char* const kGen1Digest[6] = {
+      "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59",
+      "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1",
+      "de205209f6015734f43af7f49146ecf60f89a74d6ce1276ce134c189a89c9f7e",
+      "67c58430e78241af1a636cdcc22092ff855371713fc7f26bc56412f7c7181139",
+      "e5cb2a4c33082c59c6f5d381f90fcc19680cc899e326d13c9c9129932bde5d08",
+      "d9c66134357acbc95c13aae81180f50843cef5cef2613a2ede7927691884e769"};
+  actuator::GeometryProvenance gen1{};
+  char* dst[6] = {gen1.urdf_sha256, gen1.mesh_manifest_sha256, gen1.endpoint_semantic_sha256,
+                  gen1.parking_semantic_sha256, gen1.safety_policy_semantic_sha256,
+                  gen1.allocation_sha256};
+  for (int k = 0; k < 6; ++k) {
+    std::memcpy(dst[k], kGen1Digest[k], 64);
+    dst[k][64] = '\0';
+  }
+  CHECK(actuator::geometryProvenanceTag(gen1) == 0x3713f4ddc43b204eULL);
+  CHECK(actuator::sameProvenance(gen1, actuator::geometry_data::kProvenance));
+  const CalibrationGeometryProfile profile = boundProfile();
+  CHECK(profile.provenanceTag() == 0x3713f4ddc43b204eULL);
+  CHECK(profile.provenanceMatches(gen1));
+
+  // A gen-1 record built from the literal digests validates against the shipped profile and
+  // survives the wire codec: it is recognised without any change of provenance.
+  CalibrationRecord r = goldenRecord(1);
+  for (int k = 0; k < 6; ++k) {
+    for (int b = 0; b < 32; ++b) {
+      r.digest[k][b] = static_cast<uint8_t>((golden::nibble(kGen1Digest[k][2 * b]) << 4) |
+                                            golden::nibble(kGen1Digest[k][2 * b + 1]));
+    }
+  }
+  r.geometry_tag = 0x3713f4ddc43b204eULL;
+  CHECK_STATUS(validateCalibrationRecord(r, profile), CRS::OK);
+  const std::vector<uint8_t> wire = encode(r);
+  CalibrationRecord decoded;
+  CHECK_STATUS(decodeCalibrationRecord(wire.data(), kSize, &decoded), CRS::OK);
+  CHECK_STATUS(validateCalibrationRecord(decoded, profile), CRS::OK);
+
+  // The operational Motion geometry is REV01-FIX and is a different identity: it neither
+  // appears in the calibration provenance nor is accepted in its place (no whitelist).
+  CHECK(std::strlen(motion::generated::kUrdfSha256) == 64);
+  CHECK(std::strcmp(motion::generated::kUrdfSha256, gen1.urdf_sha256) != 0);
+  CalibrationRecord foreign = r;
+  actuator::GeometryProvenance rev01 = gen1;
+  std::memcpy(rev01.urdf_sha256, motion::generated::kUrdfSha256, 64);
+  rev01.urdf_sha256[64] = '\0';
+  for (int b = 0; b < 32; ++b) {
+    const char* hex = rev01.urdf_sha256;
+    foreign.digest[0][b] = static_cast<uint8_t>((golden::nibble(hex[2 * b]) << 4) |
+                                                golden::nibble(hex[2 * b + 1]));
+  }
+  foreign.geometry_tag = actuator::geometryProvenanceTag(rev01);
+  CHECK_STATUS(validateCalibrationRecord(foreign, profile), CRS::PROVENANCE_MISMATCH);
 }
 
 void test_provenance_validation() {
@@ -661,6 +721,7 @@ int main() {
   test_incompatible_schema();
   test_malformed_fields_refused_by_decoder();
   test_provenance_validation();
+  test_gen1_identity_is_independent_of_operational_geometry();
   test_identity_validation();
   test_q0_and_contact_validation();
   test_diagnostics_are_recomputed();

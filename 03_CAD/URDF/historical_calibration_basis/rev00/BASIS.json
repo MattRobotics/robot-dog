@@ -1,0 +1,74 @@
+{
+  "schema": "matdog.calibration_geometry_basis.v1",
+  "basis_id": "REV00",
+  "role": "HISTORICAL PROVENANCE of the hardware calibration chain. NOT the operational model.",
+  "operational_model_dir": "03_CAD/URDF/matt_robodog_rev00",
+  "statement": "The Geometry Compiler V5 bundle 2026-08-11_131818_..._REMEDIATION_BENCHMARK_D_W4, CalibrationGeometryProfileData.h, CalibrationSequencePlanData.h, the startup reference and the gen-1 NVS record (geometry tag 3713f4ddc43b204e) were produced and measured on the REV00 inputs below. They are preserved unchanged. The operational model moved to REV01-FIX; the delta is closed and machine-checked (matdog_calibration_basis.py --check): hip origin Z, visual mesh paths, the base_link collision mesh and, since the 2026-10-30 physical-property update, the <inertial> block of each of the 17 links. <inertial> data are dynamic properties: they are not read by the Geometry Compiler, the calibration chain or the kinematics. No hardware validation on REV01-FIX is claimed by this file.",
+  "files": {
+    "matt_robodog_rev00.urdf": {
+      "sha256": "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59"
+    },
+    "SHA256SUMS.txt": {
+      "sha256": "60fff604eae0857c7c61f115bbe3922949ababdd827fab61c74e1673336c39e1"
+    },
+    "meshes/collision/base_link.stl": {
+      "sha256": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f"
+    }
+  },
+  "allowed_urdf_delta": {
+    "tolerance_m": 1e-09,
+    "hip_origin_z_m": {
+      "lf_hip_joint": [
+        0.0465,
+        0.0487
+      ],
+      "rf_hip_joint": [
+        0.0465,
+        0.0487
+      ],
+      "rh_hip_joint": [
+        0.0265,
+        0.0287
+      ],
+      "lh_hip_joint": [
+        0.0265,
+        0.0287
+      ]
+    },
+    "visual_mesh_prefix": [
+      "meshes/",
+      "meshes/collision/"
+    ],
+    "inertial_links": [
+      "base_link",
+      "lf_hip_link",
+      "lf_upper_leg_link",
+      "lf_lower_leg_link",
+      "lf_foot_link",
+      "rf_hip_link",
+      "rf_upper_leg_link",
+      "rf_lower_leg_link",
+      "rf_foot_link",
+      "rh_hip_link",
+      "rh_upper_leg_link",
+      "rh_lower_leg_link",
+      "rh_foot_link",
+      "lh_hip_link",
+      "lh_upper_leg_link",
+      "lh_lower_leg_link",
+      "lh_foot_link"
+    ],
+    "inertial_rules": {
+      "max_link_mass_kg": 5.0,
+      "com_inside_collision_mesh_aabb": true,
+      "tensor": "symmetric, positive definite, principal moments satisfy the triangle inequality",
+      "gyration_radius_max": "link collision mesh AABB diagonal",
+      "origin_rpy": "0 0 0",
+      "children": [
+        "origin",
+        "mass",
+        "inertia"
+      ]
+    }
+  }
+}

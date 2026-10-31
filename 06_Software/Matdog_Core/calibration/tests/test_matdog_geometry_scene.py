@@ -141,8 +141,8 @@ class TestRobotSceneLoad(unittest.TestCase):
 
 
 class TestFrontHindGeometry(unittest.TestCase):
-    """Section 5 of the canonical handoff: front hip Z ~= 0.0465 m, hind hip
-    Z ~= 0.0265 m -- a real, numerically-derivable 20 mm difference, not an
+    """Section 5 of the canonical handoff: front hip Z ~= 0.0487 m (REV01-FIX; 0.0465 m in REV00), hind hip
+    Z ~= 0.0287 m (0.0265 m in REV00) -- a real, numerically-derivable 20 mm difference, not an
     assumption."""
 
     @classmethod
@@ -154,8 +154,8 @@ class TestFrontHindGeometry(unittest.TestCase):
         lf_hip_z = self.scene.link_transform("lf_hip_link", pose).translation[2]
         rh_hip_z = self.scene.link_transform("rh_hip_link", pose).translation[2]
 
-        self.assertAlmostEqual(lf_hip_z, 0.0465, places=6)
-        self.assertAlmostEqual(rh_hip_z, 0.0265, places=6)
+        self.assertAlmostEqual(lf_hip_z, 0.0487, places=6)
+        self.assertAlmostEqual(rh_hip_z, 0.0287, places=6)
         self.assertAlmostEqual(lf_hip_z - rh_hip_z, 0.020, places=6)
 
     def test_lf_rf_hip_height_equal(self):

@@ -147,7 +147,7 @@ Design decisions worth knowing:
 
 ```
 03_CAD/URDF/matt_robodog_rev00/matt_robodog_rev00.urdf
-sha256 3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59
+sha256 ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7
 ```
 
 Verified facts (asserted by the test suite, not assumed):
@@ -174,9 +174,12 @@ maintained geometry definition.
 
 ## Collision-mesh strategy
 
-`<collision>` only. The heavy `<visual>` meshes are never fetched, never
-staged, and never rendered. The staging script copies only the STLs referenced
-by a `<collision>` element (5.8 MB, 119 696 triangles).
+`<collision>` only. Since REV01-FIX the canonical URDF points every `<visual>`
+at the same `meshes/collision/<link>.stl` as its `<collision>` (one STL per
+link, no separate decorative set), and the viewer still reads the `<collision>`
+references. The staging script copies only those STLs (6.7 MB, 134 484
+triangles: 119 696 on REV00 minus the old 22 044-triangle `base_link` plus the
+36 832-triangle REV01-FIX one).
 
 If any referenced collision mesh is missing, empty, or an unfetched git-lfs
 pointer, staging fails loudly. If any mesh fails to load at runtime, the whole
@@ -432,8 +435,10 @@ window.matdogViewer.snapshot();
 
 Browser smoke test (dev server and the production `dist`): the page boots with
 no console errors, reports 17 links / 16 joints / 17 collision meshes, and WebGL
-draws **119 716 triangles** — the canonical collision baseline of 119 696
-triangles plus 20 helper triangles. Viewport sizing was checked at 1280×800,
+drew **119 716 triangles** on the REV00 model — the canonical collision baseline
+of 119 696 triangles plus 20 helper triangles. That figure predates REV01-FIX;
+the expected figure for the integrated model is 134 484 + 20 = 134 504 and has
+not been re-measured in a browser. Viewport sizing was checked at 1280×800,
 1600×900, 1920×1080, 2560×1400 and a stacked 700×900, with the drawing buffer
 and `camera.aspect` tracking the container at every size.
 
