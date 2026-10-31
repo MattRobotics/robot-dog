@@ -36,7 +36,7 @@ def geometry(q):
    a=np.eye(4)
    if j.get('type')!='fixed':a[:3,:3]=rot(j.find('axis').get('xyz'),q[j.get('name')])
    frames[j.find('child').get('link')]=frames[parent]@origin(j.find('origin'))@a;pending.remove(j)
- return {n:(frames[n]@v.T).T[:,:3] for n,v in meshes.items()},sum(m*(frames[n]@p)[:3] for n,m,p in inert)/2.48
+ return {n:(frames[n]@v.T).T[:,:3] for n,v in meshes.items()},sum(m*(frames[n]@p)[:3] for n,m,p in inert)/sum(m for _,m,_ in inert)
 
 def rest(q,reference=0):
  V,c=geometry(q);pts=np.concatenate(list(V.values()))[:,[0,2]];pts=pts[ConvexHull(pts).vertices];pts=sorted(set(map(tuple,pts)));h=[]
@@ -77,7 +77,7 @@ def rest3d(q,reference=(0,.09)):
  # 20 micrometres only groups STL roundoff between mirrored coplanar patches.
  contacts={k:v[v[:,2]<2e-5] for k,v in W.items() if low[k]<2e-5}
  cp=np.concatenate(list(contacts.values()));hull=ConvexHull(cp[:,:2]);margin=float(np.min(-(hull.equations[:,:2]@cw[:2]+hull.equations[:,2])))
- A=np.array([np.ones(len(cp)),cp[:,0],cp[:,1]]);b=2.8*9.80665*np.r_[1,cw[:2]]
+ A=np.array([np.ones(len(cp)),cp[:,0],cp[:,1]]);b=sum(m for _,m,_ in inert)*9.80665*np.r_[1,cw[:2]]
  belly=np.concatenate([np.ones(len(v)) if k=='base_link' else np.zeros(len(v)) for k,v in contacts.items()]);forces=[]
  for sign in [1,-1]:
   r=linprog(sign*belly,A_eq=A,b_eq=b,bounds=(0,None),method='highs');assert r.success;forces.append(float(sign*r.fun))

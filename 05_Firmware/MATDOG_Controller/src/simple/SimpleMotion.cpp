@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 namespace matdog { namespace simple {
+double bodyHeightFromOperatorM(double h){return h-(motion::legModel(motion::LegId::LF)->hipOrigin.z-kHeightDatumFrontHipZM);}
 using namespace motion;
 namespace {
 constexpr double kArrivalRad=12*kTickRad; // V25 native positioning allowance
@@ -63,8 +64,9 @@ template<unsigned N> unsigned nearestVia(const unsigned (&knots)[N],const JointT
 }
 constexpr unsigned kDeployEnd=collision::kDeployKnots[sizeof(collision::kDeployKnots)/sizeof(collision::kDeployKnots[0])-1];
 static_assert(kDeployEnd==collision::kLiftKnots[0],"DEPLOY ends where LIFT starts");
+double operatorHeightFromBodyM(double body){return body+legModel(LegId::LF)->hipOrigin.z-kHeightDatumFrontHipZM;}
 GaitParameters walkGait(unsigned stride){
-  GaitParameters g;g.heightM=.15;g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
+  GaitParameters g;g.heightM=bodyHeightFromOperatorM(.15);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
   g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;return g;
 }
 }
@@ -170,7 +172,7 @@ bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFra
 }
 bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
   if(!std::isfinite(h)||h<kMinStandM||h>.150)return false; // effective C4 workspace
-  auto d=canonicalStandDefinition();d.lowBodyHeightM=h/2;d.standBodyHeightM=h;
+  const double body=bodyHeightFromOperatorM(h);auto d=canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;
   const auto s=generateStandTarget(d);q=s.target;return s.status==StandStatus::OK&&pointSafe(q)&&contains(collision::kHeight,q);
 }
 const char* SimpleMotion::stand(double h,uint64_t now){
@@ -338,7 +340,7 @@ void SimpleMotion::measureHeight(){
     Vector3 world;if(f.status!=ContactStatus::OK||!pointToWorld(body,f.referenceM,world))return;
     const double h=-world.z;sum+=h;lo=std::fmin(lo,h);hi=std::fmax(hi,h);
   }
-  actualHeight_=sum/4; heightValid_=hi-lo<.015&&(phase_==Phase::HOLD||phase_==Phase::HEIGHT);
+  actualHeight_=operatorHeightFromBodyM(sum/4); heightValid_=hi-lo<.015&&(phase_==Phase::HOLD||phase_==Phase::HEIGHT);
 }
 void SimpleMotion::updateTelemetry(uint64_t now){
   if(now<nextTelemetryUs_)return;
@@ -485,7 +487,7 @@ void SimpleMotion::nextStand(uint64_t now){
     case Phase::WALK_HOLD:
       segmentBox_=nullptr;planned_=false;
       phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
-      {GaitParameters g;g.heightM=requestedHeight_;holdNominal_=solveGait(g,gaitHold(g,0,requestedHeight_,0),nullptr,false);}
+      {GaitParameters g;g.heightM=bodyHeightFromOperatorM(requestedHeight_);holdNominal_=solveGait(g,gaitHold(g,0,g.heightM,0),nullptr,false);}
       heightValid_=false;nextTelemetryUs_=0;
       if(walkRequested_)startWalk(now);
       return;
@@ -716,7 +718,7 @@ void SimpleMotion::update(uint64_t now){
           // Level stance: same contact FK as the height estimate, flat ground.
           double h=0;for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),actual.legs[l]);
             if(c.status!=ContactStatus::OK){fault("STAND_CONTACT_IK");return;}h-=c.referenceM.z/4;}
-          beginHeight(actual,std::fmin(.150,std::fmax(kMinStandM,h)),collision::kHeight,now);break;}
+          beginHeight(actual,std::fmin(.150,std::fmax(kMinStandM,operatorHeightFromBodyM(h))),collision::kHeight,now);break;}
         case InitialRoute::WALK:{
           // A stopped gait returns through the proved whole WALK region to
           // 150 mm, then the ordinary height move reaches the requested Q.

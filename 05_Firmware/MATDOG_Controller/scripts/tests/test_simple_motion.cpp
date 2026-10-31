@@ -81,7 +81,7 @@ int main(){
   // touchdown, four-contact sway windows, end of the start ramp, decel start,
   // terminal touchdown and recentring end, for each stride and quarter stop.
   for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
-    motion::GaitParameters g;g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
+    motion::GaitParameters g;g.heightM=simple::bodyHeightFromOperatorM(.15);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
     g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=simple::kWalkStartCycles;g.stopCycles=simple::kWalkStopCycles;
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
@@ -124,6 +124,10 @@ int main(){
   Rig r;assert(r.m.state()==simple::State::READY);
   assert(r.m.stand(0,r.p.now));assert(r.p.enables==0&&r.p.frames==0);
   assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(r.p.enables==12);assert(r.m.heightValid());
+  // Operator STAND 150: the joint targets qualified on the built robot, whatever the model correction of the HIP axes.
+  for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(r.m.target(),i)-(i%3==0?motion::canonicalStandDefinition().standSeed[i/3].hip:i%3==1?motion::canonicalStandDefinition().standSeed[i/3].upper:motion::canonicalStandDefinition().standSeed[i/3].lower))<1e-6);
+  assert(std::abs(simple::bodyHeightFromOperatorM(.15)-.1478)<1e-12);assert(std::abs(r.m.requestedHeightM()-.15)<1e-12);
+  for(auto leg:{motion::LegId::LF,motion::LegId::RF})assert(motion::legModel(leg)->hipOrigin.z==.0487);for(auto leg:{motion::LegId::RH,motion::LegId::LH})assert(motion::legModel(leg)->hipOrigin.z==.0287);
   std::printf("STAND sequence: %u coordinated pose writes; scripted observation only\n",r.p.frames);
   const auto beforeHeight=r.p.frames;assert(r.m.stand(.049,r.p.now));assert(!r.m.stand(.05,r.p.now));assert(r.p.frames==beforeHeight);assert(r.reachStand());assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
   assert(!r.m.walk(1,r.p.now));
@@ -247,7 +251,7 @@ int main(){
   assert(low.m.state()==simple::State::STANDING&&lowPhases=="ACQUIRE REFERENCE ENABLE DISENGAGE ALIGN STAND_DEPLOY STAND_LIFT HOLD ");
   const double lowSeconds=(low.p.now-1300000)/1e6;
   for(unsigned k=0;k<100;++k)low.tick();  // 2 s: correction slew 20 mrad/s
-  {auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=.025;d.standBodyHeightM=.05;const auto s=motion::generateStandTarget(d).target;
+  {const double body=simple::bodyHeightFromOperatorM(.05);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;
    for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(low.m.target(),i)-motion::jointSlot(s,i))<1e-9);}
   std::printf("PRONE->STAND50: %s(%.2f s replay)\n",lowPhases.c_str(),lowSeconds);
   // WALK STOP ends recentred on the canonical 150 mm stand.
@@ -255,7 +259,7 @@ int main(){
   for(unsigned k=0;k<3000&&centred.m.state()!=simple::State::WALKING;++k)centred.tick();
   for(unsigned k=0;k<500;++k)centred.tick();centred.m.walkStop();
   for(unsigned k=0;k<2000&&strcmp(centred.m.phase(),"WALK_SETTLE");++k)centred.tick();assert(!strcmp(centred.m.phase(),"WALK_SETTLE"));
-  {auto d=motion::canonicalStandDefinition();const auto s=motion::generateStandTarget(d).target;  // last gait sample
+  {const double body=simple::bodyHeightFromOperatorM(.15);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;  // last gait sample
    for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(centred.m.target(),i)-motion::jointSlot(s,i))<1e-6);}
   assert(centred.reachStand());
   // Repeated STOP while SAFE_OFF is pending (dashboard/USB duplicates): one

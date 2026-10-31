@@ -13,7 +13,7 @@ boxes={name:np.array([[float(v) for v in b.split(',')] for b in [lo,hi]]) for na
 
 def vertices(leg):
  # Coordinate vectors in each source link's frame, before its joint rotations.
- result=[];hipz=.0465 if leg in ('lf','rf') else .0265;side=1 if leg in ('lf','lh') else -1
+ result=[];hipz=vec(x.find(f"joint[@name='{leg}_hip_joint']/origin").get('xyz'))[2];side=1 if leg in ('lf','lh') else -1
  for part in ('upper_leg','lower_leg','foot'):
   v=meshes[leg+'_'+part+'_link'][:,:3].copy()
   if part=='foot':v+=np.array([.107,-side*.0015,-.0499])

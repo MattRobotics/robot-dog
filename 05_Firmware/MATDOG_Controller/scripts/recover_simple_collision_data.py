@@ -10,20 +10,35 @@ import json
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--evidence-root", type=Path, required=True,
+parser.add_argument("--evidence-root", type=Path,
                     help="existing TOLERANCE_V1_20261018 evidence directory")
 parser.add_argument("--optimization-root", type=Path, help="SIMPLE_OPT_20261022 continuous box proofs")
 parser.add_argument("--trajectory-root", type=Path, help="SIMPLE_TRAJ_V2_20261022 WALK/DEPLOY/LIFT box proofs and route vias")
+parser.add_argument("--certificate-root", type=Path, help="one directory holding the ENTRY/WALK/HEIGHT/DEPLOY/LIFT box certificates and stand_vias.json of a recertified CAD; replaces the three roots above")
 parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parents[1] / "src/simple/CollisionData.h")
 args = parser.parse_args()
 keys = [leg + "_" + joint + "_joint" for leg in ("lf", "rf", "rh", "lh")
         for joint in ("hip", "upper_leg", "lower_leg")]
+def recertified(root):
+    names = ("ENTRY", "WALK", "HEIGHT", "DEPLOY", "LIFT")
+    raw = [(root / (name + "_certificate.json")).read_bytes() for name in names]
+    proofs = [json.loads(data) for data in raw]
+    if not all(proof["all_pass"] for proof in proofs):
+        raise SystemExit("cannot recover a failed geometry proof")
+    vias = json.loads((root / "stand_vias.json").read_bytes())
+    return raw, proofs, vias
 files = ["entry_region_40mrad_bounded.json", "walk_region_40mrad.json",
          "height_region_25mrad.json", "trajectory-optimization/phase_chords-certificate.json"]
-raw = [(args.evidence_root / name).read_bytes() for name in files]
-proofs = [json.loads(data) for data in raw]
-if not all(proof["all_pass"] for proof in proofs):
-    raise SystemExit("cannot recover a failed geometry proof")
+trajectory = None
+if args.certificate_root:
+    raw, proofs, vias = recertified(args.certificate_root)
+    trajectory = (proofs[3], raw[3], proofs[4], raw[4], vias, 160)
+    raw, proofs = raw[:3], proofs[:3]
+else:
+    raw = [(args.evidence_root / name).read_bytes() for name in files]
+    proofs = [json.loads(data) for data in raw]
+    if not all(proof["all_pass"] for proof in proofs):
+        raise SystemExit("cannot recover a failed geometry proof")
 
 if args.optimization_root:
     height_raw = (args.optimization_root / "height50-certificate.json").read_bytes()
@@ -34,7 +49,6 @@ if args.optimization_root:
     proofs[2], proofs[3] = height, route
     raw[2], raw[3] = height_raw, route_raw
 
-trajectory = None
 if args.trajectory_root:
     walk_raw = (args.trajectory_root / "walk_v2_certificate.json").read_bytes()
     deploy_raw = (args.trajectory_root / "DEPLOY_0_107_certificate.json").read_bytes()

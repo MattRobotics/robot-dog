@@ -11,9 +11,9 @@ constexpr Box kLift={{-0.040000000000000001,1.1578286277159544,-1.58461638801498
 constexpr unsigned kDeployKnots[]={0,30,42,43,50,58,65,72,80,100,107};
 constexpr unsigned kLiftKnots[]={107,114,115,125,134,146,160};
 constexpr unsigned kLiftTopKnot=160;
-constexpr char kEntryProof[]="bafcf9f5b5cd19dfa6cc7eb9363634f4ed5071223cfb5c8a9002f8da4704632e";
-constexpr char kWalkProof[]="d720f478d4f324dab5a805bbff02aa65d2e2a0adc23c97b66a251d97ff8693f3";
-constexpr char kHeightProof[]="18454905634b9d8400b0aaead2295f26eac56b4ce6ffbf001430e02111a6ef4e";
-constexpr char kDeployProof[]="2a0538ac8c03f3869df947d033f182b0d4af58d2f56582b9f12718c9aa96dd18";
-constexpr char kLiftProof[]="d309908a3c4e64780a8d8aabd6375410bbb87c2446a02a80ecd3ba1d3ca40fae";
+constexpr char kEntryProof[]="83392c874f5afb01c3ffa80ab3c480911928663fd441dbe0489a3ea6c8e297f4";
+constexpr char kWalkProof[]="19e4d914377195b8d979bea693f64d6ffdca2350345e79e7aaa67cfa98573a3f";
+constexpr char kHeightProof[]="1004b9d5aadb2f0041f6e38073b98817f03b2dac970a8d6ca9388dafdd1392af";
+constexpr char kDeployProof[]="3a60a9c14c11ceaeb4009f55dc0d168023600dbb9c22e0d244f56a79e62e22b9";
+constexpr char kLiftProof[]="3e7d59670b79ae697552ec3d8372556ab316766b6a734e1821cdd76084272616";
 } } }
