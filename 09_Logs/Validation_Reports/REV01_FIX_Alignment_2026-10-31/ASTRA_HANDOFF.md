@@ -1,22 +1,32 @@
 # MATDOG — Handoff per la sessione Astra (Motion) dopo il consolidamento REV01-FIX
 
-Data: 2026-10-31. Documento unico di passaggio di consegne. Offline: nessun flash, nessuna calibrazione, nessuna scrittura NVS/EEPROM, nessuna modifica al firmware operativo, nessun merge.
+Data: 2026-10-31. Documento unico di passaggio di consegne. Offline: nessun flash, nessuna calibrazione, nessuna scrittura NVS/EEPROM, nessuna modifica al firmware operativo. **Stato finale (dopo i merge di PR #57 e #58): vedi la sezione 1**; le voci "prima del merge" sono conservate come storia dell'intervento.
 
 Classi di prova: **VH** = verificato su hardware, **VO** = verificato offline, **H** = ipotesi, **U** = ignoto.
 
 ## 1. Identità del repository (verificata sul remoto)
 
+### Situazione finale (verificata sul remoto dopo i merge)
+
 | Voce | Valore |
 |---|---|
 | Repository | `https://github.com/MattRobotics/robot-dog` |
-| PR | [#57](https://github.com/MattRobotics/robot-dog/pull/57), **draft**, non unita |
-| Branch | `geometry/rev01-fix-integration-20261030` |
-| Base (`origin/main`, intatto) | `9b2c42ff6a2867d4fa986edcd3a0a02d29634385` |
+| PR #57 | [#57](https://github.com/MattRobotics/robot-dog/pull/57) **merged**, merge commit **`887103e501a4a02be89e204b77a5301af6d15905`** (genitori `9b2c42ff…` e `bd6939c47a0b534432474b7b66e7608a485804e8`, commit sorgente integrato; albero identico a `bd6939c`). Il merge **non** è una validazione hardware della nuova geometria |
+| PR #58 | [#58](https://github.com/MattRobotics/robot-dog/pull/58) **merged**, merge commit **`750672a312844a68a76465672b5f7fc6a710d0c6`** (commit sorgente `3e0c90d663dfe93106ca3f234c35c49f3dd2ea5a`): allineamento di questo handoff, README principale, README CAD/BOM e indici di `09_Logs`. Solo Markdown |
+| `main` | Verificato a `750672a312844a68a76465672b5f7fc6a710d0c6` dopo il merge della #58. Una successiva rettifica documentale di questo file (stato obsoleto della sezione 1) avanza `main`; la punta corrente si legge con `git ls-remote origin refs/heads/main` |
+| `9b2c42ff6a2867d4fa986edcd3a0a02d29634385` | **Commit base precedente al merge**: era `main` prima della #57, non è la punta attuale |
+| Branch remoti | Solo `main` e `matdog/rc5-source-checkpoint-20261026` (checkpoint storico, `c0e82234…`). I branch temporanei `geometry/rev01-fix-integration-20261030` e `docs/astra-handoff-merged-20261031` sono stati **eliminati dal remoto** dopo la verifica che fossero contenuti in `main`; i loro commit restano raggiungibili da `main` |
+| `dev5` | Il branch `dev5/prone-stand-20261030` (`df43feb`) resta **esclusivamente locale**; non esiste alcun branch `dev5` sul remoto |
+
+### Stato precedente al merge (storia dell'intervento, conservata)
+
+| Voce | Valore |
+|---|---|
+| PR | #57, allora **draft** e non unita, sul branch `geometry/rev01-fix-integration-20261030` (poi eliminato) |
+| Base (`origin/main`, allora intatto) | `9b2c42ff6a2867d4fa986edcd3a0a02d29634385` |
 | Commit precedenti del branch | `aa89dd4` geometria REV01-FIX · `0f8f7ff` base di calibrazione storica · `820d80b` proprietà fisiche · `7d04939` chiusura |
-| **Commit di contenuto di questo intervento (su remoto, verificato con `git ls-remote`)** | `423de3a` workbook approvato (byte esatti) + rimozione archivio URDF Studio · `bfdf7b83380ec2d75021bb759a2338b92a1d9312` allineamento tabella del workbook |
-| **Integrazione in `main`** | PR #57 unita il 2026-10-31 con merge commit **`887103e501a4a02be89e204b77a5301af6d15905`** (genitori `9b2c42ff…` e `bd6939c47a0b534432474b7b66e7608a485804e8`, quest'ultimo il commit sorgente integrato, che include questo documento e la correzione del generatore di `LegGeometryData.h`). L'albero di `main` è identico a quello di `bd6939c`. Il merge **non** è una validazione hardware della nuova geometria. |
-| Questo documento | In `main` dal merge `887103e`; i riferimenti a questo punto sono stati allineati da un commit documentale successivo. Branch di lavoro della PR: `geometry/rev01-fix-integration-20261030` (punta `bd6939c`). |
-| Branch remoti esistenti | `main`, `geometry/rev01-fix-integration-20261030`, `matdog/rc5-source-checkpoint-20261026`. **Non esiste alcun branch `dev5` sul remoto.** |
+| **Commit di contenuto di questo intervento (verificati sul remoto con `git ls-remote` prima del merge)** | `423de3a` workbook approvato (byte esatti) + rimozione archivio URDF Studio · `bfdf7b83380ec2d75021bb759a2338b92a1d9312` allineamento tabella del workbook · `f3876bf` handoff · `bd6939c` correzione del generatore di `LegGeometryData.h` |
+| Branch remoti allora esistenti | `main`, `geometry/rev01-fix-integration-20261030`, `matdog/rc5-source-checkpoint-20261026` (poi anche `docs/astra-handoff-merged-20261031`) |
 
 ## 2. Modello canonico (URDF e manifest)
 
