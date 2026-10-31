@@ -1,5 +1,31 @@
 # Open items and blockers
 
+## Update 2026-10-31 — dev.7 hardware baseline (supersedes the sections below where they differ)
+
+Installed and tested: `1.0.1-dev.7`, source `4634de8`, tag `matdog-controller-v1.0.1-dev.7`, APP `4c7e2c8a…`. `main` carries the same `src/` through PR [#60](https://github.com/MattRobotics/robot-dog/pull/60) in a different commit; a build of `main` is not the validated binary. Report: [`Motion_dev7_HW_2026-10-31`](Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md).
+
+Closed by hardware evidence: STAND between heights 50–150 mm, PRONE, PRONE to STAND without STOP, WALK STANDARD 45 mm (USB, dashboard + Twin), WALK STOP, STOP/SAFE_OFF 13/13, automatic RESTORE at boot, 0 missed releases in three walks. Verified offline: FCL certification of the Motion boxes on REV01-FIX, unchanged values.
+
+Still open:
+
+| Item | State |
+|---|---|
+| Motion processing peaks | Up to 36.9 ms per release, compensation up to 21.7 ms; the same 8 Newton steps took 7.9 and 20 ms, cause unexplained. Priority before raising gait speed (#52) |
+| WALK efficiency, stability, speed | Regular in three walks, not yet a statistic. Support margin 3.7 mm from the model only, real CoM unknown |
+| Front feet | STAND from PRONE: fronts +55 mm, rears 0, reversible on return (model 50–53 mm). WALK: 2–3 mm front dip on three legs. Observed, not acted on |
+| Dashboard wording | `MOTION_BUDGET_UNAVAILABLE` is expected under torque but reads as a problem. Executor and RESTORE fields of the Twin panel show `UNKNOWN`/`N/D` |
+| Manual RESTORE from the dashboard, per-joint refusal criteria | Not demonstrated on hardware (#48) |
+| Offline-only in dev.7 | Low-height rest in `kLift` not exercised (descent residuals are smaller than ascent); PRONE correction not tried on a measured tilt |
+| Stable release | dev.7 is a pre-release (#46) |
+| `static_audit` | FAIL, 25 findings unchanged since dev.5: rules stale against SIMPLE. `flash_app_only.sh` refuses it, so the dedicated APP-only procedure is used |
+| `run_host_tests.sh`, `test_matdog_leg_fk_live` | Fail: removed Core Motion sources, data outside the repository |
+| ST3215 speed limit | 40 RPM design reference vs 29 RPM in the URDF; neither confirmed as final |
+| Workbook, physical data | Workbook not opened in Excel; 9 g residual unallocated; no inertial data for the weighed configuration without Jetson |
+
+Local only, never in the repository: NVS dumps, checkpoints, full hardware logs.
+
+---
+
 ## Aggiornamento release 2026-10-13
 
 Implementati e provati offline SOC con isteresi/UNKNOWN e breathing charging continuo; LAN MAINTENANCE con cinque GET read-only, ADMIN_AP e RUN_STA separati. RESTORE e Motion hanno ora admission locale RAM-only; nessuna prova hardware nuova. Stato corrente, limiti e gate fisici: [release finale](Validation_Reports/Final_Release_Candidate_2026-10-13/README.md). Le righe DEFERRED del closeout sotto sono la baseline storica dell’11 ottobre.
