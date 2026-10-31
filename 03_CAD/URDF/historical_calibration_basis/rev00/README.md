@@ -16,5 +16,5 @@ Bound to this basis (preserved unchanged): the Geometry Compiler V5 bundle `2026
 
 Rules:
 - Do not edit these files. `BASIS.json` declares them and `matdog_calibration_basis.py` re-hashes them on every use.
-- `python3 06_Software/Matdog_Core/calibration/matdog_calibration_basis.py --check` (also run by `static_audit.py`) proves the operational model equals REV00 plus the declared delta only: the four hip origin Z values, the visual mesh paths and the `base_link` collision mesh. A change to any joint axis/limit/motor metadata, inertial, other collision mesh or hip X/Y fails it.
+- `python3 06_Software/Matdog_Core/calibration/matdog_calibration_basis.py --check` (also run by `static_audit.py`) proves the operational model equals REV00 plus the declared delta only: the four hip origin Z values, the visual mesh paths, the `base_link` collision mesh and the `<inertial>` block of the 17 declared links (dynamic properties, rigorously checked: structure, positive-definite tensor, CoM inside the link mesh, plausible units). A change to any joint axis/limit/motor metadata, other collision mesh, hip X/Y or any other element fails it.
 - Nothing here claims hardware validation on REV01-FIX. Calibration evidence is joint-space and was measured on the physical robot; this file only records which model its provenance hashes refer to.
