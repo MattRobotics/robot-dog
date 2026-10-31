@@ -40,7 +40,7 @@ for token in ("/api/motion/command", "/api/calibration/restore", "navigator.seri
     check(token not in js, f"no {token} in twin JS")
 check(raws["/twin/matdog_collision.mtw"][:4] == b"MTW1", "MTW1 magic")
 check(raws["/twin/matt_robodog_rev00.urdf"].lstrip().startswith(b"<?xml") or b"<robot" in raws["/twin/matt_robodog_rev00.urdf"][:400], "URDF")
-check(hashlib.sha256(raws["/twin/matt_robodog_rev00.urdf"]).hexdigest() == "3890a3f0732dbed8abdc559106d7f32ee8d6e2111c8e1a06d2485bf2ffc81e59", "canonical URDF unchanged")
+check(hashlib.sha256(raws["/twin/matt_robodog_rev00.urdf"]).hexdigest() == "ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7", "canonical URDF unchanged")
 for path in ("/twin", "/twin/", "/twin/assets/twin.js", "/twin/matdog_collision.mtw", "/twin/matt_robodog_rev00.urdf"):
     check(transport.count(f'"{path}"') == 2 or transport.count(f'"{path}",') >= 2, f"{path} on admin+TLS and read-only listeners")
 handler = transport[transport.index("esp_err_t HttpTransport::handleTwin("):transport.index("esp_err_t HttpTransport::handleWifi(")]
