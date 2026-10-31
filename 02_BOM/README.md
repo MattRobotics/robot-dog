@@ -19,9 +19,9 @@ The mechanical and electronic architecture is still evolving.
 
 The canonical kinematic mass and material references for the current robot body and legs are stored in:
 
-[MATDOG REV00 reference workbook](../03_CAD/URDF/matt_robodog_rev00/reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx)
+[MATDOG REV01-FIX reference workbook](../03_CAD/URDF/matt_robodog_rev00/reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx) (file name keeps the `rev00` label for compatibility)
 
-That workbook is not a procurement BOM. It is the engineering reference for link masses, materials and kinematic components.
+That workbook is not a procurement BOM. It is the single canonical 7-sheet engineering reference: joint table, per-link masses, CoM and inertias (Solid Edge, 2026-10-30, nominal configuration including the Jetson Orin: 17 links 2.928 kg vs 2.937 kg assembly), mass reconciliation with the 2.807 kg weighing (historical, without Jetson), and the preliminary ST3215 3S speed/torque reference (40 RPM design reference, not qualified; the URDF limit stays 29 RPM). The sheets that existed before the 2026-10-31 consolidation remain in Git history.
 
 ## Future Structure
 

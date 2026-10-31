@@ -1,0 +1,404 @@
+{
+ "REV00": {
+  "lf_hip_joint": {
+   "pair": [
+    "base_link",
+    "lf_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lf_lower_leg_joint": {
+   "pair": [
+    "lf_upper_leg_link",
+    "lf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lf_upper_leg_joint": {
+   "pair": [
+    "lf_hip_link",
+    "lf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_hip_joint": {
+   "pair": [
+    "base_link",
+    "lh_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_lower_leg_joint": {
+   "pair": [
+    "lh_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_upper_leg_joint": {
+   "pair": [
+    "lh_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_hip_joint": {
+   "pair": [
+    "base_link",
+    "rf_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_lower_leg_joint": {
+   "pair": [
+    "rf_upper_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_upper_leg_joint": {
+   "pair": [
+    "rf_hip_link",
+    "rf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_hip_joint": {
+   "pair": [
+    "base_link",
+    "rh_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_lower_leg_joint": {
+   "pair": [
+    "rh_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_upper_leg_joint": {
+   "pair": [
+    "rh_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  }
+ },
+ "REV01_before_fix": {
+  "lf_hip_joint": {
+   "pair": [
+    "base_link",
+    "lf_hip_link"
+   ],
+   "status": "INTERSECTING",
+   "witness_triangles": [
+    25483,
+    5512
+   ]
+  },
+  "lf_lower_leg_joint": {
+   "pair": [
+    "lf_upper_leg_link",
+    "lf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lf_upper_leg_joint": {
+   "pair": [
+    "lf_hip_link",
+    "lf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_hip_joint": {
+   "pair": [
+    "base_link",
+    "lh_hip_link"
+   ],
+   "status": "INTERSECTING",
+   "witness_triangles": [
+    263,
+    3862
+   ]
+  },
+  "lh_lower_leg_joint": {
+   "pair": [
+    "lh_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_upper_leg_joint": {
+   "pair": [
+    "lh_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_hip_joint": {
+   "pair": [
+    "base_link",
+    "rf_hip_link"
+   ],
+   "status": "INTERSECTING",
+   "witness_triangles": [
+    26420,
+    3867
+   ]
+  },
+  "rf_lower_leg_joint": {
+   "pair": [
+    "rf_upper_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_upper_leg_joint": {
+   "pair": [
+    "rf_hip_link",
+    "rf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_hip_joint": {
+   "pair": [
+    "base_link",
+    "rh_hip_link"
+   ],
+   "status": "INTERSECTING",
+   "witness_triangles": [
+    19759,
+    3864
+   ]
+  },
+  "rh_lower_leg_joint": {
+   "pair": [
+    "rh_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_upper_leg_joint": {
+   "pair": [
+    "rh_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  }
+ },
+ "REV01_FIX": {
+  "lf_hip_joint": {
+   "pair": [
+    "base_link",
+    "lf_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lf_lower_leg_joint": {
+   "pair": [
+    "lf_upper_leg_link",
+    "lf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lf_upper_leg_joint": {
+   "pair": [
+    "lf_hip_link",
+    "lf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_hip_joint": {
+   "pair": [
+    "base_link",
+    "lh_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_lower_leg_joint": {
+   "pair": [
+    "lh_upper_leg_link",
+    "lh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "lh_upper_leg_joint": {
+   "pair": [
+    "lh_hip_link",
+    "lh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_hip_joint": {
+   "pair": [
+    "base_link",
+    "rf_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_lower_leg_joint": {
+   "pair": [
+    "rf_upper_leg_link",
+    "rf_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rf_upper_leg_joint": {
+   "pair": [
+    "rf_hip_link",
+    "rf_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_hip_joint": {
+   "pair": [
+    "base_link",
+    "rh_hip_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_lower_leg_joint": {
+   "pair": [
+    "rh_upper_leg_link",
+    "rh_lower_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  },
+  "rh_upper_leg_joint": {
+   "pair": [
+    "rh_hip_link",
+    "rh_upper_leg_link"
+   ],
+   "status": "SEPARATED_NARROW",
+   "witness_triangles": [
+    null,
+    null
+   ]
+  }
+ }
+}

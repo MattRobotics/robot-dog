@@ -3832,6 +3832,24 @@ def check_calibration_geometry_export(sketch_dir):
              f"stderr={result.stderr!r})")
 
 
+def check_calibration_basis(sketch_dir):
+    """The calibration chain stays bound to the preserved REV00 inputs; the operational model
+    (REV01-FIX) must equal REV00 plus the closed declared delta (4 hip origin Z, visual paths,
+    base_link collision mesh). Any other change to a joint, limit, motor metadata, inertial or
+    collision mesh fails here."""
+    repo_root = sketch_dir.parents[1]
+    checker = (repo_root / "06_Software/Matdog_Core/calibration/"
+                           "matdog_calibration_basis.py")
+    if not checker.exists():
+        fail(f"{checker}: the calibration basis checker was not found")
+        return
+    result = subprocess.run([sys.executable, str(checker), "--check"],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        fail(f"{checker}: the operational model departs from the REV00 calibration basis "
+             f"(stdout={result.stdout!r} stderr={result.stderr!r})")
+
+
 def check_position_offset_boundary(files, sketch_dir):
     """PositionOffset: exactly one approved read accessor, and never a write.
 
@@ -6718,6 +6736,7 @@ def main():
     check_safe_actuator_boundaries(files, SKETCH_DIR)
     check_calibration_geometry_boundaries(files, SKETCH_DIR)
     check_calibration_geometry_export(SKETCH_DIR)
+    check_calibration_basis(SKETCH_DIR)
     check_position_offset_boundary(files, SKETCH_DIR)
     check_servo_profile_contract(files, SKETCH_DIR)
     check_servo_profile_export(SKETCH_DIR)

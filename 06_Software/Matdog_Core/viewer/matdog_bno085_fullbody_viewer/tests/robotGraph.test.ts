@@ -116,12 +116,12 @@ describe('articulated scene graph', () => {
     const worldPosition = (linkName: string): Vector3 =>
       robot.linkObject(linkName)!.getWorldPosition(new Vector3());
 
-    // lf_hip_joint origin 0.1125 0.0475 0.0465 from base_link.
-    expect(worldPosition('lf_hip_link').toArray()).toEqual([0.1125, 0.0475, 0.0465]);
+    // lf_hip_joint origin 0.1125 0.0475 0.0487 from base_link (REV01-FIX: +2.2 mm).
+    expect(worldPosition('lf_hip_link').toArray()).toEqual([0.1125, 0.0475, 0.0487]);
     // + lf_upper_leg_joint 0 0.048 0, then lf_lower_leg_joint 0 0 -0.09.
     expect(worldPosition('lf_lower_leg_link').x).toBeCloseTo(0.1125, 9);
     expect(worldPosition('lf_lower_leg_link').y).toBeCloseTo(0.0955, 9);
-    expect(worldPosition('lf_lower_leg_link').z).toBeCloseTo(-0.0435, 9);
+    expect(worldPosition('lf_lower_leg_link').z).toBeCloseTo(-0.0413, 9);
 
     // Left legs at +Y, right legs at -Y; front legs at +X, hind at -X.
     expect(worldPosition('rf_hip_link').y).toBeLessThan(0);

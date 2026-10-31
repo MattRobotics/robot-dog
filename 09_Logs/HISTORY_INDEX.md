@@ -147,3 +147,12 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | dev.3 delta audit | three documents | Equivalent file is on `main` (blob-identical to the one at `b764c25`) | Relative links |
 | Installed-firmware provenance commit `b3fd945` | several documents | Not an ancestor of `main` | SHA kept as text; recreated as `e028dd8` |
 | Operator-machine paths in older logs and in the dev.1 convergence note | various | HISTORICAL, not resolvable from the repository | Left as recorded |
+
+## 10. Update 2026-10-31 — REV01-FIX integration (added; the sections above are unchanged)
+
+| Date | PR / commit | Document | Status |
+|---|---|---|---|
+| 2026-10-30 | #57 `aa89dd4` | [REV01-FIX integration report](Validation_Reports/REV01_FIX_Integration_2026-10-30/REPORT.md) and [calibration-chain decision](Validation_Reports/REV01_FIX_Integration_2026-10-30/calibration_chain/CALIBRATION_BASIS_DECISION.md) | VERIFIED OFFLINE; REV00 calibration basis preserved |
+| 2026-10-31 | #57 `820d80b`, `7d04939` | [Physical properties report](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) | VERIFIED OFFLINE; no dynamic hardware validation |
+| 2026-10-31 | #57 `423de3a`, `bfdf7b8`, `f3876bf`, `bd6939c` | [Astra handoff](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md) (approved 7-sheet workbook, 29/40 RPM dependency map, Motion certifications still on REV00) | VERIFIED OFFLINE; handoff, not a certification |
+| 2026-10-31 | #57 merge `887103e` | Integration of the above into `main` | Merged; not a hardware validation |

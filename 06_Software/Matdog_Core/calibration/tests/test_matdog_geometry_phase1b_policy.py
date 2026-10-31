@@ -51,21 +51,16 @@ from matdog_geometry_scene import (  # noqa: E402
     path_safety_pairs,
 )
 
-VISUAL_MESH_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00/meshes"
-COLLISION_MESH_DIR = VISUAL_MESH_DIR / "collision"
+MODEL_DIR = REPO_ROOT / "03_CAD/URDF/matt_robodog_rev00"
+COLLISION_MESH_DIR = MODEL_DIR / "meshes" / "collision"
 
-# These five historical detailed meshes remain unchanged visual assets after G1.
-EXPECTED_VISUAL_MESH_SHA256 = {
-    "base_link.stl": "644a83e98fd116f3fc8e5d8792ca2b60b0bdb09bcafa4fc49140d641079e4b6b",
-    "lf_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
-    "lh_upper_leg_link.stl": "3c484b110a622274d1f8446b30329b8e16a0ff542d25da2a39334d41e8f4f169",
-    "rf_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16",
-    "rh_upper_leg_link.stl": "08fab5e3229280f21a52c6cfbfdab32f1e8345aae6e10648360ae30fe1e06b16",
-}
-
-# Their approved G1 collision representations are pinned independently.
+# REV01-FIX unified visual and collision geometry: one STL per link, used by
+# both <visual> and <collision>. The former detailed visual set (including the
+# five historical hashes pinned here before) was removed and is recoverable
+# from Git history. base_link is the REV01-FIX export; the four upper-leg
+# meshes keep their approved G1 collision hashes.
 EXPECTED_COLLISION_MESH_SHA256 = {
-    "base_link.stl": "0a485e7a1101d457f317b664e52a7a4ef061382e6ecc2c7c87a333c81d5b466f",
+    "base_link.stl": "c2eadf6d6db1b03379cf256b542dadbcd8d63076179bc84ebd7169634e9f0097",
     "lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
     "lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
     "rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
@@ -349,18 +344,33 @@ class TestCorrectedGeometryAtHome(unittest.TestCase):
 
 
 class TestMeshIntegrity(unittest.TestCase):
-    """16: visual assets stay fixed and collision assets follow approved G1."""
+    """16: visual and collision share one pinned STL per link."""
 
-    def test_five_historical_visual_mesh_hashes(self):
-        for name, expected in EXPECTED_VISUAL_MESH_SHA256.items():
-            path = VISUAL_MESH_DIR / name
-            self.assertTrue(path.is_file(), f"missing {name}")
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            self.assertEqual(digest, expected, f"{name} visual geometry changed")
+    def test_visual_and_collision_reference_the_same_pinned_mesh_files(self):
+        import xml.etree.ElementTree as ET
+
+        root = ET.parse(MODEL_DIR / "matt_robodog_rev00.urdf").getroot()
+        links = {link.get("name"): link for link in root.findall("link")}
+        self.assertEqual(len(links), 17)
+        for name, expected in EXPECTED_COLLISION_MESH_SHA256.items():
+            link = links[name[:-4]]
+            visual = link.find("visual/geometry/mesh").get("filename")
+            collision = link.find("collision/geometry/mesh").get("filename")
+            self.assertEqual(visual, collision, f"{name} visual/collision files differ")
+            self.assertEqual(collision, f"meshes/collision/{name}")
+            digest = hashlib.sha256((MODEL_DIR / collision).read_bytes()).hexdigest()
+            self.assertEqual(digest, expected, f"{name} geometry changed")
+        for link in links.values():
+            self.assertEqual(
+                link.find("visual/geometry/mesh").get("filename"),
+                link.find("collision/geometry/mesh").get("filename"),
+                f"{link.get('name')} visual/collision files differ",
+            )
+        # No standalone decorative STL set may remain next to the canonical one.
+        self.assertEqual(sorted((MODEL_DIR / "meshes").glob("*.stl")), [])
 
     def test_meshes_are_real_binary_stl_not_lfs_pointers(self):
         for directory, names in (
-            (VISUAL_MESH_DIR, EXPECTED_VISUAL_MESH_SHA256),
             (COLLISION_MESH_DIR, EXPECTED_COLLISION_MESH_SHA256),
         ):
             for name in names:
@@ -372,9 +382,8 @@ class TestMeshIntegrity(unittest.TestCase):
     def test_scene_mesh_hashes_match_files_on_disk(self):
         """Staleness guard: the scene follows the URDF collision manifest.
 
-        G1 explicitly separated detailed visual meshes from the approved
-        collision meshes, so the old root-level visual-file constants are no
-        longer valid expectations for ``RobotScene.mesh``.
+        Since REV01-FIX the visual and collision references are the same
+        files, and ``RobotScene.mesh`` follows the URDF collision manifest.
         """
         scene = shared_scene()
         for name, approved_collision_sha in EXPECTED_COLLISION_MESH_SHA256.items():
