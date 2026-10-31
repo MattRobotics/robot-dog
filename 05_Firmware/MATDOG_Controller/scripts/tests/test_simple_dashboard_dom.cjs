@@ -99,7 +99,7 @@ async function boot() {
   }
   assert(values().includes('Posa misurata (encoder)PRONE (ripiegata)') && ready.pose_region === 'PRONE_ENTRY', values());
   assert(values().includes('Sessione amministratorevalida'));
-  assert(values().includes('Quota richiesta (comando)') && values().includes('Quota stimata (encoder + IMU)'));
+  assert(values().includes('Quota nominale richiesta (comando)') && values().includes('Quota nominale stimata (encoder + IMU)'));
   assert(/nessuno inviato/.test(last()));
   let received = p.clock(), sequence = 0;
 

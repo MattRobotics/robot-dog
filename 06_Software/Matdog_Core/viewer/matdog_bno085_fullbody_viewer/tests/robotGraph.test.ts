@@ -311,7 +311,8 @@ describe('separate visual geometry',()=>{
   expect(host.collisionMeshCount).toBe(17);expect(host.visualMeshCount).toBe(17);
   for(const link of model.links){
    if(!link.collision||!link.visual)continue;
-   expect(link.visual.mesh.filename).not.toBe(link.collision.mesh.filename);
+   // One canonical STL per link feeds <visual> and <collision>; the viewer still builds separate Mesh objects.
+   expect(link.visual.mesh.filename).toBe(link.collision.mesh.filename);
    expect(host.visualMesh(link.name)).not.toBe(host.collisionMesh(link.name));
    expect(host.collisionMesh(link.name)!.visible).toBe(false);
    expect(host.visualMesh(link.name)!.visible).toBe(true);
