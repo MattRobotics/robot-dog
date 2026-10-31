@@ -8,6 +8,17 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## 1.0.1-dev.7 — hardware baseline, pre-release (2026-10-31; source `4634de8`, tag `matdog-controller-v1.0.1-dev.7`)
+
+APP `4c7e2c8a6e41fbd218cb09834c6543e3f039c349089cf02a7fc8bceded5bcc3c`. Tested on the robot in the supervised session of 2026-10-31. Not a stable release.
+
+- REV01-FIX as the only physical geometry: nominal height defined once as 46.5 mm below the front HIP axes; collision boxes recertified with unchanged values; Twin assets regenerated.
+- STAND changes height directly from any hold, including a loaded low hold, with unchanged boxes, targets and limits.
+- WALK keeps the last solved correction offset on alternate releases: 0 missed releases in three walks (dev.6: 8 USB-only).
+- PRONE keeps the IMU correction inside `kLift` at the 53 mm handover.
+- Status reports missed releases, first-miss phase and worst release of the current movement.
+- Dashboard: banner shows only the latest command, STAND accepts any millimetre, separate rows for nominal and belly height, joint table scrolls on narrow screens.
+
 ## Unreleased — MATDOG Controller 1.0.0-rc.4 candidate: operational firmware, no operator-presence gates (on `f838f67`, SIMPLE 1.0.0-rc.3) — 2026-10-23
 
 > Embedded Motion & Robot Control Firmware. Offline candidate, not hardware-qualified; 1.0.0 follows hardware qualification. SIMPLE 1.0.0-rc.3 (`f838f677`, APP `e244f9b8…`) stays the historical/installed reference. Motion stack unchanged (`MATDOG_SIMPLE_V1`: gait, IK, geometry, servo mapping, calibration untouched).
