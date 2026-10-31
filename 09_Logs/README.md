@@ -2,6 +2,8 @@
 
 Latest: [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
+Update 2026-10-31 (separate from the dated lines above): REV01-FIX geometry, physical properties and the Astra handoff were integrated in `main` by PR #57 (merge `887103e`, verified offline only) — [integration report](Validation_Reports/REV01_FIX_Integration_2026-10-30/REPORT.md) · [physical properties](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) · [**Astra handoff**](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md).
+
 > **CHRONOLOGY AND EVIDENCE — NOT CURRENT-STATE AUTHORITY**
 >
 > Start with the [root README](../README.md) for today's hardware, firmware baseline, validation
@@ -17,7 +19,7 @@ automatically describe the robot after a later rebuild or architecture change.
 | Area | Purpose |
 |---|---|
 | [History index](HISTORY_INDEX.md) | One chronology, June–October 2026: phases, status, documents and available evidence |
-| [Open items](OPEN_ITEMS.md) | Blockers and residuals; checkpoint after PR #40 (2026-10-08), updated after PR #41 and for C2 (2026-10-09) |
+| [Open items](OPEN_ITEMS.md) | Blockers and residuals; checkpoint after PR #40 (2026-10-08), updated after PR #41 and for C2 (2026-10-09); a separate current update of 2026-10-31 sits at the top |
 | [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#41 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 (PR #38 merged with original SHAs; PR #41 is documentation only) |
 | [External archives](EXTERNAL_ARCHIVES.md) | Deleted branches (last tips), remaining tags, the non-public archive status and recovery steps; items without evidence stay `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |

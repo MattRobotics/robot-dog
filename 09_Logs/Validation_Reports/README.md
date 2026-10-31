@@ -43,6 +43,16 @@ Navigation for the whole ST3215 evidence set: [`ST3215_EVIDENCE_INDEX.md`](../ST
 | [dev.3 thermal delta audit](MATDOG_V0_2_DEV3_THERMAL_DELTA_AUDIT_2026-10-06.md) | 2026-10-06 | HW + audit | 24/24 under dev.3; SAVE/ACK and LOAD across a reset observed; automatic recovery not triggered; no real power cycle |
 | [LED RMT DMA + dirty-frame hardware validation](MATDOG_LED_RMT_DMA_DIRTY_FRAME_HW_VALIDATION_2026-10-10.md) | 2026-10-10 | HW (LED only) | Installed `fee9383`: active RMT DMA, 10 min SoftAP-on steady LED without observed anomalies, servo timing unchanged; **no release or motion approval** |
 
+## REV01-FIX geometry, physical properties and handoff (October 2026, added 2026-10-31)
+
+| Report | Date | Kind | Scope as recorded |
+|---|---|---|---|
+| [REV01-FIX integration](REV01_FIX_Integration_2026-10-30/REPORT.md) | 2026-10-30/31 | OFFLINE | New `base_link`, HIP Z +2.2 mm, unified visual/collision STL; REV00 calibration basis preserved ([decision](REV01_FIX_Integration_2026-10-30/calibration_chain/CALIBRATION_BASIS_DECISION.md)); no hardware |
+| [Physical properties](REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) | 2026-10-31 | OFFLINE | Solid Edge masses, CoM, inertias for 17 links (nominal configuration with Jetson); 9 g residual documented; no dynamic validation |
+| [Alignment and Astra handoff](REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md) | 2026-10-31 | OFFLINE | Approved 7-sheet workbook, dependency map for 29 vs 40 RPM, Motion certifications still bound to REV00, dev5 vs installed firmware, work list for STAND / return-to-PRONE / WALK STANDARD |
+
+Merged by PR #57 (`887103e`). Local `dev5` hardware logs (30/10) are not in this directory.
+
 ## Not in this directory
 
 - **Hardware Validation 2026-10-07 (dev.3):** execution COMPLETE, acceptance BLOCKED, as stated by
