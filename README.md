@@ -1,5 +1,7 @@
 # MATDOG — quadrupede robotico personalizzato
 
+**[Ultimo firmware MATDOG pubblicato — 1.0.1-dev.7 | Baseline validata su hardware | Pre-release](https://github.com/MattRobotics/robot-dog/releases/tag/matdog-controller-v1.0.1-dev.7)**
+
 MATDOG è la piattaforma quadrupede di Matt Robotics: un robot a quattro zampe progettato da zero, con l'obiettivo di arrivare a una **locomozione continua, precisa e sicura** (STAND, WALK, stabilizzazione IMU) comandata a livello semantico da una dashboard e, in futuro, da un computer di alto livello.
 
 > **Stato in una riga:** STAND, PRONE, WALK STANDARD, STOP e Digital Twin sono **collaudati su hardware** con il firmware `1.0.1-dev.7` (sessione supervisionata del 31/10/2026). È una baseline verificata e una pre-release: non è ancora una release stabile, e l'analisi delle prestazioni continua.
@@ -48,7 +50,7 @@ Report del collaudo: [`Motion_dev7_HW_2026-10-31`](09_Logs/Validation_Reports/Mo
 
 - **`main`:** linea ufficiale, contiene lo stack Motion SIMPLE della dev.7.
 - **Rollback locali:** dev.6 `98c4a82` (APP `5760eeee…`) e dev.5 `df43feb` (APP `c8b27d67…`). I checkpoint, con NVS di riferimento e APP, sono su disco locale e non nel repository.
-- **Storici:** il branch `matdog/rc5-source-checkpoint-20261026` (checkpoint RC5) e i tag `archive/*` restano conservati.
+- **Storici:** il checkpoint RC5 è conservato dal tag `archive/rc5-source-checkpoint-20261026`; anche gli altri tag `archive/*` restano conservati.
 
 ## Cosa è validato su hardware e cosa no
 
