@@ -3,7 +3,7 @@
 Punto d'ingresso: [`README.md`](README.md). Storia fino al 26/10/2026: diario V2 in [`09_Logs/Firmware_History/`](09_Logs/Firmware_History/README.md). Architettura: [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md). Sicurezza flash: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 
 ## Non confondere queste identità
-`main` (sorgenti), il branch `matdog/rc5-source-checkpoint-20261026` (checkpoint storico, solo offline; la RCA corrente non è ancora integrata), un commit, una **APP compilata** (identificata da manifest + SHA256) e il **firmware installato sul robot** sono cose diverse. Un commit non riproduce bit a bit una APP (la build incorpora SHA Git, flag dirty, build ID e ora). Non dedurre l'APP installata da `main`, da un branch o da un nome file: richiede una verifica del dispositivo.
+`main` (sorgenti), il tag `archive/rc5-source-checkpoint-20261026` (checkpoint storico, solo offline; la RCA corrente non è ancora integrata), il **commit sorgente validato**, una **APP compilata** (identificata da manifest + SHA256) e il **firmware installato sul robot** sono cose diverse. Un commit non riproduce bit a bit una APP (la build incorpora SHA Git, flag dirty, build ID e ora). Non dedurre l'APP installata da `main`, da un branch o da un nome file: richiede una verifica del dispositivo.
 
 ## Vincoli di dominio
 - L'**ESP32‑S3** è l'unica autorità su Motion, ServoBus e sicurezza runtime; browser/host inviano solo intenti semantici.
