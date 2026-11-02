@@ -204,6 +204,8 @@ class Controller {
     bool readDeferred() const override;
     bool resolve(unsigned,double,uint16_t&) override;
     bool frame(const uint16_t[12],simple::Drive) override;
+    bool framePreempted() const override { return frame_preempted; }
+    bool frame_preempted=false;
     bool enable(unsigned) override;
     bool off(unsigned first=0) override;
     bool verifyOff(unsigned) override;

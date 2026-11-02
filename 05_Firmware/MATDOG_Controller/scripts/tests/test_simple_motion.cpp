@@ -48,11 +48,11 @@ struct ScriptedObservationPort: simple::ServoPort {
     if(missing)return false;
     if(control&&static_cast<int>(i)==missControlSlot&&missControlReads){--missControlReads;return false;}
     out=observed[i];out.stampUs=now;out.goal=target[i];out.goalSpeed=drive.speed;out.acc=drive.acc;
-    (void)control;return true;
+    if(control)out.controlStampUs=now;return true;
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override{
-    assert(!motion||!motion->stopping());if(failFrame)return false;++frames;drive=d;
+    assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}
     const bool drop=dropFrames>0;if(drop)--dropFrames;
     for(unsigned i=0;i<12;++i)if(!drop||static_cast<int>(i)!=dropFrameSlot)target[i]=raw[i];if(stopOnFrame&&motion){motion->stop();stopOnFrame=false;}return true;
@@ -140,26 +140,24 @@ int main(){
   const auto elapsed=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-start).count();
   assert(maxStep<.05);r.m.walkStop();assert(r.reachStand());
   std::printf("WALK STANDARD production gait/IK: max target step %.6f rad, host mean %.1f us/frame (not ESP timing)\n",maxStep,elapsed/1200);
-  const auto frames=r.p.frames;const auto offBefore=r.p.offCalls;r.m.stop();r.m.update(r.p.now+1);assert(r.p.offCalls==offBefore+1);r.tick(false);assert(r.p.frames==frames);assert(r.m.stopping());
-  for(unsigned i=0;i<14;++i)r.tick(false);assert(r.m.offVerified());assert(r.m.state()==simple::State::STOPPED);
-  // STOP must not impose a manual return to PRONE before another STAND.
-  assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(r.p.enables==24);
+  const auto offBefore=r.p.offCalls;r.m.stop();r.m.update(r.p.now+1);assert(r.p.offCalls==offBefore);assert(r.m.stopping());
+  for(unsigned i=0;i<150&&!r.m.stopVerified();++i)r.tick();assert(r.m.stopVerified());assert(r.m.state()==simple::State::STOPPED&&r.m.energized());
+  // A held contextual STOP is latched; a new operational goal cannot silently resume it.
+  assert(r.m.stand(.15,r.p.now));assert(r.p.enables==12);
   Rig interrupted;assert(!interrupted.m.stand(.15,interrupted.p.now));
   for(unsigned i=0;i<400&&interrupted.p.frames<25;++i)interrupted.tick();
-  interrupted.m.stop();for(unsigned i=0;i<15;++i)interrupted.tick(false);assert(interrupted.m.offVerified());
-  assert(!interrupted.m.stand(.15,interrupted.p.now));assert(interrupted.reachStand());
-  // STOP inside STAND_LIFT: restart resumes the certified LIFT group from the measured pose.
+  interrupted.m.stop();for(unsigned i=0;i<150&&!interrupted.m.offVerified()&&!interrupted.m.stopVerified();++i)interrupted.tick();
+  assert(interrupted.m.offVerified()||interrupted.m.stopVerified());assert(interrupted.m.stand(.15,interrupted.p.now));
+  // STOP inside STAND_LIFT retains the nominal route reference and torque; no implicit resume.
   Rig liftStop;assert(!liftStop.m.stand(.15,liftStop.p.now));
   for(unsigned i=0;i<1000&&strcmp(liftStop.m.phase(),"STAND_LIFT");++i)liftStop.tick();
   for(unsigned i=0;i<60;++i)liftStop.tick();assert(!strcmp(liftStop.m.phase(),"STAND_LIFT"));
-  liftStop.m.stop();for(unsigned i=0;i<15;++i)liftStop.tick(false);assert(liftStop.m.offVerified());
-  assert(!liftStop.m.stand(.15,liftStop.p.now));const char* resumed="";
-  for(unsigned i=0;i<200&&(!strcmp(resumed,"")||!strcmp(resumed,"ACQUIRE")||!strcmp(resumed,"REFERENCE")||!strcmp(resumed,"ENABLE")||!strcmp(resumed,"IDLE"));++i){liftStop.tick();resumed=liftStop.m.phase();}
-  assert(!strcmp(resumed,"STAND_LIFT"));assert(liftStop.reachStand());
+  liftStop.m.stop();for(unsigned i=0;i<150&&!liftStop.m.stopVerified();++i)liftStop.tick();
+  assert(liftStop.m.stopVerified()&&liftStop.m.energized()&&!liftStop.m.stopSupportVerified());assert(liftStop.m.stand(.15,liftStop.p.now));
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
-  for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<15;++i)gaitRestart.tick(false);
-  assert(gaitRestart.m.offVerified());assert(!gaitRestart.m.stand(.06,gaitRestart.p.now));assert(gaitRestart.reachStand());
+  for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<150&&!gaitRestart.m.stopVerified();++i)gaitRestart.tick();
+  assert(gaitRestart.m.stopVerified()&&gaitRestart.m.energized());assert(gaitRestart.m.stand(.06,gaitRestart.p.now));
   Rig native;assert(!native.m.stand(.15,native.p.now));native.p.holdObservation=true;
   for(unsigned i=0;i<3000&&native.m.state()!=simple::State::FAULT;++i)native.tick(false);
   assert(native.m.state()==simple::State::FAULT);assert(!strcmp(native.m.reason(),"NATIVE_TARGET_NOT_REACHED"));
@@ -211,14 +209,16 @@ int main(){
   assert(!tiltedStand.m.stand(.05,tiltedStand.p.now));assert(tiltedStand.reachStand());
   std::printf("IMU during MOVING STAND: %u different releases, max reference difference %.6f rad (software only)\n",correctedMoving,standCorrection);
   Rig stopControl;assert(!stopControl.m.stand(.15,stopControl.p.now));assert(stopControl.reachStand());stopControl.p.stopOnControl=true;
-  for(unsigned k=0;k<6&&!stopControl.m.stopping();++k){const auto count=stopControl.p.offCalls;stopControl.tick(false);if(stopControl.m.stopping())assert(stopControl.p.offCalls==count+1);}
+  for(unsigned k=0;k<6&&!stopControl.m.stopping();++k){const auto count=stopControl.p.offCalls;stopControl.tick(false);if(stopControl.m.stopping())assert(stopControl.p.offCalls==count);}
   assert(stopControl.m.stopping());
   for(unsigned phase=0;phase<4;++phase){Rig interrupt;assert(!interrupt.m.stand(.15,interrupt.p.now));
     if(phase!=0){for(unsigned k=0;k<100&&strcmp(interrupt.m.phase(),"ENABLE");++k)interrupt.tick();assert(!strcmp(interrupt.m.phase(),"ENABLE"));}
     if(phase<2)interrupt.p.stopOnControl=true;else if(phase==2)interrupt.p.stopOnEnable=true;else interrupt.p.stopOnFrame=true;
     const unsigned off=interrupt.p.offCalls;
     for(unsigned k=0;k<30&&!interrupt.m.stopping();++k)interrupt.tick(false);
-    assert(interrupt.m.stopping()&&interrupt.p.offCalls==off+1&&interrupt.m.state()==simple::State::STOPPED);
+    assert(interrupt.m.stopping()&&interrupt.p.offCalls==off+1);
+    assert(interrupt.m.state()==(phase==3?simple::State::FAULT:simple::State::STOPPED));
+    if(phase==3)assert(!strcmp(interrupt.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));
     if(phase<2)assert(interrupt.p.enables==0);
   }
   Rig rejectedHeight;assert(!rejectedHeight.m.stand(.15,rejectedHeight.p.now));assert(rejectedHeight.reachStand());
@@ -263,25 +263,25 @@ int main(){
   {const double body=simple::baseLinkHeightFromNominalM(.15);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;  // last gait sample
    for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(centred.m.target(),i)-motion::jointSlot(s,i))<1e-6);}
   assert(centred.reachStand());
-  // Repeated STOP while SAFE_OFF is pending (dashboard/USB duplicates): one
-  // torque-OFF broadcast, then 13 read-backs, never restarted, no re-enable;
-  // from STANDING, from MOVING (STAND_LIFT) and from WALKING.
+  // Repeated healthy STOPs keep the same controlled arrest and evidence dwell;
+  // the dedicated STOP tests compare the entire single/duplicate reference.
   for(unsigned during=0;during<3;++during){
     Rig s;
     if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());}
-    else if(during==1){assert(!s.m.stand(.15,s.p.now));for(unsigned i=0;i<1000&&strcmp(s.m.phase(),"STAND_LIFT");++i)s.tick();assert(!strcmp(s.m.phase(),"STAND_LIFT"));}
-    else{assert(!s.m.walk(1,s.p.now));for(unsigned i=0;i<3000&&s.m.state()!=simple::State::WALKING;++i)s.tick();assert(s.m.state()==simple::State::WALKING);}
-    const unsigned off=s.p.offCalls,enables=s.p.enables,frames=s.p.frames;unsigned updates=0;
-    while(!s.m.offVerified()&&updates<60){s.m.stop();s.tick(false);++updates;}
-    assert(updates==14&&s.p.offCalls==off+1&&s.m.offMask()==0x1fff&&!s.m.energized()&&!s.m.stopping());
-    assert(s.p.enables==enables&&s.p.frames==frames&&s.m.state()==simple::State::STOPPED&&!strcmp(s.m.reason(),"STOP_REQUESTED"));
-    assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());  // a STOP never needs a manual reset
+    else if(during==1){assert(!s.m.stand(.15,s.p.now));for(unsigned i=0;i<1000&&strcmp(s.m.phase(),"STAND_LIFT");++i)s.tick();for(unsigned i=0;i<10;++i)s.tick();}
+    else{assert(!s.m.walk(1,s.p.now));for(unsigned i=0;i<3000&&s.m.state()!=simple::State::WALKING;++i)s.tick();for(unsigned i=0;i<20;++i)s.tick();}
+    const unsigned off=s.p.offCalls,enables=s.p.enables;unsigned updates=0;
+    while(!s.m.stopVerified()&&updates<150){s.m.stop();s.tick();++updates;}
+    assert(s.m.stopVerified()&&s.p.offCalls==off&&s.m.energized()&&s.m.stopping());
+    assert(s.p.enables==enables&&s.m.state()==simple::State::STOPPED&&!s.m.stopSupportVerified());
+    assert(s.m.stand(.15,s.p.now));
   }
   // One servo fails its read-back: SAFE_OFF stays pending and re-broadcasts;
   // repeated STOPs keep the 12 verified servos; nothing can re-enable; the
   // servo recovering completes 13/13 without another STOP.
   Rig failing;assert(!failing.m.stand(.15,failing.p.now));assert(failing.reachStand());failing.p.failVerify=5;
   const unsigned failOff=failing.p.offCalls,failEnables=failing.p.enables,failFrames=failing.p.frames;
+  failing.m.fault("TEST_SAFE_OFF_READBACK_FAILURE");
   for(unsigned i=0;i<80;++i){if(i%3==0)failing.m.stop();failing.tick(false);}
   assert(!failing.m.offVerified()&&failing.m.stopping()&&failing.m.energized()&&failing.m.offMask()==(0x1fff&~(1u<<5)));
   assert(failing.p.offCalls>failOff+3&&failing.p.enables==failEnables&&failing.p.frames==failFrames);
@@ -291,18 +291,18 @@ int main(){
   // A STOP after completion is a new SAFE_OFF (fresh broadcast + 13 reads).
   Rig again;assert(again.m.offVerified());const unsigned againOff=again.p.offCalls;again.m.stop();again.tick(false);
   assert(!again.m.offVerified()&&again.p.offCalls==againOff+1);for(unsigned i=0;i<13;++i)again.tick(false);assert(again.m.offVerified());
-  // STOP after a FAULT clears the latch once (one restart); duplicates then keep progress.
+  // STOP after a FAULT cannot clear the fault latch or restart SAFE_OFF progress.
   Rig faulted;assert(!faulted.m.stand(.15,faulted.p.now));assert(faulted.reachStand());faulted.p.missing=true;
   for(unsigned i=0;i<20&&faulted.m.state()!=simple::State::FAULT;++i)faulted.tick(false);assert(faulted.m.state()==simple::State::FAULT);
   faulted.p.missing=false;const unsigned faultOff=faulted.p.offCalls;unsigned afterStop=0;
   while(!faulted.m.offVerified()&&afterStop<60){faulted.m.stop();faulted.tick(false);++afterStop;}
-  assert(afterStop==14&&faulted.p.offCalls==faultOff+1&&faulted.m.state()==simple::State::STOPPED);
-  assert(!faulted.m.stand(.15,faulted.p.now));assert(faulted.reachStand());
+  assert(afterStop<=14&&faulted.p.offCalls<=faultOff+1&&faulted.m.state()==simple::State::FAULT);
+  assert(faulted.m.stand(.15,faulted.p.now));
   // pose_region: shared certified-region predicate on 12 fresh ACTUAL angles.
   Rig pose;for(unsigned i=0;i<8;++i)pose.tick(false);assert(!strcmp(pose.m.poseRegion(pose.p.now),"PRONE_ENTRY"));
   assert(!pose.m.stand(.15,pose.p.now));assert(pose.reachStand());assert(!strcmp(pose.m.poseRegion(pose.p.now),"STAND_HEIGHT"));
   pose.p.missing=true;for(unsigned i=0;i<20;++i)pose.tick(false);assert(!strcmp(pose.m.poseRegion(pose.p.now),"UNKNOWN"));
-  std::puts("STOP repeated: 13/13 in 14 updates from STANDING/MOVING/WALKING with one broadcast; failing read-back re-broadcasts and keeps 12/13; no re-enable");
+  std::puts("Healthy STOP repeated: torque maintained from STANDING/MOVING/WALKING; fault SAFE_OFF read-back retries preserved, no fault clear or re-enable");
   // Pre-enable acquisition on the real PRONE of 24/10/2026 (USB log
   // MATDOG_STAND_WALK_20261024_152020: RAW and ACTUAL angles). GoalPosition
   // reads 0 at power-on, before the reference SYNC_WRITE, as on the robot.
@@ -358,16 +358,15 @@ int main(){
     {Rig r;prone(r);assert(!r.m.stand(.05,r.p.now));toEnable(r,2);r.p.missControlSlot=2;r.p.missControlReads=2;r.tick(false);
      r.m.stop();for(unsigned i=0;i<15;++i)r.tick(false);
      assert(r.m.offVerified()&&r.m.state()==simple::State::STOPPED&&r.p.enables==2&&!r.m.energized());}
-    // 6. A real change before enable latches FAULT; nothing runs by itself; STOP then a new STAND proceeds.
+    // 6. A real change before enable latches FAULT; STOP cannot implicitly re-enable.
     {Rig r;prone(r);assert(!r.m.stand(.05,r.p.now));toEnable(r,4);shift(r,9,40);prepare(r);
      assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"REFERENCE_CHANGED_BEFORE_ENABLE"));
      const unsigned frames=r.p.frames,enables=r.p.enables;for(unsigned i=0;i<200;++i)r.tick(false);
      assert(r.m.offVerified()&&r.m.state()==simple::State::FAULT&&r.p.frames==frames&&r.p.enables==enables);
      assert(!strcmp(r.m.stand(.05,r.p.now),"FAULT_STOP_REQUIRED"));
-     r.m.stop();for(unsigned i=0;i<15;++i)r.tick(false);assert(r.m.state()==simple::State::STOPPED&&r.m.offVerified());
-     for(unsigned i=0;i<12;++i)r.p.target[i]=0;  // torque OFF: the new reference comes from the new ACTUAL pose
-     assert(!r.m.stand(.05,r.p.now));assert(prepare(r)==25&&r.p.enables==enables+12);assert(r.reachStand());}
-    std::puts("PRONE 24/10 pre-enable: 3 consecutive failures/no feedback refuse torque; STOP during retry -> SAFE_OFF; real change -> FAULT, STOP, new STAND");
+     r.m.stop();for(unsigned i=0;i<15;++i)r.tick(false);assert(r.m.state()==simple::State::FAULT&&r.m.offVerified());
+     assert(r.m.stand(.05,r.p.now));assert(r.p.frames==frames&&r.p.enables==enables);}
+    std::puts("PRONE 24/10 pre-enable: 3 consecutive failures/no feedback refuse torque; STOP during retry -> SAFE_OFF; real change -> latched FAULT");
     // Re-sent reference while 7 servos already hold torque: the identical
     // packet (real encoder, real slot IDs), the measured RAW, 300/8; OFF only
     // for the not-yet-enabled suffix, no other goal frame before the 12th enable.
@@ -395,13 +394,13 @@ int main(){
     {Rig r;prone(r);r.p.dropFrameSlot=7;r.p.dropFrames=1;assert(!r.m.stand(.05,r.p.now));toEnable(r,7);r.p.stopOnFrame=true;
      r.tick(false);assert(r.m.stopping()&&r.p.sent.size()==2);for(unsigned i=0;i<15;++i)r.tick(false);
      assert(r.m.offVerified()&&r.m.state()==simple::State::STOPPED&&r.p.enables==7&&r.p.sent.size()==2&&!r.m.energized());}
-    // Failure counters start from zero at every STAND: a persistent fault, STOP,
-    // then one missed READ on the same servo is again recovered.
+    // A persistent fault remains latched after STOP; an independent fresh
+    // controller still recovers one transient READ on the same servo.
     {Rig r;prone(r);assert(!r.m.stand(.05,r.p.now));toEnable(r,5);r.p.missControlSlot=5;r.p.missControlReads=3;prepare(r);
      assert(r.m.state()==simple::State::FAULT);r.m.stop();for(unsigned i=0;i<15;++i)r.tick(false);assert(r.m.offVerified());
-     for(unsigned i=0;i<12;++i)r.p.target[i]=0;const unsigned before=r.p.enables;
-     assert(!r.m.stand(.05,r.p.now));r.p.missControlSlot=5;r.p.missControlReads=1;prepare(r);  // first READ of slot 5 in ACQUIRE
-     assert(r.p.enables==before+12&&r.m.state()==simple::State::MOVING);assert(r.reachStand());}
+     assert(r.m.state()==simple::State::FAULT&&r.m.stand(.05,r.p.now));
+     Rig fresh;prone(fresh);assert(!fresh.m.stand(.05,fresh.p.now));fresh.p.missControlSlot=5;fresh.p.missControlReads=1;prepare(fresh);
+     assert(fresh.p.enables==12&&fresh.m.state()==simple::State::MOVING);assert(fresh.reachStand());}
     std::puts("PRONE 24/10 re-sent reference: byte-identical packet with 7 servos ON, no SAFE_OFF; slots 0/5/11 recover 1-2, fault on 3 before torque; STOP during re-send; counters reset per STAND");
   }
   // PRONE from above 53 mm on a tilted floor: the correction carried to the
@@ -431,7 +430,7 @@ int main(){
    Rig r;reach(r,.05,1);assert(!r.m.walk(1,r.p.now));for(unsigned i=0;i<1500&&r.m.state()!=simple::State::WALKING;++i)step(r,1);assert(r.m.state()==simple::State::WALKING);
    for(unsigned i=0;i<200;++i)step(r,1);r.m.walkStop();for(unsigned i=0;i<1500&&r.m.state()!=simple::State::STANDING;++i)step(r,1);assert(r.m.state()==simple::State::STANDING);
    reach(r,.05,1);assert(!r.m.prone(r.p.now));for(unsigned i=0;i<2500&&r.m.state()!=simple::State::PRONE;++i){step(r,1);assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::PRONE);
-   reach(r,.05,1);assert(!r.m.stand(.10,r.p.now));for(unsigned i=0;i<30;++i)step(r,1);r.m.stop();for(unsigned i=0;i<20;++i)step(r,1);assert(r.m.offVerified());
+   reach(r,.05,1);assert(!r.m.stand(.10,r.p.now));for(unsigned i=0;i<30;++i)step(r,1);r.m.stop();for(unsigned i=0;i<150&&!r.m.stopVerified();++i)step(r,1);assert(r.m.stopVerified()&&r.m.energized());
    std::puts("STAND height changes from loaded holds: 50<->150 and intermediate heights, WALK and PRONE from low holds, STOP mid-change");}
   std::puts("PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION");
 }

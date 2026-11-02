@@ -17,6 +17,7 @@ struct MotionStatusSnapshot {
   uint16_t commandedRaw[12]{};
   const char *activeReason="",*activeOutcome="";
   bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
+  bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false;
   uint16_t offMask=0,referenceFaultRaw=0;
   double requestedHeightM=0,heightM=0,walkCycles=0,quaternion[4]{};
   unsigned referenceFaultSlot=12;
@@ -39,13 +40,16 @@ class MotionService {
   bool busy() const { return motion_&&motion_->engaged(); }
   const simple::SimpleMotion* motion() const { return motion_; } // LOADDIAG read-only
   bool engaged() const {return busy();}
+  // One cross-channel cancellation fence, read atomically by HTTPD at receipt.
+  uint32_t stopEpoch() const {return stopEpoch_.load(std::memory_order_acquire);}
   bool slack(uint64_t now,uint32_t reserve) const {
     return !busy()||motion_->nextReleaseUs()>now+reserve;
   }
  private:
   simple::SimpleMotion* motion_=nullptr;
   Prepare prepare_=nullptr;void* context_=nullptr;
-  bool ready_=false,active_=false;
+  bool ready_=false,active_=false,activeStop_=false;
+  std::atomic<uint32_t> stopEpoch_{0};
   const char* reason_="BOOTING";
   motion::MotionAck last_{},activeAck_{};
   uint32_t acceptedMs_=0,finishedMs_=0;

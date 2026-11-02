@@ -77,6 +77,7 @@ class ControllerService {
   motion::MotionAck motionCommand(const motion::MotionCommand& command,uint32_t now_ms) {
     return motion_?motion_->command(command,now_ms):motion::MotionAck{};
   }
+  uint32_t motionStopEpoch() const {return motion_?motion_->stopEpoch():0;}
   bool motionSnapshot(MotionStatusSnapshot& out,uint32_t now_ms) const { return motion_&&motion_->captureStatus(out,now_ms); }
   bool motionStatus(char* out,size_t cap,uint32_t now_ms) const { return motion_&&motion_->statusJson(out,cap,now_ms); }
   bool motionCapabilities(char* out,size_t cap) const { return motion_&&motion_->capabilitiesJson(out,cap); }

@@ -11,10 +11,20 @@ const char* boolean(bool b){return b?"true":"false";}
 }
 void MotionService::update(){
  if(!active_||!motion_)return;
+ if(activeStop_){
+  // ACK revokes the old operation; only feedback-qualified arrest completes
+  // the contextual STOP. SAFE_OFF is a distinct, register-verified terminal.
+  if(motion_->state()==simple::State::FAULT){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+  else if(motion_->stopVerified()){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STOPPED_SUPPORT_UNVERIFIED";active_=false;}
+  else if(!motion_->stopping()&&!motion_->stopActive()&&motion_->offVerified()&&!motion_->energized()){
+   activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED";active_=false;
+  }else activeAck_.reason="STOP_IN_PROGRESS";
+ }else{
  // PRONE terminal completes the LIE_DOWN command: torque ON, contact NOT verified.
  if(motion_->state()==simple::State::PRONE){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_CONTACT_UNVERIFIED";active_=false;}
  if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
  if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ }
  if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
  activeAck_.executor_state=simple::name(motion_->state());
 }
@@ -25,7 +35,19 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  memcpy(a.id,c.id,sizeof(a.id));
  if(!motion_){a.reason="NOT_INITIALIZED";return a;}
  a.executor_state=simple::name(motion_->state());
- if(c.intent==motion::Intent::STOP){motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason="SAFE_OFF_REQUESTED";return last_=a;}
+ if(c.intent==motion::Intent::STOP){
+   // Every channel shares this fence, including STOP received over USB while
+   // an older HTTP motion request is waiting for its Controller turn.
+   stopEpoch_.fetch_add(1,std::memory_order_release);
+   motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason="STOP_REQUESTED";
+   // Repeated STOPs acknowledge independently without restarting the first
+   // operation's timing, progress or identity (including its held terminal).
+   if(!activeStop_){activeAck_=a;active_=activeStop_=true;acceptedMs_=now;finishedMs_=0;}
+   return last_=a;
+ }
+ if(motion_->stopActive()&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){
+   a.reason=motion_->stopInProgress()?"STOP_IN_PROGRESS":"STOP_LATCHED";return last_=a;
+ }
  const unsigned owner=static_cast<unsigned>(c.owner);
  if(owner>=3){a.reason="INVALID_OWNER";return last_=a;}
  auto& replay=replay_[owner];
@@ -34,7 +56,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;acceptedMs_=now;finishedMs_=0;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
@@ -73,6 +95,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.offVerified=motion_->offVerified();
  s.offMask=motion_->offMask();
  s.energized=motion_->energized();
+ s.stopActive=motion_->stopActive();s.stopInProgress=motion_->stopInProgress();
+ s.stopVerified=motion_->stopVerified();s.stopSupportVerified=motion_->stopSupportVerified();
  s.heightValid=motion_->heightValid();
  s.requestedHeightM=motion_->requestedHeightM();
  s.heightM=motion_->heightM();
@@ -119,6 +143,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"commanded_raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,s.commandedRaw[i],f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]");
  add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
+ add(",\"stop\":{\"active\":%s,\"in_progress\":%s,\"motion_verified\":%s,\"support_verified\":%s}",
+   boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified));
  add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
    (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

@@ -5,6 +5,7 @@
 #include "../motion/Gait.h"
 #include "CollisionData.h"
 #include "ViaPlan.h"
+#include "StopPlan.h"
 
 namespace matdog { namespace simple {
 constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
@@ -53,6 +54,8 @@ class ServoPort {
   virtual bool readDeferred() const { return false; }
   virtual bool resolve(unsigned slot,double q,uint16_t&)=0;
   virtual bool frame(const uint16_t raw[12],Drive)=0;
+  // Only an explicit pre-TX cancellation, never a partial/failed write.
+  virtual bool framePreempted() const { return false; }
   virtual bool enable(unsigned slot)=0;
   virtual bool off(unsigned first=0)=0; // OFF slots first..12 (includes neck); default SAFE_OFF is global
   virtual bool verifyOff(unsigned slot)=0;  // slots 0..12, includes neck
@@ -96,7 +99,15 @@ class SimpleMotion {
   const char* reason() const { return reason_; }
   const char* phase() const;
   bool engaged() const { return energized_||state_==State::MOVING||offPending_; }
-  bool stopping() const { return offPending_||stop_.load(); }
+  bool stopping() const { return offPending_||stop_.load()||stopActive_; }
+  bool stopActive() const { return stopActive_; }
+  bool stopInProgress() const { return stopActive_&&!stopVerified_; }
+  bool stopVerified() const { return stopVerified_; } // feedback evidence of rest, NOT contact
+  bool stopSupportVerified() const { return false; }
+  bool stopFrameAuthorized(const uint16_t raw[12],Drive) const;
+  bool busPreemptRequested() const {
+    return stop_.load()||offPending_||faultLatched_||(stopActive_&&!stopIo_);
+  }
   bool energized() const { return energized_; }
   bool offVerified() const { return offMask_==0x1fff; }
   uint16_t offMask() const { return offMask_; }
@@ -130,7 +141,7 @@ class SimpleMotion {
   Drive commandedDrive() const { return commandedDrive_; }
   uint64_t goalSentUs() const { return goalSentUs_; }
   uint64_t settleUs() const { return settleUs_; }
-  uint64_t deadlineUs() const { return segmentBox_?segmentDeadlineUs_:goalDeadlineUs_; }
+  uint64_t deadlineUs() const { return stopActive_?stopDeadlineUs_:segmentBox_?segmentDeadlineUs_:goalDeadlineUs_; }
   // Last boundary completed under a static load: joint mask and phase.
   uint16_t loadedMask() const { return loadedMask_; }
   const char* loadedPhase() const { return loadedPhase_; }
@@ -140,9 +151,10 @@ class SimpleMotion {
   uint32_t tempSpikes() const { return tempSpikes_; }
   uint16_t hotPendingMask() const { uint16_t m=0;for(unsigned i=0;i<12;++i)if(hotSinceUs_[i])m|=1u<<i;return m; }
  private:
-  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT };
+  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT, STOP };
   enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool readTimed(unsigned slot,bool control,Feedback&);
+  bool readDeferred() const { return readInterrupted_||port_->readDeferred(); }
   bool frameTimed(const uint16_t raw[12],Drive);
   bool planInitialReference();
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
@@ -164,7 +176,7 @@ class SimpleMotion {
   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
   void beginProne(Phase,uint64_t);
   bool proneDisengage(motion::JointTargetFrame&) const;
-  bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT; }
+  bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_WAIT; }
   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
   void beginLift(const motion::JointTargetFrame* measured,uint64_t);
   void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);
@@ -175,6 +187,9 @@ class SimpleMotion {
   void startWalk(uint64_t);
   void serviceOff();
   bool serviceStop();
+  void beginStop(uint64_t);
+  void generateStop(uint64_t);
+  void rememberReference(const motion::JointTargetFrame&,uint64_t);
   void enterOff(bool fault,const char*);
   ServoPort* port_=nullptr;
   Inputs input_{};
@@ -185,6 +200,18 @@ class SimpleMotion {
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
   bool operatorStopped_=false;
+  bool stopActive_=false,stopVerified_=false,stopIo_=false,stopFrame_=false,readInterrupted_=false;
+  const uint16_t* stopRaw_=nullptr;
+  Drive stopDrive_=kStandDrive;
+  StopPlan stopPlan_{};
+  uint64_t stopStartUs_=0,stopTerminalUs_=0,stopDwellUs_=0,stopDeadlineUs_=0;
+  uint16_t stopDwellRaw_[12]{};
+  const collision::Box* stopBox_=nullptr;
+  // Three synchronous issued references, including the IMU correction. These
+  // are commands at known controller epochs, never asynchronous encoder poses.
+  motion::JointTargetFrame issued_[3]{};
+  uint64_t issuedUs_[3]{};
+  unsigned issuedCount_=0;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;
   uint16_t offMask_=0; unsigned offNext_=0;
   uint64_t nowUs_=0,nextUs_=0,lastReleaseUs_=0,goalSentUs_=0,goalDeadlineUs_=0;

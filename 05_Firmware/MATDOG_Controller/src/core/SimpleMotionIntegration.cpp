@@ -56,10 +56,15 @@ bool Controller::SimpleServoPort::resolve(unsigned i,double q,uint16_t& raw){
   return tr&&lim&&actuator::resolveRadiansToRaw(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,q,&raw)==actuator::TargetResolveStatus::OK&&lim->contains(raw);
 }
 bool Controller::SimpleServoPort::frame(const uint16_t raw[12],simple::Drive drive){
-  if(!owner||owner->simple_motion_.stopping())return false;
+  // Only SimpleMotion's scoped, exact STOP frame may pass its operational
+  // revocation. ServoBus still checks the shared STOP/fault preemption hook.
+  frame_preempted=false;
+  if(!owner)return false;
+  if(owner->simple_motion_.stopping()&&!owner->simple_motion_.stopFrameAuthorized(raw,drive)){frame_preempted=true;return false;}
   uint8_t ids[12];for(unsigned i=0;i<12;++i)ids[i]=slotId(i);
   if(!owner->servo_bus_.setOperationalDrive(drive.speed,drive.acc))return false;
-  servo::ServoBus::FrameTx tx;return owner->servo_bus_.syncWriteGoalPositions(ids,raw,&tx)&&tx.complete;
+  servo::ServoBus::FrameTx tx;const bool sent=owner->servo_bus_.syncWriteGoalPositions(ids,raw,&tx);
+  frame_preempted=tx.preempted;return sent&&tx.complete;
 }
 bool Controller::SimpleServoPort::enable(unsigned i){
   if(!owner||i>=12||owner->simple_motion_.stopping())return false;
