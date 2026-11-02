@@ -29,19 +29,23 @@ bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback&
   // the physical temperature directly, within the same 2 ms reply budget.
   if(out.temp>=70){int direct=-1;if(!bus.readPresentTemperatureDirect(slotId(i),&direct,2))return false;out.temp=direct;}
   simple::timing::Section conversion(simple::timing::CONVERT);
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
-  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  if(!tr||out.raw>=4096)return false;
-  actuator::MicroRad urad=0;
-  if(actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,out.raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  if(!radians(i,out.raw,out.q))return false;
   // Acquiring a folded pose can observe a contact outside the URDF. This
   // never expands command limits: only the unchanged recorded contact span
   // may be observed, then DISENGAGE moves LOWER inward before the route.
   const int contactMargin=c.simple_record_.repeatability[i]+calibration::LivePositionEvidence{}.extra_margin_ticks;
   if(static_cast<int>(out.raw)<static_cast<int>(c.simple_record_.contact_min[i])-contactMargin||
      static_cast<int>(out.raw)>static_cast<int>(c.simple_record_.contact_max[i])+contactMargin)return false;
-  out.q=actuator::microRadToRadians(urad);out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
+  out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
   return true;
+}
+bool Controller::SimpleServoPort::radians(unsigned i,uint16_t raw,double& q){
+  if(!owner||i>=12||raw>=4096)return false;auto& c=*owner;
+  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
+  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
+  actuator::MicroRad urad=0;
+  if(!tr||actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  q=actuator::microRadToRadians(urad);return true;
 }
 bool Controller::SimpleServoPort::readDeferred() const {
   // A two-block control read can answer block40 then defer block56. Its TX

@@ -51,6 +51,7 @@ struct ScriptedObservationPort: simple::ServoPort {
     if(control)out.controlStampUs=now;return true;
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
+  bool radians(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override{
     assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}
@@ -153,10 +154,10 @@ int main(){
   for(unsigned i=0;i<1000&&strcmp(liftStop.m.phase(),"STAND_LIFT");++i)liftStop.tick();
   for(unsigned i=0;i<60;++i)liftStop.tick();assert(!strcmp(liftStop.m.phase(),"STAND_LIFT"));
   liftStop.m.stop();for(unsigned i=0;i<150&&!liftStop.m.stopVerified();++i)liftStop.tick();
-  // This scripted flat IMU disagrees with the route's intentional pitch:
-  // its moving correction has no analytic derivatives; do not certify C2.
-  assert(liftStop.m.state()==simple::State::FAULT&&!strcmp(liftStop.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));
-  assert(liftStop.m.offVerified()&&liftStop.m.stand(.15,liftStop.p.now));
+  // IMU-corrected writer samples now admit C0 arrest without an analytic
+  // derivative claim for the preceding compensation signal.
+  assert(liftStop.m.stopVerified()&&liftStop.m.energized()&&!liftStop.m.offVerified());
+  assert(liftStop.m.stand(.15,liftStop.p.now)); // intermediate posture still unqualified for recovery
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
   for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<150&&!gaitRestart.m.stopVerified();++i)gaitRestart.tick();

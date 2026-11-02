@@ -18,23 +18,24 @@ using namespace matdog;
 namespace matdog { namespace simple {
 struct StopReferenceProbe {
   struct Knot { double q[12]{},v[12]{},a[12]{}; };
-  static Knot original(const SimpleMotion& m,uint64_t now){
-    Knot k;auto nominal=m.issuedNominal_;
-    if(m.phase_==SimpleMotion::Phase::HOLD)nominal=m.holdNominal_.target;
-    else if(m.phase_==SimpleMotion::Phase::WALK){
-      motion::GaitParameters g;g.heightM=baseLinkHeightFromNominalM(.15);g.liftM=kWalkLiftM;g.duty=kWalkDuty;
-      g.advanceXM=kStrideM[m.stride_];g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
-      const double terminal=m.walkStopping_?m.stopCycle_+kWalkStopCycles:-1;
-      auto f=motion::solveGait(g,motion::gaitCartesian(g,(now-m.walkStartUs_)/1e6/kWalkPeriodS,1/kWalkPeriodS,0,terminal),&m.walkPrevious_,true);
-      assert(f.target.valid);nominal=f.target;
-      for(unsigned l=0;l<4;++l){auto v=f.velocityRadS[l],a=f.accelerationRadS2[l];
-        k.v[3*l]=v.hip;k.v[3*l+1]=v.upper;k.v[3*l+2]=v.lower;k.a[3*l]=a.hip;k.a[3*l+1]=a.upper;k.a[3*l+2]=a.lower;}
-    }else {double q[ViaPlan::kDim],v[ViaPlan::kDim],a[ViaPlan::kDim];
-      assert(m.planned_);m.plan_.sample((now-m.segmentStartUs_)/1e6,q,v,a);
-      for(unsigned i=0;i<12;++i){motion::jointSlot(nominal,i)=q[i];k.v[i]=v[i];k.a[i]=a[i];}}
-    for(unsigned i=0;i<12;++i)k.q[i]=motion::jointSlot(nominal,i)+motion::jointSlot(m.issuedOffset_,i);
+  static Knot original(const SimpleMotion& m,uint64_t){
+    Knot k;assert(m.issuedUs_>m.previousUs_&&m.previousUs_);
+    const double dt=(m.issuedUs_-m.previousUs_)/1e6, vmax=m.commandedDrive_.speed*kTickRad;
+    for(unsigned i=0;i<12;++i){double previous=0;
+      assert(m.port_->radians(i,m.commandedRaw_[i],k.q[i]));
+      assert(m.port_->radians(i,m.previousRaw_[i],previous));
+      k.v[i]=std::clamp((k.q[i]-previous)/dt,-vmax,vmax);}
     return k;
   }
+  static double correction(const SimpleMotion& m){
+    auto nominal=m.phase_==SimpleMotion::Phase::WALK?m.walkPrevious_.target:m.holdNominal_.target;
+    if(m.planned_&&m.phase_!=SimpleMotion::Phase::HOLD){double q[ViaPlan::kDim];
+      m.plan_.sample((m.lastReleaseUs_-m.segmentStartUs_)/1e6,q);
+      for(unsigned i=0;i<12;++i)motion::jointSlot(nominal,i)=q[i];}
+    double d=0;for(unsigned i=0;i<12;++i)d=std::fmax(d,std::abs(motion::jointSlot(m.goal_,i)-motion::jointSlot(nominal,i)));
+    return d;
+  }
+  static uint64_t deadline(const SimpleMotion& m){return m.stopDeadlineUs_;}
   static void joined(const SimpleMotion& m,const Knot& k){
     assert(m.stopActive_);double q[12],v[12],a[12];m.stopPlan_.sample(0,q,v,a);
     for(unsigned i=0;i<12;++i){assert(std::abs(q[i]-k.q[i])<1e-12);assert(std::abs(v[i]-k.v[i])<1e-12);assert(std::abs(a[i]-k.a[i])<1e-12);}
@@ -42,8 +43,7 @@ struct StopReferenceProbe {
     for(unsigned n=0;n<=1000;++n){m.stopPlan_.sample(m.stopPlan_.duration*n/1000,q,v,a);
       for(unsigned i=0;i<12;++i){assert(q[i]>=b.lo[i]&&q[i]<=b.hi[i]);assert(std::abs(v[i])<=m.stopDrive_.speed*kTickRad+1e-10);assert(std::abs(a[i])<=m.stopDrive_.acc*100*kTickRad+1e-10);}}
   }
-  static bool stable(const SimpleMotion& m){return m.issuedOffsetStable_;}
-  static double offset(const SimpleMotion& m){double d=0;for(unsigned i=0;i<12;++i)d=std::fmax(d,std::abs(motion::jointSlot(m.issuedOffset_,i)));return d;}
+
 };
 } }
 namespace {
@@ -55,7 +55,7 @@ struct ObservationPort : simple::ServoPort {
   simple::Drive drive{};
   bool missing=false,stale=false,freeze=false,failStopFrame=false,verify=true;
   bool stopInFrame=false,stopAfterFrame=false,frameInterrupted=false,failWithDuplicate=false,failWithSafeOff=false,safeOffInFrame=false,safeOffAfterFrame=false,faultAfterFrame=false;
-  unsigned stopDuringReads=0;
+  unsigned stopDuringReads=0,frameDelayUs=0;
   int offsetTicks=0;
   unsigned frames=0,stopFrames=0,offCalls=0,enables=0;
   std::vector<std::array<uint16_t,12>> sent;
@@ -82,8 +82,9 @@ struct ObservationPort : simple::ServoPort {
   bool resolve(unsigned,double q,uint16_t& raw) override {
     raw=2048+std::lround(q/simple::kTickRad);return raw<4096;
   }
+  bool radians(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override {
-    frameInterrupted=false;
+    frameInterrupted=false;test_clock_us+=frameDelayUs;
     const bool stopping=motion&&motion->stopping();
     assert(!stopping||motion->stopFrameAuthorized(raw,d));
     if(safeOffInFrame){safeOffInFrame=false;frameInterrupted=true;motion->safeOff();return false;}
@@ -181,7 +182,7 @@ void holdAndProne(){
   loaded.p.observed[2].raw+=7;loaded.p.observed[2].q+=7*simple::kTickRad;
   loaded.p.freeze=true;loaded.p.observed[2].load=1024+176;
   const auto nominal=loaded.m.target();checkHeldStop(loaded);
-  for(unsigned i=0;i<12;++i)assert(motion::jointSlot(loaded.m.target(),i)==motion::jointSlot(nominal,i));
+  for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(loaded.m.target(),i)-motion::jointSlot(nominal,i))<=simple::kTickRad/2);
   std::puts("STOP HOLD50/100/150 and PRONE: torque maintained, endpoint observed, support unverified, WALK/PRONE refused; explicit STAND tested separately");
 }
 void movementAndDuplicates(){
@@ -337,25 +338,71 @@ void safeOffAndRecovery(){
   assert(!core::parseMotionJson(bad,strlen(bad),&parsed,&why));
   puts("SAFE_OFF global 13/13 overrides Motion/STOP/TX and concurrent fault; HTTP STOP never undoes OFF. Explicit STAND uses existing torque only from admitted held poses");
 }
-void analyticHandoff(){
-  for(bool walking:{false,true}){Rig r;if(walking){r.walk();r.ticks(380);}else{r.stand(.10);r.ticks(100);assert(!r.m.stand(.15,r.p.now));r.ticks(5);}
-    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now+simple::kPeriodUs);
-    double dynamic=0;for(unsigned i=0;i<12;++i)dynamic=std::fmax(dynamic,std::abs(k.v[i])+std::abs(k.a[i]));assert(dynamic>1e-4);
-    r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);assert(r.finishStop());}
-  {Rig r;r.stand(.15);r.in.quaternion[0]=std::cos(.02/2);r.in.quaternion[1]=std::sin(.02/2);r.ticks(200);
-    assert(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8);
-    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now+simple::kPeriodUs);r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);assert(r.finishStop());}
-  {Rig r;r.stand(.10);r.ticks(50);assert(!r.m.stand(.15,r.p.now));r.ticks(10);
-    r.in.quaternion[0]=std::cos(.04/2);r.in.quaternion[1]=std::sin(.04/2);r.ticks(2);
-    assert(!simple::StopReferenceProbe::stable(r.m));r.m.stop();r.tick();
-    assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));r.finishOff();}
-  {Rig r;r.walk();r.in.quaternion[0]=std::cos(.02/2);r.in.quaternion[1]=std::sin(.02/2);
-    for(unsigned n=0;n<400;++n){r.tick();if(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8)break;}
-    assert(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8);
-    r.m.stop();r.tick();assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));r.finishOff();}
-  puts("Analytic ViaPlan/Gait q/v/a at common handoff epoch: C2 PASS, full-curve V/A/box PASS; changing applied IMU offset explicitly unsupported");
+void writerHandoffWithImu(){
+  // Constant and varying ordinary IMU correction in HOLD, HEIGHT50->100,
+  // and all four gait swing / four-stance windows. No contact claim.
+  for(unsigned mode=0;mode<3;++mode)for(unsigned window=0;window<(mode==2?8u:2u);++window){
+    Rig r;if(mode==2)r.walk();else {r.stand(.05);r.ticks(100);}
+    if(mode==1){assert(!r.m.stand(.10,r.p.now));r.ticks(20);}
+    unsigned ticks=mode==2?unsigned(std::ceil((1.+(window/2)*.25+(window%2?.1625:.0375))*simple::kWalkPeriodS/.02)):10;
+    for(unsigned n=0;n<ticks;++n){const double angle=.02+(window%2?.006*std::sin(n*.3):0);
+      r.in.quaternion[0]=std::cos(angle/2);r.in.quaternion[1]=std::sin(angle/2);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(simple::StopReferenceProbe::correction(r.m)>1e-8);
+    if(mode==2){motion::GaitParameters gait;gait.duty=simple::kWalkDuty;unsigned stance=0;
+      for(unsigned l=0;l<4;++l)stance+=motion::legPhase(gait,static_cast<motion::LegId>(l),r.m.walkCycles()).stance;
+      assert(stance==(window%2?3u:4u));}
+    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now);
+    const auto off=r.p.offCalls,enables=r.p.enables;
+    r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);
+    assert(r.finishStop()&&r.m.energized()&&!r.m.stopSupportVerified());
+    assert(r.p.offCalls==off&&r.p.enables==enables);
+    if(mode==0){assert(!r.m.standResumeRefusal(r.p.now));assert(!r.m.stand(.10,r.p.now));
+      for(unsigned n=0;n<1500&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables);}
+    else assert(r.m.stand(.15,r.p.now));
+  }
+  // Sub-tick changes are not emitted frames. The accepted RAW, not the
+  // unquantized floating goal or asynchronous encoder snapshot, is authoritative.
+  {Rig r;r.stand(.15);r.ticks(100);const auto raw=r.p.target[1];const auto frames=r.p.frames;
+    for(unsigned n=0;n<10;++n){r.in.quaternion[0]=std::cos(1e-7*n/2);r.in.quaternion[1]=std::sin(1e-7*n/2);r.tick();}
+    assert(r.p.target[1]==raw&&r.p.frames==frames);
+    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now);
+    for(double v:k.v)assert(v==0);r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);assert(r.finishStop());}
+  puts("Writer RAW handoff C0: constant/variable IMU HOLD, HEIGHT50->100 and WALK phase windows PASS; bounded new curve, no C1/C2 or physical braking claim");
+}
+void referenceBoundaries(){
+  // The last accepted planned frame remains authoritative when the generator
+  // changes phase before its next emission (including WALK's first release).
+  {Rig r;r.walk();r.m.stop();r.tick();assert(r.m.stopActive());assert(r.finishStop());}
+  {Rig r;r.stand(.10);r.ticks(100);r.m.stop();assert(r.finishStop());
+    const auto enables=r.p.enables;assert(!r.m.stand(.15,r.p.now));r.m.stop();r.tick();
+    assert(r.m.stopActive()&&r.finishStop()&&r.m.energized()&&r.p.enables==enables);}
+}
+void preemptionDeadline(){
+  // The deadline is immutable even when every candidate frame is preempted.
+  for(bool expire:{false,true}){Rig r;r.walk();r.ticks(380);r.m.stop();r.tick();
+    const auto deadline=simple::StopReferenceProbe::deadline(r.m);const auto off=r.p.offCalls,enables=r.p.enables;
+    for(unsigned n=0;n<(expire?300u:20u)&&r.m.state()!=simple::State::FAULT;++n){
+      r.p.stopInFrame=true;r.m.stop();r.tick();
+      assert(simple::StopReferenceProbe::deadline(r.m)==deadline);
+      assert(r.m.stand(.10,r.p.now));
+      if(r.p.now<=deadline)assert(r.m.state()!=simple::State::FAULT);
+    }
+    if(expire){assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_NOT_SETTLED"));r.finishOff();
+      assert(!r.m.energized()&&r.m.offMask()==8191&&r.p.offCalls>off);}
+    else {r.p.stopInFrame=false;assert(r.finishStop()&&r.m.energized()&&r.p.offCalls==off);}
+    assert(r.p.enables==enables);
+  }
+  // A preempted atomic attempt crossing the existing deadline is checked on
+  // return, without sending another frame or waiting for the next release.
+  {Rig r;r.walk();r.ticks(380);r.m.stop();r.tick();const auto deadline=simple::StopReferenceProbe::deadline(r.m);
+    while(r.p.now+simple::kPeriodUs+10000<deadline){r.p.stopInFrame=true;r.tick();}
+    r.p.frameDelayUs=30000;r.p.stopInFrame=true;r.tick();
+    assert(test_clock_us>int64_t(deadline)&&r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_NOT_SETTLED"));
+    r.p.frameDelayUs=0;r.finishOff();assert(r.m.offMask()==8191&&!r.m.energized());}
+  puts("STOP preemption: short retry retains torque; continuous duplicates/concurrent STAND cannot extend deadline; crossing deadline in TX faults to SAFE_OFF 13/13");
 }
 
 }
-int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();analyticHandoff();
+int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

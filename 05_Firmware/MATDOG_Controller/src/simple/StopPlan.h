@@ -4,10 +4,11 @@
 #include <initializer_list>
 
 namespace matdog { namespace simple {
-// Candidate reference arrest, NOT an actuator/contact model. Initial derivatives
-// come from the original analytic generator at the handoff epoch, including
-// an admissible applied offset, never encoder snapshots or fitted differences.
-// The quartic joins q,v,a C2 and ends with v=a=0. Physical tracking is unqualified.
+// Candidate reference arrest, NOT an actuator/contact model. q is the last
+// accepted command; v is a bounded reference rate, a a chosen boundary value.
+// The quartic is smooth internally and ends with v=a=0. Only C0 is claimed at
+// the handoff from sampled/quantized IMU-corrected goals; physical tracking and
+// the preceding signal's derivatives are not inferred from these samples.
 struct StopPlan {
   static constexpr double kMaxDurationS=1.2, kMaxResidualRad=.35;
   double q[12]{},v[12]{},a[12]{},end[12]{},duration=0;

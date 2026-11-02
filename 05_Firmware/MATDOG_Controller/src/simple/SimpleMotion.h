@@ -53,6 +53,8 @@ class ServoPort {
   // after a successful first block. No new unanswered reply is implied.
   virtual bool readDeferred() const { return false; }
   virtual bool resolve(unsigned slot,double q,uint16_t&)=0;
+  // Decode a commanded RAW with the same gen-1 transform as readback. No I/O.
+  virtual bool radians(unsigned,uint16_t,double&) { return false; }
   virtual bool frame(const uint16_t raw[12],Drive)=0;
   // Only an explicit pre-TX cancellation, never a partial/failed write.
   virtual bool framePreempted() const { return false; }
@@ -163,7 +165,7 @@ class SimpleMotion {
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
-  bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false,const motion::JointTargetFrame* nominal=nullptr);
+  bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
   bool arrived(uint64_t) const;
   bool settledUnderLoad(uint64_t);
   bool entersHeight(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
@@ -192,7 +194,8 @@ class SimpleMotion {
   bool serviceStop();
   void beginStop(uint64_t);
   void generateStop(uint64_t);
-  void rememberReference(const motion::JointTargetFrame&,uint64_t,const motion::JointTargetFrame*);
+  void rememberReference(uint64_t);
+  bool stopTimedOut(uint64_t);
   void enterOff(bool fault,const char*);
   ServoPort* port_=nullptr;
   Inputs input_{};
@@ -213,12 +216,12 @@ class SimpleMotion {
   const collision::Box* stopBox_=nullptr;
   Phase stopOrigin_=Phase::IDLE;
   bool stopHadSwing_=false;
-  // The last generator and its actually applied, sample-held IMU offset.
-  // A changing offset has no analytic derivatives: it is never extrapolated.
-  motion::JointTargetFrame issuedNominal_{},issuedOffset_{};
-  uint64_t issuedUs_=0;
+  // Writer-owned samples of the accepted RAW reference (including unchanged
+  // held goals). Timestamped with the ESP clock after TX, not release entry.
+  uint16_t previousRaw_[12]{};
+  uint64_t issuedUs_=0,previousUs_=0;
   Phase issuedPhase_=Phase::IDLE;
-  bool issuedPlanned_=false,issuedOffsetStable_=false;
+  bool issuedPlanned_=false;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;
   uint16_t offMask_=0; unsigned offNext_=0;
   uint64_t nowUs_=0,nextUs_=0,lastReleaseUs_=0,goalSentUs_=0,goalDeadlineUs_=0;
