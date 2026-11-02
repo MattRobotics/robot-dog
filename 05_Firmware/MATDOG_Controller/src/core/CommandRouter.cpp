@@ -270,7 +270,17 @@ void CommandRouter::handleLine(String line) {
     for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_max_us=%lu",k,(unsigned long)t.externalMax[k]);
     for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();return;
   }
-  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||(modules_.service&&modules_.service->motionEngaged()&&upper.startsWith("@SERVO SAFE_OFF "))) {
+  if(upper.startsWith("@SERVO SAFE_OFF")){
+    int id=-1;char extra=0;
+    if(sscanf(upper.c_str(),"@SERVO SAFE_OFF %d %c",&id,&extra)!=1||id<0||id>253){Serial.println("ERROR=USAGE @SERVO SAFE_OFF <id>");return;}
+    // Explicit de-escalation is global in SIMPLE, including its torque-ON
+    // STOP terminal. Never reinterpret SAFE_OFF as contextual operational STOP.
+    if(modules_.service&&modules_.service->motionSafeOff()){
+      Serial.printf("SERVO_SAFE_OFF id=%d scope=GLOBAL_13 result=REQUESTED_VERIFY_MOTION_STATUS\n",id);return;
+    }
+    printServoSafeOff(id);return;
+  }
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP") {
     if(upper=="@MOTION STATUS"){
       static char out[6144];MotionStatusSnapshot snapshot;bool ok;
       {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
@@ -1310,16 +1320,6 @@ void CommandRouter::handleLine(String line) {
       printServoRead(id);
     } else {
       Serial.println("ERROR=USAGE @SERVO READ <id>");
-    }
-  } else if (upper.startsWith("@SERVO SAFE_OFF")) {
-    // Deliberately NOT gated by operating mode: this is the one write that
-    // can only make things safer (torque off), so it must stay reachable
-    // regardless of MAINTENANCE/RUN — see OperatingMode.h.
-    int id = -1;
-    if (sscanf(upper.c_str(), "@SERVO SAFE_OFF %d", &id) == 1) {
-      printServoSafeOff(id);
-    } else {
-      Serial.println("ERROR=USAGE @SERVO SAFE_OFF <id>");
     }
   } else if (upper == "@MODE STATUS") {
     printModeStatus();

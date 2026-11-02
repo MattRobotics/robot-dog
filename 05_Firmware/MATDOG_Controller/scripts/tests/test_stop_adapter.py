@@ -30,6 +30,11 @@ case = "case HttpRequestKind::MOTION_COMMAND: {" + extract(
     "network/HttpTransport.cpp", "case HttpRequestKind::MOTION_COMMAND: {",
     "case HttpRequestKind::CALIBRATION_RESTORE: {")
 http = (SRC / "network/HttpTransport.cpp").read_text()
+router = (SRC / "core/CommandRouter.cpp").read_text()
+off_route = router.split('if(upper.startsWith("@SERVO SAFE_OFF"))', 1)[1].split('if(upper=="@STOP"', 1)[0]
+assert 'modules_.service->motionSafeOff()' in off_route
+assert 'Intent::STOP' not in off_route and 'motionEngaged()' not in off_route
+assert router.count('upper.startsWith("@SERVO SAFE_OFF")') == 1
 assert "r.stop_epoch=self->service_->motionStopEpoch();" in http
 assert "stop_epoch_" not in http
 

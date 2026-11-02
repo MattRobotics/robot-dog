@@ -5,9 +5,9 @@
 
 namespace matdog { namespace simple {
 // Candidate reference arrest, NOT an actuator/contact model. Initial derivatives
-// describe the synchronous issued reference, never twelve encoder observations.
-// The quartic is C2 internally, joins that reference's quadratic interpolant at
-// q,v,a, and ends with v=a=0. No claim of physical C2 tracking is made.
+// come from the original analytic generator at the handoff epoch, including
+// an admissible applied offset, never encoder snapshots or fitted differences.
+// The quartic joins q,v,a C2 and ends with v=a=0. Physical tracking is unqualified.
 struct StopPlan {
   static constexpr double kMaxDurationS=1.2, kMaxResidualRad=.35;
   double q[12]{},v[12]{},a[12]{},end[12]{},duration=0;

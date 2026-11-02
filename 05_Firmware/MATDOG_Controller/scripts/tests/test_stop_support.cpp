@@ -3,6 +3,7 @@
 #include "../../src/simple/SimpleMotion.h"
 #include "../../src/simple/StopPlan.h"
 #include "../../src/core/MotionService.h"
+#include "../../src/core/MotionJson.h"
 #include "../../src/motion/PairedProneData.h"
 #include <array>
 #include <cassert>
@@ -14,6 +15,37 @@
 static int64_t test_clock_us=1000000;
 extern "C" int64_t esp_timer_get_time(){return test_clock_us;}
 using namespace matdog;
+namespace matdog { namespace simple {
+struct StopReferenceProbe {
+  struct Knot { double q[12]{},v[12]{},a[12]{}; };
+  static Knot original(const SimpleMotion& m,uint64_t now){
+    Knot k;auto nominal=m.issuedNominal_;
+    if(m.phase_==SimpleMotion::Phase::HOLD)nominal=m.holdNominal_.target;
+    else if(m.phase_==SimpleMotion::Phase::WALK){
+      motion::GaitParameters g;g.heightM=baseLinkHeightFromNominalM(.15);g.liftM=kWalkLiftM;g.duty=kWalkDuty;
+      g.advanceXM=kStrideM[m.stride_];g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+      const double terminal=m.walkStopping_?m.stopCycle_+kWalkStopCycles:-1;
+      auto f=motion::solveGait(g,motion::gaitCartesian(g,(now-m.walkStartUs_)/1e6/kWalkPeriodS,1/kWalkPeriodS,0,terminal),&m.walkPrevious_,true);
+      assert(f.target.valid);nominal=f.target;
+      for(unsigned l=0;l<4;++l){auto v=f.velocityRadS[l],a=f.accelerationRadS2[l];
+        k.v[3*l]=v.hip;k.v[3*l+1]=v.upper;k.v[3*l+2]=v.lower;k.a[3*l]=a.hip;k.a[3*l+1]=a.upper;k.a[3*l+2]=a.lower;}
+    }else {double q[ViaPlan::kDim],v[ViaPlan::kDim],a[ViaPlan::kDim];
+      assert(m.planned_);m.plan_.sample((now-m.segmentStartUs_)/1e6,q,v,a);
+      for(unsigned i=0;i<12;++i){motion::jointSlot(nominal,i)=q[i];k.v[i]=v[i];k.a[i]=a[i];}}
+    for(unsigned i=0;i<12;++i)k.q[i]=motion::jointSlot(nominal,i)+motion::jointSlot(m.issuedOffset_,i);
+    return k;
+  }
+  static void joined(const SimpleMotion& m,const Knot& k){
+    assert(m.stopActive_);double q[12],v[12],a[12];m.stopPlan_.sample(0,q,v,a);
+    for(unsigned i=0;i<12;++i){assert(std::abs(q[i]-k.q[i])<1e-12);assert(std::abs(v[i]-k.v[i])<1e-12);assert(std::abs(a[i]-k.a[i])<1e-12);}
+    const auto& b=*m.stopBox_;
+    for(unsigned n=0;n<=1000;++n){m.stopPlan_.sample(m.stopPlan_.duration*n/1000,q,v,a);
+      for(unsigned i=0;i<12;++i){assert(q[i]>=b.lo[i]&&q[i]<=b.hi[i]);assert(std::abs(v[i])<=m.stopDrive_.speed*kTickRad+1e-10);assert(std::abs(a[i])<=m.stopDrive_.acc*100*kTickRad+1e-10);}}
+  }
+  static bool stable(const SimpleMotion& m){return m.issuedOffsetStable_;}
+  static double offset(const SimpleMotion& m){double d=0;for(unsigned i=0;i<12;++i)d=std::fmax(d,std::abs(motion::jointSlot(m.issuedOffset_,i)));return d;}
+};
+} }
 namespace {
 struct ObservationPort : simple::ServoPort {
   simple::SimpleMotion* motion=nullptr;
@@ -22,7 +54,7 @@ struct ObservationPort : simple::ServoPort {
   uint16_t target[12]{};
   simple::Drive drive{};
   bool missing=false,stale=false,freeze=false,failStopFrame=false,verify=true;
-  bool stopInFrame=false,stopAfterFrame=false,frameInterrupted=false,failWithDuplicate=false;
+  bool stopInFrame=false,stopAfterFrame=false,frameInterrupted=false,failWithDuplicate=false,failWithSafeOff=false,safeOffInFrame=false,safeOffAfterFrame=false,faultAfterFrame=false;
   unsigned stopDuringReads=0;
   int offsetTicks=0;
   unsigned frames=0,stopFrames=0,offCalls=0,enables=0;
@@ -54,12 +86,13 @@ struct ObservationPort : simple::ServoPort {
     frameInterrupted=false;
     const bool stopping=motion&&motion->stopping();
     assert(!stopping||motion->stopFrameAuthorized(raw,d));
+    if(safeOffInFrame){safeOffInFrame=false;frameInterrupted=true;motion->safeOff();return false;}
     if(stopping&&stopInFrame){stopInFrame=false;frameInterrupted=true;motion->stop();return false;}
-    if(stopping&&failStopFrame){if(failWithDuplicate)motion->stop();return false;}
+    if(stopping&&failStopFrame){if(failWithDuplicate)motion->stop();if(failWithSafeOff)motion->safeOff();return false;}
     ++frames;if(stopping)++stopFrames;drive=d;
     std::array<uint16_t,12> copy{};
     for(unsigned i=0;i<12;++i)copy[i]=target[i]=raw[i];
-    sent.push_back(copy);if(stopAfterFrame){stopAfterFrame=false;motion->stop();}return true;
+    sent.push_back(copy);if(safeOffAfterFrame){safeOffAfterFrame=false;motion->safeOff();if(faultAfterFrame)motion->fault("CONCURRENT_PHYSICAL_FAULT");}if(stopAfterFrame){stopAfterFrame=false;motion->stop();}return true;
   }
   bool framePreempted() const override { return frameInterrupted; }
   bool enable(unsigned i) override {observed[i].torque=1;++enables;return true;}
@@ -101,7 +134,7 @@ void checkHeldStop(Rig& r){
   assert(r.m.state()==simple::State::STOPPED&&r.m.energized());
   assert(!r.m.offVerified()&&!r.m.stopSupportVerified());assert(r.p.offCalls==off&&r.p.enables==enables);
   const auto frames=r.p.frames;r.ticks(30);assert(r.p.frames==frames);
-  assert(r.m.stand(.15,r.p.now));assert(r.m.prone(r.p.now));assert(r.m.walk(1,r.p.now));
+  assert(r.m.prone(r.p.now));assert(r.m.walk(1,r.p.now));
   r.m.walkStop();r.ticks(30);assert(r.p.frames==frames&&r.p.enables==enables);
   assert(r.m.stopVerified()&&!r.m.stopSupportVerified());
 }
@@ -149,7 +182,7 @@ void holdAndProne(){
   loaded.p.freeze=true;loaded.p.observed[2].load=1024+176;
   const auto nominal=loaded.m.target();checkHeldStop(loaded);
   for(unsigned i=0;i<12;++i)assert(motion::jointSlot(loaded.m.target(),i)==motion::jointSlot(nominal,i));
-  std::puts("STOP HOLD50/100/150 and PRONE: torque maintained, endpoint observed, support unverified, operational intents refused");
+  std::puts("STOP HOLD50/100/150 and PRONE: torque maintained, endpoint observed, support unverified, WALK/PRONE refused; explicit STAND tested separately");
 }
 void movementAndDuplicates(){
   for(unsigned scenario=0;scenario<3;++scenario){Rig one,repeated;
@@ -259,12 +292,70 @@ void serviceCompletion(){
     assert(!strcmp(status.activeOutcome,"COMPLETED"));
     assert(!strcmp(status.activeReason,engaged?"STOPPED_SUPPORT_UNVERIFIED":"SAFE_OFF_VERIFIED"));
     assert(status.stopVerified==engaged&&!status.stopSupportVerified);
+    char json[core::kMotionStatusJsonBytes];assert(service.statusJson(json,sizeof(json),r.p.now/1000));
+    assert(strstr(json,engaged?"\"stand_resume_allowed\":true":"\"stand_resume_allowed\":false"));
     if(engaged){motion::MotionCommand move;move.owner=motion::ClientOwner::DASHBOARD;move.intent=motion::Intent::STAND;
       move.sequence=3;move.issued_at_ms=r.p.now/1000;move.ttl_ms=1000;move.target_height_m=.15;std::strcpy(move.id,"late-motion");
-      assert(service.command(move,r.p.now/1000).outcome==motion::CommandOutcome::REJECTED);}
+      assert(service.command(move,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);}
   }
   std::puts("STOP service: ACK is not completion; first identity retained, common epoch, feedback/SAFE_OFF terminal distinguished");
 }
+void safeOffAndRecovery(){
+  for(unsigned scenario=0;scenario<7;++scenario){Rig r;r.walk();r.ticks(380);
+    core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    if(scenario==1||scenario==2||scenario==3){r.m.stop();r.tick();if(scenario==2)assert(r.finishStop());}
+    const auto enables=r.p.enables;
+    if(scenario==3){r.p.safeOffInFrame=true;r.tick();}
+    else if(scenario==4||scenario==6){r.p.safeOffAfterFrame=true;r.p.faultAfterFrame=scenario==6;r.tick();}
+    else {if(scenario==5)r.m.fault("CONCURRENT_PHYSICAL_FAULT");const auto epoch=service.stopEpoch();service.safeOff();assert(service.stopEpoch()==epoch+1);r.tick();}
+    const auto frames=r.p.frames;
+    // A dashboard STOP after explicit SAFE_OFF cannot restore a torque-ON terminal.
+    motion::MotionCommand c;c.intent=motion::Intent::STOP;c.owner=motion::ClientOwner::DASHBOARD;strcpy(c.id,"http-after-safe-off");c.sequence=1;
+    assert(service.command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+    r.finishOff();r.ticks(20);assert(r.m.offMask()==8191&&!r.m.energized()&&!r.m.stopActive());
+    assert(r.p.enables==enables&&r.p.frames==frames&&r.m.stand(.15,r.p.now));
+    if(scenario==5||scenario==6)assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"CONCURRENT_PHYSICAL_FAULT"));
+  }
+  {Rig r;r.walk();r.ticks(380);r.p.failStopFrame=r.p.failWithSafeOff=true;r.m.stop();
+    for(unsigned n=0;n<20&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"SYNC_WRITE_FAILED"));r.finishOff();}
+  for(bool prone:{false,true}){Rig r;r.stand(.10);r.ticks(100);if(prone){assert(!r.m.prone(r.p.now));r.phase("PRONE_CONTACT_UNVERIFIED");}
+    r.m.stop();r.tick();assert(!strcmp(r.m.stand(.15,r.p.now),"STOP_IN_PROGRESS"));assert(r.finishStop());
+    const auto enables=r.p.enables,off=r.p.offCalls,frames=r.p.frames;r.ticks(30);assert(r.p.frames==frames);
+    assert(!r.m.standResumeRefusal(r.p.now));assert(!r.m.stand(.15,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==off);
+  }
+  {Rig r;r.walk();r.ticks(380);r.m.stop();assert(r.finishStop());assert(r.m.stand(.15,r.p.now));}
+  {Rig r;r.stand(.10);r.ticks(50);assert(!r.m.stand(.15,r.p.now));r.ticks(20);r.m.stop();assert(r.finishStop());
+    assert(!strcmp(r.m.stand(.15,r.p.now),"STOP_RECOVERY_POSTURE_UNQUALIFIED"));}
+  {Rig r;r.stand(.15);r.ticks(50);r.m.stop();assert(r.finishStop());const auto n=r.p.enables;
+    r.in.authorityOk=false;r.m.inputs(r.in);assert(!strcmp(r.m.stand(.15,r.p.now),"ACTUATOR_OWNER_BUSY"));
+    r.in.authorityOk=true;r.in.powerOk=false;r.m.inputs(r.in);assert(!strcmp(r.m.stand(.15,r.p.now),"POWER_NOT_READY"));assert(r.p.enables==n);}
+  motion::MotionCommand parsed;const char* why=nullptr;
+  const char bad[]={"{\"version\":1,\"id\":\"off\",\"sequence\":1,\"issued_at_ms\":0,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"SERVO.SAFE_OFF\",\"params\":{}}"};
+  assert(!core::parseMotionJson(bad,strlen(bad),&parsed,&why));
+  puts("SAFE_OFF global 13/13 overrides Motion/STOP/TX and concurrent fault; HTTP STOP never undoes OFF. Explicit STAND uses existing torque only from admitted held poses");
 }
-int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();
+void analyticHandoff(){
+  for(bool walking:{false,true}){Rig r;if(walking){r.walk();r.ticks(380);}else{r.stand(.10);r.ticks(100);assert(!r.m.stand(.15,r.p.now));r.ticks(5);}
+    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now+simple::kPeriodUs);
+    double dynamic=0;for(unsigned i=0;i<12;++i)dynamic=std::fmax(dynamic,std::abs(k.v[i])+std::abs(k.a[i]));assert(dynamic>1e-4);
+    r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);assert(r.finishStop());}
+  {Rig r;r.stand(.15);r.in.quaternion[0]=std::cos(.02/2);r.in.quaternion[1]=std::sin(.02/2);r.ticks(200);
+    assert(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8);
+    const auto k=simple::StopReferenceProbe::original(r.m,r.p.now+simple::kPeriodUs);r.m.stop();r.tick();simple::StopReferenceProbe::joined(r.m,k);assert(r.finishStop());}
+  {Rig r;r.stand(.10);r.ticks(50);assert(!r.m.stand(.15,r.p.now));r.ticks(10);
+    r.in.quaternion[0]=std::cos(.04/2);r.in.quaternion[1]=std::sin(.04/2);r.ticks(2);
+    assert(!simple::StopReferenceProbe::stable(r.m));r.m.stop();r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));r.finishOff();}
+  {Rig r;r.walk();r.in.quaternion[0]=std::cos(.02/2);r.in.quaternion[1]=std::sin(.02/2);
+    for(unsigned n=0;n<400;++n){r.tick();if(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8)break;}
+    assert(simple::StopReferenceProbe::stable(r.m)&&simple::StopReferenceProbe::offset(r.m)>1e-8);
+    r.m.stop();r.tick();assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));r.finishOff();}
+  puts("Analytic ViaPlan/Gait q/v/a at common handoff epoch: C2 PASS, full-curve V/A/box PASS; changing applied IMU offset explicitly unsupported");
+}
+
+}
+int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();analyticHandoff();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

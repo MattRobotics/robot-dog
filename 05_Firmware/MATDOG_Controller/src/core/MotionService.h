@@ -1,7 +1,7 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
 namespace matdog { namespace core {
-constexpr size_t kMotionStatusJsonBytes=5120; // fixed HTTPD buffer, including transport diagnostics
+constexpr size_t kMotionStatusJsonBytes=5248; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case)
 // Immutable per-request observation, transferred by the existing HTTP mailbox.
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
@@ -17,7 +17,7 @@ struct MotionStatusSnapshot {
   uint16_t commandedRaw[12]{};
   const char *activeReason="",*activeOutcome="";
   bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
-  bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false;
+  bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
   uint16_t offMask=0,referenceFaultRaw=0;
   double requestedHeightM=0,heightM=0,walkCycles=0,quaternion[4]{};
   unsigned referenceFaultSlot=12;
@@ -32,6 +32,7 @@ class MotionService {
   void setReady(bool r,const char* reason){ready_=r;reason_=reason;}
   void update();
   motion::MotionAck command(const motion::MotionCommand&,uint32_t now_ms);
+  void safeOff() { stopEpoch_.fetch_add(1,std::memory_order_release);if(motion_)motion_->safeOff(); }
   bool statusJson(char*,size_t,uint32_t) const;
   bool captureStatus(MotionStatusSnapshot&,uint32_t) const;
   static bool formatStatus(const MotionStatusSnapshot&,char*,size_t);

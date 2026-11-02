@@ -74,7 +74,7 @@ bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   timing::Section section(timing::READ);
   if(timing::state.active){if(control)++timing::state.working.controlReads;else ++timing::state.working.fastReads;}
   const bool previous=stopIo_;if(stopActive_)stopIo_=true;
-  const bool ok=port_->read(slot,control,out);readInterrupted_=stop_.load();stopIo_=previous;return ok;
+  const bool ok=port_->read(slot,control,out);readInterrupted_=stop_.load()||safeOffRequest_.load();stopIo_=previous;return ok;
 }
 bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
   timing::Section section(timing::FRAME);
@@ -85,7 +85,7 @@ bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
   stopRaw_=nullptr;stopIo_=previous;return ok;
 }
 bool SimpleMotion::stopFrameAuthorized(const uint16_t raw[12],Drive drive) const {
-  return raw&&stopRaw_&&stopActive_&&stopFrame_&&stopIo_&&!stop_.load()&&!offPending_&&!faultLatched_&&
+  return raw&&stopRaw_&&stopActive_&&stopFrame_&&stopIo_&&!safeOffRequest_.load()&&!stop_.load()&&!offPending_&&!faultLatched_&&
     drive.speed==stopDrive_.speed&&drive.acc==stopDrive_.acc&&std::equal(raw,raw+12,stopRaw_);
 }
 const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";case State::PRONE:return "PRONE";}return "FAULT";}
@@ -112,7 +112,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   // motion or after completion starts SAFE_OFF again from the broadcast.
   const bool repeated=!fault&&state_==State::STOPPED&&offPending_;
   faultLatched_=faultLatched_||fault;state_=faultLatched_?State::FAULT:State::STOPPED;reason_=r;
-  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedCount_=0;
+  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=0;issuedOffset_.valid=false;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
@@ -127,22 +127,30 @@ void SimpleMotion::serviceOff(){
   if(offMask_==0x1fff){energized_=false;offPending_=false;offVerifiedUs_=esp_timer_get_time();}
 }
 bool SimpleMotion::serviceStop(){
+  if(safeOffRequest_.exchange(false,std::memory_order_acq_rel)){
+    stop_.store(false,std::memory_order_release);operatorStopped_=true;
+    if(!offPending_)enterOff(false,faultLatched_?reason_:"SAFE_OFF_REQUESTED");
+    serviceOff();return true;
+  }
   if(!stop_.exchange(false,std::memory_order_acq_rel))return false;
   if(faultLatched_||offPending_){serviceOff();return true;}
   if(stopActive_)return false; // duplicate never restarts the clock or dwell
   beginStop(esp_timer_get_time());return true;
 }
-void SimpleMotion::rememberReference(const JointTargetFrame& q,uint64_t now){
+void SimpleMotion::rememberReference(const JointTargetFrame& q,uint64_t now,const JointTargetFrame* nominal){
   if(stopActive_)return;
-  if(issuedCount_&&issuedUs_[issuedCount_-1]==now){issued_[issuedCount_-1]=q;return;}
-  if(issuedCount_==3){issued_[0]=issued_[1];issued_[1]=issued_[2];issuedUs_[0]=issuedUs_[1];issuedUs_[1]=issuedUs_[2];--issuedCount_;}
-  issued_[issuedCount_]=q;issuedUs_[issuedCount_++]=now;
+  if(!nominal||!nominal->valid){issuedUs_=0;issuedOffset_.valid=false;return;}
+  JointTargetFrame offset=q;bool stable=issuedOffset_.valid&&(now>issuedUs_||(now==issuedUs_&&issuedOffsetStable_));
+  for(unsigned i=0;i<12;++i){jointSlot(offset,i)-=jointSlot(*nominal,i);
+    stable=stable&&jointSlot(offset,i)==jointSlot(issuedOffset_,i);}
+  issuedOffsetStable_=stable;issuedOffset_=offset;issuedNominal_=*nominal;
+  issuedUs_=now;issuedPhase_=phase_;issuedPlanned_=planned_;
 }
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
   // WALK STOP, and never enables a previously OFF servo.
-  const bool pending=pendingGoalValid_;
-  walkRequested_=walkStopping_=pendingGoalValid_=false;operatorStopped_=true;
+  const double walkTerminal=walkStopping_?stopCycle_+kWalkStopCycles:-1;
+  walkRequested_=pendingGoalValid_=false;operatorStopped_=true;
   if(!energized_||phase_==Phase::REFERENCE||phase_==Phase::ENABLE){enterOff(false,stopReason_.load());serviceOff();return;}
   if(!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!input_.ready||!input_.authorityOk){fault(input_.refusal);serviceOff();return;}
@@ -152,34 +160,53 @@ void SimpleMotion::beginStop(uint64_t now){
   // Native moves have only an endpoint, not a synchronous in-flight reference.
   // Never pretend that a distant goal is the current pose. Retain the existing
   // fail-closed SAFE_OFF if control cannot construct an authorized reference.
-  if((!planned_&&phase_!=Phase::WALK&&phase_!=Phase::HOLD&&phase_!=Phase::PRONE_WAIT&&
-      !(pending&&(phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)))||
-     !goal_.valid||issuedCount_<3||now<issuedUs_[2]||now-issuedUs_[2]>100000){
+  const auto source=(phase_==Phase::HOLD||phase_==Phase::PRONE_WAIT)?phase_:issuedPhase_;
+  if((issuedPlanned_&&source!=Phase::HOLD&&source!=Phase::PRONE_WAIT&&issuedPhase_!=phase_)||
+     !goal_.valid||!issuedUs_||now<issuedUs_||now-issuedUs_>100000||
+      (!issuedPlanned_&&source!=Phase::WALK&&source!=Phase::HOLD&&source!=Phase::PRONE_WAIT)){
     fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;
   }
-  const auto source=phase_;
+  // compensate() applies a sample-held joint offset, not a differentiable
+  // trajectory. Only an unchanged applied offset can join with zero offset
+  // derivatives. No finite-difference estimate may certify changing IMU IK.
+  if(!issuedOffsetStable_&&source!=Phase::PRONE_WAIT){fault("STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE");serviceOff();return;}
+  // A coincident pair of nonzero moving IK corrections is not a derivative
+  // proof. Admit moving ViaPlan/Gait only without an applied correction;
+  // fixed HOLD may retain a constant corrected target. Other cases fail closed.
+  if(source!=Phase::HOLD&&source!=Phase::PRONE_WAIT)
+    for(unsigned i=0;i<12;++i)if(jointSlot(issuedOffset_,i)!=0){fault("STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE");serviceOff();return;}
+  double q[12]{},v[12]{},a[12]{},lo[12],hi[12];
+  JointTargetFrame nominal=source==Phase::HOLD?holdNominal_.target:issuedNominal_;stopHadSwing_=false;
+  if(source==Phase::WALK){
+    const auto g=walkGait(stride_);const double end=walkTerminal+gaitSettleCycles(g);
+    const double c=(now-walkStartUs_)/1e6/kWalkPeriodS;
+    const bool done=walkTerminal>=0&&c>=end;
+    const auto f=solveGait(g,gaitCartesian(g,done?end:c,done?0:1/kWalkPeriodS,0,walkTerminal),&walkPrevious_,true);
+    if(!f.target.valid){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
+    nominal=f.target;
+    for(unsigned l=0;l<4;++l){stopHadSwing_|=!f.cartesian.phases[l].stance;
+      const auto vel=f.velocityRadS[l],acc=f.accelerationRadS2[l];
+      v[3*l]=vel.hip;v[3*l+1]=vel.upper;v[3*l+2]=vel.lower;
+      a[3*l]=acc.hip;a[3*l+1]=acc.upper;a[3*l+2]=acc.lower;}
+  }else if(source!=Phase::HOLD&&source!=Phase::PRONE_WAIT&&issuedPlanned_){
+    double position[ViaPlan::kDim],velocity[ViaPlan::kDim],acceleration[ViaPlan::kDim];
+    plan_.sample((now-segmentStartUs_)/1e6,position,velocity,acceleration);
+    for(unsigned i=0;i<12;++i){jointSlot(nominal,i)=position[i];v[i]=velocity[i];a[i]=acceleration[i];}
+  }
   stopBox_=source==Phase::WALK?&collision::kWalk:segmentBox_;
   if(!stopBox_)stopBox_=contains(collision::kHeight,goal_)?&collision::kHeight:&collision::kLift;
-  // A loaded low HOLD may sag outside kHeight while remaining inside kLift,
-  // already admitted by SIMPLE. Use one existing common box, never their union.
   if(!contains(*stopBox_,measured())&&contains(collision::kLift,goal_)&&contains(collision::kLift,measured()))stopBox_=&collision::kLift;
-  double q[12],v[12],a[12],lo[12],hi[12];
-  const double dt=(issuedUs_[2]-issuedUs_[1])/1e6,previous=(issuedUs_[1]-issuedUs_[0])/1e6;
-  if(!(dt>0&&previous>0&&dt<=.1&&previous<=.1)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
   for(unsigned i=0;i<12;++i){
-    q[i]=jointSlot(goal_,i);
-    const double recent=(q[i]-jointSlot(issued_[1],i))/dt;
-    const double old=(jointSlot(issued_[1],i)-jointSlot(issued_[0],i))/previous;
-    a[i]=2*(recent-old)/(dt+previous);v[i]=recent+.5*a[i]*dt;
+    q[i]=source==Phase::PRONE_WAIT?jointSlot(goal_,i):jointSlot(nominal,i)+jointSlot(issuedOffset_,i);
     lo[i]=std::fmax(stopBox_->lo[i],input_.minRad[i]);hi[i]=std::fmin(stopBox_->hi[i],input_.maxRad[i]);
   }
   stopDrive_=commandedDrive_;
   if(!stopPlan_.build(q,v,a,lo,hi,stopDrive_.speed*kTickRad,stopDrive_.acc*100*kTickRad)){
     fault("STOP_REFERENCE_OUTSIDE_BOUNDS");serviceOff();return;
   }
-  // Initial v/a are those of the quadratic through three issued references,
-  // including the discrete IMU correction. C0 handoff of commanded position;
-  // C2 against that interpolant, not a claim about the old native motor motion.
+  // q,v,a all belong to the original generator at NOW, plus the unchanged
+  // applied offset. The quartic joins that reference C2, never motor motion.
+  stopOrigin_=source;walkStopping_=false;
   stopActive_=true;stopVerified_=false;stopStartUs_=now;stopTerminalUs_=stopDwellUs_=0;
   // One existing control-read population takes 1.44 s, plus the 0.5 s dwell.
   stopDeadlineUs_=now+static_cast<uint64_t>(std::ceil(stopPlan_.duration*1e6))+3000000;
@@ -269,14 +296,25 @@ bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
   const auto s=generateStandTarget(d);q=s.target;return s.status==StandStatus::OK&&pointSafe(q)&&contains(collision::kHeight,q);
 }
 const char* SimpleMotion::stand(double h,uint64_t now){
-  if(stopActive_)return stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS";
-  if(stopping())return "SAFE_OFF_IN_PROGRESS";
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
+  if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
+  if(stopActive_){if(const char* r=standResumeRefusal(now))return r;}
+  else if(operatorStopped_&&!energized_)return "SAFE_OFF_STAND_REFUSED";
   if(!input_.ready)return input_.refusal;
   if(!input_.powerOk)return "POWER_NOT_READY";
   if(!input_.imuValid)return "IMU_UNAVAILABLE";
   if(state_==State::MOVING||state_==State::WALKING)return "MOTION_BUSY";
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
+  if(stopActive_){
+    if(stopOrigin_==Phase::HOLD&&!heightStartClear(measured(),q))return "HEIGHT_PATH_NOT_CLEAR";
+    // Explicit, admitted recovery with existing torque: reuse HEIGHT or the
+    // held-PRONE entry. ACQUIRE/REFERENCE/ENABLE are never entered here.
+    stopActive_=stopVerified_=false;operatorStopped_=false;
+    if(stopOrigin_==Phase::HOLD){state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;}
+    else {state_=State::PRONE;phase_=Phase::PRONE_WAIT;}
+    const auto& nominal=stopOrigin_==Phase::HOLD?holdNominal_.target:goal_;
+    rememberReference(goal_,now,&nominal);issuedOffsetStable_=true; // verified fixed reference throughout the dwell
+  }
   if(state_==State::PRONE){
     // Rise from the held terminal through the same DISENGAGE->ALIGN->DEPLOY->
     // LIFT route as a STAND from PRONE_ENTRY, keeping torque ON (no SAFE_OFF,
@@ -301,6 +339,24 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   }else{referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
     std::fill(controlFailures_,controlFailures_+12,0);}
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
+  return nullptr;
+}
+const char* SimpleMotion::standResumeRefusal(uint64_t now) const {
+  if(faultLatched_)return "FAULT_STOP_REQUIRED";
+  if(offPending_||safeOffRequest_.load()||stop_.load()||!energized_)return "SAFE_OFF_STAND_REFUSED";
+  if(!stopActive_||!stopVerified_)return "STOP_IN_PROGRESS";
+  if(!input_.ready)return input_.refusal;
+  if(!input_.powerOk)return "POWER_NOT_READY";
+  if(!input_.authorityOk)return "ACTUATOR_OWNER_BUSY";
+  if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000)return "IMU_UNAVAILABLE";
+  if(!fresh(now))return "STOP_RECOVERY_FEEDBACK_UNAVAILABLE";
+  for(const auto& f:fb_)if(f.torque!=1||!f.controlStampUs||now<f.controlStampUs||now-f.controlStampUs>12*6*kPeriodUs+250000)return "STOP_RECOVERY_TORQUE_UNVERIFIED";
+  if(stopOrigin_==Phase::WALK)return stopHadSwing_?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_WALK_UNVERIFIED";
+  if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
+  InitialRoute route;const auto actual=measured();
+  if(!certifiedRegion(actual,route)||!pointSafe(actual))return "STAND_PATH_NOT_CLEAR";
+  if(stopOrigin_==Phase::HOLD){if(!heightStartClear(actual,segmentTo_))return "HEIGHT_PATH_NOT_CLEAR";}
+  else {JointTargetFrame d;if(route!=InitialRoute::ENTRY||!proneDisengage(d)||!transitionSafe(actual,d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";}
   return nullptr;
 }
 const char* SimpleMotion::prone(uint64_t now){
@@ -338,7 +394,7 @@ void SimpleMotion::walkStop(){
     reason_="WALK_STOPPING";
   }
 }
-bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference){
+bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference,const JointTargetFrame* nominal){
   timing::Section section(timing::CONVERT);
   if(stopActive_&&!stopFrame_)return false;
   uint16_t raw[12]{};double distance=0;
@@ -352,14 +408,14 @@ bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool 
   // Identical RAM goals need no retransmission, especially in HOLD. Always
   // write the measured reference with torque OFF before enabling.
   if(!holdReference&&goal_.valid&&drive.speed==commandedDrive_.speed&&drive.acc==commandedDrive_.acc&&
-     std::equal(raw,raw+12,commandedRaw_)){goal_=q;rememberReference(q,now);return true;}
+     std::equal(raw,raw+12,commandedRaw_)){goal_=q;rememberReference(q,now,nominal);return true;}
   if(!frameTimed(raw,drive)){
     // A repeated STOP may preempt even its authorized frame. Retry the same
     // arrest clock next release; intentional preemption is not a bus failure.
-    if(port_->framePreempted()&&stop_.load())serviceStop();else fault("SYNC_WRITE_FAILED");return false;
+    if(port_->framePreempted()&&(stop_.load()||safeOffRequest_.load()))serviceStop();else fault("SYNC_WRITE_FAILED");return false;
   }
   commandedDrive_=drive;goal_=q;for(unsigned i=0;i<12;++i)commandedRaw_[i]=raw[i];goalSentUs_=now;
-  rememberReference(q,now);
+  rememberReference(q,now,nominal);
   if(serviceStop())return false; // include the completed atomic UART burst in STOP history
   // Native speed/acceleration transit estimate, conservative 2x + V25's
   // 12 s positioning timeout. This is a completion deadline, not a lag test.
@@ -615,7 +671,7 @@ void SimpleMotion::generateStand(uint64_t now){
   for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
     if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
   if(!pointSafe(f.target)||!contains(*segmentBox_,f.target)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
-  compensate(f,now);send(f.target,kStandDrive,now);
+  const auto nominal=f.target;compensate(f,now);send(f.target,kStandDrive,now,false,&nominal);
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
@@ -709,7 +765,7 @@ void SimpleMotion::generateWalk(uint64_t now){
   auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
   if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
-  if(!send(f.target,kWalkDrive,now))return;
+  if(!send(f.target,kWalkDrive,now,false,&walkPrevious_.target))return;
   if(done){
     state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
@@ -755,7 +811,7 @@ void SimpleMotion::update(uint64_t now){
          (f.q<input_.minRad[i]-2*kTickRad||f.q>input_.maxRad[i]+2*kTickRad)){fault("MEASURED_MECHANICAL_LIMIT");break;}
     }else if(readInterrupted_){--pollNext_;} // retry this slot after intentional STOP preemption
     else if(!readDeferred()&&++failures_[i]>=3&&energized_){fault("SERVO_COMMUNICATION_LOST");break;}
-    if(stop_.load())break;
+    if(stop_.load()||safeOffRequest_.load())break;
   }
   if(serviceStop())return;
   if(offPending_){serviceOff();return;}
@@ -891,7 +947,7 @@ void SimpleMotion::update(uint64_t now){
   }
   if(returningProne()){
     if(!segmentBox_||!pointSafe(measured())||!contains(*segmentBox_,measured())){fault("PRONE_MEASURED_OUTSIDE_BOX");return;}
-    if(phase_==Phase::PRONE_WAIT){rememberReference(goal_,now);return;} // constant reference, no automatic recovery
+    if(phase_==Phase::PRONE_WAIT){rememberReference(goal_,now,&goal_);return;} // constant reference, no automatic recovery
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
@@ -905,7 +961,7 @@ void SimpleMotion::update(uint64_t now){
     // Nominal height/contacts are constant in HOLD; only the IMU correction
     // changes. Do not solve the same nominal IK and differential every 20 ms.
     auto f=holdNominal_;
-    if(f.target.valid){compensate(f,now);send(f.target,kStandDrive,now);}
+    if(f.target.valid){const auto nominal=f.target;compensate(f,now);send(f.target,kStandDrive,now,false,&nominal);}
   }
 }
 } }

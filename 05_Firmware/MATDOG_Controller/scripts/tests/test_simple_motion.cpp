@@ -142,8 +142,8 @@ int main(){
   std::printf("WALK STANDARD production gait/IK: max target step %.6f rad, host mean %.1f us/frame (not ESP timing)\n",maxStep,elapsed/1200);
   const auto offBefore=r.p.offCalls;r.m.stop();r.m.update(r.p.now+1);assert(r.p.offCalls==offBefore);assert(r.m.stopping());
   for(unsigned i=0;i<150&&!r.m.stopVerified();++i)r.tick();assert(r.m.stopVerified());assert(r.m.state()==simple::State::STOPPED&&r.m.energized());
-  // A held contextual STOP is latched; a new operational goal cannot silently resume it.
-  assert(r.m.stand(.15,r.p.now));assert(r.p.enables==12);
+  // No automatic resume: an admitted explicit STAND reuses the existing torque.
+  assert(!r.m.stand(.15,r.p.now));assert(r.p.enables==12);assert(r.reachStand());
   Rig interrupted;assert(!interrupted.m.stand(.15,interrupted.p.now));
   for(unsigned i=0;i<400&&interrupted.p.frames<25;++i)interrupted.tick();
   interrupted.m.stop();for(unsigned i=0;i<150&&!interrupted.m.offVerified()&&!interrupted.m.stopVerified();++i)interrupted.tick();
@@ -153,7 +153,10 @@ int main(){
   for(unsigned i=0;i<1000&&strcmp(liftStop.m.phase(),"STAND_LIFT");++i)liftStop.tick();
   for(unsigned i=0;i<60;++i)liftStop.tick();assert(!strcmp(liftStop.m.phase(),"STAND_LIFT"));
   liftStop.m.stop();for(unsigned i=0;i<150&&!liftStop.m.stopVerified();++i)liftStop.tick();
-  assert(liftStop.m.stopVerified()&&liftStop.m.energized()&&!liftStop.m.stopSupportVerified());assert(liftStop.m.stand(.15,liftStop.p.now));
+  // This scripted flat IMU disagrees with the route's intentional pitch:
+  // its moving correction has no analytic derivatives; do not certify C2.
+  assert(liftStop.m.state()==simple::State::FAULT&&!strcmp(liftStop.m.reason(),"STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE"));
+  assert(liftStop.m.offVerified()&&liftStop.m.stand(.15,liftStop.p.now));
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
   for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<150&&!gaitRestart.m.stopVerified();++i)gaitRestart.tick();
@@ -236,7 +239,7 @@ int main(){
   test_clock_us=api.p.now;auto ack=service.command(cmd,api.p.now/1000);assert(ack.outcome==motion::CommandOutcome::ACCEPTED);
   assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);assert(api.reachStand());test_clock_us=api.p.now;service.update();
   char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,api.p.now/1000));
-  std::printf("API status %zu bytes (5120 B transport, 640 B reserved); JSON=%s\n",std::strlen(status),status);
+  std::printf("API status %zu bytes (%zu B transport, 640 B reserved); JSON=%s\n",std::strlen(status),core::kMotionStatusJsonBytes,status);
   std::strcpy(cmd.id,"new-browser-session-1");cmd.intent=motion::Intent::STATUS;cmd.issued_at_ms=api.p.now/1000;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
   cmd.intent=motion::Intent::STOP;cmd.ttl_ms=0;cmd.issued_at_ms=0;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);api.tick(false);assert(api.m.stopping());
   Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()!=simple::State::FAULT;++i)unsafe.tick(false);
@@ -267,14 +270,14 @@ int main(){
   // the dedicated STOP tests compare the entire single/duplicate reference.
   for(unsigned during=0;during<3;++during){
     Rig s;
-    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());}
-    else if(during==1){assert(!s.m.stand(.15,s.p.now));for(unsigned i=0;i<1000&&strcmp(s.m.phase(),"STAND_LIFT");++i)s.tick();for(unsigned i=0;i<10;++i)s.tick();}
+    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();}
+    else if(during==1){assert(!s.m.stand(.10,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();assert(!s.m.stand(.15,s.p.now));for(unsigned i=0;i<10;++i)s.tick();}
     else{assert(!s.m.walk(1,s.p.now));for(unsigned i=0;i<3000&&s.m.state()!=simple::State::WALKING;++i)s.tick();for(unsigned i=0;i<20;++i)s.tick();}
     const unsigned off=s.p.offCalls,enables=s.p.enables;unsigned updates=0;
     while(!s.m.stopVerified()&&updates<150){s.m.stop();s.tick();++updates;}
     assert(s.m.stopVerified()&&s.p.offCalls==off&&s.m.energized()&&s.m.stopping());
     assert(s.p.enables==enables&&s.m.state()==simple::State::STOPPED&&!s.m.stopSupportVerified());
-    assert(s.m.stand(.15,s.p.now));
+    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();}else assert(s.m.stand(.15,s.p.now));
   }
   // One servo fails its read-back: SAFE_OFF stays pending and re-broadcasts;
   // repeated STOPs keep the 12 verified servos; nothing can re-enable; the
@@ -285,7 +288,7 @@ int main(){
   for(unsigned i=0;i<80;++i){if(i%3==0)failing.m.stop();failing.tick(false);}
   assert(!failing.m.offVerified()&&failing.m.stopping()&&failing.m.energized()&&failing.m.offMask()==(0x1fff&~(1u<<5)));
   assert(failing.p.offCalls>failOff+3&&failing.p.enables==failEnables&&failing.p.frames==failFrames);
-  assert(!strcmp(failing.m.stand(.15,failing.p.now),"SAFE_OFF_IN_PROGRESS")&&failing.p.enables==failEnables);
+  assert(!strcmp(failing.m.stand(.15,failing.p.now),"FAULT_STOP_REQUIRED")&&failing.p.enables==failEnables);
   failing.p.failVerify=-1;unsigned recovered=0;while(!failing.m.offVerified()&&recovered<40){failing.tick(false);++recovered;}
   assert(failing.m.offVerified()&&recovered<=14&&!failing.m.energized());
   // A STOP after completion is a new SAFE_OFF (fresh broadcast + 13 reads).

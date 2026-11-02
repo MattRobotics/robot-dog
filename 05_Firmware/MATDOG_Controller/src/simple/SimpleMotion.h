@@ -91,6 +91,7 @@ class SimpleMotion {
   void walkStop();
   // Atomic latch only: callable independently of HTTP and of the Motion tick.
   void stop(const char* reason="STOP_REQUESTED");
+  void safeOff() { safeOffRequest_.store(true,std::memory_order_release); }
   void fault(const char* reason);
   void update(uint64_t now);
   // Read-only model estimate, 10 Hz in cooperative slack, outside Motion.
@@ -99,14 +100,15 @@ class SimpleMotion {
   const char* reason() const { return reason_; }
   const char* phase() const;
   bool engaged() const { return energized_||state_==State::MOVING||offPending_; }
-  bool stopping() const { return offPending_||stop_.load()||stopActive_; }
+  bool stopping() const { return offPending_||safeOffRequest_.load()||stop_.load()||stopActive_; }
   bool stopActive() const { return stopActive_; }
   bool stopInProgress() const { return stopActive_&&!stopVerified_; }
   bool stopVerified() const { return stopVerified_; } // feedback evidence of rest, NOT contact
   bool stopSupportVerified() const { return false; }
+  const char* standResumeRefusal(uint64_t now) const;
   bool stopFrameAuthorized(const uint16_t raw[12],Drive) const;
   bool busPreemptRequested() const {
-    return stop_.load()||offPending_||faultLatched_||(stopActive_&&!stopIo_);
+    return safeOffRequest_.load()||stop_.load()||offPending_||faultLatched_||(stopActive_&&!stopIo_);
   }
   bool energized() const { return energized_; }
   bool offVerified() const { return offMask_==0x1fff; }
@@ -151,6 +153,7 @@ class SimpleMotion {
   uint32_t tempSpikes() const { return tempSpikes_; }
   uint16_t hotPendingMask() const { uint16_t m=0;for(unsigned i=0;i<12;++i)if(hotSinceUs_[i])m|=1u<<i;return m; }
  private:
+  friend struct StopReferenceProbe; // offline read-only verification of the generator handoff
   enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT, STOP };
   enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool readTimed(unsigned slot,bool control,Feedback&);
@@ -160,7 +163,7 @@ class SimpleMotion {
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
-  bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
+  bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false,const motion::JointTargetFrame* nominal=nullptr);
   bool arrived(uint64_t) const;
   bool settledUnderLoad(uint64_t);
   bool entersHeight(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
@@ -189,13 +192,14 @@ class SimpleMotion {
   bool serviceStop();
   void beginStop(uint64_t);
   void generateStop(uint64_t);
-  void rememberReference(const motion::JointTargetFrame&,uint64_t);
+  void rememberReference(const motion::JointTargetFrame&,uint64_t,const motion::JointTargetFrame*);
   void enterOff(bool fault,const char*);
   ServoPort* port_=nullptr;
   Inputs input_{};
   Feedback fb_[12]{};
   uint8_t failures_[12]{},controlFailures_[12]{};
   std::atomic<bool> stop_{false};
+  std::atomic<bool> safeOffRequest_{false};
   std::atomic<const char*> stopReason_{"STOP_REQUESTED"};
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
@@ -207,11 +211,14 @@ class SimpleMotion {
   uint64_t stopStartUs_=0,stopTerminalUs_=0,stopDwellUs_=0,stopDeadlineUs_=0;
   uint16_t stopDwellRaw_[12]{};
   const collision::Box* stopBox_=nullptr;
-  // Three synchronous issued references, including the IMU correction. These
-  // are commands at known controller epochs, never asynchronous encoder poses.
-  motion::JointTargetFrame issued_[3]{};
-  uint64_t issuedUs_[3]{};
-  unsigned issuedCount_=0;
+  Phase stopOrigin_=Phase::IDLE;
+  bool stopHadSwing_=false;
+  // The last generator and its actually applied, sample-held IMU offset.
+  // A changing offset has no analytic derivatives: it is never extrapolated.
+  motion::JointTargetFrame issuedNominal_{},issuedOffset_{};
+  uint64_t issuedUs_=0;
+  Phase issuedPhase_=Phase::IDLE;
+  bool issuedPlanned_=false,issuedOffsetStable_=false;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;
   uint16_t offMask_=0; unsigned offNext_=0;
   uint64_t nowUs_=0,nextUs_=0,lastReleaseUs_=0,goalSentUs_=0,goalDeadlineUs_=0;
