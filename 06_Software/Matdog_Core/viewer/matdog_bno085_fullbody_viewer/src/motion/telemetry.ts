@@ -22,11 +22,13 @@ export interface MotionFrame {
   readonly owner: string;
   readonly fault: string;
   readonly reason: string;
+  readonly source: string;
   readonly quaternion: Sh2Quaternion | null;
   readonly actual: Readonly<Record<string, number>> | null;
   readonly target: Readonly<Record<string, number>> | null;
-  /** Defined relative to the measured/declared support plane; never derived from IMU. */
+  /** Reported support-plane height, or SIMPLE's explicitly valid encoder/IMU estimate. */
   readonly baseHeightM: number | null;
+  readonly baseHeightSource: 'reported' | 'controller-estimate' | null;
   readonly basePositionM: Point3 | null;
   readonly feet: readonly FootTelemetry[];
   readonly trackingErrorRad: number | null;
@@ -87,8 +89,8 @@ function channelsOf(status: Record<string, unknown>, telemetry: Record<string, u
   const c = object(status.channels), imu = object(c?.imu), raw = object(c?.raw), mapped = object(c?.mapped);
   const imuServo = object(status.imu);
   return {
-    imuValid: typeof imu?.valid === 'boolean' ? imu.valid : typeof imuServo?.valid === 'boolean' ? imuServo.valid : quaternion != null ? true : null,
-    imuAgeMs: nonnegative(imu?.age_ms) ? imu.age_ms : nonnegative(imuServo?.stamp_ms) && nonnegative(status.now_ms) && status.now_ms >= imuServo.stamp_ms
+    imuValid: typeof imu?.valid === 'boolean' ? imu.valid : typeof status.imu_valid === 'boolean' ? status.imu_valid : typeof imuServo?.valid === 'boolean' ? imuServo.valid : quaternion != null ? true : null,
+    imuAgeMs: nonnegative(imu?.age_ms) ? imu.age_ms : nonnegative(status.imu_age_ms) ? status.imu_age_ms : nonnegative(imuServo?.stamp_ms) && nonnegative(status.now_ms) && status.now_ms >= imuServo.stamp_ms
       ? status.now_ms - imuServo.stamp_ms : null,
     rawCount: nonnegative(raw?.count) ? raw.count : rawTicks ? rawTicks.length : null,
     mappedCount: nonnegative(mapped?.count) ? mapped.count
@@ -126,17 +128,28 @@ export function parseMotionFrame(value: unknown): MotionFrame | null {
     ? telemetry.raw_ticks as number[] : null;
   const legacyStale = status.stale === true || telemetry.stale === true;
   const anyMeasured = actualByJoint !== null && Object.values(actualByJoint).some((v) => v !== null);
+  const channels = channelsOf(status, telemetry, actualByJoint, rawTicks, telemetry.quaternion);
+  // SIMPLE publishes the number even when height_valid=false (notably PRONE
+  // and WALK). Never substitute requested_height_mm or a previous invalid Z.
+  const estimatedHeight = status.height_valid === true && status.height_source === 'ENCODER_IMU_FLAT_GROUND_ESTIMATE' &&
+    nonnegative(status.base_link_height_mm) && !legacyStale && actual !== null && quaternion !== null &&
+    channels.imuValid === true && channels.imuAgeMs !== null && channels.imuAgeMs <= 200 &&
+    status.now_ms - telemetry.sampled_at_ms <= 250 && (!nonnegative(status.snapshot_age_ms) || status.snapshot_age_ms <= 250)
+    ? status.base_link_height_mm / 1000 : null;
+  const reportedHeight = baseHeight ?? basePosition?.[2] ?? null;
   return {
     controllerNowMs: status.now_ms, sampledAtMs: telemetry.sampled_at_ms,
     executorState: label(status.executor_state, 'UNKNOWN'), standState: label(status.stand_state, 'UNKNOWN'),
     owner: label(status.owner, 'NONE'), fault: status.fault === true ? 'FAULT' : label(status.fault, 'NONE'), reason: label(status.reason, ''),
+    source: label(telemetry.source, ''),
     quaternion, actual, actualByJoint, rawTicks,
-    channels: channelsOf(status, telemetry, actualByJoint, rawTicks, telemetry.quaternion),
+    channels,
     restore: object(status.restore) ? { decision: label(object(status.restore)!.decision, 'UNKNOWN'), reason: label(object(status.restore)!.reason, ''),
       generation: nonnegative(object(status.restore)!.generation) ? object(status.restore)!.generation as number : null } : null,
     jointsStale: legacyStale || actual === null,
     target: joints(telemetry.target_rad, telemetry.joint_names),
-    baseHeightM: baseHeight ?? basePosition?.[2] ?? null,
+    baseHeightM: reportedHeight ?? estimatedHeight,
+    baseHeightSource: reportedHeight !== null ? 'reported' : estimatedHeight !== null ? 'controller-estimate' : null,
     basePositionM: basePosition,
     feet, trackingErrorRad: nonnegative(telemetry.tracking_error_rad) ? telemetry.tracking_error_rad : nonnegative(status.tracking_error_rad) ? status.tracking_error_rad : null,
     // A stale flag can only age data that exists: with no measured joint the

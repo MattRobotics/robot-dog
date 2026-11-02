@@ -15,7 +15,7 @@ const { JSDOM } = require('jsdom');
 const fx = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const viewer = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer');
 const STUBS = {
-  '../viewer/scene': 'export function createViewerScene(){return{setBeforeRender(){},robotAnchor:{add(){}},start(){}}}',
+  '../viewer/scene': 'export function createViewerScene(){const scene={resetCalls:[],resetCamera(yaw=0){this.resetCalls.push(yaw)},setBeforeRender(){},robotAnchor:{add(){}},start(){}};globalThis.__viewers.push(scene);return scene}',
   '../urdf/parseUrdf': 'export function parseUrdf(){return{}}',
   '../urdf/buildRobot': 'export async function buildRobot(){return{rootObject:{},resetJoints(){},collisionMeshCount:17}}',
   '../viewer/linkStyle': 'export const styleForLink=()=>({})',
@@ -37,7 +37,7 @@ async function boot(query, framed) {
   const fetches = [], timers = [], listeners = [], parent = { dashboard: true, postMessage(){} };
   const win = { addEventListener: (type, fn) => { if (type === 'message') listeners.push(fn); } };
   win.parent = framed ? parent : win;
-  globalThis.__twins = [];
+  globalThis.__twins = []; globalThis.__viewers = [];
   Object.assign(globalThis, {
     window: win, document: dom.window.document, location: dom.window.location,
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, setInterval: () => 0,
@@ -51,7 +51,7 @@ async function boot(query, framed) {
   await settle();
   const twin = globalThis.__twins[0];
   assert(twin, 'model built');
-  return { dom, fetches, timers, listeners, parent, twin, statusReads: () => fetches.filter(f => f.url === '/api/motion/status').length };
+  return { dom, fetches, timers, listeners, parent, twin, scene: globalThis.__viewers[0], statusReads: () => fetches.filter(f => f.url === '/api/motion/status').length };
 }
 let checks = 0;
 const check = (c, m) => { checks++; assert(c, m); };
@@ -63,7 +63,18 @@ const check = (c, m) => { checks++; assert(c, m); };
   check(t.fetches.every(f => f.url === 'matt_robodog_rev00.urdf' || f.url === 'matdog_collision.mtw'), 'embedded Twin loads only its model');
   check(t.timers.every(f => f.ms !== 500), 'no poll timer armed');
   check(t.listeners.length === 1, 'one message listener');
+  check(t.dom.window.document.querySelectorAll('header .chip').length === 1 && !t.dom.window.document.querySelector('header').textContent.includes('MATDOG Twin'), 'compact Twin header has one badge and no repeated title');
+  check(t.dom.window.document.getElementById('dashboard-link').hidden && !t.dom.window.document.getElementById('panel').open, 'embedded STOP link is redundant; technical diagnostics stay expandable');
+  const reset = t.dom.window.document.getElementById('reset-view');
+  check(reset && reset.textContent === 'Reset vista', 'read-only view reset is exposed');
+  const beforeFirstReset = t.fetches.length;
+  reset.click();
+  check(t.scene.resetCalls.length === 1 && t.scene.resetCalls[0] === 0, 'reset before telemetry uses canonical +X heading');
+  check(t.fetches.length === beforeFirstReset && t.twin.applied.length === 0, 'reset before telemetry neither fetches nor invents a posture');
   const status = JSON.parse(fx.status_walking);
+  // Exercise a tilted, nonzero heading: Reset must not hide roll/pitch or
+  // assume that the BNO085 magnetic heading is already canonical.
+  status.telemetry.quaternion = [.94, .10, -.12, .29];
   const post = (data, origin = 'http://192.168.4.1', source = t.parent) => t.listeners[0]({ data, origin, source });
   post(status, 'http://192.168.4.2'); post(status, 'http://192.168.4.1', {}); post({ unrelated: true });
   check(t.twin.applied.length === 0, 'foreign origin, foreign source or a non-status message is ignored');
@@ -73,20 +84,34 @@ const check = (c, m) => { checks++; assert(c, m); };
   const { JOINT_NAMES } = await import(pathToFileURL(path.join(viewer, 'src/motion/telemetry.ts')).href);
   JOINT_NAMES.forEach((joint, i) => check(frame.actual[joint] === status.telemetry.actual_rad[i], 'same ACTUAL angle ' + joint));
   check(JSON.stringify(frame.quaternion) !== 'null', 'BNO085 quaternion carried');
+  const { sh2ToRollPitchYaw } = await import(pathToFileURL(path.join(viewer, 'src/frame/orientation.ts')).href);
+  const heading = sh2ToRollPitchYaw(frame.quaternion).yaw;
+  check(Math.abs(heading) > .1 && t.scene.resetCalls.length === 2 && t.scene.resetCalls[1] === heading, 'first measured frame places the camera in front of the nonzero measured heading');
+  const receivedQuaternion = JSON.stringify(status.telemetry.quaternion), frameQuaternion = JSON.stringify(frame.quaternion);
+  const beforeReset = t.fetches.length, beforeFrames = t.twin.applied.length, beforeCameraResets = t.scene.resetCalls.length;
+  reset.click();
+  check(t.scene.resetCalls.length === beforeCameraResets + 1 && t.scene.resetCalls.at(-1) === heading, 'Reset vista delegates only to the camera using measured heading');
+  check(t.fetches.length === beforeReset && t.fetches.every(f => !f.init.method || f.init.method === 'GET'), 'Reset vista issues no extra telemetry GET or command POST');
+  check(t.twin.applied.length === beforeFrames && JSON.stringify(frame.quaternion) === frameQuaternion && JSON.stringify(status.telemetry.quaternion) === receivedQuaternion, 'Reset vista preserves the received IMU quaternion and robot posture');
   check(t.dom.window.document.getElementById('banner').textContent !== 'In attesa della prima telemetria…', 'Twin view updated');
   const older = JSON.parse(fx.status_walking); older.now_ms -= 350; older.telemetry.sampled_at_ms -= 350; post(older);
   check(t.twin.applied.length === 1, 'an older snapshot never replaces a newer one');
   const newer = JSON.parse(fx.status_walking); newer.now_ms += 350; newer.telemetry.sampled_at_ms += 350; post(newer);
   check(t.twin.applied.length === 2, 'each newer dashboard snapshot is applied');
-  // Badges: the bare status has no channels (installed rc.4: 'IMU ? ms', 'RAW N/D');
-  // the dashboard binds imu_valid/imu_age_ms/joints[].valid to them.
+  // SIMPLE already reports IMU validity/age at top level. The dashboard
+  // additionally binds the raw joint count into optional channels.*.
   const chip = id => t.dom.window.document.getElementById(id).textContent;
-  check(chip('chip-imu') === 'IMU ? ms' && chip('chip-raw') === 'RAW N/D', 'bare status: IMU age and RAW count unknown');
+  const diagnostics = () => t.dom.window.document.getElementById('facts').textContent;
+  check(chip('twin-status') === 'LIVE' && diagnostics().includes(`valida · ${newer.imu_age_ms} ms`) && diagnostics().includes('RAWN/D'), 'single LIVE badge; source IMU age and unknown RAW remain in diagnostics');
   const bound = JSON.parse(fx.status_walking); bound.now_ms += 700; bound.telemetry.sampled_at_ms += 700;
   bound.channels = { imu: { valid: bound.imu_valid, age_ms: bound.imu_age_ms }, raw: { count: bound.joints.filter(j => j.valid).length } }; post(bound);
-  check(chip('chip-imu') === `IMU ${bound.imu_age_ms} ms` && chip('chip-raw') === 'RAW 12/12', 'bound status: IMU age and RAW 12/12 shown');
+  check(chip('twin-status') === 'LIVE' && diagnostics().includes(`valida · ${bound.imu_age_ms} ms`) && diagnostics().includes('RAW12/12'), 'bound status: IMU age and RAW 12/12 kept in expandable diagnostics');
   const invalid = JSON.parse(JSON.stringify(bound)); invalid.now_ms += 350; invalid.telemetry.sampled_at_ms += 350; invalid.telemetry.quaternion = null; invalid.channels.imu.valid = false; post(invalid);
-  check(chip('chip-imu') === 'IMU NON VALIDA', 'Controller imu_valid=false is shown as invalid');
+  check(chip('twin-status') !== 'LIVE' && diagnostics().includes('NON VALIDA'), 'Controller imu_valid=false never shows LIVE');
+  const demo = JSON.parse(JSON.stringify(bound)); demo.now_ms += 1000; demo.telemetry.sampled_at_ms += 1000; demo.telemetry.source = 'OFFLINE_UI_FIXTURE'; post(demo);
+  check(chip('twin-status') === 'OFFLINE', 'an offline fixture with full measured channels is explicitly OFFLINE');
+  post({ unrelated: true });
+  check(chip('twin-status') === 'ERRORE' || chip('twin-status') === 'OFFLINE · ERRORE', 'rejected telemetry never leaves a falsely positive badge');
   for (const timer of t.timers) timer.fn();
   check(t.statusReads() === 0, 'still no status request after every timer fired');
   console.log(`embedded: 0 status requests, ${t.twin.applied.length} frames from the dashboard poll`);
@@ -95,6 +120,7 @@ const check = (c, m) => { checks++; assert(c, m); };
 {
   const t = await boot('?feed=parent', false);
   check(t.listeners.length === 0 && t.statusReads() === 1, 'top-level ?feed=parent polls by itself');
+  check(!t.dom.window.document.getElementById('dashboard-link').hidden, 'standalone Twin keeps access to dashboard STOP');
 }
 // Standalone: own poll every 500 ms, without credentials (never the operator session).
 {

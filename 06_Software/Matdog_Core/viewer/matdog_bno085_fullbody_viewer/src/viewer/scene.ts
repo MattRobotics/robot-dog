@@ -21,6 +21,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { canonicalView } from './canonicalView';
 
 export interface ViewerScene {
   readonly scene: Scene;
@@ -31,7 +32,8 @@ export interface ViewerScene {
   readonly robotAnchor: Object3D;
   start(): void;
   dispose(): void;
-  resetCamera(): void;
+  /** Face the robot's +X heading, without changing its measured orientation. */
+  resetCamera(headingRad?: number): void;
   /** Renders a single frame, re-syncing the viewport to the container first. */
   renderFrame(): void;
   /** Visual-only per-frame hook (e.g. joint interpolation), called before each paced render. */
@@ -123,11 +125,20 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
   robotAnchor.name = 'robot_anchor';
   scene.add(robotAnchor);
 
-  const resetCamera = (): void => {
-    // Behind-left-above: the nose (+X) points away to the right of frame.
-    camera.position.set(-0.60, -0.65, 0.48);
-    controls.target.set(0, 0, 0.05);
+  const resetCamera = (headingRad = 0): void => {
+    // Drain pending orbit/pan damping before replacing the pose; otherwise a
+    // reset during an easing gesture keeps drifting away from the front view.
+    const damping = controls.enableDamping;
+    controls.enableDamping = false;
     controls.update();
+    const aspect = container.clientHeight > 0 ? container.clientWidth / container.clientHeight : camera.aspect;
+    const view = canonicalView(aspect, headingRad);
+    camera.position.fromArray(view.position);
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
+    controls.target.fromArray(view.target);
+    controls.update();
+    controls.enableDamping = damping;
   };
   resetCamera();
 

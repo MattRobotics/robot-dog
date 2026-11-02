@@ -171,14 +171,19 @@ int fixtures(const char* path) {
     put("ack_walk_stop", ackJson(service, service.command(zero, zero.issued_at_ms)));
     auto stop = semantic(motion::Intent::STOP, rig);
     const auto s = service.command(stop, stop.issued_at_ms);
-    check(s.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(s.reason, "SAFE_OFF_REQUESTED"), "fixture STOP acknowledged");
+    check(s.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(s.reason, "STOP_REQUESTED"), "fixture STOP acknowledged");
     put("ack_stop", ackJson(service, s));
     rig.tick(false); service.update();
-    check(rig.m.stopping() && !rig.m.offVerified(), "fixture SAFE_OFF in progress");
+    check(rig.m.stopping() && !rig.m.offVerified(), "fixture STOP in progress");
     put("status_stopping", statusJson(service, rig));
-    for (unsigned i = 0; i < 15; ++i) rig.tick(false);
+    for (unsigned i = 0; i < 250 && !rig.m.stopVerified(); ++i) rig.tick();
     service.update();
-    check(rig.m.offVerified(), "fixture SAFE_OFF verified (scripted port)");
+    check(rig.m.stopVerified() && rig.m.energized() && !rig.m.stopSupportVerified(), std::string("fixture STOP observed, torque ON, support unknown: ")+rig.m.reason());
+    put("status_stopped_on", statusJson(service, rig));
+    service.safeOff();
+    for (unsigned i = 0; i < 20; ++i) rig.tick(false);
+    service.update();
+    check(rig.m.offVerified(), "fixture explicit SAFE_OFF verified (scripted port)");
     put("status_stopped", statusJson(service, rig), true);
   }
   out << "}\n";
@@ -205,8 +210,10 @@ void anchors(const std::string& src) {
     "if(!self->dispatch(r,&resp,",
     "strcmp(resp.message,\"ACK_UNAVAILABLE\")?\"403 Forbidden\":\"500 Internal Server Error\""}, "handleMotion POST order mirrored by handlerGate; STOP returns before the mailbox dispatch; ACK_UNAVAILABLE is 500, never AUTH_FAILED");
   const auto lane = between(http, "bool HttpTransport::serviceStopLane(", "esp_err_t HttpTransport::handleCalibrationRestore");
-  ordered(lane, {"stop_applied_.store(false);", "portal_.authorize(", "stop_epoch_.fetch_add(1);", "service_->motionCommand(req.motion_command,now_ms);", "stop_applied_.store(true);stop_ack_ok_.store("},
-          "STOP lane: session+CSRF, epoch supersedes earlier commands, then MotionService");
+  ordered(lane, {"stop_applied_.store(false);", "portal_.authorize(", "service_->motionCommand(req.motion_command,now_ms);", "stop_applied_.store(true);stop_ack_ok_.store("},
+          "STOP lane: session+CSRF, then MotionService (owner of the common STOP epoch)");
+  ordered(slurp(src + "/core/MotionService.cpp"), {"if(c.intent==motion::Intent::STOP){", "stopEpoch_.fetch_add(1,std::memory_order_release);", "motion_->stop();"},
+          "common STOP fence owned by MotionService for HTTP and USB");
   const auto mailbox = between(http, "case HttpRequestKind::MOTION_COMMAND: {", "case HttpRequestKind::CALIBRATION_RESTORE:");
   ordered(mailbox, {"portal_.authorize(", "resp.message=\"AUTH_FAILED\"", "SUPERSEDED_BY_STOP", "if(!mailbox_.awaitingResponse())break;", "service_->motionCommand(req.motion_command,millis());"},
           "mailbox command: session+CSRF, STOP epoch, then MotionService");
@@ -301,11 +308,14 @@ int envelopes(const char* path, const char* src) {
       service.setReady(false, "IMU_UNAVAILABLE");  // STOP never depends on readiness
       const auto off = rig.p.offCalls;
       const auto r = serve(request(body, session), session, service, rig, c.issued_at_ms + 60000);  // stale clock, expired TTL
-      check(r.status == 200 && r.code == "ACCEPTED SAFE_OFF_REQUESTED", name + ": HTTP 200 SAFE_OFF_REQUESTED with stale TTL and no readiness (" + r.code + ")");
+      check(r.status == 200 && r.code == "ACCEPTED STOP_REQUESTED", name + ": HTTP 200 STOP_REQUESTED with stale TTL and no readiness (" + r.code + ")");
       rig.tick(false);
-      check(rig.m.stopping() && rig.p.offCalls == off + 1 && !rig.m.offVerified(), name + ": torque OFF sent; ACK is not verification");
-      for (unsigned k = 0; k < 15; ++k) rig.tick(false);
-      check(rig.m.offVerified() && rig.m.state() == simple::State::STOPPED, name + ": 13/13 verified by the scripted port only");
+      check(rig.m.stopInProgress() && rig.p.offCalls == off && rig.m.energized(), name + ": torque retained; ACK is not verification");
+      const auto enables=rig.p.enables;
+      for (unsigned k = 0; k < 250 && !rig.m.stopVerified(); ++k) rig.tick();
+      check(rig.m.stopVerified() && rig.m.state() == simple::State::STOPPED && rig.m.energized() &&
+            !rig.m.stopSupportVerified() && rig.p.enables==enables && rig.p.offCalls==off,
+            name + ": feedback-verified motion arrest, existing torque ON, support unknown");
     } else check(false, "unknown envelope case " + name);
   }
   check(seen == 9, "nine dashboard envelopes captured (" + std::to_string(seen) + ")");
@@ -339,7 +349,7 @@ int envelopes(const char* path, const char* src) {
     for (uint64_t t = used.now; t <= used.now + 1200000; t += 350) alive = alive && used.portal.authorize(t, used.peer, used.portal.cookie(), used.portal.csrf());
     used.now += 1200000;
     const auto longStop = serve(request(stopBody, used), used, service, rig, 0);
-    check(alive && longStop.status == 200 && longStop.code == "ACCEPTED SAFE_OFF_REQUESTED", "STOP after 20 min of continuous use -> " + longStop.code);
+    check(alive && longStop.status == 200 && longStop.code == "ACCEPTED STOP_REQUESTED", "STOP after 20 min of continuous use -> " + longStop.code);
     Session expired; expired.now += 300000;
     const auto late = serve(request(stopBody, expired), expired, service, rig, 0);
     check(late.status == 403 && late.code == "AUTH_FAILED", "STOP with an expired session -> 403 AUTH_FAILED");
@@ -356,7 +366,7 @@ int envelopes(const char* path, const char* src) {
     auto local = semantic(motion::Intent::STOP, rig); local.owner = motion::ClientOwner::LOCAL; service.setReady(false, "IMU_UNAVAILABLE");
     const auto a = service.command(local, local.issued_at_ms + 60000);
     rig.tick(false);
-    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "SAFE_OFF_REQUESTED") && rig.m.stopping(), "LOCAL (USB) STOP preempts a JETSON WALK, no readiness or TTL needed");
+    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "STOP_REQUESTED") && rig.m.stopping(), "LOCAL (USB) STOP preempts a JETSON WALK, no readiness or TTL needed");
   }
   // rc.3 (f838f677) payloads, transcribed from its MotionDashboard.h lines
   // 41 and 51-55: the deterministic causes of the observed 400/400/403.

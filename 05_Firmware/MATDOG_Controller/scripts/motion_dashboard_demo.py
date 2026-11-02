@@ -17,12 +17,51 @@ from time import monotonic
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
-def portal_html() -> str:
+def joystick_layout_preview() -> tuple[str, str]:
+    """Static host-preview artwork only; never included in firmware assets."""
+    style = """<style>
+#layout-joystick-preview{margin:0 0 14px;padding:12px;border:1px solid var(--line);border-radius:10px;background:#101a23;color:var(--muted)}
+#layout-joystick-preview .preview-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#layout-joystick-preview h3{margin:0;font-size:15px;color:var(--text)}
+#layout-joystick-preview .preview-badge{padding:2px 7px;border:1px solid #55717e;border-radius:999px;color:#b8d3df;font-size:11px;white-space:nowrap}
+#layout-joystick-preview p{margin:5px 0 8px;font-size:12px}
+#layout-joystick-preview .preview-pad{display:flex;align-items:center;justify-content:center;gap:12px}
+#layout-joystick-preview svg{display:block;width:166px;height:166px;max-width:70%;flex-shrink:0}
+#layout-joystick-preview .preview-yaw{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px}
+#layout-joystick-preview .preview-yaw span{display:grid;place-items:center;width:42px;height:42px;border:1px solid #405360;border-radius:50%;background:#182630;color:#b8d3df;font-size:29px;line-height:1}
+@media(max-width:940px){#layout-joystick-preview{padding:10px}#layout-joystick-preview .preview-pad{gap:16px}#layout-joystick-preview svg{width:140px;height:140px}}
+</style>"""
+    markup = """<section id="layout-joystick-preview" aria-label="Anteprima joystick in sviluppo, non operativa">
+<div class="preview-title"><h3>Joystick</h3><span class="preview-badge">In sviluppo</span></div>
+<p>Anteprima grafica · non operativa</p>
+<div class="preview-pad" aria-hidden="true"><svg viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+<circle cx="90" cy="90" r="58" fill="#15242f" stroke="#3c5667" stroke-width="2"/>
+<circle cx="90" cy="90" r="40" fill="none" stroke="#294454" stroke-dasharray="3 5"/>
+<path d="M90 32V148M32 90H148" stroke="#294454"/>
+<circle cx="90" cy="90" r="22" fill="#243e4e" stroke="#6b9cb2" stroke-width="2"/>
+<circle cx="90" cy="90" r="7" fill="#8bb9ca"/>
+<path d="M90 26l-7 10h14zM90 154l-7-10h14zM26 90l10-7v14zM154 90l-10-7v14z" fill="#acc5d0"/>
+<g fill="#a8bdc9" font-family="system-ui,sans-serif" font-size="9" text-anchor="middle"><text x="90" y="17">Avanti</text><text x="90" y="173">Indietro</text><text x="16" y="112">Sinistra</text><text x="164" y="112">Destra</text></g>
+</svg><div class="preview-yaw"><span>↶</span><small>Rotazione</small><span>↷</span></div></div></section>"""
+    return style, markup
+
+
+def portal_html(layout_preview: bool = False) -> str:
     source = (SRC / "network/PortalPage.h").read_text()
     fragments = re.findall(r'R"MATDOG\(([\s\S]*?)\)MATDOG"', source)
     motion = re.search(r'R"MOTION\(([\s\S]*?)\)MOTION"', (SRC / "network/MotionDashboard.h").read_text())
     assert len(fragments) == 1 and motion
-    return fragments[0] + motion[1] + "</html>"
+    motion_html = motion[1]
+    preview_style = ""
+    if layout_preview:
+        preview_style, preview_markup = joystick_layout_preview()
+        # The existing cockpit puts this column beside the Twin on desktop,
+        # and below it on mobile. Inject static markup before real controls;
+        # no event handlers or additional command/polling path are introduced.
+        anchor = '<div class="command-panel" id="simple-controls" tabindex="-1" aria-label="Comandi Motion">'
+        assert motion_html.count(anchor) == 1
+        motion_html = motion_html.replace(anchor, anchor + preview_markup, 1)
+    return fragments[0] + preview_style + motion_html + "</html>"
 
 def dashboard_csp() -> str:
     policy = (SRC / "network/TwinHostPolicy.h").read_text()
@@ -79,6 +118,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=5185)
     parser.add_argument("--trace", type=Path)
+    parser.add_argument("--layout-preview", action="store_true", help="include static, non-operational joystick artwork in the host preview only")
     args = parser.parse_args()
     frames = []
     if args.trace:
@@ -87,7 +127,7 @@ def main() -> None:
         except (ValueError, TypeError, OSError) as error:
             parser.error(str(error))
     start = monotonic()
-    html = portal_html().encode()
+    html = portal_html(layout_preview=args.layout_preview).encode()
     caps = capabilities()
     class Handler(BaseHTTPRequestHandler):
         def send(self, body: bytes, content_type="application/json", status=200):
