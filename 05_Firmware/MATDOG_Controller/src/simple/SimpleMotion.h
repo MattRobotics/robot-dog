@@ -54,7 +54,7 @@ class ServoPort {
   virtual bool readDeferred() const { return false; }
   virtual bool resolve(unsigned slot,double q,uint16_t&)=0;
   // Decode a commanded RAW with the same gen-1 transform as readback. No I/O.
-  virtual bool radians(unsigned,uint16_t,double&) { return false; }
+  virtual bool decodeRaw(unsigned,uint16_t,double&) { return false; }
   virtual bool frame(const uint16_t raw[12],Drive)=0;
   // Only an explicit pre-TX cancellation, never a partial/failed write.
   virtual bool framePreempted() const { return false; }

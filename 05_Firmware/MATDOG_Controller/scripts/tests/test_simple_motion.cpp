@@ -51,7 +51,7 @@ struct ScriptedObservationPort: simple::ServoPort {
     if(control)out.controlStampUs=now;return true;
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
-  bool radians(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
+  bool decodeRaw(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override{
     assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}

@@ -174,7 +174,7 @@ void SimpleMotion::beginStop(uint64_t now){
   if(!(dt>0&&dt<=.1)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
   const double vmax=commandedDrive_.speed*kTickRad;
   for(unsigned i=0;i<12;++i){double previous=0;
-    if(!port_->radians(i,commandedRaw_[i],q[i])||!port_->radians(i,previousRaw_[i],previous)){
+    if(!port_->decodeRaw(i,commandedRaw_[i],q[i])||!port_->decodeRaw(i,previousRaw_[i],previous)){
       fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
     jointSlot(start,i)=q[i];
     v[i]=std::clamp((q[i]-previous)/dt,-vmax,vmax);

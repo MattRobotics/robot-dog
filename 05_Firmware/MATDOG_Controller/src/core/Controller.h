@@ -203,7 +203,7 @@ class Controller {
     bool read(unsigned,bool,simple::Feedback&) override;
     bool readDeferred() const override;
     bool resolve(unsigned,double,uint16_t&) override;
-    bool radians(unsigned,uint16_t,double&) override;
+    bool decodeRaw(unsigned,uint16_t,double&) override;
     bool frame(const uint16_t[12],simple::Drive) override;
     bool framePreempted() const override { return frame_preempted; }
     bool frame_preempted=false;

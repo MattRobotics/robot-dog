@@ -22,8 +22,8 @@ struct StopReferenceProbe {
     Knot k;assert(m.issuedUs_>m.previousUs_&&m.previousUs_);
     const double dt=(m.issuedUs_-m.previousUs_)/1e6, vmax=m.commandedDrive_.speed*kTickRad;
     for(unsigned i=0;i<12;++i){double previous=0;
-      assert(m.port_->radians(i,m.commandedRaw_[i],k.q[i]));
-      assert(m.port_->radians(i,m.previousRaw_[i],previous));
+      assert(m.port_->decodeRaw(i,m.commandedRaw_[i],k.q[i]));
+      assert(m.port_->decodeRaw(i,m.previousRaw_[i],previous));
       k.v[i]=std::clamp((k.q[i]-previous)/dt,-vmax,vmax);}
     return k;
   }
@@ -82,7 +82,7 @@ struct ObservationPort : simple::ServoPort {
   bool resolve(unsigned,double q,uint16_t& raw) override {
     raw=2048+std::lround(q/simple::kTickRad);return raw<4096;
   }
-  bool radians(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
+  bool decodeRaw(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override {
     frameInterrupted=false;test_clock_us+=frameDelayUs;
     const bool stopping=motion&&motion->stopping();
