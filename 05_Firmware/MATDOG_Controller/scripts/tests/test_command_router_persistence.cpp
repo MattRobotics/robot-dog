@@ -83,11 +83,18 @@ struct Fixture {
     CHECK(command("@CALIBRATION Q0 PROMOTE CONFIRM_CURRENT_INSTALLATION").find("PROMOTE=OK") != std::string::npos);
   }
   // Explicit length is essential: a C-string loop cannot inject an embedded NUL.
-  // Every raw chunk corresponds to one real CommandRouter::update() call.
+  // One delivery can span multiple bounded Controller visits.
   std::string raw(const char* bytes, size_t length) {
     Serial.output.clear();
     for (size_t i = 0; i < length; ++i) Serial.input.push_back(bytes[i]);
-    router.update(millis());  // actual framing, normalization and handleLine()
+    do {
+      const auto pending = Serial.input.size();
+      router.update(millis());
+      if (pending && Serial.input.size() >= pending) {
+        CHECK(false && "USB parser made no progress");
+        break;
+      }
+    } while (Serial.available());
     return Serial.output;
   }
   std::string raw(const std::string& bytes) { return raw(bytes.data(), bytes.size()); }
@@ -449,7 +456,7 @@ void usb_multiple_lines_and_begin_reset() {
       framing_case = invalid.name;
       withFramingFixture(nvs, [&](Fixture& f) {
         const FramingSnapshot before(f);
-        // All three lines are drained by ONE update(), with a valid line immediately
+        // All three lines arrive together, with a valid line immediately
         // following the invalid one. CHECK exercises the real SAVE gate without writing.
         const auto out = f.raw(invalid.payload + "\n@CALIBRATION PERSIST STATUS\n"
                                "@CALIBRATION PERSIST SAVE CHECK\n");
@@ -606,7 +613,7 @@ void source_identity_is_read_only() {
   CHECK(schemas.marker_schema == kSaveMarkerSchemaV1);
   before.checkUnchanged(f);
   const auto out = f.command("@SYSTEM SOURCE_SIGNATURE");
-  CHECK(out.find("FW_VERSION=0.2.0-dev.5") != std::string::npos);
+  CHECK(out.find(std::string("FW_VERSION=") + matdog::build::kFirmwareVersion + " ") != std::string::npos);
   CHECK(out.find("GIT_SHA=") != std::string::npos);
   CHECK(out.find("GIT_DIRTY=") != std::string::npos);
   CHECK(out.find("HARDWARE_PROFILE=ROBOT_POWERED") != std::string::npos);

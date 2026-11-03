@@ -578,11 +578,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Driver admission was checked by HTTPD before dispatch and is checked again
   // before sending the observation. Controller revalidates RAM facts under the
   // existing zero-wait fence; session ownership remains on Controller only.
+  AdminLease lease(gate);
   const bool readonly=readOnlyAdmitted(req,!motion_read);
   if(req.kind>=HttpRequestKind::OTA_CHALLENGE&&req.kind<=HttpRequestKind::OTA_ABORT&&static_cast<RoleReason>(service_->wifiStatus().role_reason)==RoleReason::MAINTENANCE_STA_READONLY){resp.message="OTA_DENIED_MAINTENANCE_LAN";return;}
   const bool sta_motion=(req.kind>=HttpRequestKind::MOTION_STATUS||req.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(req,!motion_read);
   const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
-  AdminLease lease(gate);
   if (admin_request && (!gate.allowed(req.admin_generation) ||
                         (!motion_read&&!WifiManager::verifyAdminRadio()))) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
@@ -590,7 +590,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Admissible facts but the fence is momentarily held (md_http_life verifies
   // the radio every 50 ms): contention is not an authorization fact. update()
   // retries on the next pass, where everything above is evaluated again.
-  if (admin_request && !lease) { deferred_ = true; return; }
+  if ((admin_request || sta_motion) && !lease) { deferred_ = true; return; }
   if(!req.ap_socket&&!req.tls&&req.local_ipv4&&!readonly){resp.message="LAN_READ_ONLY_REQUIRED";return;}
   if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;

@@ -23,19 +23,20 @@ class StartupAuditTests(unittest.TestCase):
         self.assertEqual(audit.failures, [])
 
         mutations = [
-            ("startup_servo_census_pending_ = servo_census_.start();",
+            ("startup_servo_census_pending_=true;",
              "startup_servo_census_pending_ = false;"),
             ("census.verdict == servo::CensusVerdict::PASS",
              "false"),
             ("servo_preflight_.begin(&servo_bus_);",
              "servo_preflight_.begin(&servo_bus_); servo_preflight_.start();"),
+            ("simple_motion_.offVerified()&&servo_census_.state()", "servo_census_.state()"),
         ]
 
         for old, new in mutations:
             audit.failures.clear()
             changed = [
                 (p, code.replace(old, new, 1)
-                 if p.name == "Controller.cpp" else code)
+                 if p.name in ("Controller.cpp", "SimpleMotionIntegration.cpp") else code)
                 for p, code in self.files
             ]
             audit.check_startup_servo_selftest_wiring(changed)
