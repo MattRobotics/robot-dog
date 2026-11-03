@@ -173,6 +173,7 @@ class SimpleMotion {
   bool liftEntersHeight(const motion::JointTargetFrame& actual) const;
   bool heightStartClear(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
   bool heightTarget(double,motion::JointTargetFrame&) const;
+  bool stoppedStandReference(motion::JointTargetFrame&) const;
   void measureHeight();
   void nextStand(uint64_t);
   void beginNative(Phase,const motion::JointTargetFrame&,const collision::Box&,uint64_t,double pitch=0,double x=0,double z=0);

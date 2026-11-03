@@ -50,7 +50,7 @@ class MotionService {
  private:
   simple::SimpleMotion* motion_=nullptr;
   Prepare prepare_=nullptr;void* context_=nullptr;
-  bool ready_=false,active_=false,activeStop_=false;
+  bool ready_=false,active_=false,activeStop_=false,activeStopFromFault_=false;
   std::atomic<uint32_t> stopEpoch_{0};
   const char* reason_="BOOTING";
   motion::MotionAck last_{},activeAck_{};

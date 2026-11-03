@@ -36,6 +36,7 @@ struct StopReferenceProbe {
     return d;
   }
   static uint64_t deadline(const SimpleMotion& m){return m.stopDeadlineUs_;}
+  static unsigned nextRead(const SimpleMotion& m){return m.pollNext_%12;}
   static void joined(const SimpleMotion& m,const Knot& k){
     assert(m.stopActive_);double q[12],v[12],a[12];m.stopPlan_.sample(0,q,v,a);
     for(unsigned i=0;i<12;++i){assert(std::abs(q[i]-k.q[i])<1e-12);assert(std::abs(v[i]-k.v[i])<1e-12);assert(std::abs(a[i]-k.a[i])<1e-12);}
@@ -261,7 +262,7 @@ void phaseCoverageAndRaces(){
     for(unsigned i=0;i<4;++i)stance+=motion::legPhase(gait,static_cast<motion::LegId>(i),r.m.walkCycles()).stance;
     assert(stance==(swing?3u:4u));checkHeldStop(r);
     const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;
-    const char* refusal=swing?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_WALK_UNVERIFIED";
+    const char* refusal=swing?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_REQUIRES_STAND_POSE";
     assert(!strcmp(r.m.standResumeRefusal(r.p.now),refusal));
     core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
     core::MotionStatusSnapshot status;assert(service.captureStatus(status,r.p.now/1000));
@@ -445,7 +446,79 @@ void faultFeedback(){
   }
   puts("FAULT: bounded feedback continues after SAFE_OFF 13/13; reason/FAULT/write fence retained, incoming STOP and SAFE_OFF still preempt reads");
 }
+void stopReceivedInFault(){
+  for(bool offAlready:{false,true}){
+    Rig r;r.stand(.15);r.ticks(100);
+    core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    r.m.fault("PRONE_PATH_NOT_CLEAR");if(offAlready)r.finishOff();else r.p.verify=false;
+    const auto frames=r.p.frames,enables=r.p.enables;
+    motion::MotionCommand stop;stop.owner=motion::ClientOwner::DASHBOARD;stop.intent=motion::Intent::STOP;
+    stop.sequence=1;strcpy(stop.id,"stop-in-fault");
+    const auto ack=service.command(stop,r.p.now/1000);
+    assert(ack.outcome==motion::CommandOutcome::ACCEPTED&&!strcmp(ack.reason,"STOP_REQUESTED_FAULT_LATCHED"));
+    r.tick();service.update();core::MotionStatusSnapshot s;assert(service.captureStatus(s,r.p.now/1000));
+    if(!offAlready){assert(!strcmp(s.activeOutcome,"ACCEPTED")&&s.finishedMs==0);r.p.verify=true;}
+    for(unsigned n=0;n<60;++n){r.tick();service.update();assert(service.captureStatus(s,r.p.now/1000));if(!strcmp(s.activeOutcome,"COMPLETED"))break;}
+    assert(!strcmp(s.activeOutcome,"COMPLETED")&&!strcmp(s.activeReason,"SAFE_OFF_VERIFIED_FAULT_LATCHED"));
+    assert(s.state==simple::State::FAULT&&!strcmp(s.reason,"PRONE_PATH_NOT_CLEAR")&&s.offVerified&&s.offMask==8191&&!s.energized);
+    assert(r.p.frames==frames&&r.p.enables==enables&&r.m.stand(.15,r.p.now));
+    // A later STOP has its own receipt even after a previous terminal STOP.
+    stop.sequence=2;strcpy(stop.id,"stop-in-fault-again");
+    assert(service.command(stop,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+    r.tick();service.update();assert(service.captureStatus(s,r.p.now/1000));
+    assert(!strcmp(s.activeId,stop.id)&&!strcmp(s.activeOutcome,"COMPLETED")&&!strcmp(s.activeReason,"SAFE_OFF_VERIFIED_FAULT_LATCHED"));
+  }
+  // A NEW physical fault during an ordinary STOP still aborts that arrest.
+  Rig r;r.walk();r.ticks(380);core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+  motion::MotionCommand stop;stop.owner=motion::ClientOwner::DASHBOARD;stop.intent=motion::Intent::STOP;stop.sequence=1;strcpy(stop.id,"stop-before-fault");
+  assert(service.command(stop,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);r.tick();r.m.fault("TEST_NEW_PHYSICAL_FAULT");service.update();
+  core::MotionStatusSnapshot s;assert(service.captureStatus(s,r.p.now/1000));
+  assert(!strcmp(s.activeOutcome,"ABORTED")&&!strcmp(s.activeReason,"TEST_NEW_PHYSICAL_FAULT"));
+  stop.sequence=2;strcpy(stop.id,"stop-after-new-fault");
+  assert(service.command(stop,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+  r.finishOff();service.update();assert(service.captureStatus(s,r.p.now/1000));
+  assert(!strcmp(s.activeId,stop.id)&&!strcmp(s.activeReason,"SAFE_OFF_VERIFIED_FAULT_LATCHED"));
+  assert(s.state==simple::State::FAULT&&!strcmp(s.reason,"TEST_NEW_PHYSICAL_FAULT"));
+  puts("STOP received in FAULT reports its own verified-OFF completion; original fault stays latched; a new fault during ordinary STOP still aborts it");
+}
+void compatibleWalkRecovery(){
+  for(bool ending:{false,true})for(unsigned stride=0;stride<3;++stride)for(double tilt:{-.01,.01}){
+    Rig r;r.stand(.15);r.in.quaternion[0]=std::cos(tilt/2);r.in.quaternion[1]=std::sin(tilt/2);r.ticks(50);
+    r.walk(stride);r.tick();
+    if(ending){r.ticks(380);r.m.walkStop();
+      const double end=std::fmax(simple::kWalkStartCycles,std::ceil(r.m.walkCycles()*4)/4)+simple::kWalkStopCycles+simple::kWalkDuty-.75;
+      while(r.m.walkCycles()<end-.006){r.tick();assert(r.m.state()==simple::State::WALKING);}}
+    r.m.stop();assert(r.finishStop());
+    if(const char* why=r.m.standResumeRefusal(r.p.now))std::fprintf(stderr,"compatible recovery ending=%u stride=%u tilt=%g refused %s\n",ending,stride,tilt,why);
+    assert(!r.m.standResumeRefusal(r.p.now)&&!r.m.stopSupportVerified());
+    std::array<uint16_t,12> held;std::copy(r.m.commandedRaw(),r.m.commandedRaw()+12,held.begin());
+    const auto frames=r.p.sent.size();const auto enables=r.p.enables,off=r.p.offCalls;
+    constexpr double heights[]={.05,.10,.15};
+    assert(!r.m.stand(heights[stride],r.p.now));assert(r.p.sent.size()==frames); // intent only
+    r.tick();assert(r.p.sent.size()>frames&&r.p.sent[frames]==held);
+    assert(r.p.drive.speed==simple::kStandDrive.speed&&r.p.drive.acc==simple::kStandDrive.acc);
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){
+      const double roll=tilt+.002*std::sin(n*.03);r.in.quaternion[0]=std::cos(roll/2);r.in.quaternion[1]=std::sin(roll/2);
+      r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::STANDING&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
+  }
+  for(unsigned race=0;race<4;++race){Rig r;r.walk();r.tick();r.m.stop();assert(r.finishStop());
+    const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;assert(!r.m.stand(.10,r.p.now));
+    if(race==0)r.m.stop();
+    if(race==1)r.p.stopAfterFrame=true;
+    if(race==2)r.m.safeOff();
+    if(race==3){const unsigned i=simple::StopReferenceProbe::nextRead(r.m);const auto& b=simple::collision::kHeight;const auto& w=simple::collision::kWalk;
+      const double q=w.lo[i]<b.lo[i]?(w.lo[i]+b.lo[i])/2:(b.hi[i]+w.hi[i])/2;
+      r.p.observed[i].q=q;r.p.resolve(i,q,r.p.observed[i].raw);r.p.freeze=true;}
+    r.tick();
+    if(race<2){assert(r.m.stopActive()&&r.finishStop()&&r.m.energized()&&r.p.offCalls==off);}
+    else {if(race==3)assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"HEIGHT_PATH_NOT_CLEAR"));
+      assert(r.p.frames==frames);r.finishOff();assert(!r.m.energized());}
+    assert(r.p.enables==enables);
+  }
+  puts("Explicit STAND from stopped WALK: narrow HEIGHT-compatible startup/recentring subset, RAW C0 with IMU, no enable/OFF; regular/swing refusals and STOP/OFF/recheck races retained (support NOT proven)");
+}
 
 }
-int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
+int main(){compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

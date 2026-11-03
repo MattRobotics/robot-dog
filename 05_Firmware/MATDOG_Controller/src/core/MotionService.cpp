@@ -14,7 +14,14 @@ void MotionService::update(){
  if(activeStop_){
   // ACK revokes the old operation; only feedback-qualified arrest completes
   // the contextual STOP. SAFE_OFF is a distinct, register-verified terminal.
-  if(motion_->state()==simple::State::FAULT){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+  if(activeStopFromFault_){
+   // This STOP was received AFTER the fault. Report its own OFF observation;
+   // state/reason still expose the original latched fault independently.
+   if(!motion_->stopping()&&motion_->offVerified()&&!motion_->energized()){
+    activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED_FAULT_LATCHED";active_=false;
+   }else activeAck_.reason="SAFE_OFF_IN_PROGRESS_FAULT_LATCHED";
+  }
+  else if(motion_->state()==simple::State::FAULT){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
   else if(motion_->stopVerified()){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STOPPED_SUPPORT_UNVERIFIED";active_=false;}
   else if(!motion_->stopping()&&!motion_->stopActive()&&motion_->offVerified()&&!motion_->energized()){
    activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED";active_=false;
@@ -39,10 +46,14 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    // Every channel shares this fence, including STOP received over USB while
    // an older HTTP motion request is waiting for its Controller turn.
    stopEpoch_.fetch_add(1,std::memory_order_release);
-   motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason="STOP_REQUESTED";
+   const bool fromFault=motion_->state()==simple::State::FAULT;
+   motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason=fromFault?"STOP_REQUESTED_FAULT_LATCHED":"STOP_REQUESTED";
    // Repeated STOPs acknowledge independently without restarting the first
    // operation's timing, progress or identity (including its held terminal).
-   if(!activeStop_){activeAck_=a;active_=activeStop_=true;acceptedMs_=now;finishedMs_=0;}
+   // A new receipt after OFF/FAULT is distinct from duplicating a held STOP.
+   if(!activeStop_||(!active_&&!motion_->stopActive())||(fromFault&&!activeStopFromFault_)){
+    activeAck_=a;active_=activeStop_=true;activeStopFromFault_=fromFault;acceptedMs_=now;finishedMs_=0;
+   }
    return last_=a;
  }
  if(motion_->stopActive()&&c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){

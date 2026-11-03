@@ -290,6 +290,12 @@ bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
   const double body=baseLinkHeightFromNominalM(h);auto d=canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;
   const auto s=generateStandTarget(d);q=s.target;return s.status==StandStatus::OK&&pointSafe(q)&&contains(collision::kHeight,q);
 }
+bool SimpleMotion::stoppedStandReference(JointTargetFrame& q) const {
+  if(!port_)return false;
+  q.valid=true;
+  for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(q,i)))return false;
+  return pointSafe(q)&&contains(collision::kHeight,q);
+}
 const char* SimpleMotion::stand(double h,uint64_t now){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
@@ -301,6 +307,19 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   if(state_==State::MOVING||state_==State::WALKING)return "MOTION_BUSY";
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
   if(stopActive_){
+    if(stopOrigin_==Phase::WALK){
+      JointTargetFrame held;if(!stoppedStandReference(held))return "STOP_RECOVERY_REQUIRES_STAND_POSE";
+      // Only the already admitted HEIGHT subset, not a continuation of WALK.
+      // Keep the accepted RAW reference until the next release builds the plan.
+      reference_=held;pendingGoal_=holdNominal_.target;plannedHeight_=.150;requestedHeight_=h;
+      segmentTo_=holdNominal_.target; // keep HOLD's nominal reference if another STOP wins before release
+      stopActive_=stopVerified_=false;operatorStopped_=false;walkRequested_=false;
+      phase_=Phase::HOLD;state_=State::MOVING;segmentBox_=nullptr;planned_=false;pendingGoalValid_=true;
+      reason_="STAND_FROM_STOPPED_WALK";referenceFaultSlot_=12;
+      rememberReference(now); // a new STOP before the first release still has a held reference
+      timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
+      return nullptr;
+    }
     if(stopOrigin_==Phase::HOLD&&!heightStartClear(measured(),q))return "HEIGHT_PATH_NOT_CLEAR";
     // Explicit, admitted recovery with existing torque: reuse HEIGHT or the
     // held-PRONE entry. ACQUIRE/REFERENCE/ENABLE are never entered here.
@@ -345,7 +364,19 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now) const {
   if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000)return "IMU_UNAVAILABLE";
   if(!fresh(now))return "STOP_RECOVERY_FEEDBACK_UNAVAILABLE";
   for(const auto& f:fb_)if(f.torque!=1||!f.controlStampUs||now<f.controlStampUs||now-f.controlStampUs>12*6*kPeriodUs+250000)return "STOP_RECOVERY_TORQUE_UNVERIFIED";
-  if(stopOrigin_==Phase::WALK)return stopHadSwing_?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_WALK_UNVERIFIED";
+  if(stopOrigin_==Phase::WALK){
+    if(stopHadSwing_)return "STOP_RECOVERY_SWING_UNVERIFIED";
+    InitialRoute route;const auto actual=measured();JointTargetFrame held;
+    const auto& stand=holdNominal_.target;
+    if(!certifiedRegion(actual,route)||route!=InitialRoute::HEIGHT||!stoppedStandReference(held)||
+       !contains(collision::kHeight,walkPrevious_.target)||!transitionSafe(actual,held,collision::kHeight)||
+       !transitionSafe(held,stand,collision::kHeight))return "STOP_RECOVERY_REQUIRES_STAND_POSE";
+    // Same positioning allowance as an attained STAND, not a new support claim.
+    // Regular WALK and known swing remain outside this narrow recovery subset.
+    for(unsigned i=0;i<12;++i)if(std::abs(jointSlot(actual,i)-jointSlot(stand,i))>kArrivalRad||
+        std::abs(jointSlot(held,i)-jointSlot(stand,i))>kArrivalRad)return "STOP_RECOVERY_REQUIRES_STAND_POSE";
+    return nullptr;
+  }
   if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
   InitialRoute route;const auto actual=measured();
   if(!certifiedRegion(actual,route)||!pointSafe(actual))return "STAND_PATH_NOT_CLEAR";
@@ -933,6 +964,15 @@ void SimpleMotion::update(uint64_t now){
   if(stopActive_){generateStop(now);return;}
   if(pendingGoalValid_){
     pendingGoalValid_=false;
+    if(phase_==Phase::HOLD&&state_==State::MOVING){
+      // Explicit stopped-WALK recovery. Recheck the actual handover after I/O;
+      // never seed from the old pre-WALK stand or apply its IMU offset twice.
+      if(!transitionSafe(measured(),reference_,collision::kHeight)||
+         !transitionSafe(reference_,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+      rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;imuStartUs_=now;compensatedUs_=0;
+      plan_.clear();if(!via(reference_,0,0,.150)||!via(pendingGoal_,0,0,.150)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+      beginPlan(Phase::HEIGHT,collision::kHeight,now);return;
+    }
     if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
     if(phase_==Phase::PRONE_WAIT){
       // Nominal terminal goal, not the sagging encoder pose (as for HEIGHT).
