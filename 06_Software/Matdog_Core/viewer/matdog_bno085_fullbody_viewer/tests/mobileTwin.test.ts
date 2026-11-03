@@ -63,6 +63,25 @@ describe('single truthful telemetry badge', () => {
     telemetry: { sampled_at_ms: 990, source: 'CONTROLLER', actual_rad: Array(12).fill(0), quaternion: [1, 0, 0, 0] } };
   const facts = (body = live, age = 10, stale = false, error = '', failures = 0) =>
     describeTwin(parseMotionFrame(body), age, stale, 'MEASURED', error, failures);
+  it('shows modern Controller state/phase ahead of obsolete legacy labels', () => {
+    const frame = parseMotionFrame({ ...live, state: 'STOPPED', phase: 'STOP', executor_state: 'OLD_EXECUTOR', stand_state: 'OLD_STAND' });
+    expect(frame?.executorState).toBe('STOPPED'); expect(frame?.standState).toBe('STOP');
+    expect(describeTwin(frame, 10, false, 'MEASURED', '', 0).rows.find(([key]) => key === 'Executor')?.[1]).toBe('STOPPED / STOP');
+  });
+  it('keeps the legacy Controller state contract readable when modern fields are absent', () => {
+    const frame = parseMotionFrame({ ...live, executor_state: 'OFF', stand_state: 'IDLE' });
+    expect(frame?.executorState).toBe('OFF'); expect(frame?.standState).toBe('IDLE');
+  });
+  it('retains modern FAULT and its original reason in fresh and expired diagnostics', () => {
+    const frame = parseMotionFrame({ ...live, state: 'FAULT', phase: 'IDLE', fault: true, reason: 'SERVO_COMMUNICATION_LOST' });
+    for (const stale of [false, true]) {
+      const f = describeTwin(frame, stale ? 1600 : 10, stale, 'MEASURED', '', 0);
+      expect(f.rows.find(([key]) => key === 'Executor')?.[1]).toBe('FAULT / IDLE');
+      expect(f.rows.find(([key]) => key === 'Motivo Controller')?.[1]).toBe('SERVO_COMMUNICATION_LOST');
+      if (stale) expect(f.chips[0]?.tone).toBe('bad');
+      else expect(f.banner).toContain('SERVO_COMMUNICATION_LOST');
+    }
+  });
   it('shows only LIVE for measured, fresh hardware data, with technical details kept in diagnostics', () => {
     const f = facts();
     expect(f.chips).toEqual([{ id: 'twin-status', text: 'LIVE', tone: 'ok' }]);

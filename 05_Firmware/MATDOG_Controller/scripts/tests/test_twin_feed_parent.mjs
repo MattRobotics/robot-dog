@@ -34,13 +34,17 @@ const html = fs.readFileSync(path.join(viewer, 'mobile.html'), 'utf8');
 let instance = 0;
 async function boot(query, framed) {
   const dom = new JSDOM(html, { url: 'http://192.168.4.1/twin/' + query });
-  const fetches = [], timers = [], listeners = [], parent = { dashboard: true, postMessage(){} };
+  const fetches = [], timers = [], listeners = [], parentPosts = [], observers = [];
+  const parent = { dashboard: true, postMessage(data, origin){parentPosts.push({data,origin})} };
+  let naturalHeight = 420;
+  dom.window.document.getElementById('app').getBoundingClientRect = () => ({ height: naturalHeight });
   const win = { addEventListener: (type, fn) => { if (type === 'message') listeners.push(fn); } };
   win.parent = framed ? parent : win;
   globalThis.__twins = []; globalThis.__viewers = [];
   Object.assign(globalThis, {
     window: win, document: dom.window.document, location: dom.window.location,
     setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimeout: () => {}, setInterval: () => 0,
+    ResizeObserver: class { constructor(callback){observers.push(callback)} observe(){} },
     fetch: async (url, init = {}) => {
       fetches.push({ url, init });
       if (url === '/api/motion/status') return { ok: true, status: 200, text: async () => fx.status_walking };
@@ -51,7 +55,8 @@ async function boot(query, framed) {
   await settle();
   const twin = globalThis.__twins[0];
   assert(twin, 'model built');
-  return { dom, fetches, timers, listeners, parent, twin, scene: globalThis.__viewers[0], statusReads: () => fetches.filter(f => f.url === '/api/motion/status').length };
+  return { dom, fetches, timers, listeners, parent, parentPosts, twin, scene: globalThis.__viewers[0], statusReads: () => fetches.filter(f => f.url === '/api/motion/status').length,
+    resize(height){naturalHeight=height;observers.forEach(callback=>callback())} };
 }
 let checks = 0;
 const check = (c, m) => { checks++; assert(c, m); };
@@ -65,6 +70,12 @@ const check = (c, m) => { checks++; assert(c, m); };
   check(t.listeners.length === 1, 'one message listener');
   check(t.dom.window.document.querySelectorAll('header .chip').length === 1 && !t.dom.window.document.querySelector('header').textContent.includes('MATDOG Twin'), 'compact Twin header has one badge and no repeated title');
   check(t.dom.window.document.getElementById('dashboard-link').hidden && !t.dom.window.document.getElementById('panel').open, 'embedded STOP link is redundant; technical diagnostics stay expandable');
+  check(!t.dom.window.document.getElementById('viewport').contains(t.dom.window.document.getElementById('banner')) && !t.dom.window.document.getElementById('viewport').contains(t.dom.window.document.getElementById('panel')), 'all diagnostics are outside the WebGL surface');
+  const sizes = () => t.parentPosts.filter(p=>p.data.type==='MATDOG_TWIN_HEIGHT');
+  check(sizes().length===1 && sizes()[0].data.height===420 && sizes()[0].origin==='http://192.168.4.1', 'natural height sent to the same-origin parent');
+  const beforeSizeRequests=t.fetches.length;
+  t.resize(900);t.resize(900);
+  check(sizes().length===2 && sizes().at(-1).data.height===900 && t.fetches.length===beforeSizeRequests, 'details growth reports a new height once without requests');
   const reset = t.dom.window.document.getElementById('reset-view');
   check(reset && reset.textContent === 'Reset vista', 'read-only view reset is exposed');
   const beforeFirstReset = t.fetches.length;
@@ -72,8 +83,8 @@ const check = (c, m) => { checks++; assert(c, m); };
   check(t.scene.resetCalls.length === 1 && t.scene.resetCalls[0] === 0, 'reset before telemetry uses canonical +X heading');
   check(t.fetches.length === beforeFirstReset && t.twin.applied.length === 0, 'reset before telemetry neither fetches nor invents a posture');
   const status = JSON.parse(fx.status_walking);
-  // Exercise a tilted, nonzero heading: Reset must not hide roll/pitch or
-  // assume that the BNO085 magnetic heading is already canonical.
+  // Exercise a tilted, nonzero heading: absolute +X Reset must not alter the
+  // measured model quaternion to make the robot face the camera.
   status.telemetry.quaternion = [.94, .10, -.12, .29];
   const post = (data, origin = 'http://192.168.4.1', source = t.parent) => t.listeners[0]({ data, origin, source });
   post(status, 'http://192.168.4.2'); post(status, 'http://192.168.4.1', {}); post({ unrelated: true });
@@ -84,13 +95,11 @@ const check = (c, m) => { checks++; assert(c, m); };
   const { JOINT_NAMES } = await import(pathToFileURL(path.join(viewer, 'src/motion/telemetry.ts')).href);
   JOINT_NAMES.forEach((joint, i) => check(frame.actual[joint] === status.telemetry.actual_rad[i], 'same ACTUAL angle ' + joint));
   check(JSON.stringify(frame.quaternion) !== 'null', 'BNO085 quaternion carried');
-  const { sh2ToRollPitchYaw } = await import(pathToFileURL(path.join(viewer, 'src/frame/orientation.ts')).href);
-  const heading = sh2ToRollPitchYaw(frame.quaternion).yaw;
-  check(Math.abs(heading) > .1 && t.scene.resetCalls.length === 2 && t.scene.resetCalls[1] === heading, 'first measured frame places the camera in front of the nonzero measured heading');
+  check(Math.abs(frame.quaternion.z)>.1 && t.scene.resetCalls.length === 2 && t.scene.resetCalls[1] === 0, 'first measured frame keeps the absolute +X camera despite nonzero measured heading');
   const receivedQuaternion = JSON.stringify(status.telemetry.quaternion), frameQuaternion = JSON.stringify(frame.quaternion);
   const beforeReset = t.fetches.length, beforeFrames = t.twin.applied.length, beforeCameraResets = t.scene.resetCalls.length;
   reset.click();
-  check(t.scene.resetCalls.length === beforeCameraResets + 1 && t.scene.resetCalls.at(-1) === heading, 'Reset vista delegates only to the camera using measured heading');
+  check(t.scene.resetCalls.length === beforeCameraResets + 1 && t.scene.resetCalls.at(-1) === 0, 'Reset vista delegates only to the absolute +X camera');
   check(t.fetches.length === beforeReset && t.fetches.every(f => !f.init.method || f.init.method === 'GET'), 'Reset vista issues no extra telemetry GET or command POST');
   check(t.twin.applied.length === beforeFrames && JSON.stringify(frame.quaternion) === frameQuaternion && JSON.stringify(status.telemetry.quaternion) === receivedQuaternion, 'Reset vista preserves the received IMU quaternion and robot posture');
   check(t.dom.window.document.getElementById('banner').textContent !== 'In attesa della prima telemetria…', 'Twin view updated');

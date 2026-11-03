@@ -139,7 +139,8 @@ export function parseMotionFrame(value: unknown): MotionFrame | null {
   const reportedHeight = baseHeight ?? basePosition?.[2] ?? null;
   return {
     controllerNowMs: status.now_ms, sampledAtMs: telemetry.sampled_at_ms,
-    executorState: label(status.executor_state, 'UNKNOWN'), standState: label(status.stand_state, 'UNKNOWN'),
+    executorState: label(status.state, label(status.executor_state, 'UNKNOWN')),
+    standState: label(status.phase, label(status.stand_state, 'UNKNOWN')),
     owner: label(status.owner, 'NONE'), fault: status.fault === true ? 'FAULT' : label(status.fault, 'NONE'), reason: label(status.reason, ''),
     source: label(telemetry.source, ''),
     quaternion, actual, actualByJoint, rawTicks,

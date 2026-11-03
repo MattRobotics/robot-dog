@@ -12,7 +12,6 @@ import { mtwMeshLoader, parseMtw } from '../urdf/mtwLoader';
 import { MotionTwinController } from '../motion/twinController';
 import { JOINT_NAMES, MotionTelemetryStream } from '../motion/telemetry';
 import { describeTwin, type TwinFacts } from './mobileModel';
-import { sh2ToRollPitchYaw } from '../frame/orientation';
 
 const URDF_URL = 'matt_robodog_rev00.urdf', MESH_URL = 'matdog_collision.mtw', STATUS_URL = '/api/motion/status';
 const POLL_MS = 500, TIMEOUT_MS = 2000;
@@ -23,14 +22,21 @@ const parentFeed = new URLSearchParams(location.search).get('feed') === 'parent'
 let viewer: ReturnType<typeof createViewerScene> | null = null, initialViewSet = false;
 
 function resetView(): void {
-  const quaternion = stream.frame?.quaternion;
-  // Place the camera in front of the measured heading. In particular a
-  // nonzero magnetic yaw must not turn a "front" reset into a side view.
-  // Roll/pitch and the complete model quaternion remain untouched.
-  viewer?.resetCamera(quaternion ? sh2ToRollPitchYaw(quaternion).yaw : 0);
+  // Absolute +X camera framing. The measured robot/IMU pose is untouched.
+  viewer?.resetCamera();
 }
 function prepareInitialView(): void {
   if (!initialViewSet && twin && stream.frame?.quaternion) { resetView(); initialViewSet = true; }
+}
+
+let reportedHeight = 0;
+function reportHeight(): void {
+  if (!parentFeed) return;
+  const height = Math.ceil(el('app').getBoundingClientRect().height);
+  if (height > 0 && height !== reportedHeight) {
+    reportedHeight = height;
+    window.parent.postMessage({ type: 'MATDOG_TWIN_HEIGHT', height }, location.origin);
+  }
 }
 
 function chip(id: string, text: string, tone: string): void { const c = el(id); c.textContent = text; c.className = `chip ${tone}`; }
@@ -44,6 +50,7 @@ function render(): void {
   for (const [k, v] of facts.rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); }
   el('joints').textContent = facts.jointLines.join('\n');
   if (twin && stream.isStale(now)) twin.setStale(true);
+  reportHeight();
 }
 function accept(body: unknown): void {
   if (!stream.accept(body, performance.now())) { lastError = 'TELEMETRY_REJECTED'; return; }
@@ -100,6 +107,8 @@ async function boot(): Promise<void> {
   viewer = createViewerScene(el('viewport'));
   el('dashboard-link').hidden = parentFeed;
   el<HTMLButtonElement>('reset-view').onclick = resetView;
+  if (parentFeed && typeof ResizeObserver === 'function') new ResizeObserver(reportHeight).observe(el('app'));
+  el('panel').addEventListener('toggle', reportHeight);
   void loadModel(viewer);
   // Embedded in the Controller dashboard (?feed=parent): reuse the status the
   // dashboard already polls (same-origin postMessage), so one page = one poll.
