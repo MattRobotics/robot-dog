@@ -55,6 +55,8 @@ struct ObservationPort : simple::ServoPort {
   simple::Drive drive{};
   bool missing=false,stale=false,freeze=false,failStopFrame=false,verify=true;
   bool stopInFrame=false,stopAfterFrame=false,frameInterrupted=false,failWithDuplicate=false,failWithSafeOff=false,safeOffInFrame=false,safeOffAfterFrame=false,faultAfterFrame=false;
+  bool honorPreempt=false,stopInRead=false,safeOffInRead=false;
+  unsigned preemptedReads=0;
   unsigned stopDuringReads=0,frameDelayUs=0;
   int offsetTicks=0;
   unsigned frames=0,stopFrames=0,offCalls=0,enables=0;
@@ -70,6 +72,10 @@ struct ObservationPort : simple::ServoPort {
     }
   }
   bool read(unsigned slot,bool control,simple::Feedback& out) override {
+    if(stopInRead){stopInRead=false;motion->stop();}
+    if(safeOffInRead){safeOffInRead=false;motion->safeOff();}
+    // Use SimpleMotion's production preemption predicate, as ServoBus does.
+    if(honorPreempt&&motion->busPreemptRequested()){++preemptedReads;return false;}
     if(stopDuringReads&&motion->stopActive()){--stopDuringReads;motion->stop();return false;}
     if(missing)return false;
     out=observed[slot];
@@ -417,7 +423,29 @@ void preemptionDeadline(){
     r.p.frameDelayUs=0;r.finishOff();assert(r.m.offMask()==8191&&!r.m.energized());}
   puts("STOP preemption: short retry retains torque; continuous duplicates/concurrent STAND cannot extend deadline; crossing deadline in TX faults to SAFE_OFF 13/13");
 }
+void faultFeedback(){
+  for(const char* reason:{"PRONE_PATH_NOT_CLEAR","INITIAL_POSE_OUTSIDE_SAFE_ENTRY"}){
+    Rig r;r.stand(.15);r.ticks(100);r.p.honorPreempt=true;
+    r.m.fault(reason);r.finishOff();const auto frames=r.p.frames,enables=r.p.enables;
+    assert(r.m.busPreemptRequested()); // fault still fences every operational writer
+    r.ticks(100); // longer than fast AND control feedback populations
+    assert(r.m.fresh(r.p.now));
+    assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),reason));
+    assert(r.m.offVerified()&&r.m.offMask()==8191&&!r.m.energized());
+    for(const auto& f:r.p.observed)assert(f.torque==0);
+    for(unsigned i=0;i<12;++i)assert(r.m.feedback()[i].torque==0&&r.m.feedback()[i].controlStampUs>r.m.offVerifiedUs());
+    assert(!strcmp(r.m.stand(.15,r.p.now),"FAULT_STOP_REQUIRED"));
+    assert(!strcmp(r.m.prone(r.p.now),"FAULT_STOP_REQUIRED"));
+    const auto preempted=r.p.preemptedReads;r.p.stopInRead=true;r.tick();
+    assert(r.p.preemptedReads>preempted&&r.m.state()==simple::State::FAULT);
+    const auto afterStop=r.p.preemptedReads;r.p.safeOffInRead=true;r.tick();
+    assert(r.p.preemptedReads>afterStop);r.finishOff();r.ticks(100);
+    assert(r.m.fresh(r.p.now)&&r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),reason));
+    assert(r.m.offVerified()&&r.p.frames==frames&&r.p.enables==enables);
+  }
+  puts("FAULT: bounded feedback continues after SAFE_OFF 13/13; reason/FAULT/write fence retained, incoming STOP and SAFE_OFF still preempt reads");
+}
 
 }
-int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();
+int main(){stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

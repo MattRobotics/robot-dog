@@ -110,7 +110,7 @@ class SimpleMotion {
   const char* standResumeRefusal(uint64_t now) const;
   bool stopFrameAuthorized(const uint16_t raw[12],Drive) const;
   bool busPreemptRequested() const {
-    return safeOffRequest_.load()||stop_.load()||offPending_||faultLatched_||(stopActive_&&!stopIo_);
+    return safeOffRequest_.load()||stop_.load()||offPending_||((faultLatched_||stopActive_)&&!stopIo_);
   }
   bool energized() const { return energized_; }
   bool offVerified() const { return offMask_==0x1fff; }

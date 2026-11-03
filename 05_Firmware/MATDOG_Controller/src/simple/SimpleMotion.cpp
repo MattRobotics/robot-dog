@@ -73,7 +73,9 @@ GaitParameters walkGait(unsigned stride){
 bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   timing::Section section(timing::READ);
   if(timing::state.active){if(control)++timing::state.working.controlReads;else ++timing::state.working.fastReads;}
-  const bool previous=stopIo_;if(stopActive_)stopIo_=true;
+  // A latched FAULT still permits these bounded, read-only observations after
+  // SAFE_OFF. A newly pending STOP/OFF always preempts them through the bus hook.
+  const bool previous=stopIo_;stopIo_=true;
   const bool ok=port_->read(slot,control,out);readInterrupted_=stop_.load()||safeOffRequest_.load();stopIo_=previous;return ok;
 }
 bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
