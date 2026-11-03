@@ -97,7 +97,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.energized=motion_->energized();
  s.stopActive=motion_->stopActive();s.stopInProgress=motion_->stopInProgress();
  s.stopVerified=motion_->stopVerified();s.stopSupportVerified=motion_->stopSupportVerified();
- s.standResumeAllowed=s.stopActive&&!motion_->standResumeRefusal(s.capturedUs);
+ s.standResumeReason=s.stopActive?motion_->standResumeRefusal(s.capturedUs):"STOP_NOT_ACTIVE";
+ s.standResumeAllowed=s.stopActive&&!s.standResumeReason;
  s.heightValid=motion_->heightValid();
  s.requestedHeightM=motion_->requestedHeightM();
  s.heightM=motion_->heightM();
@@ -144,8 +145,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"commanded_raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,s.commandedRaw[i],f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]");
  add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
- add(",\"stop\":{\"active\":%s,\"in_progress\":%s,\"motion_verified\":%s,\"support_verified\":%s,\"stand_resume_allowed\":%s}",
-   boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed));
+ add(",\"stop\":{\"active\":%s,\"in_progress\":%s,\"motion_verified\":%s,\"support_verified\":%s,\"stand_resume_allowed\":%s,\"stand_resume_reason\":\"%s\"}",
+   boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
  add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
    (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

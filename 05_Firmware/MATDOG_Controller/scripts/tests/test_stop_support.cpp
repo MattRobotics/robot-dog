@@ -254,6 +254,20 @@ void phaseCoverageAndRaces(){
     motion::GaitParameters gait;gait.duty=simple::kWalkDuty;unsigned stance=0;
     for(unsigned i=0;i<4;++i)stance+=motion::legPhase(gait,static_cast<motion::LegId>(i),r.m.walkCycles()).stance;
     assert(stance==(swing?3u:4u));checkHeldStop(r);
+    const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;
+    const char* refusal=swing?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_WALK_UNVERIFIED";
+    assert(!strcmp(r.m.standResumeRefusal(r.p.now),refusal));
+    core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    core::MotionStatusSnapshot status;assert(service.captureStatus(status,r.p.now/1000));
+    assert(!status.standResumeAllowed&&!strcmp(status.standResumeReason,refusal));
+    char json[core::kMotionStatusJsonBytes];assert(service.statusJson(json,sizeof(json),r.p.now/1000));
+    assert(strstr(json,refusal));
+    motion::MotionCommand stand;stand.owner=motion::ClientOwner::DASHBOARD;stand.intent=motion::Intent::STAND;
+    stand.sequence=1;stand.issued_at_ms=r.p.now/1000;stand.ttl_ms=1000;stand.target_height_m=.15;strcpy(stand.id,"walk-stop-recovery");
+    const auto ack=service.command(stand,r.p.now/1000);
+    assert(ack.outcome==motion::CommandOutcome::REJECTED&&!strcmp(ack.reason,refusal));
+    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.stopSupportVerified());
+    assert(r.p.frames==frames&&r.p.enables==enables&&r.p.offCalls==off);
   }
   // STOP before the first release of a newly accepted posture must cancel it.
   for(bool prone:{false,true}){Rig r;r.stand(.10);r.ticks(100);
@@ -295,6 +309,7 @@ void serviceCompletion(){
     assert(status.stopVerified==engaged&&!status.stopSupportVerified);
     char json[core::kMotionStatusJsonBytes];assert(service.statusJson(json,sizeof(json),r.p.now/1000));
     assert(strstr(json,engaged?"\"stand_resume_allowed\":true":"\"stand_resume_allowed\":false"));
+    assert(strstr(json,engaged?"\"stand_resume_reason\":\"STAND_RECOVERY_AVAILABLE\"":"\"stand_resume_reason\":\"STOP_NOT_ACTIVE\""));
     if(engaged){motion::MotionCommand move;move.owner=motion::ClientOwner::DASHBOARD;move.intent=motion::Intent::STAND;
       move.sequence=3;move.issued_at_ms=r.p.now/1000;move.ttl_ms=1000;move.target_height_m=.15;std::strcpy(move.id,"late-motion");
       assert(service.command(move,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);}

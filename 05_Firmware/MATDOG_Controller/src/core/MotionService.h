@@ -18,6 +18,7 @@ struct MotionStatusSnapshot {
   const char *activeReason="",*activeOutcome="";
   bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
   bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
+  const char* standResumeReason="STOP_NOT_ACTIVE";
   uint16_t offMask=0,referenceFaultRaw=0;
   double requestedHeightM=0,heightM=0,walkCycles=0,quaternion[4]{};
   unsigned referenceFaultSlot=12;
