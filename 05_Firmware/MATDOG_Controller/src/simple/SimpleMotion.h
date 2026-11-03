@@ -167,6 +167,7 @@ class SimpleMotion {
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
   bool arrived(uint64_t) const;
+  const collision::Box* proneHandoverBox() const;
   bool settledUnderLoad(uint64_t);
   bool entersHeight(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
   bool liftEntersHeight(const motion::JointTargetFrame& actual) const;

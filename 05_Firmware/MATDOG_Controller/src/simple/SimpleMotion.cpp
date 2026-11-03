@@ -421,7 +421,18 @@ bool SimpleMotion::arrived(uint64_t now) const {
   const auto terminal=segmentBox_?settleUs_:goalSentUs_;
   if(!terminal||now<terminal||!fresh(esp_timer_get_time())||now-terminal<100000)return false;
   for(unsigned i=0;i<12;++i)if(fb_[i].stampUs<=terminal||std::abs(fb_[i].q-jointSlot(goal_,i))>kArrivalRad||magnitude(fb_[i].speed)>50)return false;
-  return true;
+  // The positioning allowance is not proof of entry into the next group.
+  // Keep the current safe reference and its deadline until tracking gets there.
+  const auto* next=proneHandoverBox();
+  return !next||contains(*next,measured());
+}
+const collision::Box* SimpleMotion::proneHandoverBox() const {
+  switch(phase_){
+    case Phase::PRONE_HEIGHT:return &collision::kLift;
+    case Phase::PRONE_LIFT:return &collision::kDeploy;
+    case Phase::PRONE_DEPLOY:return &collision::kEntry;
+    default:return nullptr;
+  }
 }
 // LIFT -> HEIGHT only (RCA 29/10): at the 50 mm lift top a loaded LOWER rests
 // a few ticks outside kHeight (robot: LF_LOWER 7 ticks) although the pose is
@@ -457,9 +468,8 @@ bool SimpleMotion::settledUnderLoad(uint64_t now){
     case Phase::DEPLOY:allowed=0xfff;next=&collision::kLift;break;
     case Phase::LIFT:allowed=0xfff;if(std::abs(plannedHeight_-requestedHeight_)>1e-9)next=&collision::kHeight;break;
     case Phase::HEIGHT:allowed=0xfff;break;
-    case Phase::PRONE_HEIGHT:allowed=0xfff;next=&collision::kLift;break;
-    case Phase::PRONE_LIFT:allowed=0xfff;next=&collision::kDeploy;break;
-    case Phase::PRONE_DEPLOY:case Phase::PRONE_LAND:allowed=0xfff;next=&collision::kEntry;break;
+    case Phase::PRONE_HEIGHT:case Phase::PRONE_LIFT:case Phase::PRONE_DEPLOY:allowed=0xfff;next=proneHandoverBox();break;
+    case Phase::PRONE_LAND:allowed=0xfff;next=&collision::kEntry;break;
     default:break;  // WALK_SETTLE and HOLD keep the 12-tick arrival only
   }
   const auto terminal=segmentBox_?settleUs_:goalSentUs_;
