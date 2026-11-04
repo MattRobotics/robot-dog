@@ -200,7 +200,7 @@ int main(){
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
   for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<150&&!gaitRestart.m.stopVerified();++i)gaitRestart.tick();
-  assert(gaitRestart.m.stopVerified()&&gaitRestart.m.energized());assert(gaitRestart.m.stand(.06,gaitRestart.p.now));
+  assert(gaitRestart.m.stopVerified()&&gaitRestart.m.energized());assert(!gaitRestart.m.stand(.06,gaitRestart.p.now)); // gait-law completion, then HEIGHT 60
   Rig native;assert(!native.m.stand(.15,native.p.now));native.p.holdObservation=true;
   for(unsigned i=0;i<3000&&native.m.state()!=simple::State::FAULT;++i)native.tick(false);
   assert(native.m.state()==simple::State::FAULT);assert(!strcmp(native.m.reason(),"NATIVE_TARGET_NOT_REACHED"));
@@ -317,7 +317,7 @@ int main(){
     while(!s.m.stopVerified()&&updates<150){s.m.stop();s.tick();++updates;}
     assert(s.m.stopVerified()&&s.p.offCalls==off&&s.m.energized()&&s.m.stopping());
     assert(s.p.enables==enables&&s.m.state()==simple::State::STOPPED&&!s.m.stopSupportVerified());
-    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();}else assert(s.m.stand(.15,s.p.now));
+    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();}else if(during==1)assert(s.m.stand(.15,s.p.now));else{assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());}
   }
   // One servo fails its read-back: SAFE_OFF stays pending and re-broadcasts;
   // repeated STOPs keep the 12 verified servos; nothing can re-enable; the

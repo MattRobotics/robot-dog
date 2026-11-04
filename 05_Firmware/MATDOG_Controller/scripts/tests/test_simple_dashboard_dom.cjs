@@ -296,13 +296,13 @@ async function boot() {
     await refresh(JSON.stringify(s));
     assert.strictEqual(q('#simple-state').textContent,'STOP COMPLETATO · COPPIA ON');assert(q('#simple-stand').disabled);
     assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_POSTURE_UNQUALIFIED'), 'actual Controller recovery refusal is visible');
-    s.stop.stand_resume_reason='STOP_RECOVERY_REQUIRES_STAND_POSE';await refresh(JSON.stringify(s));
-    assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_REQUIRES_STAND_POSE') && q('#simple-reason').textContent.includes('Supporto non verificato') && q('#simple-stand').disabled, 'geometric recovery refusal does not qualify support or bypass Controller admission');
+    s.stop.stand_resume_reason='STOP_RECOVERY_PATH_NOT_CLEAR';await refresh(JSON.stringify(s));
+    assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR') && q('#simple-reason').textContent.includes('Supporto non verificato') && q('#simple-stand').disabled, 'geometric recovery refusal does not qualify support or bypass Controller admission');
     s.stop.stand_resume_reason='FUTURE_CONTROLLER_REFUSAL';await refresh(JSON.stringify(s));
     assert(q('#simple-reason').textContent.includes('FUTURE_CONTROLLER_REFUSAL') && q('#simple-stand').disabled, 'unknown refusal stays visible and never grants admission');
     s.stop.stand_resume_allowed=true;s.stop.stand_resume_reason='STAND_RECOVERY_AVAILABLE';await refresh(JSON.stringify(s));assert(!q('#simple-stand').disabled&&q('#simple-walk').disabled);
-    assert(q('#simple-reason').textContent.includes('Recupero STAND ammesso dal Controller.'), 'admission comes from Controller boolean');
-    const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='HEIGHT';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
+    assert(q('#simple-reason').textContent.includes('Recupero STAND ammesso dal Controller:') && q('#simple-reason').textContent.includes('piccolo avanzamento'), 'admission comes from Controller boolean');
+    const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='WALK_STANDARD';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
     await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Recupero STAND dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
     await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);

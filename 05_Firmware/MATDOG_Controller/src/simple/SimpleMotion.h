@@ -173,7 +173,12 @@ class SimpleMotion {
   bool liftEntersHeight(const motion::JointTargetFrame& actual) const;
   bool heightStartClear(const motion::JointTargetFrame& actual,const motion::JointTargetFrame& q) const;
   bool heightTarget(double,motion::JointTargetFrame&) const;
-  bool stoppedStandReference(motion::JointTargetFrame&) const;
+  struct WalkRecoveryStart {
+    motion::JointTargetFrame held{},first{};
+    double cycles=0,stopCycle=-1;
+  };
+  bool walkRecoveryStart(WalkRecoveryStart&) const;
+  const char* standResumeRefusal(uint64_t,WalkRecoveryStart&) const;
   void measureHeight();
   void nextStand(uint64_t);
   void beginNative(Phase,const motion::JointTargetFrame&,const collision::Box&,uint64_t,double pitch=0,double x=0,double z=0);
@@ -217,7 +222,6 @@ class SimpleMotion {
   uint16_t stopDwellRaw_[12]{};
   const collision::Box* stopBox_=nullptr;
   Phase stopOrigin_=Phase::IDLE;
-  bool stopHadSwing_=false;
   // Writer-owned samples of the accepted RAW reference (including unchanged
   // held goals). Timestamped with the ESP clock after TX, not release entry.
   uint16_t previousRaw_[12]{};
@@ -258,6 +262,9 @@ class SimpleMotion {
   motion::LocomotionFrame holdNominal_{};
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1;
+  // Explicit STAND after a verified WALK STOP: the same gait completes its WALK STOP
+  // from the stopped phase. Clock eased in from rest; the held RAW offset fades out.
+  bool walkRecover_=false; double recoverCycles_=0; uint64_t recoverUs_=0; motion::JointTargetFrame recoverOffset_{};
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
   motion::JointTargetFrame walkOffset_;

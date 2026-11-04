@@ -118,7 +118,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
-  walkRequested_=false;walkStopping_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;
+  walkRequested_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -146,8 +146,6 @@ void SimpleMotion::rememberReference(uint64_t now){
   issuedUs_=now;
   if(stopActive_)return; // keep the revoked operation metadata, not stale RAW history
   issuedPhase_=phase_;issuedPlanned_=planned_;
-  stopHadSwing_=false;
-  if(phase_==Phase::WALK)for(const auto& leg:walkPrevious_.cartesian.phases)stopHadSwing_|=!leg.stance;
 }
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
@@ -162,7 +160,8 @@ void SimpleMotion::beginStop(uint64_t now){
   // Native moves have only an endpoint, not a synchronous in-flight reference.
   // Never pretend that a distant goal is the current pose. Retain the existing
   // fail-closed SAFE_OFF if control cannot construct an authorized reference.
-  const auto source=(phase_==Phase::HOLD||phase_==Phase::PRONE_WAIT)?phase_:issuedPhase_;
+  // WALK_SETTLE re-sends the final gait frame each release, like HOLD: same WALK origin.
+  const auto source=(phase_==Phase::HOLD||phase_==Phase::PRONE_WAIT)?phase_:issuedPhase_==Phase::WALK_HOLD?Phase::WALK:issuedPhase_;
   if(!goal_.valid||!issuedUs_||now<issuedUs_||now-issuedUs_>100000||
       (!issuedPlanned_&&source!=Phase::WALK&&source!=Phase::HOLD&&source!=Phase::PRONE_WAIT)){
     fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;
@@ -195,7 +194,7 @@ void SimpleMotion::beginStop(uint64_t now){
   }
   // q starts exactly at the decoded accepted RAW. All times use the ESP
   // clock; no unwritten nominal point or asynchronous encoder pose is used.
-  stopOrigin_=source;walkStopping_=false;
+  stopOrigin_=source;walkStopping_=walkRecover_=false;
   stopActive_=true;stopVerified_=false;stopStartUs_=now;stopTerminalUs_=stopDwellUs_=0;
   // One existing control-read population takes 1.44 s, plus the 0.5 s dwell.
   stopDeadlineUs_=now+static_cast<uint64_t>(std::ceil(stopPlan_.duration*1e6))+3000000;
@@ -290,16 +289,27 @@ bool SimpleMotion::heightTarget(double h,JointTargetFrame& q) const {
   const double body=baseLinkHeightFromNominalM(h);auto d=canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;
   const auto s=generateStandTarget(d);q=s.target;return s.status==StandStatus::OK&&pointSafe(q)&&contains(collision::kHeight,q);
 }
-bool SimpleMotion::stoppedStandReference(JointTargetFrame& q) const {
+bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
+  auto& held=start.held;auto& first=start.first;auto& c=start.cycles;auto& stopCycle=start.stopCycle;
+  // The held STOP reference is the gait extrapolated by half the arrest time:
+  // resume the law there. A WALK STOP already in progress keeps its terminal,
+  // so planted feet keep their anchors; otherwise it starts at the next touchdown.
   if(!port_)return false;
-  q.valid=true;
-  for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(q,i)))return false;
-  return pointSafe(q)&&contains(collision::kHeight,q);
+  held.valid=true;
+  for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return false;
+  const auto g=walkGait(stride_);
+  c=cycles_+.5*stopPlan_.duration/kWalkPeriodS;
+  stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
+  c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
+  first=solveGait(g,gaitCartesian(g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
+  return pointSafe(held)&&contains(collision::kWalk,held)&&first.valid&&pointSafe(first)&&contains(collision::kWalk,first);
 }
 const char* SimpleMotion::stand(double h,uint64_t now){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
-  if(stopActive_){if(const char* r=standResumeRefusal(now))return r;}
+  // Reuse this admission's computed handoff; no second IK solve or persistent cache.
+  WalkRecoveryStart recovery;
+  if(stopActive_){if(const char* r=standResumeRefusal(now,recovery))return r;}
   else if(operatorStopped_&&!energized_)return "SAFE_OFF_STAND_REFUSED";
   if(!input_.ready)return input_.refusal;
   if(!input_.powerOk)return "POWER_NOT_READY";
@@ -308,13 +318,14 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
   if(stopActive_){
     if(stopOrigin_==Phase::WALK){
-      JointTargetFrame held;if(!stoppedStandReference(held))return "STOP_RECOVERY_REQUIRES_STAND_POSE";
-      // Only the already admitted HEIGHT subset, not a continuation of WALK.
-      // Keep the accepted RAW reference until the next release builds the plan.
-      reference_=held;pendingGoal_=holdNominal_.target;plannedHeight_=.150;requestedHeight_=h;
-      segmentTo_=holdNominal_.target; // keep HOLD's nominal reference if another STOP wins before release
+      // Complete the interrupted WALK STOP with the same gait law: planted feet
+      // keep their anchors, a swing lands on its own target, then four-contact
+      // recentring and WALK_SETTLE to STAND150. No new walking intent.
+      for(unsigned i=0;i<12;++i)jointSlot(recoverOffset_,i)=jointSlot(recovery.held,i)-jointSlot(recovery.first,i);
+      walkRecover_=true;recoverCycles_=recovery.cycles;recoverUs_=0;stopCycle_=recovery.stopCycle;walkStopping_=true;
+      requestedHeight_=h;plannedHeight_=.150;
       stopActive_=stopVerified_=false;operatorStopped_=false;walkRequested_=false;
-      phase_=Phase::HOLD;state_=State::MOVING;segmentBox_=nullptr;planned_=false;pendingGoalValid_=true;
+      phase_=Phase::WALK;state_=State::MOVING;segmentBox_=nullptr;planned_=false;
       reason_="STAND_FROM_STOPPED_WALK";referenceFaultSlot_=12;
       rememberReference(now); // a new STOP before the first release still has a held reference
       timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
@@ -355,6 +366,9 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   return nullptr;
 }
 const char* SimpleMotion::standResumeRefusal(uint64_t now) const {
+  WalkRecoveryStart recovery;return standResumeRefusal(now,recovery);
+}
+const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& recovery) const {
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load()||!energized_)return "SAFE_OFF_STAND_REFUSED";
   if(!stopActive_||!stopVerified_)return "STOP_IN_PROGRESS";
@@ -365,16 +379,9 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now) const {
   if(!fresh(now))return "STOP_RECOVERY_FEEDBACK_UNAVAILABLE";
   for(const auto& f:fb_)if(f.torque!=1||!f.controlStampUs||now<f.controlStampUs||now-f.controlStampUs>12*6*kPeriodUs+250000)return "STOP_RECOVERY_TORQUE_UNVERIFIED";
   if(stopOrigin_==Phase::WALK){
-    if(stopHadSwing_)return "STOP_RECOVERY_SWING_UNVERIFIED";
-    InitialRoute route;const auto actual=measured();JointTargetFrame held;
-    const auto& stand=holdNominal_.target;
-    if(!certifiedRegion(actual,route)||route!=InitialRoute::HEIGHT||!stoppedStandReference(held)||
-       !contains(collision::kHeight,walkPrevious_.target)||!transitionSafe(actual,held,collision::kHeight)||
-       !transitionSafe(held,stand,collision::kHeight))return "STOP_RECOVERY_REQUIRES_STAND_POSE";
-    // Same positioning allowance as an attained STAND, not a new support claim.
-    // Regular WALK and known swing remain outside this narrow recovery subset.
-    for(unsigned i=0;i<12;++i)if(std::abs(jointSlot(actual,i)-jointSlot(stand,i))>kArrivalRad||
-        std::abs(jointSlot(held,i)-jointSlot(stand,i))>kArrivalRad)return "STOP_RECOVERY_REQUIRES_STAND_POSE";
+    // Kinematic admission only: encoders and the gait law never prove contact.
+    if(!walkRecoveryStart(recovery)||!transitionSafe(measured(),recovery.held,collision::kWalk)||
+       !transitionSafe(recovery.held,recovery.first,collision::kWalk))return "STOP_RECOVERY_PATH_NOT_CLEAR";
     return nullptr;
   }
   if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
@@ -679,10 +686,8 @@ void SimpleMotion::nextStand(uint64_t now){
     // The single settled checkpoint inside the route: four feet placed under
     // the body, before its weight leaves a possible ventral support.
     case Phase::DEPLOY:beginLift(nullptr,now);return;
-    case Phase::LIFT:case Phase::HEIGHT:
+    case Phase::LIFT:case Phase::HEIGHT:case Phase::WALK_HOLD:
       if(std::abs(plannedHeight_-requestedHeight_)>1e-9){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
-      [[fallthrough]];
-    case Phase::WALK_HOLD:
       segmentBox_=nullptr;planned_=false;
       phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
       {GaitParameters g;g.heightM=baseLinkHeightFromNominalM(requestedHeight_);holdNominal_=solveGait(g,gaitHold(g,0,g.heightM,0),nullptr,false);}
@@ -713,7 +718,7 @@ void SimpleMotion::startWalk(uint64_t now){
   const auto g=walkGait(stride_);plannedHeight_=.150;
   walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(collision::kWalk,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
-  walkStartUs_=now;walkStopping_=false;stopCycle_=-1;cycles_=0;
+  walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
   phase_=Phase::WALK;state_=State::WALKING;reason_="WALK_STANDARD";
 }
 void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
@@ -795,14 +800,27 @@ void SimpleMotion::generateWalk(uint64_t now){
   // velocity and acceleration; the last window recentres with four feet down.
   const auto g=walkGait(stride_);
   const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
-  cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
+  double fade=0;
+  if(walkRecover_){
+    // First release: exact held RAW, IMU correction restarted from zero (not applied twice).
+    if(!recoverUs_){
+      // Recheck the actual pose after I/O; the held RAW was proved inside kWalk at admission.
+      if(!pointSafe(measured())||!contains(collision::kWalk,measured())){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
+      recoverUs_=now;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;imuStartUs_=now;compensatedUs_=0;}
+    // Same C2 ease as the WALK start ramp: gait rate 0->1 over one second.
+    const double t=(now-recoverUs_)/1e6,u=std::fmin(1.,t);
+    cycles_=recoverCycles_+(t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5)/kWalkPeriodS;
+    fade=1-quinticTimeLaw(u,1).progress;
+  }else cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
   const bool done=walkStopping_&&cycles_>=end;if(done)cycles_=end;
   auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
   if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
+  if(fade>0){for(unsigned i=0;i<12;++i)jointSlot(f.target,i)+=fade*jointSlot(recoverOffset_,i);
+    if(!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}}
   if(!send(f.target,kWalkDrive,now))return;
   if(done){
-    state_=State::MOVING;reason_="WALK_SETTLING";
+    walkRecover_=false;state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
     // correction and a fixed completion deadline. Reuse the same generator.
     beginNative(Phase::WALK_HOLD,walkPrevious_.target,collision::kWalk,now,0,0,.15);
@@ -964,15 +982,6 @@ void SimpleMotion::update(uint64_t now){
   if(stopActive_){generateStop(now);return;}
   if(pendingGoalValid_){
     pendingGoalValid_=false;
-    if(phase_==Phase::HOLD&&state_==State::MOVING){
-      // Explicit stopped-WALK recovery. Recheck the actual handover after I/O;
-      // never seed from the old pre-WALK stand or apply its IMU offset twice.
-      if(!transitionSafe(measured(),reference_,collision::kHeight)||
-         !transitionSafe(reference_,pendingGoal_,collision::kHeight)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-      rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;imuStartUs_=now;compensatedUs_=0;
-      plan_.clear();if(!via(reference_,0,0,.150)||!via(pendingGoal_,0,0,.150)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-      beginPlan(Phase::HEIGHT,collision::kHeight,now);return;
-    }
     if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
     if(phase_==Phase::PRONE_WAIT){
       // Nominal terminal goal, not the sagging encoder pose (as for HEIGHT).

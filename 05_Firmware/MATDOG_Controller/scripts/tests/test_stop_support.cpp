@@ -262,19 +262,24 @@ void phaseCoverageAndRaces(){
     for(unsigned i=0;i<4;++i)stance+=motion::legPhase(gait,static_cast<motion::LegId>(i),r.m.walkCycles()).stance;
     assert(stance==(swing?3u:4u));checkHeldStop(r);
     const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;
-    const char* refusal=swing?"STOP_RECOVERY_SWING_UNVERIFIED":"STOP_RECOVERY_REQUIRES_STAND_POSE";
-    assert(!strcmp(r.m.standResumeRefusal(r.p.now),refusal));
+    assert(!r.m.standResumeRefusal(r.p.now));
     core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
     core::MotionStatusSnapshot status;assert(service.captureStatus(status,r.p.now/1000));
-    assert(!status.standResumeAllowed&&!strcmp(status.standResumeReason,refusal));
+    assert(status.standResumeAllowed&&!status.standResumeReason&&!status.stopSupportVerified);
     char json[core::kMotionStatusJsonBytes];assert(service.statusJson(json,sizeof(json),r.p.now/1000));
-    assert(strstr(json,refusal));
+    assert(strstr(json,"\"stand_resume_allowed\":true")&&strstr(json,"STAND_RECOVERY_AVAILABLE"));
     motion::MotionCommand stand;stand.owner=motion::ClientOwner::DASHBOARD;stand.intent=motion::Intent::STAND;
     stand.sequence=1;stand.issued_at_ms=r.p.now/1000;stand.ttl_ms=1000;stand.target_height_m=.15;strcpy(stand.id,"walk-stop-recovery");
     const auto ack=service.command(stand,r.p.now/1000);
-    assert(ack.outcome==motion::CommandOutcome::REJECTED&&!strcmp(ack.reason,refusal));
-    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.stopSupportVerified());
+    assert(ack.outcome==motion::CommandOutcome::ACCEPTED);
+    assert(r.m.energized()&&!r.m.stopSupportVerified());
     assert(r.p.frames==frames&&r.p.enables==enables&&r.p.offCalls==off);
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){
+      r.tick();service.update();assert(r.m.state()!=simple::State::FAULT&&r.m.state()!=simple::State::WALKING);}
+    service.update();assert(service.captureStatus(status,r.p.now/1000));
+    assert(r.m.state()==simple::State::STANDING&&!strcmp(r.m.reason(),"STAND_REACHED"));
+    assert(!strcmp(status.activeOutcome,"COMPLETED")&&!strcmp(status.activeReason,"STAND_REACHED"));
+    assert(r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
   }
   // STOP before the first release of a newly accepted posture must cancel it.
   for(bool prone:{false,true}){Rig r;r.stand(.10);r.ticks(100);
@@ -349,7 +354,7 @@ void safeOffAndRecovery(){
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
     assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==off);
   }
-  {Rig r;r.walk();r.ticks(380);r.m.stop();assert(r.finishStop());assert(r.m.stand(.15,r.p.now));}
+  {Rig r;r.walk();r.ticks(380);r.m.stop();assert(r.finishStop());assert(!r.m.stand(.15,r.p.now));}
   {Rig r;r.stand(.10);r.ticks(50);assert(!r.m.stand(.15,r.p.now));r.ticks(20);r.m.stop();assert(r.finishStop());
     assert(!strcmp(r.m.stand(.15,r.p.now),"STOP_RECOVERY_POSTURE_UNQUALIFIED"));}
   {Rig r;r.stand(.15);r.ticks(50);r.m.stop();assert(r.finishStop());const auto n=r.p.enables;
@@ -381,7 +386,8 @@ void writerHandoffWithImu(){
     if(mode==0){assert(!r.m.standResumeRefusal(r.p.now));assert(!r.m.stand(.10,r.p.now));
       for(unsigned n=0;n<1500&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
       assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables);}
-    else assert(r.m.stand(.15,r.p.now));
+    else if(mode==1)assert(r.m.stand(.15,r.p.now)); // intermediate HEIGHT posture still unqualified
+    else assert(!r.m.stand(.15,r.p.now));            // WALK: gait-law completion
   }
   // Sub-tick changes are not emitted frames. The accepted RAW, not the
   // unquantized floating goal or asynchronous encoder snapshot, is authoritative.
@@ -482,43 +488,67 @@ void stopReceivedInFault(){
   puts("STOP received in FAULT reports its own verified-OFF completion; original fault stays latched; a new fault during ordinary STOP still aborts it");
 }
 void compatibleWalkRecovery(){
-  for(bool ending:{false,true})for(unsigned stride=0;stride<3;++stride)for(double tilt:{-.01,.01}){
+  // Explicit STAND after a verified WALK STOP completes the same gait's WALK STOP
+  // from the stopped phase (kinematic proof only; contact/support NOT measured).
+  const auto& w=simple::collision::kWalk;constexpr double heights[]={.05,.10,.15};
+  auto decode=[](const std::array<uint16_t,12>& raw,unsigned i){return (int(raw[i])-2048)*simple::kTickRad;};
+  unsigned cases=0;
+  for(bool ending:{false,true})for(unsigned stride=0;stride<3;++stride)for(double tilt:{-.01,.01})for(unsigned at:{1u,380u,1003u}){
     Rig r;r.stand(.15);r.in.quaternion[0]=std::cos(tilt/2);r.in.quaternion[1]=std::sin(tilt/2);r.ticks(50);
-    r.walk(stride);r.tick();
-    if(ending){r.ticks(380);r.m.walkStop();
-      const double end=std::fmax(simple::kWalkStartCycles,std::ceil(r.m.walkCycles()*4)/4)+simple::kWalkStopCycles+simple::kWalkDuty-.75;
-      while(r.m.walkCycles()<end-.006){r.tick();assert(r.m.state()==simple::State::WALKING);}}
+    r.walk(stride);r.ticks(at);if(ending){r.m.walkStop();r.ticks(150);}
     r.m.stop();assert(r.finishStop());
-    if(const char* why=r.m.standResumeRefusal(r.p.now))std::fprintf(stderr,"compatible recovery ending=%u stride=%u tilt=%g refused %s\n",ending,stride,tilt,why);
+    if(const char* why=r.m.standResumeRefusal(r.p.now))std::fprintf(stderr,"walk recovery ending=%u stride=%u at=%u refused %s\n",ending,stride,at,why);
     assert(!r.m.standResumeRefusal(r.p.now)&&!r.m.stopSupportVerified());
     std::array<uint16_t,12> held;std::copy(r.m.commandedRaw(),r.m.commandedRaw()+12,held.begin());
     const auto frames=r.p.sent.size();const auto enables=r.p.enables,off=r.p.offCalls;
-    constexpr double heights[]={.05,.10,.15};
     assert(!r.m.stand(heights[stride],r.p.now));assert(r.p.sent.size()==frames); // intent only
-    r.tick();assert(r.p.sent.size()>frames&&r.p.sent[frames]==held);
-    assert(r.p.drive.speed==simple::kStandDrive.speed&&r.p.drive.acc==simple::kStandDrive.acc);
+    r.tick();assert(r.p.sent.size()==frames||r.p.sent[frames]==held);          // C0: same RAW, not even resent
+    bool walking=true;
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){
       const double roll=tilt+.002*std::sin(n*.03);r.in.quaternion[0]=std::cos(roll/2);r.in.quaternion[1]=std::sin(roll/2);
-      r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      const auto before=r.p.sent.size();r.tick();assert(r.m.state()!=simple::State::FAULT&&r.m.state()!=simple::State::WALKING);
+      walking=walking&&!strcmp(r.m.phase(),"WALK_STANDARD");
+      if(walking&&r.p.sent.size()>before){const auto& f=r.p.sent.back();
+        assert(r.p.drive.speed==simple::kWalkDrive.speed&&r.p.drive.acc==simple::kWalkDrive.acc);
+        for(unsigned i=0;i<12;++i){assert(decode(f,i)>=w.lo[i]&&decode(f,i)<=w.hi[i]);
+          if(before>frames)assert(std::abs(int(f[i])-int(r.p.sent[before-1][i]))<=20);}}  // <= 1000 ticks/s per release
+    }
     assert(r.m.state()==simple::State::STANDING&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
+    assert(!strcmp(r.m.reason(),"STAND_REACHED")&&r.m.heightValid());
+    assert(std::abs(r.m.requestedHeightM()-heights[stride])<1e-12);++cases;
   }
-  for(unsigned race=0;race<4;++race){Rig r;r.walk();r.tick();r.m.stop();assert(r.finishStop());
+  // A second STOP during the recovery keeps the active terminal; STOP in WALK_SETTLE holds torque.
+  {Rig r;r.walk(2);r.ticks(600);r.m.stop();assert(r.finishStop());assert(!r.m.stand(.15,r.p.now));r.ticks(150);
+    assert(r.m.state()==simple::State::MOVING);r.m.stop();assert(r.finishStop());assert(!r.m.stand(.15,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::STANDING&&!strcmp(r.m.reason(),"STAND_REACHED"));++cases;}
+  {Rig r;r.walk(2);r.ticks(500);r.m.walkStop();r.phase("WALK_SETTLE");const auto enables=r.p.enables,off=r.p.offCalls;
+    r.m.stop();r.tick();assert(r.m.stopActive()&&r.m.state()!=simple::State::FAULT);assert(r.finishStop());assert(!r.m.stand(.10,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.p.enables==enables&&r.p.offCalls==off);++cases;}
+  // Real faults during an already advancing recovery still take the existing SAFE_OFF path.
+  for(bool powerFault:{false,true}){Rig r;r.walk(2);r.ticks(500);r.m.stop();assert(r.finishStop());
+    const auto enables=r.p.enables;assert(!r.m.stand(.15,r.p.now));r.ticks(100);
+    assert(r.m.state()==simple::State::MOVING);
+    if(powerFault)r.in.powerOk=false;else r.in.imuValid=false;
+    r.tick();assert(r.m.state()==simple::State::FAULT);r.finishOff();
+    assert(!r.m.energized()&&r.m.offVerified()&&r.p.enables==enables);
+  }
+  for(unsigned race=0;race<4;++race){Rig r;r.walk();r.ticks(700);r.m.stop();assert(r.finishStop());
     const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;assert(!r.m.stand(.10,r.p.now));
     if(race==0)r.m.stop();
     if(race==1)r.p.stopAfterFrame=true;
     if(race==2)r.m.safeOff();
-    if(race==3){const unsigned i=simple::StopReferenceProbe::nextRead(r.m);const auto& b=simple::collision::kHeight;const auto& w=simple::collision::kWalk;
-      const double q=w.lo[i]<b.lo[i]?(w.lo[i]+b.lo[i])/2:(b.hi[i]+w.hi[i])/2;
+    if(race==3){const unsigned i=simple::StopReferenceProbe::nextRead(r.m);const double q=w.hi[i]+.02<r.in.maxRad[i]-.005?w.hi[i]+.02:w.lo[i]-.02;
       r.p.observed[i].q=q;r.p.resolve(i,q,r.p.observed[i].raw);r.p.freeze=true;}
-    r.tick();
-    if(race<2){assert(r.m.stopActive()&&r.finishStop()&&r.m.energized()&&r.p.offCalls==off);}
-    else {if(race==3)assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"HEIGHT_PATH_NOT_CLEAR"));
-      assert(r.p.frames==frames);r.finishOff();assert(!r.m.energized());}
-    assert(r.p.enables==enables);
+    r.tick();if(race==1)for(unsigned n=0;n<10&&!r.m.stopActive();++n)r.tick(); // first release resends nothing (same RAW)
+    if(race<2){if(!r.m.stopActive())std::fprintf(stderr,"race %u state=%s reason=%s phase=%s\n",race,simple::name(r.m.state()),r.m.reason(),r.m.phase());assert(r.m.stopActive()&&r.finishStop()&&r.m.energized()&&r.p.offCalls==off);}
+    else {if(race==3)std::fprintf(stderr,"race3 state=%s reason=%s phase=%s\n",simple::name(r.m.state()),r.m.reason(),r.m.phase());if(race==3)assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_RECOVERY_PATH_NOT_CLEAR"));
+      r.finishOff();assert(!r.m.energized());}
+    assert(r.p.enables==enables);(void)frames;
   }
-  puts("Explicit STAND from stopped WALK: narrow HEIGHT-compatible startup/recentring subset, RAW C0 with IMU, no enable/OFF; regular/swing refusals and STOP/OFF/recheck races retained (support NOT proven)");
+  std::printf("Explicit STAND from stopped WALK: %u gait-law completions (stance/swing, 30/45/60, decel, settle, re-STOP), RAW C0, kWalk, no enable/OFF; races retained (support NOT proven)\n",cases);
 }
-
 }
 int main(){compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

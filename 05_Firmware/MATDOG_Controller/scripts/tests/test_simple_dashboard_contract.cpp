@@ -320,6 +320,33 @@ int envelopes(const char* path, const char* src) {
   }
   check(seen == 9, "nine dashboard envelopes captured (" + std::to_string(seen) + ")");
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
+  // Reuse the shipped STOP/STAND envelopes for the new WALK recovery path.
+  for(unsigned stride:{1u,2u}){
+    Session session;Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    check(!rig.m.walk(stride,rig.p.now),"HTTP recovery: WALK intent");
+    for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::WALKING;++n)rig.tick();
+    for(unsigned n=0;n<(stride==1?380u:500u);++n)rig.tick();
+    const auto enables=rig.p.enables,off=rig.p.offCalls;
+    auto freshBody=[&](const std::string& body,unsigned sequence){
+      motion::MotionCommand parsed;const char* why=nullptr;
+      check(core::parseMotionJson(body.data(),body.size(),&parsed,&why),"recovery envelope parses");
+      auto result=replace(body,"\"sequence\":"+std::to_string(parsed.sequence),"\"sequence\":"+std::to_string(sequence));
+      return replace(result,"\"issued_at_ms\":"+std::to_string(parsed.issued_at_ms),"\"issued_at_ms\":"+std::to_string(rig.p.now/1000));
+    };
+    const auto stop=serve(request(freshBody(stopBody,100),session),session,service,rig,rig.p.now/1000);
+    check(stop.status==200&&stop.code=="ACCEPTED STOP_REQUESTED","HTTP WALK STOP accepted");
+    for(unsigned n=0;n<300&&!rig.m.stopVerified();++n){rig.tick();service.update();}
+    check(rig.m.stopVerified()&&rig.m.energized(),"HTTP WALK STOP verified, torque ON");
+    const auto status=statusJson(service,rig);
+    check(status.find("\"stand_resume_allowed\":true")!=std::string::npos,"HTTP recovery admission in status");
+    const auto stand=serve(request(freshBody(standBody,101),session),session,service,rig,rig.p.now/1000);
+    check(stand.status==200&&stand.code=="ACCEPTED COMMAND_ACCEPTED","HTTP explicit recovery STAND accepted");
+    for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::STANDING;++n){rig.tick();service.update();}
+    core::MotionStatusSnapshot terminal;service.update();service.captureStatus(terminal,rig.p.now/1000);
+    check(rig.m.state()==simple::State::STANDING&&!std::strcmp(terminal.activeReason,"STAND_REACHED")&&
+      !std::strcmp(terminal.activeOutcome,"COMPLETED"),"HTTP recovery actually reaches STAND_REACHED");
+    check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP recovery has no enable/OFF");
+  }
   // Rejections keep working on the generated envelopes: none reaches the service.
   {
     Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
