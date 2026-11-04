@@ -5,6 +5,7 @@
  * WebGL runs on the phone; the ESP32 only serves bytes.
  */
 import { createViewerScene } from '../viewer/scene';
+import { sh2ToRollPitchYaw } from '../frame/orientation';
 import { parseUrdf } from '../urdf/parseUrdf';
 import { buildRobot } from '../urdf/buildRobot';
 import { styleForLink } from '../viewer/linkStyle';
@@ -22,8 +23,10 @@ const parentFeed = new URLSearchParams(location.search).get('feed') === 'parent'
 let viewer: ReturnType<typeof createViewerScene> | null = null, initialViewSet = false;
 
 function resetView(): void {
-  // Absolute +X camera framing. The measured robot/IMU pose is untouched.
-  viewer?.resetCamera();
+  // Face the measured robot +X direction, not world +X. Only the camera moves:
+  // the same SH2 -> base_link -> Z-up Three frame mapping keeps the pose truthful.
+  const q = twin?.actual.rootObject.quaternion;
+  viewer?.resetCamera(q ? sh2ToRollPitchYaw(q).yaw : 0);
 }
 function prepareInitialView(): void {
   if (!initialViewSet && twin && stream.frame?.quaternion) { resetView(); initialViewSet = true; }

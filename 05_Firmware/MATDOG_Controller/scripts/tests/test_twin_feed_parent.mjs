@@ -17,10 +17,10 @@ const viewer = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../..
 const STUBS = {
   '../viewer/scene': 'export function createViewerScene(){const scene={resetCalls:[],resetCamera(yaw=0){this.resetCalls.push(yaw)},setBeforeRender(){},robotAnchor:{add(){}},start(){}};globalThis.__viewers.push(scene);return scene}',
   '../urdf/parseUrdf': 'export function parseUrdf(){return{}}',
-  '../urdf/buildRobot': 'export async function buildRobot(){return{rootObject:{},resetJoints(){},collisionMeshCount:17}}',
+  '../urdf/buildRobot': 'export async function buildRobot(){return{rootObject:{quaternion:{w:1,x:0,y:0,z:0}},resetJoints(){},collisionMeshCount:17}}',
   '../viewer/linkStyle': 'export const styleForLink=()=>({})',
   '../urdf/mtwLoader': 'export const mtwMeshLoader=()=>()=>null;export const parseMtw=()=>({})',
-  '../motion/twinController': 'export class MotionTwinController{constructor(){this.applied=[];this.actualState="MEASURED";this.interpolationMs=0;globalThis.__twins.push(this)}apply(f){this.applied.push(f)}setStale(){}animate(){}}',
+  '../motion/twinController': 'export class MotionTwinController{constructor(actual){this.actual=actual;this.applied=[];this.actualState="MEASURED";this.interpolationMs=0;globalThis.__twins.push(this)}apply(f){this.applied.push(f);if(f.quaternion&&f.channels.imuValid!==false&&f.channels.imuAgeMs<=200)this.actual.rootObject.quaternion=f.quaternion}setStale(){}animate(){}}',
 };
 register('data:text/javascript,' + encodeURIComponent(`const STUBS=${JSON.stringify(STUBS)};
 export async function resolve(spec, ctx, next) {
@@ -83,8 +83,8 @@ const check = (c, m) => { checks++; assert(c, m); };
   check(t.scene.resetCalls.length === 1 && t.scene.resetCalls[0] === 0, 'reset before telemetry uses canonical +X heading');
   check(t.fetches.length === beforeFirstReset && t.twin.applied.length === 0, 'reset before telemetry neither fetches nor invents a posture');
   const status = JSON.parse(fx.status_walking);
-  // Exercise a tilted, nonzero heading: absolute +X Reset must not alter the
-  // measured model quaternion to make the robot face the camera.
+  // Exercise a tilted, nonzero heading: camera follows the robot +X direction;
+  // Reset must not rotate the measured model to face a fixed world camera.
   status.telemetry.quaternion = [.94, .10, -.12, .29];
   const post = (data, origin = 'http://192.168.4.1', source = t.parent) => t.listeners[0]({ data, origin, source });
   post(status, 'http://192.168.4.2'); post(status, 'http://192.168.4.1', {}); post({ unrelated: true });
@@ -95,11 +95,12 @@ const check = (c, m) => { checks++; assert(c, m); };
   const { JOINT_NAMES } = await import(pathToFileURL(path.join(viewer, 'src/motion/telemetry.ts')).href);
   JOINT_NAMES.forEach((joint, i) => check(frame.actual[joint] === status.telemetry.actual_rad[i], 'same ACTUAL angle ' + joint));
   check(JSON.stringify(frame.quaternion) !== 'null', 'BNO085 quaternion carried');
-  check(Math.abs(frame.quaternion.z)>.1 && t.scene.resetCalls.length === 2 && t.scene.resetCalls[1] === 0, 'first measured frame keeps the absolute +X camera despite nonzero measured heading');
+  const q=frame.quaternion, heading=Math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z));
+  check(Math.abs(q.z)>.1 && t.scene.resetCalls.length === 2 && Math.abs(t.scene.resetCalls[1]-heading)<1e-12, 'first measured frame places the camera at the robot +X heading');
   const receivedQuaternion = JSON.stringify(status.telemetry.quaternion), frameQuaternion = JSON.stringify(frame.quaternion);
   const beforeReset = t.fetches.length, beforeFrames = t.twin.applied.length, beforeCameraResets = t.scene.resetCalls.length;
   reset.click();
-  check(t.scene.resetCalls.length === beforeCameraResets + 1 && t.scene.resetCalls.at(-1) === 0, 'Reset vista delegates only to the absolute +X camera');
+  check(t.scene.resetCalls.length === beforeCameraResets + 1 && Math.abs(t.scene.resetCalls.at(-1)-heading)<1e-12, 'Reset vista delegates only to the measured robot +X camera heading');
   check(t.fetches.length === beforeReset && t.fetches.every(f => !f.init.method || f.init.method === 'GET'), 'Reset vista issues no extra telemetry GET or command POST');
   check(t.twin.applied.length === beforeFrames && JSON.stringify(frame.quaternion) === frameQuaternion && JSON.stringify(status.telemetry.quaternion) === receivedQuaternion, 'Reset vista preserves the received IMU quaternion and robot posture');
   check(t.dom.window.document.getElementById('banner').textContent !== 'In attesa della prima telemetria…', 'Twin view updated');
@@ -113,10 +114,14 @@ const check = (c, m) => { checks++; assert(c, m); };
   const diagnostics = () => t.dom.window.document.getElementById('facts').textContent;
   check(chip('twin-status') === 'LIVE' && diagnostics().includes(`valida · ${newer.imu_age_ms} ms`) && diagnostics().includes('RAWN/D'), 'single LIVE badge; source IMU age and unknown RAW remain in diagnostics');
   const bound = JSON.parse(fx.status_walking); bound.now_ms += 700; bound.telemetry.sampled_at_ms += 700;
+  bound.telemetry.quaternion=status.telemetry.quaternion;
   bound.channels = { imu: { valid: bound.imu_valid, age_ms: bound.imu_age_ms }, raw: { count: bound.joints.filter(j => j.valid).length } }; post(bound);
   check(chip('twin-status') === 'LIVE' && diagnostics().includes(`valida · ${bound.imu_age_ms} ms`) && diagnostics().includes('RAW12/12'), 'bound status: IMU age and RAW 12/12 kept in expandable diagnostics');
+  const displayedQuaternion=JSON.stringify(t.twin.actual.rootObject.quaternion);
   const invalid = JSON.parse(JSON.stringify(bound)); invalid.now_ms += 350; invalid.telemetry.sampled_at_ms += 350; invalid.telemetry.quaternion = null; invalid.channels.imu.valid = false; post(invalid);
   check(chip('twin-status') !== 'LIVE' && diagnostics().includes('NON VALIDA'), 'Controller imu_valid=false never shows LIVE');
+  reset.click();
+  check(JSON.stringify(t.twin.actual.rootObject.quaternion)===displayedQuaternion && Math.abs(t.scene.resetCalls.at(-1)-heading)<1e-12, 'Reset follows retained displayed orientation after invalid IMU, not the rejected stream sample');
   const demo = JSON.parse(JSON.stringify(bound)); demo.now_ms += 1000; demo.telemetry.sampled_at_ms += 1000; demo.telemetry.source = 'OFFLINE_UI_FIXTURE'; post(demo);
   check(chip('twin-status') === 'OFFLINE', 'an offline fixture with full measured channels is explicitly OFFLINE');
   post({ unrelated: true });
