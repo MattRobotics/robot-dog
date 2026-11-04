@@ -21,6 +21,12 @@ extern "C" int64_t esp_timer_get_time(){return test_clock_us;}
 #include <string>
 #include <vector>
 using namespace matdog;
+namespace matdog { namespace simple {
+struct StopReferenceProbe {
+  static double roll(const SimpleMotion& m){return m.rollCorrection_*m.correctionScale_;}
+  static double pitch(const SimpleMotion& m){return m.pitchCorrection_*m.correctionScale_;}
+};
+} }
 struct ScriptedObservationPort: simple::ServoPort {
   uint64_t now=1000000;simple::Feedback observed[12]{};
   uint16_t target[12]{};simple::Drive drive{};
@@ -116,7 +122,46 @@ static void proneHandoverWait(){
   }
   std::puts("PRONE handover waits inside current box, follows catch-up into next box, and retains the original timeout");
 }
-int main(){
+static void standHoldTilt(){
+  // Scripted measured attitude + ideal encoder tracking, not a physical board model.
+  for(double height:{.05,.10,.15})for(bool pitchAxis:{false,true})for(double sign:{-1.,1.}){
+    Rig r;assert(!r.m.stand(height,r.p.now));assert(r.reachStand());
+    for(unsigned n=0;n<100;++n)r.tick();std::array<uint16_t,12> flat;std::copy(r.p.target,r.p.target+12,flat.begin());
+    const auto enables=r.p.enables,off=r.p.offCalls;unsigned maxRaw=0;double maxEffective=0;
+    for(double amplitude:{.01,.02,.04,.08,.16}){
+      for(unsigned n=0;n<250;++n){
+        const double tilt=sign*amplitude,roll=pitchAxis?0:tilt,pitch=pitchAxis?tilt:0;
+        r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);
+        r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
+        std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());r.tick();
+        assert(r.m.state()==simple::State::STANDING);
+        const auto& box=height==.05?simple::collision::kLift:simple::collision::kHeight;
+        for(unsigned j=0;j<12;++j){const double q=motion::jointSlot(r.m.target(),j);
+          assert(q>=box.lo[j]&&q<=box.hi[j]&&q>=r.in.minRad[j]&&q<=r.in.maxRad[j]);
+          const auto step=unsigned(std::abs(int(r.p.target[j])-int(previous[j])));maxRaw=std::max(maxRaw,step);assert(step<=10);}
+        const auto accepted=r.p.sent.size();r.m.update(r.p.now);assert(r.p.sent.size()==accepted); // no second release/compensation
+      }
+      const double correction=pitchAxis?simple::StopReferenceProbe::pitch(r.m):simple::StopReferenceProbe::roll(r.m);
+      maxEffective=std::fmax(maxEffective,std::abs(correction));
+      assert(sign*correction<0&&std::abs(correction)<=.020); // reduces measured error; bounded, no accumulating offset
+    }
+    // Slow measured tilt: same bounded release path, no synthetic world-contact update.
+    for(unsigned n=0;n<1500;++n){const double tilt=.04*std::sin(n*.004),roll=pitchAxis?0:tilt,pitch=pitchAxis?tilt:0;
+      r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);
+      r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
+      std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());r.tick();
+      assert(r.m.state()==simple::State::STANDING);
+      for(unsigned j=0;j<12;++j)assert(std::abs(int(r.p.target[j])-int(previous[j]))<=10);
+    }
+    // Return to horizontal: bounded slew, no residual integral / exact flat reference.
+    for(unsigned n=0;n<1000;++n){r.in.quaternion[0]=1;r.in.quaternion[1]=r.in.quaternion[2]=r.in.quaternion[3]=0;r.tick();}
+    for(unsigned j=0;j<12;++j)assert(r.p.target[j]==flat[j]);
+    assert(r.p.enables==enables&&r.p.offCalls==off);
+    printf("HOLD tilt h=%.0fmm axis=%s sign=%g max_effective_rad=%.9f max_RAW_step=%u\n",height*1000,pitchAxis?"pitch":"roll",sign,maxEffective,maxRaw);
+  }
+  puts("STAND HOLD IMU: 50/100/150, signed roll/pitch0.01..0.16rad, opposing bounded correction, certified box/RAW continuity, exact return to flat; NOT full board leveling or hardware stability");
+}
+int main(){standHoldTilt();
   proneHandoverWait();
   // Exercise the production gait + IK across every join: swing lift-off and
   // touchdown, four-contact sway windows, end of the start ramp, decel start,
