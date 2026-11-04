@@ -244,6 +244,44 @@ void evidenceAndFaults(){
     assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"SYNC_WRITE_FAILED"));r.finishOff();}
   std::puts("STOP verification requires post-terminal speed/convergence/dwell; power/authority/feedback/alarm/deadline/write failures retain latched FAULT + 13/13 SAFE_OFF");
 }
+void terminalStopHold(){
+  {Rig r;r.stand(.15);r.ticks(100);core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    motion::MotionCommand c;c.owner=motion::ClientOwner::DASHBOARD;c.intent=motion::Intent::STOP;
+    c.sequence=1;c.issued_at_ms=r.p.now/1000;c.ttl_ms=1000;strcpy(c.id,"terminal-stop");
+    assert(service.command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+    assert(r.finishStop());service.update();r.ticks(2000); // 40 s, well past acquisition deadline
+    const auto held=r.p.target[11];const auto enables=r.p.enables,off=r.p.offCalls;
+    r.p.freeze=true;r.p.observed[11].raw+=4;r.p.observed[11].q+=4*simple::kTickRad;r.ticks(100);service.update();
+    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.stopSupportVerified()&&r.m.state()==simple::State::STOPPED&&r.p.target[11]==held);
+    core::MotionStatusSnapshot status;assert(service.captureStatus(status,r.p.now/1000));
+    assert(!strcmp(status.activeOutcome,"COMPLETED")&&!strcmp(status.activeReason,"STOPPED_SUPPORT_UNVERIFIED"));
+    r.m.stop();r.tick();assert(r.m.stopVerified()); // duplicate cannot revoke terminal result
+    c.intent=motion::Intent::STAND;c.sequence=2;c.issued_at_ms=r.p.now/1000;c.target_height_m=.15;strcpy(c.id,"stand-after-terminal-stop");
+    assert(service.command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
+    r.p.freeze=false;for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();service.update();assert(r.m.state()!=simple::State::FAULT);}
+    service.update();assert(service.captureStatus(status,r.p.now/1000));
+    assert(r.m.state()==simple::State::STANDING&&!strcmp(status.activeReason,"STAND_REACHED")&&!strcmp(status.activeOutcome,"COMPLETED")&&!strcmp(status.activeId,"stand-after-terminal-stop")&&status.activeSequence==2);
+    assert(r.p.enables==enables&&r.p.offCalls==off);r.m.safeOff();r.tick();r.finishOff();assert(r.m.offVerified());
+  }
+  for(unsigned fault=0;fault<7;++fault){Rig r;r.stand(.15);r.ticks(100);r.m.stop();assert(r.finishStop());r.ticks(200);
+    r.p.freeze=true;
+    if(fault==0){r.p.observed[1].raw+=49;r.p.observed[1].q+=49*simple::kTickRad;}
+    if(fault==1)r.p.stale=true;
+    if(fault==2)for(auto& f:r.p.observed)f.torque=0;
+    if(fault==3)r.in.authorityOk=false;
+    if(fault==4)r.in.powerOk=false;
+    if(fault==5)for(auto& f:r.p.observed)f.status=8;
+    if(fault==6)for(auto& f:r.p.observed)f.load=401;
+    for(unsigned n=0;n<150&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&strcmp(r.m.reason(),"STOP_NOT_SETTLED"));
+    if(fault==0||fault==6)assert(!strcmp(r.m.reason(),"STOP_HOLD_TRACKING_UNSAFE"));
+    r.finishOff();assert(r.m.offVerified());
+  }
+  {Rig r;r.stand(.15);r.ticks(100);for(auto& f:r.p.observed)f.speed=100;r.m.stop();
+    for(unsigned n=0;n<250&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_NOT_SETTLED"));r.finishOff();}
+  puts("Terminal STOP: 4-tick disturbance after 40s keeps reference/result/torque; new STAND ACK completes; acquisition timeout and physical faults/SAFE_OFF retained");
+}
 void fallbackAndWalkStop(){
   {Rig r;assert(!r.m.stand(.15,r.p.now));r.phase("DISENGAGE");r.m.stop();r.tick();
     assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));r.finishOff();}
@@ -550,5 +588,5 @@ void compatibleWalkRecovery(){
   std::printf("Explicit STAND from stopped WALK: %u gait-law completions (stance/swing, 30/45/60, decel, settle, re-STOP), RAW C0, kWalk, no enable/OFF; races retained (support NOT proven)\n",cases);
 }
 }
-int main(){compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
+int main(){terminalStopHold();compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

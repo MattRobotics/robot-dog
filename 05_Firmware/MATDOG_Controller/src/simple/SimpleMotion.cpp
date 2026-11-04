@@ -210,6 +210,14 @@ void SimpleMotion::generateStop(uint64_t now){
   stopFrame_=true;const bool sent=send(q,stopDrive_,now);stopFrame_=false;
   if(!stopActive_)return;
   if(serviceStop()||stopTimedOut(esp_timer_get_time())||!sent)return;
+  if(stopVerified_){
+    // Acquisition is terminal. Keep its RAW reference and result; a later
+    // disturbance is supervised as a hold, never against the old brake deadline.
+    // Freshness, torque/goal, authority, electrical and box guards still run.
+    for(unsigned i=0;i<12;++i)if(std::abs(fb_[i].q-jointSlot(goal_,i))>kLoadedTicks*kTickRad||
+        (fb_[i].load&1023)>kLoadedMaxPermille){fault("STOP_HOLD_TRACKING_UNSAFE");return;}
+    return;
+  }
   if((now-stopStartUs_)/1e6<stopPlan_.duration)return;
   if(!stopTerminalUs_)stopTerminalUs_=now;
   bool resting=fresh(esp_timer_get_time());
