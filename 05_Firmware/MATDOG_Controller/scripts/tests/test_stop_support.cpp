@@ -5,6 +5,7 @@
 #include "../../src/core/MotionService.h"
 #include "../../src/core/MotionJson.h"
 #include "../../src/motion/PairedProneData.h"
+#include "../../src/motion/TiltCompensation.h"
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -243,6 +244,49 @@ void evidenceAndFaults(){
     for(unsigned k=0;k<20&&r.m.state()!=simple::State::FAULT;++k)r.tick();
     assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"SYNC_WRITE_FAILED"));r.finishOff();}
   std::puts("STOP verification requires post-terminal speed/convergence/dwell; power/authority/feedback/alarm/deadline/write failures retain latched FAULT + 13/13 SAFE_OFF");
+}
+void supportPlaneLevelTarget(){
+  // Kinematic support/no-slip hypotheses only, not contact or hardware stability evidence.
+  constexpr double deg=3.14159265358979323846/180;
+  const auto& stand=motion::canonicalStandDefinition();
+  unsigned cases=0;
+  const std::array<std::array<double,2>,11> angles={{{0,0},{0,15},{0,-15},{.25,0},{-.25,0},{1.0,0},{-1.0,0},{1.8,0},{-1.8,0},{.5,.5},{-.5,-.5}}};
+  for(const auto& angle:angles){
+    const auto board=motion::bodyPoseFromRollPitch({0,0,0},angle[0]*deg,angle[1]*deg);
+    const motion::Vector3 upSupport={board.rotation[2][0],board.rotation[2][1],board.rotation[2][2]};
+    const double expectedRoll=-std::asin(upSupport.y),expectedPitch=std::atan2(upSupport.x,upSupport.z);
+    // Both before response (body parallel to plane) and after exact leveling:
+    // the measured encoder/IMU geometry returns the same target, no accumulated error.
+    for(bool leveled:{false,true}){
+      const double currentRoll=leveled?expectedRoll:0,currentPitch=leveled?expectedPitch:0;
+      const auto solved=motion::compensateStand(stand,simple::baseLinkHeightFromNominalM(.100),currentRoll,currentPitch,stand.standSeed,false);
+      assert(solved.status==motion::TiltCompensation::Status::OK);
+      for(unsigned i=0;i<12;++i)assert(motion::jointSlot(solved.target,i)>=simple::collision::kHeight.lo[i]&&motion::jointSlot(solved.target,i)<=simple::collision::kHeight.hi[i]);
+      // R_WB = R_WS * R_SB; its third row is gravity-up expressed in body.
+      const auto& current=solved.pose;
+      const motion::Vector3 upBody={upSupport.x*current.rotation[0][0]+upSupport.y*current.rotation[1][0]+upSupport.z*current.rotation[2][0],
+        upSupport.x*current.rotation[0][1]+upSupport.y*current.rotation[1][1]+upSupport.z*current.rotation[2][1],
+        upSupport.x*current.rotation[0][2]+upSupport.y*current.rotation[1][2]+upSupport.z*current.rotation[2][2]};
+      for(unsigned omitted=0;omitted<=4;++omitted){bool stance[4];for(unsigned i=0;i<4;++i)stance[i]=i!=omitted;
+        double roll=9,pitch=9;assert(motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,upBody,current,roll,pitch));
+        assert(std::abs(roll-expectedRoll)<1e-7&&std::abs(pitch-expectedPitch)<1e-7);++cases;
+      }
+    }
+  }
+  const auto solved=motion::compensateStand(stand,simple::baseLinkHeightFromNominalM(.100),0,0,stand.standSeed,false);
+  bool stance[4]={true,true,true,true};double roll=9,pitch=9;motion::Vector3 up={0,0,1};
+  auto invalid=solved.target;invalid.valid=false;
+  assert(!motion::supportLevelTarget(stand.contactsWorldM,invalid,stance,up,solved.pose,roll,pitch)&&roll==0&&pitch==0);
+  invalid=solved.target;invalid.legs[0].hip=std::numeric_limits<double>::quiet_NaN();
+  assert(!motion::supportLevelTarget(stand.contactsWorldM,invalid,stance,up,solved.pose,roll,pitch));
+  assert(!motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,{0,0,0},solved.pose,roll,pitch));
+  assert(!motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,{0,0,-1},solved.pose,roll,pitch));
+  auto badPose=solved.pose;badPose.rotation[0][0]=2;
+  assert(!motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,up,badPose,roll,pitch));
+  stance[2]=stance[3]=false;assert(!motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,up,solved.pose,roll,pitch));
+  stance[2]=true;motion::Vector3 collinear[4]={{0,0,0},{.1,0,0},{.2,0,0},{.3,0,0}};
+  assert(!motion::supportLevelTarget(collinear,solved.target,stance,up,solved.pose,roll,pitch));
+  std::printf("Support level target: %u production-IK roundtrips (pitch +/-15deg100mm, roll and combined signs, every three-stance set), retained level at zero IMU error; invalid geometry refused\n",cases);
 }
 void terminalStopHold(){
   {Rig r;r.stand(.15);r.ticks(100);core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
@@ -588,5 +632,5 @@ void compatibleWalkRecovery(){
   std::printf("Explicit STAND from stopped WALK: %u gait-law completions (stance/swing, 30/45/60, decel, settle, re-STOP), RAW C0, kWalk, no enable/OFF; races retained (support NOT proven)\n",cases);
 }
 }
-int main(){terminalStopHold();compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
+int main(){supportPlaneLevelTarget();terminalStopHold();compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();
   std::puts("PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED");}

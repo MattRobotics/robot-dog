@@ -9,6 +9,7 @@ static int64_t test_clock_us=1000000;
 extern "C" int64_t esp_timer_get_time(){return test_clock_us;}
 #include "../../src/motion/PairedProneData.h"
 #include "../../src/motion/GaitTiming.h"
+#include "../../src/motion/TiltCompensation.h"
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -25,6 +26,9 @@ namespace matdog { namespace simple {
 struct StopReferenceProbe {
   static double roll(const SimpleMotion& m){return m.rollCorrection_*m.correctionScale_;}
   static double pitch(const SimpleMotion& m){return m.pitchCorrection_*m.correctionScale_;}
+  static const motion::LocomotionFrame& hold(const SimpleMotion& m){return m.holdNominal_;}
+  static bool pending(const SimpleMotion& m){return m.pendingGoalValid_;}
+  static const motion::JointTargetFrame& segmentTo(const SimpleMotion& m){return m.segmentTo_;}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -122,44 +126,175 @@ static void proneHandoverWait(){
   }
   std::puts("PRONE handover waits inside current box, follows catch-up into next box, and retains the original timeout");
 }
-static void standHoldTilt(){
-  // Scripted measured attitude + ideal encoder tracking, not a physical board model.
-  for(double height:{.05,.10,.15})for(bool pitchAxis:{false,true})for(double sign:{-1.,1.}){
-    Rig r;assert(!r.m.stand(height,r.p.now));assert(r.reachStand());
-    for(unsigned n=0;n<100;++n)r.tick();std::array<uint16_t,12> flat;std::copy(r.p.target,r.p.target+12,flat.begin());
-    const auto enables=r.p.enables,off=r.p.offCalls;unsigned maxRaw=0;double maxEffective=0;
-    for(double amplitude:{.01,.02,.04,.08,.16}){
-      for(unsigned n=0;n<250;++n){
-        const double tilt=sign*amplitude,roll=pitchAxis?0:tilt,pitch=pitchAxis?tilt:0;
-        r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);
-        r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
-        std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());r.tick();
-        assert(r.m.state()==simple::State::STANDING);
-        const auto& box=height==.05?simple::collision::kLift:simple::collision::kHeight;
-        for(unsigned j=0;j<12;++j){const double q=motion::jointSlot(r.m.target(),j);
-          assert(q>=box.lo[j]&&q<=box.hi[j]&&q>=r.in.minRad[j]&&q<=r.in.maxRad[j]);
-          const auto step=unsigned(std::abs(int(r.p.target[j])-int(previous[j])));maxRaw=std::max(maxRaw,step);assert(step<=10);}
-        const auto accepted=r.p.sent.size();r.m.update(r.p.now);assert(r.p.sent.size()==accepted); // no second release/compensation
-      }
-      const double correction=pitchAxis?simple::StopReferenceProbe::pitch(r.m):simple::StopReferenceProbe::roll(r.m);
-      maxEffective=std::fmax(maxEffective,std::abs(correction));
-      assert(sign*correction<0&&std::abs(correction)<=.020); // reduces measured error; bounded, no accumulating offset
-    }
-    // Slow measured tilt: same bounded release path, no synthetic world-contact update.
-    for(unsigned n=0;n<1500;++n){const double tilt=.04*std::sin(n*.004),roll=pitchAxis?0:tilt,pitch=pitchAxis?tilt:0;
-      r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);
-      r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
-      std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());r.tick();
-      assert(r.m.state()==simple::State::STANDING);
-      for(unsigned j=0;j<12;++j)assert(std::abs(int(r.p.target[j])-int(previous[j]))<=10);
-    }
-    // Return to horizontal: bounded slew, no residual integral / exact flat reference.
-    for(unsigned n=0;n<1000;++n){r.in.quaternion[0]=1;r.in.quaternion[1]=r.in.quaternion[2]=r.in.quaternion[3]=0;r.tick();}
-    for(unsigned j=0;j<12;++j)assert(r.p.target[j]==flat[j]);
-    assert(r.p.enables==enables&&r.p.offCalls==off);
-    printf("HOLD tilt h=%.0fmm axis=%s sign=%g max_effective_rad=%.9f max_RAW_step=%u\n",height*1000,pitchAxis?"pitch":"roll",sign,maxEffective,maxRaw);
+// Quasistatic kinematic board model, not dynamics or proof of physical contact.
+// Four nominal references are assumed planted/no-slip on one rigid plane. Servo
+// encoder angles follow accepted RAW with a 0.1 s first-order lag and tick
+// quantization. A measured-FK rigid fit recovers body-in-support orientation;
+// IMU receives board_from_support * support_from_body, never a prescribed error.
+struct LevelBoardPlant {
+  Rig& r; motion::LocomotionFrame nominal; motion::BodyPose actual{};
+  double q[12]{}; unsigned maxRawStep=0; double maxFitResidual=0,maxSettledError=0,maxMovingError=0;
+  explicit LevelBoardPlant(Rig& rig):r(rig),nominal(simple::StopReferenceProbe::hold(r.m)){
+    assert(nominal.target.valid);
+    for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;
+    actual=motion::bodyPoseFromRollPitch({},simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));
   }
-  puts("STAND HOLD IMU: 50/100/150, signed roll/pitch0.01..0.16rad, opposing bounded correction, certified box/RAW continuity, exact return to flat; NOT full board leveling or hardware stability");
+  static motion::Vector3 sub(motion::Vector3 a,motion::Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
+  static double norm(motion::Vector3 a){return std::sqrt(a.x*a.x+a.y*a.y+a.z*a.z);}
+  static motion::Vector3 cross(motion::Vector3 a,motion::Vector3 b){return {a.y*b.z-a.z*b.y,a.z*b.x-a.x*b.z,a.x*b.y-a.y*b.x};}
+  static motion::Vector3 unit(motion::Vector3 a){const double n=norm(a);assert(n>1e-6);return {a.x/n,a.y/n,a.z/n};}
+  static motion::BodyPose triad(const motion::Vector3 p[4]){
+    const auto x=unit(sub(p[1],p[0])),z=unit(cross(x,sub(p[2],p[0]))),y=cross(z,x);
+    motion::BodyPose b;const motion::Vector3 col[3]={x,y,z};
+    for(unsigned j=0;j<3;++j){b.rotation[0][j]=col[j].x;b.rotation[1][j]=col[j].y;b.rotation[2][j]=col[j].z;}return b;
+  }
+  static motion::BodyPose multiply(const motion::BodyPose& a,const motion::BodyPose& b){
+    motion::BodyPose c;for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j){c.rotation[i][j]=0;for(unsigned k=0;k<3;++k)c.rotation[i][j]+=a.rotation[i][k]*b.rotation[k][j];}return c;
+  }
+  // Robust matrix -> quaternion, including combined roll/pitch (no Euler sum).
+  static void quaternion(const motion::BodyPose& p,double out[4]){
+    const auto& a=p.rotation;const double trace=a[0][0]+a[1][1]+a[2][2];
+    if(trace>0){const double s=2*std::sqrt(1+trace);out[0]=s/4;out[1]=(a[2][1]-a[1][2])/s;out[2]=(a[0][2]-a[2][0])/s;out[3]=(a[1][0]-a[0][1])/s;}
+    else{unsigned i=0;if(a[1][1]>a[i][i])i=1;if(a[2][2]>a[i][i])i=2;const unsigned j=(i+1)%3,k=(i+2)%3;
+      const double s=2*std::sqrt(1+a[i][i]-a[j][j]-a[k][k]);out[i+1]=s/4;out[0]=(a[k][j]-a[j][k])/s;out[j+1]=(a[j][i]+a[i][j])/s;out[k+1]=(a[k][i]+a[i][k])/s;}
+  }
+  motion::BodyPose measuredBody(){
+    motion::Vector3 feet[4];const auto support=triad(nominal.cartesian.feet);
+    // The contact reference depends on the plane normal in base_link. Iterate
+    // this small algebraic registration to consistency; no controller state or
+    // control law is emulated here. Production control still runs unmodified.
+    for(unsigned iteration=0;iteration<8;++iteration){
+      const motion::Vector3 normal{actual.rotation[2][0],actual.rotation[2][1],actual.rotation[2][2]};
+      for(unsigned l=0;l<4;++l){const motion::LegJointAngles angles{r.p.observed[l*3].q,r.p.observed[l*3+1].q,r.p.observed[l*3+2].q};
+        const auto fk=motion::contactForwardKinematics(static_cast<motion::LegId>(l),angles,normal);assert(fk.status==motion::ContactStatus::OK);feet[l]=fk.referenceM;}
+      const auto body=triad(feet);motion::BodyPose fit;
+      // body * support^T maps support points INTO base_link; transpose it
+      // for the physical support_from_body rotation used by worldR below.
+      for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j){fit.rotation[i][j]=0;for(unsigned k=0;k<3;++k)fit.rotation[i][j]+=body.rotation[j][k]*support.rotation[i][k];}actual=fit;
+    }
+    const auto delta=sub(nominal.cartesian.feet[3],nominal.cartesian.feet[0]);motion::Vector3 predicted{};
+    predicted.x=actual.rotation[0][0]*delta.x+actual.rotation[1][0]*delta.y+actual.rotation[2][0]*delta.z;
+    predicted.y=actual.rotation[0][1]*delta.x+actual.rotation[1][1]*delta.y+actual.rotation[2][1]*delta.z;
+    predicted.z=actual.rotation[0][2]*delta.x+actual.rotation[1][2]*delta.y+actual.rotation[2][2]*delta.z;
+    maxFitResidual=std::fmax(maxFitResidual,norm(sub(predicted,sub(feet[3],feet[0]))));return actual;
+  }
+  motion::BodyPose step(double boardRoll,double boardPitch,bool freshImu=true){
+    std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
+    for(unsigned i=0;i<12;++i){const double target=(int(r.p.target[i])-2048)*simple::kTickRad;q[i]+=.2*(target-q[i]);
+      r.p.observed[i].raw=2048+std::lround(q[i]/simple::kTickRad);r.p.observed[i].q=(int(r.p.observed[i].raw)-2048)*simple::kTickRad;}
+    const auto world=multiply(motion::bodyPoseFromRollPitch({},boardRoll,boardPitch),measuredBody());quaternion(world,r.in.quaternion);
+    if(freshImu)r.tick(false);else{r.p.now+=simple::kPeriodUs;r.m.inputs(r.in);test_clock_us=r.p.now;r.m.update(r.p.now);r.m.updateTelemetry(r.p.now);}
+    if(r.m.state()==simple::State::FAULT){std::printf("board fault=%s phase=%s board=%.6f,%.6f accepted=%.6f,%.6f\n",r.m.reason(),r.m.phase(),boardRoll,boardPitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));std::fflush(stdout);}
+    assert(r.m.state()!=simple::State::FAULT);
+    bool inHeight=true,inLift=true;
+    for(unsigned i=0;i<12;++i){const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=10);
+      const double target=motion::jointSlot(r.m.target(),i),decoded=(int(r.p.target[i])-2048)*simple::kTickRad;assert(target>=r.in.minRad[i]&&target<=r.in.maxRad[i]);
+      inHeight&=target>=simple::collision::kHeight.lo[i]&&target<=simple::collision::kHeight.hi[i]&&decoded>=simple::collision::kHeight.lo[i]&&decoded<=simple::collision::kHeight.hi[i];
+      inLift&=target>=simple::collision::kLift.lo[i]&&target<=simple::collision::kLift.hi[i]&&decoded>=simple::collision::kLift.lo[i]&&decoded<=simple::collision::kLift.hi[i];}
+    assert(inHeight||inLift);
+    // New full HOLD leveling must retain the production finite-cylinder
+    // nominal support mode, including the RAW frame actually sent to servos.
+    const auto accepted=motion::bodyPoseFromRollPitch({},simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));
+    const motion::Vector3 normal{accepted.rotation[2][0],accepted.rotation[2][1],accepted.rotation[2][2]};
+    for(unsigned l=0;l<4;++l){auto decoded=r.m.target().legs[l];decoded.hip=(int(r.p.target[l*3])-2048)*simple::kTickRad;decoded.upper=(int(r.p.target[l*3+1])-2048)*simple::kTickRad;decoded.lower=(int(r.p.target[l*3+2])-2048)*simple::kTickRad;
+      for(const auto& angles:{r.m.target().legs[l],decoded}){const auto fk=motion::contactForwardKinematics(static_cast<motion::LegId>(l),angles,normal);assert(fk.status==motion::ContactStatus::OK&&fk.support==motion::SupportMode::NOMINAL_STRIP);}}
+    const auto frames=r.p.frames;const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m);
+    r.m.update(r.p.now);assert(r.p.frames==frames&&simple::StopReferenceProbe::roll(r.m)==roll&&simple::StopReferenceProbe::pitch(r.m)==pitch);
+    return world;
+  }
+  static double error(const motion::BodyPose& world){return std::acos(std::clamp(world.rotation[2][2],-1.,1.));}
+  void settle(double roll,double pitch,unsigned count=1100,double tolerance=.003){motion::BodyPose w;for(unsigned n=0;n<count;++n)w=step(roll,pitch);
+    const double e=error(w);maxSettledError=std::fmax(maxSettledError,e);if(e>=tolerance)std::printf("level error=%.9f board=%.6f,%.6f accepted=%.6f,%.6f limited=%u\n",e,roll,pitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.stabilizationLimited());std::fflush(stdout);assert(e<tolerance);}
+};
+static void standHoldTilt(){
+  constexpr double degree=3.14159265358979323846/180;
+  for(double height:{.05,.10,.15}){
+    Rig r;assert(!r.m.stand(height,r.p.now));assert(r.reachStand());
+    const auto enables=r.p.enables,off=r.p.offCalls;LevelBoardPlant plant(r);
+    std::printf("closed-loop board begin h=%.0fmm accepted=%.9f,%.9f\n",height*1000,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));std::fflush(stdout);
+    // Close the physical plant before taking the flat baseline. The preceding
+    // route uses the legacy scripted IMU (identity independent of its intentional
+    // body pitch), so its retained tiny route correction is not a flat plant.
+    plant.settle(0,0,150);std::array<uint16_t,12> flat;std::copy(r.p.target,r.p.target+12,flat.begin());
+    for(unsigned i=0;i<12;++i){uint16_t nominal=0;assert(r.p.resolve(i,motion::jointSlot(plant.nominal.target,i),nominal));assert(std::abs(int(flat[i])-int(nominal))<=3);}
+    plant.settle(0,0,100);for(unsigned i=0;i<12;++i)assert(r.p.target[i]==flat[i]);
+    // Workspace differs with height. At 100 mm pitch +/-15 degrees is feasible;
+    // the tighter 50/150 mm certified boxes admit a smaller proven neighborhood.
+    const double pitch=height==.10?15*degree:.2*degree,roll=height==.10?degree:.1*degree;
+    for(double sign:{-1.,1.}){plant.settle(0,sign*pitch);assert(sign*simple::StopReferenceProbe::pitch(r.m)<0);plant.settle(0,0);
+      plant.settle(sign*roll,0,height==.10?1100:350);assert(sign*simple::StopReferenceProbe::roll(r.m)<0);plant.settle(0,0,height==.10?1100:350);}
+    if(height==.10){
+      plant.settle(.5*degree,8*degree,800);plant.settle(-.5*degree,-8*degree,1000);plant.settle(0,0,800);
+      // Slowly moving plane: +/-15 degrees at 0.01 rad/s, below correction slew.
+      for(double from:{0.,15*degree,-15*degree}){const double to=from==0?15*degree:from>0?-15*degree:0.;
+        const unsigned steps=unsigned(std::ceil(std::abs(to-from)/(.01*.02)));
+        for(unsigned n=1;n<=steps;++n){const auto world=plant.step(0,from+(to-from)*n/steps);plant.maxMovingError=std::fmax(plant.maxMovingError,LevelBoardPlant::error(world));assert(LevelBoardPlant::error(world)<.008);}}
+      plant.settle(0,0,200);
+      // Transient IMU age 200..580 ms: retain the last compensated RAW, never
+      // jump to the uncompensated reference; the existing >600 ms fault remains.
+      plant.settle(0,5*degree,500);std::array<uint16_t,12> held;std::copy(r.p.target,r.p.target+12,held.begin());
+      for(unsigned n=0;n<29;++n)plant.step(0,5*degree,false);
+      for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(held[i]))<=1);
+      plant.settle(0,0,550);
+    }
+    // No accumulated integral: after returning flat the angular/RAW residual is
+    // limited by the production 0.001 rad target deadband + encoder quantization.
+    assert(std::abs(simple::StopReferenceProbe::roll(r.m))<.002&&std::abs(simple::StopReferenceProbe::pitch(r.m))<.002);
+    for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(flat[i]))<=3);
+    assert(plant.maxFitResidual<.001&&r.p.enables==enables&&r.p.offCalls==off);
+    std::printf("closed-loop board STAND h=%.0fmm pitch=+/-%.3fdeg roll=+/-%.3fdeg max_RAW_step=%u fourth_reference_residual=%.6fmm max_settled_error=%.6fdeg max_moving_error=%.6fdeg\n",height*1000,pitch/degree,roll/degree,plant.maxRawStep,plant.maxFitResidual*1000,plant.maxSettledError/degree,plant.maxMovingError/degree);
+  }
+  // Saturation must remain bounded and recover when the plane reverses. No
+  // reduction of workspace/feedback guards or extra actuator enable/OFF occurs.
+  {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);const auto enables=r.p.enables,off=r.p.offCalls;
+    for(unsigned n=0;n<1100;++n)plant.step(10*degree,0);assert(r.m.stabilizationLimited());assert(std::abs(simple::StopReferenceProbe::roll(r.m))<10*degree);
+    plant.settle(-degree,0,1100);plant.settle(0,0,1100);assert(r.p.enables==enables&&r.p.offCalls==off);}
+  // Full leveling must unwind before the existing HEIGHT/PRONE route starts.
+  // STOP during either held leveling or outgoing unwind keeps the issued held
+  // reference and a later explicit STAND has its own accepted command lifetime.
+  for(bool prone:{false,true})for(bool stopDuringUnwind:{false,true}){
+    Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);plant.settle(0,8*degree,700);
+    const auto enables=r.p.enables,off=r.p.offCalls;
+    assert(prone?!r.m.prone(r.p.now):!r.m.stand(.15,r.p.now));assert(simple::StopReferenceProbe::pending(r.m));
+    for(unsigned n=0;n<50;++n)plant.step(0,8*degree);
+    if(stopDuringUnwind){r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n)plant.step(0,8*degree);
+      assert(r.m.stopVerified()&&r.m.energized());assert(!r.m.stand(.10,r.p.now));
+      for(unsigned n=0;n<2000&&r.m.state()!=simple::State::STANDING;++n)plant.step(0,8*degree);
+      assert(r.m.state()==simple::State::STANDING);
+    }else{bool unwound=false;for(unsigned n=0;n<1500&&simple::StopReferenceProbe::pending(r.m);++n){plant.step(0,8*degree);
+        unwound|=simple::StopReferenceProbe::pending(r.m)&&simple::StopReferenceProbe::roll(r.m)==0&&simple::StopReferenceProbe::pitch(r.m)==0;}
+      std::printf("unwind prone=%u pending=%u phase=%s accepted=%.9f,%.9f limited=%u\n",prone,simple::StopReferenceProbe::pending(r.m),r.m.phase(),simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.stabilizationLimited());std::fflush(stdout);
+      // beginPlan generates the next route's first frame immediately and its
+      // existing bounded route compensation may already be nonzero. Observe
+      // exact zero on the preceding held frame, before that handoff occurs.
+      assert(unwound&&!simple::StopReferenceProbe::pending(r.m));
+      // Beyond the unwind this test returns to the existing scripted route
+      // observations; body/board contact during PRONE is not modeled here.
+      r.in.quaternion[0]=1;r.in.quaternion[1]=r.in.quaternion[2]=r.in.quaternion[3]=0;
+      for(unsigned n=0;n<2500&&r.m.state()!=(prone?simple::State::PRONE:simple::State::STANDING);++n)r.tick();
+      assert(r.m.state()==(prone?simple::State::PRONE:simple::State::STANDING));}
+    assert(r.p.enables==enables&&r.p.offCalls==off);
+  }
+  {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);plant.settle(0,-8*degree,700);
+    const auto enables=r.p.enables,off=r.p.offCalls;r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n)plant.step(0,-8*degree);
+    assert(r.m.stopVerified()&&r.m.energized());assert(!r.m.stand(.10,r.p.now));plant.settle(0,-8*degree,700);
+    assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==off);
+    // Permanent stale attitude uses the existing IMU_STALE SAFE_OFF path.
+    for(unsigned n=0;n<40&&r.m.state()!=simple::State::FAULT;++n){r.p.now+=simple::kPeriodUs;r.p.publishCommandedPose();r.m.inputs(r.in);test_clock_us=r.p.now;r.m.update(r.p.now);}
+    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"IMU_STALE"));}
+  for(double sign:{-1.,1.}){Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);
+    const auto enables=r.p.enables,off=r.p.offCalls;for(unsigned n=0;n<1100;++n)plant.step(sign*10*degree,0);assert(r.m.stabilizationLimited());
+    // Move briefly away from the real workspace edge, then one accepted frame
+    // toward it: STOP must remain feasible while the leveling reference moves.
+    for(unsigned n=0;n<10;++n)plant.step(0,0);const double before=simple::StopReferenceProbe::roll(r.m);plant.step(sign*10*degree,0);
+    assert(std::abs(simple::StopReferenceProbe::roll(r.m)-before)>1e-5);r.m.stop();
+    for(unsigned n=0;n<200&&!r.m.stopVerified();++n)plant.step(sign*10*degree,0);
+    assert(r.m.stopVerified()&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);}
+  {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);plant.settle(0,8*degree,700);
+    assert(!r.m.stand(.15,r.p.now));for(unsigned n=0;n<50;++n)plant.step(0,8*degree);
+    const auto frames=r.p.frames,enables=r.p.enables,off=r.p.offCalls;r.m.safeOff();for(unsigned n=0;n<30&&!r.m.offVerified();++n)r.tick(false);
+    assert(r.m.offVerified()&&!r.m.energized()&&r.p.frames==frames&&r.p.enables==enables&&r.p.offCalls>off);}
+  std::puts("production closed-loop STAND board plant PASS: quantized 0.1s servo lag, signed/combined/slow tilt, saturation reversal, flat return, stale IMU, height/PRONE unwind, STOP and explicit STAND; no hardware stability claim");
 }
 int main(){standHoldTilt();
   proneHandoverWait();
@@ -332,16 +467,18 @@ int main(){standHoldTilt();
   Rig off;off.p.verify=false;off.m.stop();for(unsigned i=0;i<30;++i)off.tick(false);assert(!off.m.offVerified()&&off.m.stopping());
   // PRONE -> STAND50: one DEPLOY and one LIFT reference, no HEIGHT move and
   // so no STAND150 detour. The rig IMU stays level while the route nominal is
-  // pitched up to 0.18 rad, so a bounded correction is active during the rise;
-  // with level nominal and level IMU in HOLD it must decay to the exact stand.
+  // pitched up to 0.18 rad, so a bounded correction is active during the rise.
+  // In HOLD close the board plant: prescribed identity IMU while the encoders
+  // keep a tilted body would instead describe a tilted plane, not flat ground.
   Rig low;assert(!low.m.stand(.05,low.p.now));std::string lowPhases;const char* lowPhase="";
   for(unsigned k=0;k<3000&&low.m.state()!=simple::State::STANDING;++k){low.tick();assert(low.m.state()!=simple::State::FAULT);
     if(strcmp(lowPhase,low.m.phase())){lowPhase=low.m.phase();lowPhases+=std::string(lowPhase)+" ";}}
   assert(low.m.state()==simple::State::STANDING&&lowPhases=="ACQUIRE REFERENCE ENABLE DISENGAGE ALIGN STAND_DEPLOY STAND_LIFT HOLD ");
   const double lowSeconds=(low.p.now-1300000)/1e6;
-  for(unsigned k=0;k<100;++k)low.tick();  // 2 s: correction slew 20 mrad/s
+  LevelBoardPlant lowPlant(low);lowPlant.settle(0,0,150);
   {const double body=simple::baseLinkHeightFromNominalM(.05);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;
-   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(low.m.target(),i)-motion::jointSlot(s,i))<1e-9);}
+   for(unsigned i=0;i<12;++i){assert(std::abs(motion::jointSlot(simple::StopReferenceProbe::hold(low.m).target,i)-motion::jointSlot(s,i))<1e-9);
+     uint16_t raw=0;assert(low.p.resolve(i,motion::jointSlot(s,i),raw));assert(std::abs(int(low.p.target[i])-int(raw))<=3);}}
   std::printf("PRONE->STAND50: %s(%.2f s replay)\n",lowPhases.c_str(),lowSeconds);
   // WALK STOP ends recentred on the canonical 150 mm stand.
   Rig centred;assert(!centred.m.walk(2,centred.p.now));
@@ -512,7 +649,8 @@ int main(){standHoldTilt();
          const int goal=std::lround(r.p.target[i]-e),raw=r.p.observed[i].raw+std::clamp(goal-int(r.p.observed[i].raw),-10,10);
          r.p.observed[i].raw=raw;r.p.observed[i].q=(raw-2048)*simple::kTickRad;const int d=int(r.p.target[i])-raw;r.p.observed[i].load=(d>0?1024:0)|std::min(900,4*std::abs(d));}}
      test_clock_us=r.p.now;r.m.update(r.p.now);r.m.updateTelemetry(r.p.now);};
-   auto reach=[&](Rig& r,double h,double scale){assert(!r.m.stand(h,r.p.now));for(unsigned i=0;i<4000;++i){step(r,scale);assert(r.m.state()!=simple::State::FAULT);
+   auto reach=[&](Rig& r,double h,double scale){const char* refusal=r.m.stand(h,r.p.now);if(refusal){std::printf("loaded hold height refusal=%s h=%.3f scale=%.1f phase=%s accepted=%.9f,%.9f\n",refusal,h,scale,r.m.phase(),simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));
+       for(unsigned i=0;i<12;++i)std::printf("loaded slot=%u observed=%.9f nominal=%.9f accepted=%.9f height=[%.9f,%.9f] lift=[%.9f,%.9f]\n",i,r.p.observed[i].q,motion::jointSlot(simple::StopReferenceProbe::segmentTo(r.m),i),motion::jointSlot(r.m.target(),i),simple::collision::kHeight.lo[i],simple::collision::kHeight.hi[i],simple::collision::kLift.lo[i],simple::collision::kLift.hi[i]);std::fflush(stdout);}assert(!refusal);for(unsigned i=0;i<4000;++i){step(r,scale);assert(r.m.state()!=simple::State::FAULT);
        if(i>2&&r.m.state()==simple::State::STANDING){assert(std::abs(r.m.requestedHeightM()-h)<1e-9);for(unsigned k=0;k<15;++k)step(r,scale);return;}}assert(false);};
    for(double scale:{0.,1.,1.5}){Rig r;for(double h:{.05,.07,.11,.10,.15,.10,.05,.10,.15,.05,.15,.07,.05,.052,.05,.053,.054,.05,.073,.127})reach(r,h,scale);}
    Rig r;reach(r,.05,1);assert(!r.m.walk(1,r.p.now));for(unsigned i=0;i<1500&&r.m.state()!=simple::State::WALKING;++i)step(r,1);assert(r.m.state()==simple::State::WALKING);

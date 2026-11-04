@@ -196,6 +196,9 @@ class SimpleMotion {
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
+  motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false);
+  bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&) const;
+  void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void serviceOff();
   bool serviceStop();

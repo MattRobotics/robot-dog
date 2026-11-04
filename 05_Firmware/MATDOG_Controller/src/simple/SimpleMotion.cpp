@@ -145,7 +145,10 @@ void SimpleMotion::rememberReference(uint64_t now){
   if(issuedUs_&&now>issuedUs_){previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
   issuedUs_=now;
   if(stopActive_)return; // keep the revoked operation metadata, not stale RAW history
-  issuedPhase_=phase_;issuedPlanned_=planned_;
+  // A pending posture command first releases the levelled HOLD reference.
+  // Its samples are synchronous HOLD, not an endpoint-only native move. Set
+  // this before send() services a STOP which may have arrived during TX.
+  issuedPhase_=pendingGoalValid_&&(phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)?Phase::HOLD:phase_;issuedPlanned_=planned_;
 }
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
@@ -368,6 +371,7 @@ const char* SimpleMotion::stand(double h,uint64_t now){
     requestedHeight_=h;walkRequested_=false;
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
+    goalDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
   }else{referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
     std::fill(controlFailures_,controlFailures_+12,0);}
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
@@ -413,6 +417,7 @@ const char* SimpleMotion::prone(uint64_t now){
   // Intent only. Keep the preceding nominal support goals until a Motion release.
   // 53 mm is inside both existing boxes, including the recorded STAND100 sag.
   pendingGoalValid_=true;walkRequested_=false;state_=State::MOVING;phase_=Phase::PRONE_HEIGHT;
+  goalDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
   reason_="PRONE_DESCENT_NOT_VALIDATED";requestedHeight_=0;heightValid_=false;
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";referenceFaultSlot_=12;
   return nullptr;
@@ -697,6 +702,7 @@ void SimpleMotion::nextStand(uint64_t now){
     case Phase::LIFT:case Phase::HEIGHT:case Phase::WALK_HOLD:
       if(std::abs(plannedHeight_-requestedHeight_)>1e-9){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
       segmentBox_=nullptr;planned_=false;
+      rollCorrection_*=correctionScale_;pitchCorrection_*=correctionScale_;correctionScale_=1;
       phase_=Phase::HOLD;state_=State::STANDING;reason_="STAND_REACHED";
       {GaitParameters g;g.heightM=baseLinkHeightFromNominalM(requestedHeight_);holdNominal_=solveGait(g,gaitHold(g,0,g.heightM,0),nullptr,false);}
       heightValid_=false;nextTelemetryUs_=0;
@@ -729,11 +735,96 @@ void SimpleMotion::startWalk(uint64_t now){
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
   phase_=Phase::WALK;state_=State::WALKING;reason_="WALK_STANDARD";
 }
+JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip){
+  timing::count(timing::SOLVES);
+  JointTargetFrame q;q.valid=true;
+  for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=seed.legs[l];opt.toleranceM=1e-6;opt.maxIterations=8;opt.requireNominalStrip=nominalStrip;
+    const auto ik=worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],body,opt);
+    timing::count(timing::IK);timing::count(timing::NEWTON,ik.base.newtonSteps);timing::count(timing::FK,ik.base.fkEvaluations);
+    // Cylinder axis depends only on HIP. Reserve its exact half-RAW rounding
+    // interval so the transmitted pose retains the same nominal contact mode.
+    if(ik.status!=TiltedIkResult::Status::OK||(nominalStrip&&ik.base.contact.axisTiltRad>footContactModel().nominalTiltRad-.5*kTickRad)){q.valid=false;break;}q.legs[l]=ik.base.joints;}
+  return q;
+}
+bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box) const {
+  if(!pointSafe(q)||!contains(box,q))return false;
+  // The same gen-1 conversion as TX/readback; an in-box floating point IK
+  // solution alone is insufficient at a box edge after RAW quantization.
+  auto decoded=q;
+  for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return false;}
+  if(!pointSafe(decoded)||!contains(box,decoded))return false;
+  const collision::Box* arrestBox=&box;
+  if(phase_!=Phase::WALK&&phase_!=Phase::WALK_HOLD){
+    // Keep the measured static-load residual when checking the next small
+    // HOLD step. A goal alone being in-box is insufficient: the recorded
+    // loaded pose must retain a common certified region with its reference.
+    auto loaded=decoded;double lagRoom[12];const uint64_t at=esp_timer_get_time();
+    for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
+      jointSlot(loaded,i)+=fb_[i].q-old;
+      // Feedback is staggered across a population. Reserve the proposed RAW
+      // step over its age plus this release, rather than treating it as a
+      // simultaneous observation of the current reference under static load.
+      lagRoom[i]=std::abs(jointSlot(decoded,i)-old)*(1+double(at>=fb_[i].stampUs?at-fb_[i].stampUs:0)/kPeriodUs);
+      if(jointSlot(loaded,i)-lagRoom[i]<input_.minRad[i]||jointSlot(loaded,i)+lagRoom[i]>input_.maxRad[i])return false;}
+    auto loadedInside=[&](const collision::Box& b){for(unsigned i=0;i<12;++i)
+      if(jointSlot(loaded,i)-lagRoom[i]<b.lo[i]||jointSlot(loaded,i)+lagRoom[i]>b.hi[i])return false;return true;};
+    const auto actual=measured();
+    if(!contains(box,actual)||!loadedInside(box)){
+      if(!contains(collision::kLift,decoded)||!contains(collision::kLift,actual)||!loadedInside(collision::kLift))return false;
+      arrestBox=&collision::kLift;
+    }
+    if(!pointSafe(loaded))return false;
+  }
+  // A reachable boundary is not necessarily stoppable from its sampled RAW
+  // rate. Reuse STOP's own proof before issuing a new levelled reference;
+  // no second trajectory law, relaxed limit or retained cache is introduced.
+  const uint64_t at=esp_timer_get_time();
+  if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return false;
+  const Drive drive=phase_==Phase::WALK?kWalkDrive:kStandDrive;
+  StopPlan arrest;double lo[12],hi[12];const double dt=(at-issuedUs_)/1e6;
+  for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
+    arrest.q[i]=jointSlot(decoded,i);arrest.v[i]=std::clamp((arrest.q[i]-old)/dt,-drive.speed*kTickRad,drive.speed*kTickRad);
+    lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
+  return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad);
+}
+void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
+  // Angles are the accepted body orientation in the existing support frame,
+  // not an integral of IMU error. Fit its orientation from labelled stance
+  // anchors and fresh encoder FK; the measured gravity direction supplies
+  // the world vertical. Contacts remain modelled, never asserted as sensed.
+  const auto previous=bodyPoseFromRollPitch({},rollCorrection_,pitchCorrection_);
+  double wantedRoll=0,wantedPitch=0;bool stance[4];for(unsigned l=0;l<4;++l)stance[l]=f.cartesian.phases[l].stance;
+  const bool fitted=unwind||supportLevelTarget(f.cartesian.feet,measured(),stance,up,previous,wantedRoll,wantedPitch);
+  timing::count(timing::FK,unwind?0:3);
+  imuLimited_=!fitted;walkOffset_.valid=false;
+  if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
+  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
+  auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
+  const double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
+  if(roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;return;}
+  auto body=bodyPoseFromRollPitch({},roll,pitch);const auto t=f.cartesian.body.translationM;
+  // Keep the nominal vertical clearance, with the body over the same gait
+  // XY in gravity's direction. Anchors stay in their support-plane frame.
+  body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
+  // Large edge-biased roll solutions do not preserve this model's nominal
+  // support strip. Keep its existing contact domain, not a new IMU-angle cap.
+  const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true);
+  if(compensationSafe(q,collision::kHeight)){
+    f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;
+  }else{
+    // Retain the accepted pose at the real workspace boundary. The desired
+    // geometric orientation is re-estimated next release, so reversal leaves
+    // saturation immediately; there is no accumulated integral to unwind.
+    if(goal_.valid)f.target=goal_;imuLimited_=true;
+  }
+}
 void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   timing::Section section(timing::COMPENSATE);
   Attitude a;
-  if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000||
-     !tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a)){imuLimited_=true;walkOffset_.valid=false;return;}
+  const bool attitudeFresh=input_.imuValid&&now>=input_.imuStampUs&&now-input_.imuStampUs<=200000&&
+     tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a);
+  if(phase_==Phase::HOLD){compensateLevel(f,attitudeFresh?Vector3{a.upBase[0],a.upBase[1],a.upBase[2]}:Vector3{},now);return;}
+  if(!attitudeFresh){imuLimited_=true;walkOffset_.valid=false;return;}
   // WALK budget: every other release keeps the joint offset of the last solved
   // correction on the new nominal target; the same limits and box still decide.
   const bool walk=phase_==Phase::WALK;
@@ -758,16 +849,8 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   const auto nominal=f.target;
   auto keep=[&](const JointTargetFrame& q){f.target=q;if(!walk)return;walkOffset_=q;for(unsigned i=0;i<12;++i)jointSlot(walkOffset_,i)-=jointSlot(nominal,i);};
   auto solve=[&](double scale){
-    timing::count(timing::SOLVES);
     auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);
-    JointTargetFrame q;q.valid=true;
-    // 1 um contact residual: <1% of one servo tick at the foot (~2e-4 m),
-    // usually reached by the first Newton step from the nominal seed.
-    for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=f.target.legs[l];opt.toleranceM=1e-6;opt.maxIterations=8;opt.requireNominalStrip=false;
-      const auto ik=worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],b,opt);
-      timing::count(timing::IK);timing::count(timing::NEWTON,ik.base.newtonSteps);timing::count(timing::FK,ik.base.fkEvaluations);
-      if(ik.status!=TiltedIkResult::Status::OK){q.valid=false;break;}q.legs[l]=ik.base.joints;}
-    return q;
+    return compensationTarget(f,b,f.target);
   };
   // Smooth geometric attenuation before the hard workspace boundary. A small
   // IK perturbation measures local joint sensitivity; reserve half the joint
@@ -989,6 +1072,12 @@ void SimpleMotion::update(uint64_t now){
   // STOP keeps the same ordinary feedback/electrical/authority guards above.
   if(stopActive_){generateStop(now);return;}
   if(pendingGoalValid_){
+    if((phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)&&holdNominal_.target.valid&&
+       (rollCorrection_!=0||pitchCorrection_!=0)){
+      if(now>goalDeadlineUs_){fault("NATIVE_TARGET_NOT_REACHED");return;}
+      timing::Section section(timing::COMPENSATE);
+      auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);return;
+    }
     pendingGoalValid_=false;
     if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
     if(phase_==Phase::PRONE_WAIT){
