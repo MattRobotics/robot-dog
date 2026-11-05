@@ -301,6 +301,27 @@ int envelopes(const char* path, const char* src) {
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
       check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
+    } else if (name == "joystick_forward" || name == "joystick_backward") {
+      const bool forward = name == "joystick_forward";
+      check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000 && !gate.stopLane &&
+            (forward ? c.vx == simple::kJoystickStrideM / simple::kWalkPeriodS : c.vx < 0 && c.vx > -simple::kJoystickStrideM / simple::kWalkPeriodS),
+            name + ": BASE_VELOCITY gait JOYSTICK inside the Controller limit, mailbox");
+      const auto r = serve(request(body, session), session, service, rig, now);
+      check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && rig.m.joystickActive(), name + ": HTTP 200 ACCEPTED, joystick intent held (" + r.code + ")");
+      // The page refreshes every 240 ms; the same semantic command stands in for it here.
+      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(c.vx, c.vy, c.yaw_rate, rig.p.now); rig.tick(); }
+      check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - c.vx) < 1e-12, name + ": scripted joystick walk at the commanded velocity (software only)");
+      for (unsigned k = 0; k < 100 && std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT"); ++k) rig.tick();
+      check(!std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT") && rig.reachStand(), name + ": silent page -> Controller WALK STOP within 1 s, STAND (software only)");
+      Rig late; core::MotionService lateService; lateService.begin(&late.m, nullptr, nullptr); lateService.setReady(true, "READY");
+      check(serve(request(body, session), session, lateService, late, c.issued_at_ms + 1000).code == "REJECTED EXPIRED", name + ": 1 s TTL enforced");
+    } else if (name == "joystick_release") {
+      check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == 0 && c.vy == 0 && c.yaw_rate == 0 && !std::strcmp(c.gait, "JOYSTICK") && !gate.stopLane, name + ": zero BASE_VELOCITY");
+      check(!rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now), name + ": test joystick walk started");
+      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now); rig.tick(); }
+      const auto r = serve(request(body, session), session, service, rig, now);
+      check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
+      check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
     } else if (name.rfind("stop", 0) == 0) {
       check(c.intent == motion::Intent::STOP && gate.stopLane, name + ": MOTION.STOP takes the STOP lane");
       stopBody = body;
@@ -318,7 +339,7 @@ int envelopes(const char* path, const char* src) {
             name + ": feedback-verified motion arrest, existing torque ON, support unknown");
     } else check(false, "unknown envelope case " + name);
   }
-  check(seen == 9, "nine dashboard envelopes captured (" + std::to_string(seen) + ")");
+  check(seen == 12, "twelve dashboard envelopes captured (" + std::to_string(seen) + ")");
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
   // Reuse the shipped STOP/STAND envelopes for the new WALK recovery path.
   for(unsigned stride:{1u,2u}){

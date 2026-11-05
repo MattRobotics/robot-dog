@@ -18,6 +18,18 @@ constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
 constexpr double kWalkHeightM=.120, kWalkSwayXM=.010, kWalkSwayYM=.002, kWalkStartCycles=1, kWalkStopCycles=1;
 static constexpr const collision::Box& kWalkBox=collision::kHeight;
 constexpr double kStrideM[]={.030,.045,.060};
+// JOYSTICK: the same WALK law with a continuous signed fore/aft stride up to
+// the 45 mm preset, rate limited to full scale over two gait cycles. A swing
+// target is fixed at lift-off, so a stride change moves later footholds off
+// centre: with these two values every planted foot stays inside the steady
+// 60 mm footprint (offline, scripts/offline_motion/joystick_envelope.cpp),
+// where both IMU tilt envelopes hold. The Controller ends the walk with WALK
+// STOP when no admitted joystick command arrives for kJoystickTimeoutUs (ESP
+// clock). Lateral and yaw velocity are refused: each needs HIP abduction, and
+// the WALK box (+/-25 mrad) and the 2-degree nominal foot strip are already
+// spent by the lateral sway and the IMU roll correction.
+constexpr double kJoystickStrideM=kStrideM[1], kJoystickRampCycles=2;
+constexpr uint64_t kJoystickTimeoutUs=1000000;
 constexpr double kMinStandM=.050;
 // Nominal height, the height of commands, status and route tables: the front HIP
 // axes stand 46.5 mm above it. STAND 150 is that operating reference, the pose
@@ -93,6 +105,9 @@ class SimpleMotion {
   // Experimental: arrival is not proof of ventral support; torque stays ON.
   const char* prone(uint64_t now);
   const char* walk(unsigned stride,uint64_t now);
+  // JOYSTICK base velocity (SI). Starts like walk() or refreshes the target
+  // and its deadline; zero velocity is walkStop().
+  const char* drive(double vx,double vy,double yawRate,uint64_t now);
   void walkStop();
   // Atomic latch only: callable independently of HTTP and of the Motion tick.
   void stop(const char* reason="STOP_REQUESTED");
@@ -127,6 +142,10 @@ class SimpleMotion {
   double heightM() const { return actualHeight_; } // encoder/FK + ground-plane MODEL
   double requestedHeightM() const { return requestedHeight_; }
   double walkCycles() const { return cycles_; }
+  // Fore/aft body velocity of the walking law (m/s), not a measurement.
+  double walkVelocityX() const { return phase_==Phase::WALK?gait_.advanceXM/kWalkPeriodS:0; }
+  // A joystick intent holds the walk: walking or rising to walk, not stopping.
+  bool joystickActive() const { return joystick_&&(walkRequested_||(state_==State::WALKING&&!walkStopping_)); }
   uint32_t releases() const { return releases_; }
   uint32_t missed() const { return missed_; }
   uint64_t maxGapUs() const { return maxGapUs_; }
@@ -203,6 +222,8 @@ class SimpleMotion {
   bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&,bool stopProof=true) const;
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
+  void steerWalk(uint64_t);
+  bool limitWalkTilt(double& roll,double& pitch) const;
   void serviceOff();
   bool serviceStop();
   void beginStop(uint64_t);
@@ -264,6 +285,13 @@ class SimpleMotion {
   bool heightValid_=false,walkRequested_=false;
   unsigned stride_=1;
   InitialRoute initialRoute_=InitialRoute::ENTRY;
+  // The walking law and its track. joystick_ is the live intent (deadline);
+  // steered_ marks a walk started by it, through STOP and its recovery.
+  motion::GaitParameters gait_{};
+  motion::GaitTrack track_{};
+  bool joystick_=false,steered_=false;
+  double joystickStrideM_=0,steeredCycles_=0;
+  uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
   motion::LocomotionFrame holdNominal_{};
   uint64_t walkStartUs_=0;

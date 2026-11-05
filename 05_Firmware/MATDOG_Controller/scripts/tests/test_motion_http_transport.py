@@ -145,7 +145,7 @@ int main() {
  check(status.response_headers["Content-Type"]=="application/json"&&status.response_headers["Cache-Control"]=="no-store","JSON/no-store response");
  auto caps=request(s,"/api/motion/capabilities","");caps.method=HTTP_GET;runMotion(caps);
  check(caps.status==200&&caps.response.find("\"motion_stack\":\"MATDOG_SIMPLE_V1\"")!=std::string::npos&&
-       caps.response.find("\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"PRONE\",\"STOP\"]")!=std::string::npos,"SIMPLE catalog delivered via mailbox");
+       caps.response.find("\"commands\":[\"STAND\",\"WALK_STANDARD\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"]")!=std::string::npos,"SIMPLE catalog delivered via mailbox");
  check(caps.response.size()<kMotionCapabilitiesBytes&&caps.response.find("\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}")!=std::string::npos,"bounded catalog discloses hardware qualification");
  auto unauth=motionRequest(s,command("MOTION.STOP"),false);runMotion(unauth);check(unauth.status==403&&s.service.command_calls==0,"cookie and CSRF required even for semantic writes");
  login(s);

@@ -406,6 +406,13 @@ static bool slackExempt(const HttpTransportRequest& r) {
   return r.kind==HttpRequestKind::MOTION_STATUS||(r.kind==HttpRequestKind::MOTION_COMMAND&&
          c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0);
 } // slackExempt
+// A JOYSTICK refresh of the walk it already holds only latches a velocity
+// target and its deadline, like WALK STOP. A starting one needs slack.
+// Controller thread only: reads the Motion owner's state.
+static bool joystickRefresh(const HttpTransportRequest& r) {
+  const auto& c=r.motion_command;
+  return r.kind==HttpRequestKind::MOTION_COMMAND&&c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+} // joystickRefresh
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response, char* large_text, size_t large_cap,
                              uint32_t budget_ms, const char** failure) {
@@ -541,7 +548,8 @@ void HttpTransport::update(uint32_t now_ms) {
   // single HTTPD task, and every request queued behind it, for seconds.
   const bool status_read=pending_request_.kind==HttpRequestKind::WEB_STATUS||
                          pending_request_.kind==HttpRequestKind::WIFI_STATUS;
-  const bool no_slack=!slackExempt(pending_request_)&&!service_->motionSlack(esp_timer_get_time(),5000);
+  const bool no_slack=!slackExempt(pending_request_)&&!(joystickRefresh(pending_request_)&&service_->motionJoystickActive())&&
+                      !service_->motionSlack(esp_timer_get_time(),5000);
   if(no_slack&&!status_read) {
     xSemaphoreGive(request_ready_); return;
   }

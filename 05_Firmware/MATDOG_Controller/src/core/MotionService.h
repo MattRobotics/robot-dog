@@ -20,7 +20,8 @@ struct MotionStatusSnapshot {
   bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
   const char* standResumeReason="STOP_NOT_ACTIVE";
   uint16_t offMask=0,referenceFaultRaw=0;
-  double requestedHeightM=0,heightM=0,walkCycles=0,quaternion[4]{};
+  double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,quaternion[4]{};
+  bool joystick=false;
   unsigned referenceFaultSlot=12;
   simple::Feedback feedback[12]{},referenceFaultFeedback{};
 };
@@ -42,6 +43,7 @@ class MotionService {
   bool busy() const { return motion_&&motion_->engaged(); }
   const simple::SimpleMotion* motion() const { return motion_; } // LOADDIAG read-only
   bool engaged() const {return busy();}
+  bool joystickActive() const { return motion_&&motion_->joystickActive(); }
   // One cross-channel cancellation fence, read atomically by HTTPD at receipt.
   uint32_t stopEpoch() const {return stopEpoch_.load(std::memory_order_acquire);}
   bool slack(uint64_t now,uint32_t reserve) const {

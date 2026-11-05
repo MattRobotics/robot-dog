@@ -153,7 +153,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
-  walkRequested_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
+  walkRequested_=joystick_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -190,7 +190,7 @@ void SimpleMotion::rememberReference(uint64_t now){
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
   // WALK STOP, and never enables a previously OFF servo.
-  walkRequested_=pendingGoalValid_=false;operatorStopped_=true;
+  walkRequested_=pendingGoalValid_=joystick_=false;operatorStopped_=true;
   if(!energized_||phase_==Phase::REFERENCE||phase_==Phase::ENABLE){enterOff(false,stopReason_.load());serviceOff();return;}
   if(!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!input_.ready||!input_.authorityOk){fault(input_.refusal);serviceOff();return;}
@@ -345,11 +345,12 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   if(!port_)return false;
   held.valid=true;
   for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return false;
-  const auto g=walkGait(stride_);
+  const auto& g=gait_;
   c=cycles_+.5*stopPlan_.duration/kWalkPeriodS;
   stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
   c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
-  first=solveGait(g,gaitCartesian(g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
+  auto track=track_;  // the admission check never advances the live track
+  first=solveGait(g,gaitTrackCartesian(track,g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
   return pointSafe(held)&&contains(kWalkBox,held)&&first.valid&&pointSafe(first)&&contains(kWalkBox,first);
 }
 const char* SimpleMotion::stand(double h,uint64_t now){
@@ -481,7 +482,31 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   if(state_==State::WALKING)return "ALREADY_WALKING";
   // One user command can acquire, energize, stand at 150 mm and then walk.
   const char* r=stand(kWalkHeightM,now);if(r)return r;
-  stride_=stride;walkRequested_=true;return nullptr;
+  stride_=stride;gait_=walkGait(stride);joystick_=false;walkRequested_=true;return nullptr;
+}
+const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now){
+  if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
+  if(!std::isfinite(vx)||!std::isfinite(vy)||!std::isfinite(yawRate))return "JOYSTICK_VELOCITY_RANGE";
+  if(vy!=0||yawRate!=0)return "LATERAL_YAW_NOT_QUALIFIED";
+  const double stride=vx*kWalkPeriodS;
+  if(stride==0||std::abs(stride)>kJoystickStrideM*(1+1e-9))return "JOYSTICK_VELOCITY_RANGE";
+  // A walk keeps the leg order of its direction: forward, or its time reverse
+  // backward. The opposite direction ends it with WALK STOP; the next command
+  // after STANDING starts the other one.
+  const bool reverse=stride<0;
+  if(state_==State::WALKING){
+    if(!joystick_)return "WALK_STANDARD_ACTIVE";
+    if(walkStopping_)return "WALK_STOPPING";
+    if(reverse!=gait_.reverse){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
+  }else if(joystick_&&walkRequested_){
+    gait_.reverse=reverse;  // still rising: the walk starts with the latest direction
+  }else{
+    // One command can acquire, energize, stand at the WALK height and walk.
+    const char* r=stand(kWalkHeightM,now);if(r)return r;
+    gait_=walkGait(0);gait_.reverse=reverse;gait_.advanceXM=stride;walkRequested_=true;
+  }
+  joystick_=true;joystickStrideM_=std::clamp(stride,-kJoystickStrideM,kJoystickStrideM);joystickDeadlineUs_=now+kJoystickTimeoutUs;
+  return nullptr;
 }
 void SimpleMotion::walkStop(){
   walkRequested_=false;
@@ -783,11 +808,28 @@ void SimpleMotion::generateStand(uint64_t now){
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
-  const auto g=walkGait(stride_);plannedHeight_=kWalkHeightM;
-  walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0),nullptr,false);
+  plannedHeight_=kWalkHeightM;track_={};steered_=joystick_;steeredCycles_=0;
+  if(steered_)gait_.advanceXM=joystickStrideM_;  // the latest target, from the qualified start ramp
+  walkPrevious_=solveGait(gait_,gaitTrackCartesian(track_,gait_,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(kWalkBox,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
-  phase_=Phase::WALK;state_=State::WALKING;reason_="WALK_STANDARD";
+  phase_=Phase::WALK;state_=State::WALKING;reason_=steered_?"WALK_JOYSTICK":"WALK_STANDARD";
+}
+void SimpleMotion::steerWalk(uint64_t now){
+  if(!joystick_||walkStopping_||walkRecover_){track_.goalRate=0;return;}
+  // Released, unreachable or silent client: the Controller ends the walk itself.
+  if(now>joystickDeadlineUs_){walkStop();reason_="JOYSTICK_TIMEOUT";return;}
+  auto next=gait_;const double step=kJoystickStrideM/kJoystickRampCycles*std::fmax(0.,cycles_-steeredCycles_);
+  next.advanceXM+=std::clamp(joystickStrideM_-gait_.advanceXM,-step,step);steeredCycles_=cycles_;
+  if((next.advanceXM<0)!=gait_.reverse)next.advanceXM=0;  // never against the leg order
+  if(next.advanceXM!=gait_.advanceXM&&gaitRetarget(track_,gait_,next,cycles_))gait_=next;
+  track_.goalAdvanceXM=(joystickStrideM_<0)!=gait_.reverse?0:joystickStrideM_;track_.goalRate=kJoystickStrideM/kJoystickRampCycles;
+}
+// The tilt envelopes hold for the steady preset phase sets; a steered stride
+// varies, so it keeps the correction inside both.
+bool SimpleMotion::limitWalkTilt(double& roll,double& pitch) const {
+  if(steered_){const bool a=projectWalkTilt(kWalkTilt45,roll,pitch);return projectWalkTilt(kWalkTilt60,roll,pitch)||a;}
+  return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
 }
 JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip){
   timing::count(timing::SOLVES);
@@ -863,7 +905,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   timing::count(timing::FK,unwind?0:3);
   imuLimited_=!fitted;
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
-  if(walk&&(stride_==2?projectWalkTilt(kWalkTilt60,wantedRoll,wantedPitch):projectWalkTilt(kWalkTilt45,wantedRoll,wantedPitch)))imuLimited_=true;
+  if(walk&&limitWalkTilt(wantedRoll,wantedPitch))imuLimited_=true;
   const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
   auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
   double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
@@ -953,8 +995,6 @@ void SimpleMotion::generateWalk(uint64_t now){
   // One constant gait clock. Start and WALK STOP are geometric C2 stride
   // ramps inside the gait law, so the body leaves and reaches rest with zero
   // velocity and acceleration; the last window recentres with four feet down.
-  const auto g=walkGait(stride_);
-  const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
   double fade=0;const bool firstRecovery=walkRecover_&&!recoverUs_;
   if(walkRecover_){
     // First release retains the accepted body-in-support correction; bridge
@@ -968,11 +1008,14 @@ void SimpleMotion::generateWalk(uint64_t now){
     cycles_=recoverCycles_+(t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5)/kWalkPeriodS;
     fade=1-quinticTimeLaw(u,1).progress;
   }else cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
+  steerWalk(now);
+  const auto g=gait_;
+  const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
   const bool clockDone=walkStopping_&&cycles_>=end;if(clockDone)cycles_=end;
   // A STOP in WALK_SETTLE can restart at the terminal clock itself. Finish
   // the existing held-RAW bridge before handing off, even with no gait left.
   const bool done=clockDone&&(!walkRecover_||now-recoverUs_>=1000000);
-  auto f=solveGait(g,gaitCartesian(g,cycles_,clockDone?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
+  auto f=solveGait(g,gaitTrackCartesian(track_,g,cycles_,clockDone?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
   if(!f.target.valid||!contains(kWalkBox,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(offPending_)return;
@@ -1011,6 +1054,9 @@ void SimpleMotion::update(uint64_t now){
   // An accepted command continues without any command source: no browser,
   // session or heartbeat condition exists here, only physical faults below.
   if(energized_&&(!input_.imuValid||now-input_.imuStampUs>600000)){fault("IMU_STALE");serviceOff();return;}
+  // A joystick intent that expires while rising to walk cancels only the walk;
+  // once walking (walkRequested_ stays set), steerWalk ends it with WALK STOP.
+  if(joystick_&&walkRequested_&&phase_!=Phase::WALK&&now>joystickDeadlineUs_)walkRequested_=joystick_=false;
   // Two single-block reads per 20 ms: whole population every 120 ms, at
   // most 4 ms wait. One 2-block control read each 120 ms adds <=4 ms.
   for(unsigned n=0;n<2;++n){const unsigned i=pollNext_++%12;Feedback f;

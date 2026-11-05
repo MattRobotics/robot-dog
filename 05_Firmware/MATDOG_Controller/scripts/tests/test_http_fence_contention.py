@@ -17,7 +17,8 @@ c = (SRC/'network/HttpTransport.cpp').read_text()
 def between(text, start, end):
     assert text.count(start) == 1 and text.count(end) == 1, (start, end)
     return text.split(start, 1)[1].split(end, 1)[0]
-exempt = 'bool slackExempt(' + between(c, 'bool slackExempt(', '} // slackExempt') + '}'
+exempt = 'bool slackExempt(' + between(c, 'bool slackExempt(', '} // slackExempt') + '}\n'
+exempt += 'bool joystickRefresh(' + between(c, 'bool joystickRefresh(', '} // joystickRefresh') + '}'
 dispatch = 'bool HttpTransport::dispatch(' + between(c, 'bool HttpTransport::dispatch(', 'void HttpTransport::appendTransportStats')
 tail = '  // Keep Controller-side command/JSON work in slack.' + between(c, '  // Keep Controller-side command/JSON work in slack.', '\nvoid HttpTransport::serviceRequest')
 admission = between(c, 'void HttpTransport::serviceRequest(uint32_t now_ms) {\n', '  switch (req.kind) {')
@@ -78,7 +79,8 @@ struct FakeService {
   AdminAccess gate;
   struct { bool run_mode=false,connected=false; uint32_t ipv4=0; uint8_t role_reason=0; } wifi;
   std::atomic<unsigned> statuses{0},commands{0},stops{0};
-  std::atomic<bool> slack{true};
+  std::atomic<bool> slack{true},joystick{false};
+  bool motionJoystickActive() const { return joystick.load(); }
   std::function<void()> beforeSlackReturn;
   bool motionSlack(uint64_t,uint32_t reserve) const { if(beforeSlackReturn)beforeSlackReturn(); return reserve==5000&&slack.load(); }
   FakeService() { gate.begin(); gate.open(); }
@@ -371,6 +373,17 @@ int main(){
     check(!first.ok&&!std::strcmp(first.failure,"MOTION_BUDGET_UNAVAILABLE"),"ordinary read without budget refused explicitly");
     check(ws.ok&&ws.resp.ok&&t.service.commands.load()==1&&wsMs<600,"WALK STOP behind it reaches the Controller and executes");
     std::printf("BUSY_HTTPD_WALK_STOP executed_in_ms=%u\n",wsMs); }
+  // 17. JOYSTICK (dev.15): a refresh of the walk it already holds only latches a
+  // target and its deadline, so it is served without Motion slack; a starting
+  // JOYSTICK command still waits for slack like a WALK start.
+  { HttpTransport t;t.service.slack.store(false);Loop loop(t);
+    auto joy=apRequest(t,HttpRequestKind::MOTION_COMMAND,motion::Intent::BASE_VELOCITY);joy.motion_command.vx=.006;std::strcpy(joy.motion_command.gait,"JOYSTICK");
+    Result start;auto a=reader(t,joy,80,&start);a.join();
+    check(!start.ok&&t.service.commands.load()==0,"JOYSTICK start without slack still waits");
+    loop.waitPasses(5);t.service.joystick.store(true);Result refresh;const uint32_t started=millis();
+    auto b=reader(t,joy,3000,&refresh);b.join();const uint32_t took=millis()-started;
+    check(refresh.ok&&refresh.resp.ok&&t.service.commands.load()==1&&took<500,"JOYSTICK refresh of the active walk served without slack");
+    std::printf("NO_SLACK_JOYSTICK_REFRESH served_in_ms=%u commands=%u\n",took,t.service.commands.load()); }
   std::printf("HTTP_FENCE_CONTENTION %s checks=%d failures=%d (production dispatch/update/admission/STOP lane; threads; no hardware)\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;
 }

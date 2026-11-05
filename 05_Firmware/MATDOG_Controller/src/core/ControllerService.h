@@ -85,6 +85,7 @@ class ControllerService {
   bool motionAck(const motion::MotionAck& ack,char* out,size_t cap) const { return motion_&&motion_->ackJson(ack,out,cap); }
   bool motionActive() const { return motion_&&motion_->busy(); }
   bool motionEngaged() const { return motion_&&motion_->engaged(); }
+  bool motionJoystickActive() const { return motion_&&motion_->joystickActive(); }
   const simple::SimpleMotion* motionDiagnostic() const { return motion_?motion_->motion():nullptr; } // LOADDIAG
   bool motionSlack(uint64_t now,uint32_t reserve) const {
     return !motion_||motion_->slack(now,reserve);

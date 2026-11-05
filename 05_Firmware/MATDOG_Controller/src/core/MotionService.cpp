@@ -74,11 +74,16 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    // Nothing to stop in the held PRONE terminal: never take over the active command.
    if(motion_->state()==simple::State::PRONE)return result("NOT_WALKING");
    motion_->walkStop();return result(nullptr);}
+ // Continuous base velocity: only an explicit JOYSTICK command, so an exact
+ // preset velocity from it never becomes an untimed WALK STANDARD.
+ const bool joystick=c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+ if(c.intent==motion::Intent::BASE_VELOCITY&&c.gait[0]&&!joystick)return result("GAIT_NOT_IN_SIMPLE_V1");
  if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY&&c.intent!=motion::Intent::LIE_DOWN)return result("COMMAND_NOT_IN_SIMPLE_V1");
  if(!ready_)return result(reason_);
  if(!motion_->stopActive()&&prepare_&&(why=prepare_(context_)))return result(why);
  if(c.intent==motion::Intent::LIE_DOWN)return result(motion_->prone(us));
  if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
+ if(joystick)return result(motion_->drive(c.vx,c.vy,c.yaw_rate,us));
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
  for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)return result(motion_->walk(i,us));
  return result("STANDARD_STRIDE_REQUIRED");
@@ -89,7 +94,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"nominal_height_mm\":%.0f,\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"TORQUE_ON_CONTACT_UNVERIFIED\",\"automatic_safe_off\":false,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkHeightM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"nominal_height_mm\":%.0f,\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":0,\"yaw_rate_max_rad_s\":0,\"timeout_ms\":%lu,\"ramp_cycles\":%.0f,\"lateral_yaw\":\"LATERAL_YAW_NOT_QUALIFIED\"},\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"TORQUE_ON_CONTACT_UNVERIFIED\",\"automatic_safe_off\":false,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkHeightM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2],simple::kJoystickStrideM/simple::kWalkPeriodS,(unsigned long)(simple::kJoystickTimeoutUs/1000),simple::kJoystickRampCycles);
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
@@ -114,6 +119,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.requestedHeightM=motion_->requestedHeightM();
  s.heightM=motion_->heightM();
  s.walkCycles=motion_->walkCycles();
+ s.walkVelocityX=motion_->walkVelocityX();s.joystick=motion_->joystickActive();
  s.stabilizationLimited=motion_->stabilizationLimited();
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -160,6 +166,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
  add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
    (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
+ // Law velocity of the walk (not measured) and whether a joystick intent holds it.
+ add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
    s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long long)s.offVerifiedUs);
  if(s.referenceFaultSlot<12){const auto& f=s.referenceFaultFeedback;
