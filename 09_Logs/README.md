@@ -1,6 +1,8 @@
 # MATDOG logs and evidence
 
-Latest: [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+Aggiornamento corrente 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+
+Historical scoped closeout (11/10/2026): [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
 Update 2026-10-31 (separate from the dated lines above): REV01-FIX geometry, physical properties and the Astra handoff were integrated in `main` by PR #57 (merge `887103e`, verified offline only) — [integration report](Validation_Reports/REV01_FIX_Integration_2026-10-30/REPORT.md) · [physical properties](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) · [**Astra handoff**](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md).
 
@@ -19,7 +21,7 @@ automatically describe the robot after a later rebuild or architecture change.
 | Area | Purpose |
 |---|---|
 | [History index](HISTORY_INDEX.md) | One chronology, June–October 2026: phases, status, documents and available evidence |
-| [Open items](OPEN_ITEMS.md) | Blockers and residuals; checkpoint after PR #40 (2026-10-08), updated after PR #41 and for C2 (2026-10-09); a separate current update of 2026-10-31 sits at the top |
+| [Open items](OPEN_ITEMS.md) | Current overview as of 05/11/2026; previous dated states preserved in Historical/ |
 | [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#41 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 (PR #38 merged with original SHAs; PR #41 is documentation only) |
 | [External archives](EXTERNAL_ARCHIVES.md) | Deleted branches (last tips), remaining tags, the non-public archive status and recovery steps; items without evidence stay `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |
