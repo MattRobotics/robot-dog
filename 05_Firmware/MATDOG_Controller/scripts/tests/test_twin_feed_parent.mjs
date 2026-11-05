@@ -15,7 +15,7 @@ const { JSDOM } = require('jsdom');
 const fx = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 const viewer = path.join(path.dirname(fileURLToPath(import.meta.url)), '../../../../06_Software/Matdog_Core/viewer/matdog_bno085_fullbody_viewer');
 const STUBS = {
-  '../viewer/scene': 'export function createViewerScene(){const scene={resetCalls:[],resetCamera(yaw=0){this.resetCalls.push(yaw)},setBeforeRender(){},robotAnchor:{add(){}},start(){}};globalThis.__viewers.push(scene);return scene}',
+  '../viewer/scene': 'export function createViewerScene(){const scene={resetCalls:[],resetCamera(yaw=0){this.resetCalls.push(yaw)},setBeforeRender(){},robotAnchor:{add(){},rotation:{z:0}},start(){}};globalThis.__viewers.push(scene);return scene}',
   '../urdf/parseUrdf': 'export function parseUrdf(){return{}}',
   '../urdf/buildRobot': 'export async function buildRobot(){return{rootObject:{quaternion:{w:1,x:0,y:0,z:0}},resetJoints(){},collisionMeshCount:17}}',
   '../viewer/linkStyle': 'export const styleForLink=()=>({})',
@@ -80,11 +80,12 @@ const check = (c, m) => { checks++; assert(c, m); };
   check(reset && reset.textContent === 'Reset vista', 'read-only view reset is exposed');
   const beforeFirstReset = t.fetches.length;
   reset.click();
-  check(t.scene.resetCalls.length === 1 && t.scene.resetCalls[0] === 0, 'reset before telemetry uses canonical +X heading');
+  check(t.scene.resetCalls.length === 1 && t.scene.resetCalls[0] === 0 && t.scene.robotAnchor.rotation.z === 0, 'reset before telemetry: canonical +X camera, no yaw reference');
   check(t.fetches.length === beforeFirstReset && t.twin.applied.length === 0, 'reset before telemetry neither fetches nor invents a posture');
   const status = JSON.parse(fx.status_walking);
-  // Exercise a tilted, nonzero heading: camera follows the robot +X direction;
-  // Reset must not rotate the measured model to face a fixed world camera.
+  // Tilted, nonzero heading: Reset cancels only the yaw seen at the click with a
+  // graphical reference on the robot anchor (ACTUAL and TARGET together); the
+  // camera takes the canonical +X view; quaternion, roll and pitch untouched.
   status.telemetry.quaternion = [.94, .10, -.12, .29];
   const post = (data, origin = 'http://192.168.4.1', source = t.parent) => t.listeners[0]({ data, origin, source });
   post(status, 'http://192.168.4.2'); post(status, 'http://192.168.4.1', {}); post({ unrelated: true });
@@ -96,11 +97,11 @@ const check = (c, m) => { checks++; assert(c, m); };
   JOINT_NAMES.forEach((joint, i) => check(frame.actual[joint] === status.telemetry.actual_rad[i], 'same ACTUAL angle ' + joint));
   check(JSON.stringify(frame.quaternion) !== 'null', 'BNO085 quaternion carried');
   const q=frame.quaternion, heading=Math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z));
-  check(Math.abs(q.z)>.1 && t.scene.resetCalls.length === 2 && Math.abs(t.scene.resetCalls[1]-heading)<1e-12, 'first measured frame places the camera at the robot +X heading');
+  check(Math.abs(q.z)>.1 && t.scene.resetCalls.length === 2 && t.scene.resetCalls[1] === 0 && Math.abs(t.scene.robotAnchor.rotation.z+heading)<1e-12, 'first measured frame shows the robot front: anchor yaw -heading, canonical +X camera');
   const receivedQuaternion = JSON.stringify(status.telemetry.quaternion), frameQuaternion = JSON.stringify(frame.quaternion);
   const beforeReset = t.fetches.length, beforeFrames = t.twin.applied.length, beforeCameraResets = t.scene.resetCalls.length;
   reset.click();
-  check(t.scene.resetCalls.length === beforeCameraResets + 1 && Math.abs(t.scene.resetCalls.at(-1)-heading)<1e-12, 'Reset vista delegates only to the measured robot +X camera heading');
+  check(t.scene.resetCalls.length === beforeCameraResets + 1 && t.scene.resetCalls.at(-1) === 0 && Math.abs(t.scene.robotAnchor.rotation.z+heading)<1e-12, 'Reset vista: anchor yaw reference -heading and canonical +X camera');
   check(t.fetches.length === beforeReset && t.fetches.every(f => !f.init.method || f.init.method === 'GET'), 'Reset vista issues no extra telemetry GET or command POST');
   check(t.twin.applied.length === beforeFrames && JSON.stringify(frame.quaternion) === frameQuaternion && JSON.stringify(status.telemetry.quaternion) === receivedQuaternion, 'Reset vista preserves the received IMU quaternion and robot posture');
   check(t.dom.window.document.getElementById('banner').textContent !== 'In attesa della prima telemetria…', 'Twin view updated');
@@ -121,9 +122,19 @@ const check = (c, m) => { checks++; assert(c, m); };
   const invalid = JSON.parse(JSON.stringify(bound)); invalid.now_ms += 350; invalid.telemetry.sampled_at_ms += 350; invalid.telemetry.quaternion = null; invalid.channels.imu.valid = false; post(invalid);
   check(chip('twin-status') !== 'LIVE' && diagnostics().includes('NON VALIDA'), 'Controller imu_valid=false never shows LIVE');
   reset.click();
-  check(JSON.stringify(t.twin.actual.rootObject.quaternion)===displayedQuaternion && Math.abs(t.scene.resetCalls.at(-1)-heading)<1e-12, 'Reset follows retained displayed orientation after invalid IMU, not the rejected stream sample');
+  check(JSON.stringify(t.twin.actual.rootObject.quaternion)===displayedQuaternion && t.scene.resetCalls.at(-1)===0&&Math.abs(t.scene.robotAnchor.rotation.z+heading)<1e-12, 'Reset follows retained displayed orientation after invalid IMU, not the rejected stream sample');
   const demo = JSON.parse(JSON.stringify(bound)); demo.now_ms += 1000; demo.telemetry.sampled_at_ms += 1000; demo.telemetry.source = 'OFFLINE_UI_FIXTURE'; post(demo);
   check(chip('twin-status') === 'OFFLINE', 'an offline fixture with full measured channels is explicitly OFFLINE');
+  // Yaw 0/+90/-90/180 deg with roll/pitch: each Reset cancels exactly the yaw at the click.
+  let stamp = 2000;
+  for (const yawDeg of [0, 90, -90, 180]) {
+    const y = yawDeg * Math.PI / 180, r = .2, pt = -.15, cy = Math.cos(y/2), sy = Math.sin(y/2), cp = Math.cos(pt/2), sp = Math.sin(pt/2), cr = Math.cos(r/2), sr = Math.sin(r/2);
+    const s = JSON.parse(fx.status_walking); stamp += 700; s.now_ms += stamp; s.telemetry.sampled_at_ms += stamp;
+    s.telemetry.quaternion = [cr*cp*cy+sr*sp*sy, sr*cp*cy-cr*sp*sy, cr*sp*cy+sr*cp*sy, cr*cp*sy-sr*sp*cy];
+    post(s); const g = t.twin.applied.at(-1).quaternion, h = Math.atan2(2*(g.w*g.z+g.x*g.y),1-2*(g.y*g.y+g.z*g.z));
+    reset.click();
+    check(t.scene.resetCalls.at(-1) === 0 && Math.abs(Math.atan2(Math.sin(t.scene.robotAnchor.rotation.z+h),Math.cos(t.scene.robotAnchor.rotation.z+h)))<1e-9 && Math.abs(Math.abs(h)-Math.abs(y))<1e-6, 'Reset vista at yaw ' + yawDeg + ' deg');
+  }
   post({ unrelated: true });
   check(chip('twin-status') === 'ERRORE' || chip('twin-status') === 'OFFLINE · ERRORE', 'rejected telemetry never leaves a falsely positive badge');
   for (const timer of t.timers) timer.fn();

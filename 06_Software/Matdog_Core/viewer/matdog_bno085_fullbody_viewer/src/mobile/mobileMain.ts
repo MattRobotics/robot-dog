@@ -23,10 +23,13 @@ const parentFeed = new URLSearchParams(location.search).get('feed') === 'parent'
 let viewer: ReturnType<typeof createViewerScene> | null = null, initialViewSet = false;
 
 function resetView(): void {
-  // Face the measured robot +X direction, not world +X. Only the camera moves:
-  // the same SH2 -> base_link -> Z-up Three frame mapping keeps the pose truthful.
+  // Front view of the robot's +X: a graphical yaw reference on the robot anchor
+  // (ACTUAL and TARGET turn together) cancels the yaw measured at the click and
+  // the camera takes the canonical +X view. The BNO085 quaternion, roll and pitch
+  // are untouched; later yaw shows relative to this reset. No command or POST.
   const q = twin?.actual.rootObject.quaternion;
-  viewer?.resetCamera(q ? sh2ToRollPitchYaw(q).yaw : 0);
+  if (viewer) viewer.robotAnchor.rotation.z = q ? -sh2ToRollPitchYaw(q).yaw : 0;
+  viewer?.resetCamera(0);
 }
 function prepareInitialView(): void {
   if (!initialViewSet && twin && stream.frame?.quaternion) { resetView(); initialViewSet = true; }
