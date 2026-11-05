@@ -11,10 +11,10 @@
 | Build ID | 4ff2aadf4ed9 |
 | APP SHA256 | 71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22 |
 | APP | 1.669.584 byte, ROBOT_POWERED, OTA ingest 0, source CLEAN |
-| Sorgente consultabile | [branch dev.14](https://github.com/MattRobotics/robot-dog/tree/validation/matdog-dev14-hw-20261105) |
+| Sorgente consultabile | [tag dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) |
 | main alla preparazione del closeout | 07f4a2178354d28de71dfa1dad5462f12cbd5437; non identifica il firmware installato |
 
-Il branch sorgente ha HEAD esattamente al commit sopra: nessuna modifica o ricompilazione per la pubblicazione. La build non è ricostruibile bit per bit dal solo SHA Git. La dev.7 pubblicata resta una pre-release storica; nessuna promozione stable/Latest. Dev.15 è sviluppo parallelo, preservato: questo report non ne attesta build o validazione hardware.
+Il tag annotato punta esattamente al commit sopra: nessuna modifica o ricompilazione per la pubblicazione. La build non è ricostruibile bit per bit dal solo SHA Git. La dev.7 pubblicata resta una pre-release storica; nessuna promozione stable/Latest. Dev.15 è sviluppo parallelo, preservato: questo report non ne attesta build o validazione hardware.
 
 ## Flash e boot — VERIFIED HARDWARE
 

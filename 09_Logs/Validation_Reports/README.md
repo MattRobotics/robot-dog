@@ -1,8 +1,8 @@
 # Validation reports — index
 
-Latest hardware checkpoint 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [branch dedicato](https://github.com/MattRobotics/robot-dog/tree/validation/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+Latest hardware checkpoint 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
 
-Latest scoped closure: [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
+Historical scoped closure (11/10/2026): [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 
 Each entry is evidence for its recorded date and scope only. A PASS here does not carry over to a
 later firmware, a later mechanical state or a later power architecture, and no entry authorizes

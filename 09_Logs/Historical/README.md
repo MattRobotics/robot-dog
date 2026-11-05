@@ -1,5 +1,7 @@
 # Historical index — superseded MATDOG phases
 
+[Snapshot integrali README e OPEN_ITEMS prima del closeout dev.14](Dev14_Documentation_Closeout_2026-11-05/README.md), con provenienza e hash.
+
 > **Nothing indexed here is current operational truth.**
 > Current architecture: [`01_Docs/02_Architecture/ARCHITECTURE.md`](../../01_Docs/02_Architecture/ARCHITECTURE.md)
 
