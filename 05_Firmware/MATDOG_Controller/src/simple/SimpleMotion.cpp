@@ -394,6 +394,26 @@ const char* SimpleMotion::stand(double h,uint64_t now){
       timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
       return nullptr;
     }
+    if(stoppedInProneDescent()){
+      // Same restart routes as after ENABLE, from the held RAW with torque ON:
+      // no ACQUIRE/ENABLE, no new route. The correction restarts from zero
+      // (the held RAW already contains the old one), engaged by the usual ramp.
+      JointTargetFrame held;if(const char* r=proneRecovery(held,initialRoute_))return r;
+      reference_=held;segmentTo_=held;stopActive_=stopVerified_=false;operatorStopped_=false;
+      rollCorrection_=pitchCorrection_=correctionScale_=0;imuStartUs_=now;compensatedUs_=0;
+      referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;reason_="STAND_FROM_STOPPED_PRONE";
+      timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
+      switch(initialRoute_){
+        case InitialRoute::ENTRY:phase_=Phase::ENABLE;nextStand(now);break;  // DISENGAGE first
+        case InitialRoute::DEPLOY:beginDeploy(&held,now);break;
+        case InitialRoute::LIFT:beginLift(&held,now);break;
+        default:{double z=0;for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),held.legs[l]);
+            if(c.status!=ContactStatus::OK){fault("STAND_CONTACT_IK");return nullptr;}z-=c.referenceM.z/4;}
+          beginHeight(held,std::fmin(.150,std::fmax(kMinStandM,nominalHeightFromBaseLinkM(z))),collision::kHeight,now);}
+      }
+      if(state_==State::MOVING)rememberReference(now);  // a new STOP before the first release still has a held reference
+      return nullptr;
+    }
     if((stopOrigin_==Phase::HOLD||stopOrigin_==Phase::HEIGHT)&&!heightStartClear(measured(),q))return "HEIGHT_PATH_NOT_CLEAR";
     if(stopOrigin_==Phase::HEIGHT){
       // A stopped synchronous HEIGHT reference can restart the same existing
@@ -442,6 +462,21 @@ const char* SimpleMotion::stand(double h,uint64_t now){
 const char* SimpleMotion::standResumeRefusal(uint64_t now) const {
   WalkRecoveryStart recovery;return standResumeRefusal(now,recovery);
 }
+// STOP in the PRONE descent: the held RAW (the reference the servos keep, not
+// the interrupted segment's future endpoint) must lie, with the measured pose,
+// in one certified region box; that region's existing restart route (as after
+// ENABLE) is then clear for any joint progress. ENTRY also needs its DISENGAGE.
+const char* SimpleMotion::proneRecovery(JointTargetFrame& held,InitialRoute& route) const {
+  held.valid=true;for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return "STAND_PATH_NOT_CLEAR";
+  if(!certifiedRegion(held,route)||route==InitialRoute::WALK)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
+  const auto& box=route==InitialRoute::ENTRY?collision::kEntry:route==InitialRoute::DEPLOY?collision::kDeploy:
+                  route==InitialRoute::LIFT?collision::kLift:collision::kHeight;
+  const auto actual=measured();
+  if(!contains(box,actual)||!contains(box,held)||(route!=InitialRoute::ENTRY&&!pointSafe(actual)))return "STAND_PATH_NOT_CLEAR";
+  if(route==InitialRoute::ENTRY){auto d=held;const auto h=routePoint(0);for(unsigned l=0;l<4;++l)d.legs[l].lower=h.legs[l].lower;
+    if(!transitionSafe(actual,d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";}
+  return nullptr;
+}
 const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& recovery) const {
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load()||!energized_)return "SAFE_OFF_STAND_REFUSED";
@@ -458,6 +493,7 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& rec
        !transitionSafe(recovery.held,recovery.first,walkBox()))return "STOP_RECOVERY_PATH_NOT_CLEAR";
     return nullptr;
   }
+  if(stoppedInProneDescent()){JointTargetFrame held;InitialRoute route;return proneRecovery(held,route);}
   const bool height=stopOrigin_==Phase::HEIGHT&&issuedPlanned_&&stopBox_==&collision::kHeight;
   if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT&&!height)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
   InitialRoute route;const auto actual=measured();

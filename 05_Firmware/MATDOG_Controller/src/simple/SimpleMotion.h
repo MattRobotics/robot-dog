@@ -37,7 +37,7 @@ constexpr uint64_t kJoystickTimeoutUs=1000000;
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
 // by at most kImuSlewMaxDtUs: no catch-up step after a pause.
-constexpr double kImuSlewRadS=.060;
+constexpr double kImuSlewRadS=.040;  // .060 delays native arrival (NATIVE_TARGET_NOT_REACHED, STOP suite)
 constexpr uint64_t kImuSlewMaxDtUs=2*kPeriodUs;
 constexpr double kMinStandM=.050;
 // Nominal height, the height of commands, status and route tables: the front HIP
@@ -228,6 +228,12 @@ class SimpleMotion {
   void beginProne(Phase,uint64_t);
   bool proneDisengage(motion::JointTargetFrame&) const;
   bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_WAIT; }
+  // A STOP in a planned route segment (the PRONE descent or the STAND_DEPLOY/
+  // STAND_LIFT rise): the held RAW restarts the STAND route of the certified
+  // region that holds it (proneRecovery). Native moves have no held reference.
+  bool stoppedInProneDescent() const { return (stopOrigin_>=Phase::PRONE_HEIGHT&&stopOrigin_<=Phase::PRONE_LAND)||
+    ((stopOrigin_==Phase::DEPLOY||stopOrigin_==Phase::LIFT)&&issuedPlanned_); }
+  const char* proneRecovery(motion::JointTargetFrame& held,InitialRoute& route) const;
   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
   void beginLift(const motion::JointTargetFrame* measured,uint64_t);
   void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);

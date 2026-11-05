@@ -548,7 +548,47 @@ static void imuSlewTime(){
   std::printf("IMU slew in physical time: %.2f mrad per regular release (%.3f rad/s), %.2f mrad after 3 lost releases (cap %.2f), reason SLEW exported\n",maxRegular*1e3,simple::kImuSlewRadS,late*1e3,capped*1e3);
 }
 
+// STOP inside the PRONE descent, then STAND (dev.15, dev.14 HW RCA A): the held
+// RAW restarts the certified route of its region with torque ON. Every phase
+// at early/mid/late instants; first frame continuous with the held RAW, no
+// enable/SAFE_OFF, a second STOP during the recovery, STANDING at the end.
+static void proneStopRecovery(){
+  const char* phases[]={"PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND"};unsigned admitted=0,refused=0;bool observedCase=false;
+  for(const char* target:phases)for(unsigned after:{3u,30u,90u}){
+    Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());assert(!r.m.prone(r.p.now));
+    unsigned n=0;for(;n<6000&&std::strcmp(r.m.phase(),target);++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    if(std::strcmp(r.m.phase(),target))continue;
+    for(unsigned k=0;k<after&&!std::strcmp(r.m.phase(),target);++k)r.tick();
+    if(std::strcmp(r.m.phase(),target))continue;  // phase shorter than this instant
+    const std::string region=r.m.poseRegion(r.p.now);
+    const auto enables=r.p.enables,offs=r.p.offCalls;r.m.stop();r.m.stop();  // double STOP
+    for(unsigned k=0;k<300&&!r.m.stopVerified();++k)r.tick();assert(r.m.stopVerified()&&r.m.energized());
+    std::array<uint16_t,12> held;std::copy(r.p.target,r.p.target+12,held.begin());
+    const char* why=r.m.standResumeRefusal(r.p.now);
+    if(why){assert(!std::strcmp(why,"STAND_PATH_NOT_CLEAR")||!std::strcmp(why,"STOP_RECOVERY_POSTURE_UNQUALIFIED"));
+      assert(r.m.stand(.10,r.p.now));++refused;std::printf("PRONE STOP %s+%u (%s): STAND refused %s\n",target,after,region.c_str(),why);continue;}
+    assert(!r.m.stand(.10,r.p.now));assert(!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_PRONE"));
+    const auto frames=r.p.sent.size();r.tick();unsigned first=0;
+    if(r.p.sent.size()>frames)for(unsigned i=0;i<12;++i)first=std::max(first,unsigned(std::abs(int(r.p.sent[frames][i])-int(held[i]))));
+    assert(first<=12);  // the first written frame starts at the held RAW (one release of route motion)
+    // STOP during the recovery, inside its first planned segment (native DISENGAGE/
+    // ALIGN keep the dev.14 STOP: no synchronous reference, SAFE_OFF), then STAND again.
+    for(unsigned k=0;k<3000&&std::strcmp(r.m.phase(),"STAND_DEPLOY")&&std::strcmp(r.m.phase(),"STAND_LIFT")&&std::strcmp(r.m.phase(),"HEIGHT");++k){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    for(unsigned k=0;k<20;++k)r.tick();
+    r.m.stop();for(unsigned k=0;k<300&&!r.m.stopVerified();++k)r.tick();assert(r.m.stopVerified()&&r.m.energized());
+    const char* again=r.m.standResumeRefusal(r.p.now);
+    if(again)std::fprintf(stderr,"second recovery refused %s after %s\n",again,target);
+    assert(!again&&!r.m.stand(.10,r.p.now));
+    for(unsigned k=0;k<6000&&r.m.state()!=simple::State::STANDING;++k){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==offs);
+    observedCase|=!std::strcmp(target,"PRONE_DEPLOY")&&region=="PRONE_ENTRY";++admitted;
+    std::printf("PRONE STOP %s+%u (%s): STAND admitted, first frame %u ticks from held RAW, STOP in recovery, STANDING, torque never cycled\n",target,after,region.c_str(),first);}
+  assert(admitted>0&&observedCase);
+  std::printf("PRONE STOP -> STAND: %u admitted, %u refused with a precise reason (software only)\n",admitted,refused);
+}
+
 int main(){standHoldTilt();
+  proneStopRecovery();
   imuSlewTime();
   joystickWalk();
   walkLevelBoard();
@@ -623,7 +663,11 @@ int main(){standHoldTilt();
   Rig interrupted;assert(!interrupted.m.stand(.15,interrupted.p.now));
   for(unsigned i=0;i<400&&interrupted.p.frames<25;++i)interrupted.tick();
   interrupted.m.stop();for(unsigned i=0;i<150&&!interrupted.m.offVerified()&&!interrupted.m.stopVerified();++i)interrupted.tick();
-  assert(interrupted.m.offVerified()||interrupted.m.stopVerified());assert(interrupted.m.stand(.15,interrupted.p.now));
+  assert(interrupted.m.offVerified()||interrupted.m.stopVerified());
+  // dev.15: a STOP held in a planned route segment restarts that region's route
+  // with torque ON; a native move ends in SAFE_OFF and STAND stays refused.
+  if(interrupted.m.stopVerified()){assert(!interrupted.m.stand(.15,interrupted.p.now));assert(interrupted.reachStand());}
+  else assert(interrupted.m.stand(.15,interrupted.p.now));
   // STOP inside STAND_LIFT retains the nominal route reference and torque; no implicit resume.
   Rig liftStop;assert(!liftStop.m.stand(.15,liftStop.p.now));
   for(unsigned i=0;i<1000&&strcmp(liftStop.m.phase(),"STAND_LIFT");++i)liftStop.tick();
@@ -632,7 +676,8 @@ int main(){standHoldTilt();
   // IMU-corrected writer samples now admit C0 arrest without an analytic
   // derivative claim for the preceding compensation signal.
   assert(liftStop.m.stopVerified()&&liftStop.m.energized()&&!liftStop.m.offVerified());
-  assert(liftStop.m.stand(.15,liftStop.p.now)); // intermediate posture still unqualified for recovery
+  const auto liftEnables=liftStop.p.enables;assert(!liftStop.m.stand(.15,liftStop.p.now));  // dev.15: held RAW restarts the certified LIFT route
+  assert(liftStop.reachStand()&&liftStop.p.enables==liftEnables);
   Rig gaitRestart;assert(!gaitRestart.m.walk(2,gaitRestart.p.now));
   for(unsigned i=0;i<1200&&gaitRestart.m.state()!=simple::State::WALKING;++i)gaitRestart.tick();
   for(unsigned i=0;i<300;++i)gaitRestart.tick();gaitRestart.m.stop();for(unsigned i=0;i<150&&!gaitRestart.m.stopVerified();++i)gaitRestart.tick();
