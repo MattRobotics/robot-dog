@@ -34,6 +34,11 @@ constexpr double kStrideM[]={.030,.045,.060};
 constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
 constexpr double kJoystickSwayYM=.012;
 constexpr uint64_t kJoystickTimeoutUs=1000000;
+// IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
+// release, slower still when releases were missed). A late release advances
+// by at most kImuSlewMaxDtUs: no catch-up step after a pause.
+constexpr double kImuSlewRadS=.060;
+constexpr uint64_t kImuSlewMaxDtUs=2*kPeriodUs;
 constexpr double kMinStandM=.050;
 // Nominal height, the height of commands, status and route tables: the front HIP
 // axes stand 46.5 mm above it. STAND 150 is that operating reference, the pose
@@ -159,6 +164,12 @@ class SimpleMotion {
   uint64_t imuStampUs() const { return input_.imuStampUs; }
   const double* quaternion() const { return input_.quaternion; }  // BNO085 w,x,y,z (normalized)
   bool stabilizationLimited() const { return imuLimited_; }
+  // Why the correction differs from the IMU request: OK, SLEW, ENVELOPE,
+  // ATTENUATED, WORKSPACE, SUPPORT_FIT or IMU_STALE; requested and applied
+  // body roll/pitch (rad). Values of the latest compensation, never re-solved.
+  const char* imuReason() const { return imuReason_; }
+  double imuWanted(unsigned i) const { return imuWanted_[i&1]; }
+  double imuApplied(unsigned i) const { return (i&1?pitchCorrection_:rollCorrection_)*correctionScale_; }
   uint64_t nextReleaseUs() const { return nextUs_; }
   const char* powerReason() const { return input_.powerReason; }
   uint32_t bmsAgeMs() const { return input_.bmsAgeMs; }
@@ -224,6 +235,7 @@ class SimpleMotion {
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
+  double slewStep(uint64_t now);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
   bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&,bool stopProof=true) const;
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
@@ -308,5 +320,6 @@ class SimpleMotion {
   bool walkRecover_=false; double recoverCycles_=0; uint64_t recoverUs_=0; motion::JointTargetFrame recoverOffset_{};
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
+  const char* imuReason_="IMU_STALE";double imuWanted_[2]{};
 };
 } }

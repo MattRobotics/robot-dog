@@ -22,6 +22,10 @@ struct MotionStatusSnapshot {
   uint16_t offMask=0,referenceFaultRaw=0;
   double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,walkVelocityY=0,walkYawRate=0,quaternion[4]{};
   bool joystick=false;
+  const char* imuReason="";float imuWanted[2]{},imuApplied[2]{};
+  // MotionTiming records (same release): parts us, previous release parts us,
+  // work counters. Copies of data already held; USB @MOTION TIMING has the rest.
+  bool timingValid[2]{};uint16_t timing[2][16]{};  // saturated at 65535
   unsigned referenceFaultSlot=12;
   simple::Feedback feedback[12]{},referenceFaultFeedback{};
 };

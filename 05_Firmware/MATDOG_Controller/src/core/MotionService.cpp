@@ -121,6 +121,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.walkCycles=motion_->walkCycles();
  s.walkVelocityX=motion_->walkVelocityX();s.walkVelocityY=motion_->walkVelocityY();s.walkYawRate=motion_->walkYawRate();s.joystick=motion_->joystickActive();
  s.stabilizationLimited=motion_->stabilizationLimited();
+ s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
  s.releases=motion_->releases();
@@ -131,6 +132,10 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.maxReleaseWorkUs=motion_->maxReleaseWorkUs();
  {const auto& t=simple::timing::state;s.commandMissed=t.missed;
   if(t.firstMiss.valid){s.firstMissPhase=t.firstMiss.phase;s.firstMissLatenessUs=static_cast<uint32_t>(t.firstMiss.latenessUs);}
+  for(unsigned i=0;i<2;++i){const auto& r=i?t.maximum:t.firstMiss;s.timingValid[i]=r.valid;
+    auto sat=[](uint32_t v){return static_cast<uint16_t>(v>65535?65535:v);};
+    for(unsigned k=0;k<simple::timing::PARTS;++k){s.timing[i][k]=sat(r.us[k]);s.timing[i][6+k]=sat(r.previousUs[k]);}
+    for(unsigned k=0;k<simple::timing::WORKS;++k)s.timing[i][12+k]=sat(r.work[k]);}
   if(t.maximum.valid){s.commandMaxWorkUs=t.maximum.workUs;s.commandMaxWorkPhase=t.maximum.phase;s.commandMaxCompensateUs=t.sectionMax[simple::timing::COMPENSATE];s.commandMaxSolves=t.maximum.work[simple::timing::SOLVES];}}
  s.offVerifiedUs=motion_->offVerifiedUs();
  s.referenceFaultSlot=motion_->referenceFaultSlot();
@@ -166,6 +171,13 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
  add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
    (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
+ // [read,nominal,compensate,convert,frame,rest] us of one release, the same six
+ // of the release before, then solves, ik, newton, fk of that release.
+ for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss\":":",\"timing\":{\"max_work\":");
+   if(!s.timingValid[i]){add("%s","null");continue;}
+   for(unsigned k=0;k<16;++k)add("%s%lu",k?",":"[",(unsigned long)s.timing[i][k]);add("%s","]");}
+ add("%s","}");
+ add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

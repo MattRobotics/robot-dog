@@ -903,6 +903,13 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
     lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
   return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad);
 }
+// One slew step per Motion release, scaled by the physical time since the last
+// one: a group boundary regenerates the reference in the same release and must
+// not advance the correction twice; a late release does not slow it down.
+double SimpleMotion::slewStep(uint64_t now){
+  const uint64_t dt=now==compensatedUs_?0:compensatedUs_&&now>compensatedUs_?std::min<uint64_t>(now-compensatedUs_,kImuSlewMaxDtUs):kPeriodUs;
+  compensatedUs_=now;return kImuSlewRadS*double(dt)/1e6;
+}
 void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
   // Angles are the accepted body orientation in the existing support frame,
   // not an integral of IMU error. Fit its orientation from labelled stance
@@ -920,15 +927,17 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   }
   const bool fitted=unwind||supportLevelTarget(f.cartesian.feet,measured(),stance,up,previous,wantedRoll,wantedPitch);
   timing::count(timing::FK,unwind?0:3);
-  imuLimited_=!fitted;
+  imuLimited_=!fitted;imuReason_=fitted?"OK":up.x==0&&up.y==0&&up.z==0?"IMU_STALE":"SUPPORT_FIT";
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
-  if(walk&&limitWalkTilt(wantedRoll,wantedPitch))imuLimited_=true;
-  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
+  if(walk&&limitWalkTilt(wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
+  imuWanted_[0]=wantedRoll;imuWanted_[1]=wantedPitch;
+  const double slew=slewStep(now);
   auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
   double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
   if(walk){const double dr=wantedRoll-rollCorrection_,dp=wantedPitch-pitchCorrection_;
     const double distance=std::fmax(std::abs(dr),std::abs(dp)),fraction=distance>.001?std::fmin(1.,slew/distance):0;
     roll=rollCorrection_+fraction*dr;pitch=pitchCorrection_+fraction*dp;}
+  if(!imuLimited_&&std::fmax(std::abs(wantedRoll-roll),std::abs(wantedPitch-pitch))>.001)imuReason_="SLEW";
   if(!walk&&roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;return;}
   if(walk&&roll==0&&pitch==0){correctionScale_=1;return;} // nominal gait already solved
   auto body=headed(f.cartesian.body,roll,pitch);const auto t=f.cartesian.body.translationM;
@@ -945,7 +954,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
     // geometric orientation is re-estimated next release, so reversal leaves
     // saturation immediately; there is no accumulated integral to unwind.
     if(walk){fault("WALK_IK_OR_WORKSPACE");return;}
-    if(goal_.valid)f.target=goal_;imuLimited_=true;
+    if(goal_.valid)f.target=goal_;imuLimited_=true;imuReason_="WORKSPACE";
   }
 }
 void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
@@ -956,16 +965,16 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   if(phase_==Phase::HOLD||phase_==Phase::WALK||phase_==Phase::WALK_HOLD){
     compensateLevel(f,attitudeFresh?Vector3{a.upBase[0],a.upBase[1],a.upBase[2]}:Vector3{},now,
       phase_==Phase::WALK_HOLD&&std::abs(plannedHeight_-requestedHeight_)>1e-9);return;}
-  if(!attitudeFresh){imuLimited_=true;return;}
-  imuLimited_=false;
+  if(!attitudeFresh){imuLimited_=true;imuReason_="IMU_STALE";return;}
+  imuLimited_=false;imuReason_="OK";
   // A small proportional BODY correction, slew limited, no servo PID or
   // integral loop. The same target generator owns nominal + correction.
-  // One slew step per Motion release: a group boundary regenerates the
-  // reference in the same release and must not advance the correction twice.
-  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
-  auto step=[slew](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);return old+std::clamp(desired-old,-slew,slew);};
+  const double slew=slewStep(now);
+  auto desired=[](double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);return std::clamp(-.5*error,-.020,.020);};
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
-  const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
+  imuWanted_[0]=desired(a.rollRad);imuWanted_[1]=desired(a.pitchRad-nominalPitch);
+  const double roll=rollCorrection_+std::clamp(imuWanted_[0]-rollCorrection_,-slew,slew),pitch=pitchCorrection_+std::clamp(imuWanted_[1]-pitchCorrection_,-slew,slew);
+  if(roll!=imuWanted_[0]||pitch!=imuWanted_[1])imuReason_="SLEW";
   if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=correctionScale_=0;return;}
   // PRONE_HEIGHT hands over to kLift, whose margin at 53 mm is 2.6 mrad: once the
   // nominal target is inside it, the correction stays inside it too.
@@ -999,13 +1008,13 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
   if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
-    keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;return;}
+    keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;if(imuLimited_)imuReason_="ATTENUATED";return;}
   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
     const auto q=solve(scale,probe.valid?probe:f.target);
-    if(pointSafe(q)&&contains(box,q)){keep(q);rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;return;}
+    if(pointSafe(q)&&contains(box,q)){keep(q);rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;if(imuLimited_)imuReason_="ATTENUATED";return;}
   }
   // If no in-workspace correction exists, the nominal safe target survives.
-  rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;
+  rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;imuReason_="WORKSPACE";
 }
 void SimpleMotion::generateWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);

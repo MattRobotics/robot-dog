@@ -530,7 +530,26 @@ static void joystickWalk(){
   std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
 }
 
+// IMU level slew in physical time (dev.15): a regular release moves the
+// correction by at most kImuSlewRadS x period, a late one by its real elapsed
+// time capped at kImuSlewMaxDtUs, never a catch-up jump; reason and values
+// are exported.
+static void imuSlewTime(){
+  constexpr double degree=3.14159265358979323846/180;
+  Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());
+  const double half=1.5*degree/2;r.in.quaternion[0]=std::cos(half);r.in.quaternion[1]=std::sin(half);r.in.quaternion[2]=r.in.quaternion[3]=0;  // 1.5 deg roll
+  const double regular=simple::kImuSlewRadS*simple::kPeriodUs/1e6,capped=simple::kImuSlewRadS*simple::kImuSlewMaxDtUs/1e6;
+  r.tick(false);  // first correction after HOLD entry: its physical gap may be two periods
+  double prev=simple::StopReferenceProbe::roll(r.m),maxRegular=0,late=0;bool slewing=false;
+  for(unsigned n=0;n<6;++n){r.tick(false);const double now=simple::StopReferenceProbe::roll(r.m);maxRegular=std::fmax(maxRegular,std::abs(now-prev));prev=now;slewing|=!std::strcmp(r.m.imuReason(),"SLEW");}
+  r.p.now+=3*simple::kPeriodUs;r.tick(false);late=std::abs(simple::StopReferenceProbe::roll(r.m)-prev);  // three releases lost, 80 ms < deadline guard
+  assert(r.m.state()==simple::State::STANDING&&slewing&&maxRegular>.9*regular&&maxRegular<=regular*(1+1e-9)&&late>regular*1.5&&late<=capped*(1+1e-9));
+  assert(std::abs(r.m.imuApplied(0)-simple::StopReferenceProbe::roll(r.m))<1e-12);
+  std::printf("IMU slew in physical time: %.2f mrad per regular release (%.3f rad/s), %.2f mrad after 3 lost releases (cap %.2f), reason SLEW exported\n",maxRegular*1e3,simple::kImuSlewRadS,late*1e3,capped*1e3);
+}
+
 int main(){standHoldTilt();
+  imuSlewTime();
   joystickWalk();
   walkLevelBoard();
   walkTxLatency();

@@ -1,4 +1,5 @@
 #include "Gait.h"
+#include "LegKinematicsInternal.h"
 #include <cmath>
 #include <limits>
 namespace matdog { namespace motion {
@@ -171,7 +172,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
   double vu=a*su-f*ct-g*st,vl=-f*ct-g*st;
   double j[3][3]={{0,xu,xl},{-d*sh-v*ch,-vu*sh,-vl*sh},{d*ch-v*sh,vu*ch,vl*ch}};
   double inverse[3][3],norm=0,inorm=0;
-  for(unsigned c=0;c<3;++c){double b[3]={0,0,0},x[3];b[c]=1;if(!solve3(j,b,x))return false;for(unsigned k=0;k<3;++k)inverse[k][c]=x[k];}
+  if(!detail::invert3(j,inverse))return false;
   for(unsigned k=0;k<3;++k){double n=0,in=0;for(unsigned c=0;c<3;++c){n+=std::abs(j[k][c]);in+=std::abs(inverse[k][c]);}norm=std::fmax(norm,n);inorm=std::fmax(inorm,in);}
   condition=norm*inorm;
   if(!derivatives)return true;
