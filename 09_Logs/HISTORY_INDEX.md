@@ -1,5 +1,7 @@
 # MATDOG history index — June to October 2026
 
+Estensione cronologica 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [branch dedicato](https://github.com/MattRobotics/robot-dog/tree/validation/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+
 One navigable chronology. It **indexes** existing documents; it adds no new evidence and does not
 change any recorded PASS/FAIL result. Where a document or report does not exist on `main`, the row
 says so instead of describing it.

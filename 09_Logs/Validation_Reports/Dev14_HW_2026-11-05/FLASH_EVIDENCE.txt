@@ -1,0 +1,16 @@
+Estratto selettivo del flash.log originale; percorsi host e backup omessi.
+APPLICATION_SHA256    = 71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22
+APPLICATION_OFFSET    = 0x010000 (partition 'app0')
+APPLICATION_SIZE      = 1669584
+MAX_PARTITION_SIZE    = 5242880
+LAYOUT_ID             = MATDOG_16M_2x5M_NVS_V1
+PARTITION_TABLE_SHA256 = 8f756ecb719c4894b9c23c26bcc171e1d01ae8cda69882950944d5ce264946e7 (build manifest == table installed on the device)
+WRITE_RANGE           = 0x010000 .. 0x1a79d0 (partition 'app0')
+ERASE_RANGE           = 0x010000 .. 0x1a8000 (sector rounded; MATDOG NVS 0xfe0000..0xff0000 untouched)
+SOURCE_COMMIT         = 4ff2aadf4ed907d39f2b3ad4f9e6af54db5decee
+Wrote 1669584 bytes at 0x00010000 in 35.5 seconds (375.7 kbit/s).
+Hash of data verified.
+Verification successful (digest matched).
+APPLICATION_ONLY_FLASH = PASS
+FLASHED_HARDWARE_PROFILE = ROBOT_POWERED
+FLASHED_OTA_INGEST_ENABLED = 0

@@ -4,7 +4,7 @@
 
 MATDOG è la piattaforma quadrupede di Matt Robotics: un robot a quattro zampe progettato da zero, con l'obiettivo di arrivare a una **locomozione continua, precisa e sicura** (STAND, WALK, stabilizzazione IMU) comandata a livello semantico da una dashboard e, in futuro, da un computer di alto livello.
 
-> **Stato in una riga:** STAND, PRONE, WALK STANDARD, STOP e Digital Twin sono **collaudati su hardware** con il firmware `1.0.1-dev.7` (sessione supervisionata del 31/10/2026). È una baseline verificata e una pre-release: non è ancora una release stabile, e l'analisi delle prestazioni continua.
+> **Stato al 05/11/2026:** installata **1.0.1-dev.14**, build `4ff2aadf4ed9`, flash APP-only **VERIFIED HARDWARE**, Motion **PARTIAL HW VALIDATION**, non stable. [Codice esatto dev.14](https://github.com/MattRobotics/robot-dog/tree/validation/matdog-dev14-hw-20261105) · [report hardware](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md). STAND, PRONE e WALK30/60 osservati; timing, recupero PRONE/STOP, durata recovery, IMU e Reset vista restano aperti. Dev.7 è la pre-release storica pubblicata; dev.15 è sviluppo parallelo, non qualificato HW da questo closeout. `main` non è il firmware installato.
 
 ## Com'è fatto
 
@@ -30,7 +30,7 @@ MATDOG è la piattaforma quadrupede di Matt Robotics: un robot a quattro zampe p
 | [`09_Logs/`](09_Logs/README.md) | Evidenze, decisioni, report di validazione, [indice storico](09_Logs/HISTORY_INDEX.md), [problemi aperti](09_Logs/OPEN_ITEMS.md) |
 | [`02_BOM/`](02_BOM), [`07_Media/`](07_Media), [`10_Backups/`](10_Backups) | Componenti, media, ricevute dei backup cifrati |
 
-## Stato al 2026-10-31
+## Snapshot storico al 2026-10-31 (non firmware attualmente installato)
 
 Cinque identità distinte: non vanno confuse.
 

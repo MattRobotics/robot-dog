@@ -1,5 +1,7 @@
 # MATDOG logs and evidence
 
+Aggiornamento corrente 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [branch dedicato](https://github.com/MattRobotics/robot-dog/tree/validation/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+
 Latest: [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
 Update 2026-10-31 (separate from the dated lines above): REV01-FIX geometry, physical properties and the Astra handoff were integrated in `main` by PR #57 (merge `887103e`, verified offline only) — [integration report](Validation_Reports/REV01_FIX_Integration_2026-10-30/REPORT.md) · [physical properties](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) · [**Astra handoff**](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md).
