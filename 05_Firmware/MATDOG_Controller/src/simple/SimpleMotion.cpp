@@ -908,9 +908,9 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // nominal target is inside it, the correction stays inside it too.
   const auto& box=phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
   auto keep=[&](const JointTargetFrame& q){f.target=q;};
-  auto solve=[&](double scale){
+  auto solve=[&](double scale,const JointTargetFrame& seed){
     auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);
-    return compensationTarget(f,b,f.target);
+    return compensationTarget(f,b,seed);
   };
   // Smooth geometric attenuation before the hard workspace boundary. A small
   // IK perturbation measures local joint sensitivity; reserve half the joint
@@ -920,7 +920,7 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // of it, the probe is already the target and the release needs one solve.
   constexpr double probeScale=1./32;
   const double trialScale=correctionScale_>0?correctionScale_:probeScale;
-  const auto probe=solve(trialScale);double sum=0;
+  const auto probe=solve(trialScale,f.target);double sum=0;
   if(probe.valid)for(unsigned i=0;i<12;++i){const auto& lim=legModel(static_cast<LegId>(i/3))->limits[i%3];
     const double q=jointSlot(f.target,i),delta=(jointSlot(probe,i)-q)/trialScale;
     const double lo=std::fmax(box.lo[i],std::fmax(input_.minRad[i],lim.lower));
@@ -938,7 +938,7 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
     keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;return;}
   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
-    const auto q=solve(scale);
+    const auto q=solve(scale,probe.valid?probe:f.target);
     if(pointSafe(q)&&contains(box,q)){keep(q);rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;return;}
   }
   // If no in-workspace correction exists, the nominal safe target survives.
