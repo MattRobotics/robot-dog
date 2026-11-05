@@ -438,7 +438,11 @@ void safeOffAndRecovery(){
   }
   {Rig r;r.walk();r.ticks(380);r.m.stop();assert(r.finishStop());assert(!r.m.stand(.15,r.p.now));}
   {Rig r;r.stand(.10);r.ticks(50);assert(!r.m.stand(.15,r.p.now));r.ticks(20);r.m.stop();assert(r.finishStop());
-    assert(!strcmp(r.m.stand(.15,r.p.now),"STOP_RECOVERY_POSTURE_UNQUALIFIED"));}
+    const auto enables=r.p.enables,off=r.p.offCalls;std::array<uint16_t,12> held;std::copy(r.m.commandedRaw(),r.m.commandedRaw()+12,held.begin());
+    assert(!r.m.standResumeRefusal(r.p.now)&&!r.m.stand(.15,r.p.now));r.tick();
+    assert(std::equal(held.begin(),held.end(),r.m.commandedRaw()));
+    for(unsigned n=0;n<2000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==off);}
   {Rig r;r.stand(.15);r.ticks(50);r.m.stop();assert(r.finishStop());const auto n=r.p.enables;
     r.in.authorityOk=false;r.m.inputs(r.in);assert(!strcmp(r.m.stand(.15,r.p.now),"ACTUATOR_OWNER_BUSY"));
     r.in.authorityOk=true;r.in.powerOk=false;r.m.inputs(r.in);assert(!strcmp(r.m.stand(.15,r.p.now),"POWER_NOT_READY"));assert(r.p.enables==n);}
@@ -468,7 +472,13 @@ void writerHandoffWithImu(){
     if(mode==0){assert(!r.m.standResumeRefusal(r.p.now));assert(!r.m.stand(.10,r.p.now));
       for(unsigned n=0;n<1500&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
       assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables);}
-    else if(mode==1)assert(r.m.stand(.15,r.p.now)); // intermediate HEIGHT posture still unqualified
+    else if(mode==1){
+      std::array<uint16_t,12> held;std::copy(r.m.commandedRaw(),r.m.commandedRaw()+12,held.begin());
+      assert(!r.m.standResumeRefusal(r.p.now)&&!r.m.stand(.15,r.p.now));r.tick();
+      assert(std::equal(held.begin(),held.end(),r.m.commandedRaw()));
+      for(unsigned n=0;n<2000&&r.m.state()!=simple::State::STANDING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.state()==simple::State::STANDING&&r.p.enables==enables&&r.p.offCalls==off);
+    } // synchronous HEIGHT in kHeight restarts from held RAW, never its old endpoint
     else assert(!r.m.stand(.15,r.p.now));            // WALK: gait-law completion
   }
   // Sub-tick changes are not emitted frames. The accepted RAW, not the
@@ -572,7 +582,7 @@ void stopReceivedInFault(){
 void compatibleWalkRecovery(){
   // Explicit STAND after a verified WALK STOP completes the same gait's WALK STOP
   // from the stopped phase (kinematic proof only; contact/support NOT measured).
-  const auto& w=simple::collision::kWalk;constexpr double heights[]={.05,.10,.15};
+  const auto& w=simple::kWalkBox;constexpr double heights[]={.05,.10,.15};
   auto decode=[](const std::array<uint16_t,12>& raw,unsigned i){return (int(raw[i])-2048)*simple::kTickRad;};
   unsigned cases=0;
   for(bool ending:{false,true})for(unsigned stride=0;stride<3;++stride)for(double tilt:{-.01,.01})for(unsigned at:{1u,380u,1003u}){
@@ -629,7 +639,7 @@ void compatibleWalkRecovery(){
       r.finishOff();assert(!r.m.energized());}
     assert(r.p.enables==enables);(void)frames;
   }
-  std::printf("Explicit STAND from stopped WALK: %u gait-law completions (stance/swing, 30/45/60, decel, settle, re-STOP), RAW C0, kWalk, no enable/OFF; races retained (support NOT proven)\n",cases);
+  std::printf("Explicit STAND from stopped WALK: %u gait-law completions (stance/swing, 30/45/60, decel, settle, re-STOP), RAW C0, configured WALK box, no enable/OFF; races retained (support NOT proven)\n",cases);
 }
 }
 int main(){supportPlaneLevelTarget();terminalStopHold();compatibleWalkRecovery();stopReceivedInFault();stopPlanBounds();holdAndProne();movementAndDuplicates();evidenceAndFaults();fallbackAndWalkStop();phaseCoverageAndRaces();serviceCompletion();safeOffAndRecovery();writerHandoffWithImu();referenceBoundaries();preemptionDeadline();faultFeedback();

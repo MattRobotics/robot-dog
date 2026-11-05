@@ -65,8 +65,43 @@ template<unsigned N> unsigned nearestVia(const unsigned (&knots)[N],const JointT
 }
 constexpr unsigned kDeployEnd=collision::kDeployKnots[sizeof(collision::kDeployKnots)/sizeof(collision::kDeployKnots[0])-1];
 static_assert(kDeployEnd==collision::kLiftKnots[0],"DEPLOY ends where LIFT starts");
+// Inner convex envelope of the unchanged HEIGHT box, gen-1 RAW, nominal
+// support strip (including rounding), and the existing StopPlan over the full
+// WALK120/2mm-sway phase set. Vertices are roll/pitch BODY-in-support radians;
+// they are not independent rectangular limits or a claim of physical contact.
+struct TiltVertex { double roll,pitch; };
+constexpr TiltVertex kWalkTilt45[]={
+ {0.014807950855685186,0.03574955578674701},
+ {0,0.11930093706093331},
+ {-0.014656913177372907,0.035384918575352142},
+ {-0.011779818742757926,-0.028438998171065412},
+ {-0,-0.053422005857361891},
+ {0.011644818622368949,-0.028113079049515703},
+};
+constexpr TiltVertex kWalkTilt60[]={
+ {0.014373513909108453,0.014373513909108453},
+ {0.013471848316828587,0.032523918916725118},
+ {0,0.10137685731507248},
+ {-0.013436993467988561,0.032439771867942953},
+ {-0.014373513909108453,0.014373513909108453},
+ {-0.0085559368620721186,-0.0035439850870762082},
+ {-0.0067072009272594714,-0.0067072009272594714},
+ {-0.0034862036684149191,-0.0084164401774712468},
+ {-0,-0.0084610410728295175},
+ {0.0065962325017923174,-0.0065962325017923174},
+ {0.0085559368620717925,-0.0035439850870778045},
+};
+template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double& roll,double& pitch){
+  double scale=1;
+  for(unsigned i=0;i<N;++i){const auto a=vertices[i],b=vertices[(i+1)%N];
+    const double x=b.roll-a.roll,y=b.pitch-a.pitch,edge=x*a.pitch-y*a.roll,ray=x*pitch-y*roll;
+    if(ray<edge)scale=std::fmin(scale,edge/ray);
+  }
+  if(scale>=1)return false;
+  roll*=scale;pitch*=scale;return true;
+}
 GaitParameters walkGait(unsigned stride){
-  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(.15);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
+  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
   g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;return g;
 }
 }
@@ -118,7 +153,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
-  walkRequested_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;
+  walkRequested_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
 }
 void SimpleMotion::serviceOff(){
   if(!port_||!offPending_)return;
@@ -185,7 +220,7 @@ void SimpleMotion::beginStop(uint64_t now){
     // Zero is the chosen initial acceleration of the NEW reference. We do
     // not fit or promise continuity of an undefined prior acceleration.
   }
-  stopBox_=source==Phase::WALK?&collision::kWalk:segmentBox_;
+  stopBox_=source==Phase::WALK?&kWalkBox:segmentBox_;
   if(!stopBox_)stopBox_=contains(collision::kHeight,start)?&collision::kHeight:&collision::kLift;
   if((!contains(*stopBox_,measured())||!contains(*stopBox_,start))&&contains(collision::kLift,start)&&contains(collision::kLift,measured()))stopBox_=&collision::kLift;
   for(unsigned i=0;i<12;++i){
@@ -313,7 +348,7 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
   c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
   first=solveGait(g,gaitCartesian(g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
-  return pointSafe(held)&&contains(collision::kWalk,held)&&first.valid&&pointSafe(first)&&contains(collision::kWalk,first);
+  return pointSafe(held)&&contains(kWalkBox,held)&&first.valid&&pointSafe(first)&&contains(kWalkBox,first);
 }
 const char* SimpleMotion::stand(double h,uint64_t now){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
@@ -332,9 +367,8 @@ const char* SimpleMotion::stand(double h,uint64_t now){
       // Complete the interrupted WALK STOP with the same gait law: planted feet
       // keep their anchors, a swing lands on its own target, then four-contact
       // recentring and WALK_SETTLE to STAND150. No new walking intent.
-      for(unsigned i=0;i<12;++i)jointSlot(recoverOffset_,i)=jointSlot(recovery.held,i)-jointSlot(recovery.first,i);
       walkRecover_=true;recoverCycles_=recovery.cycles;recoverUs_=0;stopCycle_=recovery.stopCycle;walkStopping_=true;
-      requestedHeight_=h;plannedHeight_=.150;
+      requestedHeight_=h;plannedHeight_=kWalkHeightM;
       stopActive_=stopVerified_=false;operatorStopped_=false;walkRequested_=false;
       phase_=Phase::WALK;state_=State::MOVING;segmentBox_=nullptr;planned_=false;
       reason_="STAND_FROM_STOPPED_WALK";referenceFaultSlot_=12;
@@ -342,11 +376,21 @@ const char* SimpleMotion::stand(double h,uint64_t now){
       timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
       return nullptr;
     }
-    if(stopOrigin_==Phase::HOLD&&!heightStartClear(measured(),q))return "HEIGHT_PATH_NOT_CLEAR";
+    if((stopOrigin_==Phase::HOLD||stopOrigin_==Phase::HEIGHT)&&!heightStartClear(measured(),q))return "HEIGHT_PATH_NOT_CLEAR";
+    if(stopOrigin_==Phase::HEIGHT){
+      // A stopped synchronous HEIGHT reference can restart the same existing
+      // HEIGHT planner from exact held RAW. The old future endpoint must not
+      // become its start. This never re-acquires or enables a servo.
+      JointTargetFrame held;held.valid=true;
+      for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return "STAND_PATH_NOT_CLEAR";
+      double pose[ViaPlan::kDim];plan_.sample(std::clamp((double(stopStartUs_-segmentStartUs_)/1e6+.5*stopPlan_.duration),0.,plan_.duration),pose);
+      segmentTo_=held;plannedHeight_=pose[14];
+      rollCorrection_=pitchCorrection_=correctionScale_=0;imuStartUs_=now;compensatedUs_=0;
+    }
     // Explicit, admitted recovery with existing torque: reuse HEIGHT or the
     // held-PRONE entry. ACQUIRE/REFERENCE/ENABLE are never entered here.
     stopActive_=stopVerified_=false;operatorStopped_=false;
-    if(stopOrigin_==Phase::HOLD){state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;}
+    if(stopOrigin_==Phase::HOLD||stopOrigin_==Phase::HEIGHT){state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;}
     else {state_=State::PRONE;phase_=Phase::PRONE_WAIT;}
     rememberReference(now); // seed the held writer reference for an immediate new STOP
   }
@@ -371,7 +415,7 @@ const char* SimpleMotion::stand(double h,uint64_t now){
     requestedHeight_=h;walkRequested_=false;
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
-    goalDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
+    segmentDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
   }else{referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
     std::fill(controlFailures_,controlFailures_+12,0);}
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
@@ -392,14 +436,21 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& rec
   for(const auto& f:fb_)if(f.torque!=1||!f.controlStampUs||now<f.controlStampUs||now-f.controlStampUs>12*6*kPeriodUs+250000)return "STOP_RECOVERY_TORQUE_UNVERIFIED";
   if(stopOrigin_==Phase::WALK){
     // Kinematic admission only: encoders and the gait law never prove contact.
-    if(!walkRecoveryStart(recovery)||!transitionSafe(measured(),recovery.held,collision::kWalk)||
-       !transitionSafe(recovery.held,recovery.first,collision::kWalk))return "STOP_RECOVERY_PATH_NOT_CLEAR";
+    if(!walkRecoveryStart(recovery)||!transitionSafe(measured(),recovery.held,kWalkBox)||
+       !transitionSafe(recovery.held,recovery.first,kWalkBox))return "STOP_RECOVERY_PATH_NOT_CLEAR";
     return nullptr;
   }
-  if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
+  const bool height=stopOrigin_==Phase::HEIGHT&&issuedPlanned_&&stopBox_==&collision::kHeight;
+  if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT&&!height)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
   InitialRoute route;const auto actual=measured();
   if(!certifiedRegion(actual,route)||!pointSafe(actual))return "STAND_PATH_NOT_CLEAR";
-  if(stopOrigin_==Phase::HOLD){if(!heightStartClear(actual,segmentTo_))return "HEIGHT_PATH_NOT_CLEAR";}
+  if(height){
+    if(!contains(collision::kHeight,actual))return "HEIGHT_PATH_NOT_CLEAR";
+    JointTargetFrame held;held.valid=true;for(unsigned i=0;i<12;++i)
+      if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return "STAND_PATH_NOT_CLEAR";
+    if(!pointSafe(held)||!contains(collision::kHeight,held))return "HEIGHT_PATH_NOT_CLEAR";
+  }
+  if(stopOrigin_==Phase::HOLD||height){if(!heightStartClear(actual,segmentTo_))return "HEIGHT_PATH_NOT_CLEAR";}
   else {JointTargetFrame d;if(route!=InitialRoute::ENTRY||!proneDisengage(d)||!transitionSafe(actual,d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";}
   return nullptr;
 }
@@ -417,7 +468,7 @@ const char* SimpleMotion::prone(uint64_t now){
   // Intent only. Keep the preceding nominal support goals until a Motion release.
   // 53 mm is inside both existing boxes, including the recorded STAND100 sag.
   pendingGoalValid_=true;walkRequested_=false;state_=State::MOVING;phase_=Phase::PRONE_HEIGHT;
-  goalDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
+  segmentDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
   reason_="PRONE_DESCENT_NOT_VALIDATED";requestedHeight_=0;heightValid_=false;
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";referenceFaultSlot_=12;
   return nullptr;
@@ -427,7 +478,7 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   if(stride>=3)return "STANDARD_STRIDE_REQUIRED";
   if(state_==State::WALKING)return "ALREADY_WALKING";
   // One user command can acquire, energize, stand at 150 mm and then walk.
-  const char* r=stand(.150,now);if(r)return r;
+  const char* r=stand(kWalkHeightM,now);if(r)return r;
   stride_=stride;walkRequested_=true;return nullptr;
 }
 void SimpleMotion::walkStop(){
@@ -518,10 +569,10 @@ bool SimpleMotion::settledUnderLoad(uint64_t now){
     case Phase::ALIGN:allowed=0xfff;next=&collision::kDeploy;break;
     case Phase::DEPLOY:allowed=0xfff;next=&collision::kLift;break;
     case Phase::LIFT:allowed=0xfff;if(std::abs(plannedHeight_-requestedHeight_)>1e-9)next=&collision::kHeight;break;
-    case Phase::HEIGHT:allowed=0xfff;break;
+    case Phase::HEIGHT:case Phase::WALK_HOLD:allowed=0xfff;break;
     case Phase::PRONE_HEIGHT:case Phase::PRONE_LIFT:case Phase::PRONE_DEPLOY:allowed=0xfff;next=proneHandoverBox();break;
     case Phase::PRONE_LAND:allowed=0xfff;next=&collision::kEntry;break;
-    default:break;  // WALK_SETTLE and HOLD keep the 12-tick arrival only
+    default:break;  // moving gait and ordinary HOLD do not complete a native segment
   }
   const auto terminal=segmentBox_?settleUs_:goalSentUs_;
   bool ok=allowed&&segmentBox_&&terminal&&now>=terminal&&now-terminal>=100000&&fresh(esp_timer_get_time());
@@ -600,7 +651,8 @@ void SimpleMotion::beginNative(Phase next,const JointTargetFrame& to,const colli
   double distance=0;for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(jointSlot(to,i)-fb_[i].q));
   phase_=next;planned_=false;segmentTo_=to;segmentBox_=&box;segmentStartUs_=now;segmentDurationUs_=0;settleUs_=now;loadedSinceUs_=0;
   nativePitch_=pitch;nativeX_=x;nativeZ_=z;
-  segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
+  const double releaseLevel=next==Phase::WALK_HOLD&&std::abs(plannedHeight_-requestedHeight_)>1e-9?std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020:0;
+  segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+releaseLevel+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
   generateStand(now);
 }
 void SimpleMotion::beginDeploy(const JointTargetFrame* start,uint64_t now){
@@ -725,13 +777,13 @@ void SimpleMotion::generateStand(uint64_t now){
   for(unsigned l=0;l<4;++l){const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l],normal);
     if(c.status!=ContactStatus::OK||!pointToWorld(f.cartesian.body,c.referenceM,f.cartesian.feet[l])){fault("STAND_CONTACT_IK");return;}}
   if(!pointSafe(f.target)||!contains(*segmentBox_,f.target)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
-  compensate(f,now);send(f.target,kStandDrive,now);
+  compensate(f,now);if(!offPending_)send(f.target,kStandDrive,now);
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
-  const auto g=walkGait(stride_);plannedHeight_=.150;
+  const auto g=walkGait(stride_);plannedHeight_=kWalkHeightM;
   walkPrevious_=solveGait(g,gaitCartesian(g,0,0,0),nullptr,false);
-  if(!pointSafe(walkPrevious_.target)||!contains(collision::kWalk,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
+  if(!pointSafe(walkPrevious_.target)||!contains(kWalkBox,walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
   phase_=Phase::WALK;state_=State::WALKING;reason_="WALK_STANDARD";
 }
@@ -746,7 +798,7 @@ JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const
     if(ik.status!=TiltedIkResult::Status::OK||(nominalStrip&&ik.base.contact.axisTiltRad>footContactModel().nominalTiltRad-.5*kTickRad)){q.valid=false;break;}q.legs[l]=ik.base.joints;}
   return q;
 }
-bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box) const {
+bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box,bool stopProof) const {
   if(!pointSafe(q)||!contains(box,q))return false;
   // The same gen-1 conversion as TX/readback; an in-box floating point IK
   // solution alone is insufficient at a box edge after RAW quantization.
@@ -754,7 +806,7 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
   for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return false;}
   if(!pointSafe(decoded)||!contains(box,decoded))return false;
   const collision::Box* arrestBox=&box;
-  if(phase_!=Phase::WALK&&phase_!=Phase::WALK_HOLD){
+  if(phase_!=Phase::WALK){
     // Keep the measured static-load residual when checking the next small
     // HOLD step. A goal alone being in-box is insufficient: the recorded
     // loaded pose must retain a common certified region with its reference.
@@ -775,6 +827,7 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
     }
     if(!pointSafe(loaded))return false;
   }
+  if(!stopProof)return true;
   // A reachable boundary is not necessarily stoppable from its sampled RAW
   // rate. Reuse STOP's own proof before issuing a new levelled reference;
   // no second trajectory law, relaxed limit or retained cache is introduced.
@@ -794,14 +847,27 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // the world vertical. Contacts remain modelled, never asserted as sensed.
   const auto previous=bodyPoseFromRollPitch({},rollCorrection_,pitchCorrection_);
   double wantedRoll=0,wantedPitch=0;bool stance[4];for(unsigned l=0;l<4;++l)stance[l]=f.cartesian.phases[l].stance;
+  const bool walk=phase_==Phase::WALK;
+  if(walk){
+    // In a four-contact window omit the newest touchdown from the fit until
+    // the next liftoff. The other three planted anchors retain their labels;
+    // delayed feedback from the formerly swinging leg cannot tilt the fit.
+    unsigned count=0,newest=0;for(unsigned l=0;l<4;++l)if(stance[l]){++count;if(f.cartesian.phases[l].phase<f.cartesian.phases[newest].phase)newest=l;}
+    if(count==4)stance[newest]=false;
+  }
   const bool fitted=unwind||supportLevelTarget(f.cartesian.feet,measured(),stance,up,previous,wantedRoll,wantedPitch);
   timing::count(timing::FK,unwind?0:3);
-  imuLimited_=!fitted;walkOffset_.valid=false;
+  imuLimited_=!fitted;
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
+  if(walk&&(stride_==2?projectWalkTilt(kWalkTilt60,wantedRoll,wantedPitch):projectWalkTilt(kWalkTilt45,wantedRoll,wantedPitch)))imuLimited_=true;
   const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
   auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
-  const double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
-  if(roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;return;}
+  double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
+  if(walk){const double dr=wantedRoll-rollCorrection_,dp=wantedPitch-pitchCorrection_;
+    const double distance=std::fmax(std::abs(dr),std::abs(dp)),fraction=distance>.001?std::fmin(1.,slew/distance):0;
+    roll=rollCorrection_+fraction*dr;pitch=pitchCorrection_+fraction*dp;}
+  if(!walk&&roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;return;}
+  if(walk&&roll==0&&pitch==0){correctionScale_=1;return;} // nominal gait already solved
   auto body=bodyPoseFromRollPitch({},roll,pitch);const auto t=f.cartesian.body.translationM;
   // Keep the nominal vertical clearance, with the body over the same gait
   // XY in gravity's direction. Anchors stay in their support-plane frame.
@@ -809,12 +875,13 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // Large edge-biased roll solutions do not preserve this model's nominal
   // support strip. Keep its existing contact domain, not a new IMU-angle cap.
   const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true);
-  if(compensationSafe(q,collision::kHeight)){
+  if(compensationSafe(q,(walk||phase_==Phase::WALK_HOLD)?kWalkBox:collision::kHeight,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;
   }else{
     // Retain the accepted pose at the real workspace boundary. The desired
     // geometric orientation is re-estimated next release, so reversal leaves
     // saturation immediately; there is no accumulated integral to unwind.
+    if(walk){fault("WALK_IK_OR_WORKSPACE");return;}
     if(goal_.valid)f.target=goal_;imuLimited_=true;
   }
 }
@@ -823,31 +890,24 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   Attitude a;
   const bool attitudeFresh=input_.imuValid&&now>=input_.imuStampUs&&now-input_.imuStampUs<=200000&&
      tiltFromQuaternion(input_.quaternion[0],input_.quaternion[1],input_.quaternion[2],input_.quaternion[3],a);
-  if(phase_==Phase::HOLD){compensateLevel(f,attitudeFresh?Vector3{a.upBase[0],a.upBase[1],a.upBase[2]}:Vector3{},now);return;}
-  if(!attitudeFresh){imuLimited_=true;walkOffset_.valid=false;return;}
-  // WALK budget: every other release keeps the joint offset of the last solved
-  // correction on the new nominal target; the same limits and box still decide.
-  const bool walk=phase_==Phase::WALK;
-  if(walk&&walkOffset_.valid){
-    auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(walkOffset_,i);
-    walkOffset_.valid=false;
-    if(pointSafe(q)&&contains(collision::kWalk,q)){f.target=q;return;}
-  }
+  if(phase_==Phase::HOLD||phase_==Phase::WALK||phase_==Phase::WALK_HOLD){
+    compensateLevel(f,attitudeFresh?Vector3{a.upBase[0],a.upBase[1],a.upBase[2]}:Vector3{},now,
+      phase_==Phase::WALK_HOLD&&std::abs(plannedHeight_-requestedHeight_)>1e-9);return;}
+  if(!attitudeFresh){imuLimited_=true;return;}
   imuLimited_=false;
   // A small proportional BODY correction, slew limited, no servo PID or
   // integral loop. The same target generator owns nominal + correction.
   // One slew step per Motion release: a group boundary regenerates the
   // reference in the same release and must not advance the correction twice.
-  const double slew=now==compensatedUs_?0:.020*(walk?2:1)*kPeriodUs/1e6;compensatedUs_=now;
+  const double slew=now==compensatedUs_?0:.020*kPeriodUs/1e6;compensatedUs_=now;
   auto step=[slew](double old,double tilt){const double error=std::copysign(std::fmax(0.,std::abs(tilt)-.005),tilt);const double desired=std::clamp(-.5*error,-.020,.020);return old+std::clamp(desired-old,-slew,slew);};
   const double nominalPitch=std::atan2(-f.cartesian.body.rotation[2][0],f.cartesian.body.rotation[0][0]);
   const double roll=step(rollCorrection_,a.rollRad),pitch=step(pitchCorrection_,a.pitchRad-nominalPitch);
   if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=correctionScale_=0;return;}
   // PRONE_HEIGHT hands over to kLift, whose margin at 53 mm is 2.6 mrad: once the
   // nominal target is inside it, the correction stays inside it too.
-  const auto& box=phase_==Phase::WALK?collision::kWalk:phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
-  const auto nominal=f.target;
-  auto keep=[&](const JointTargetFrame& q){f.target=q;if(!walk)return;walkOffset_=q;for(unsigned i=0;i<12;++i)jointSlot(walkOffset_,i)-=jointSlot(nominal,i);};
+  const auto& box=phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
+  auto keep=[&](const JointTargetFrame& q){f.target=q;};
   auto solve=[&](double scale){
     auto b=bodyPoseFromRollPitch(f.cartesian.body.translationM,roll*scale,nominalPitch+pitch*scale);
     return compensationTarget(f,b,f.target);
@@ -891,30 +951,38 @@ void SimpleMotion::generateWalk(uint64_t now){
   // velocity and acceleration; the last window recentres with four feet down.
   const auto g=walkGait(stride_);
   const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
-  double fade=0;
+  double fade=0;const bool firstRecovery=walkRecover_&&!recoverUs_;
   if(walkRecover_){
-    // First release: exact held RAW, IMU correction restarted from zero (not applied twice).
+    // First release retains the accepted body-in-support correction; bridge
+    // from the stopped RAW to the compensated gait, never apply it twice.
     if(!recoverUs_){
-      // Recheck the actual pose after I/O; the held RAW was proved inside kWalk at admission.
-      if(!pointSafe(measured())||!contains(collision::kWalk,measured())){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
-      recoverUs_=now;rollCorrection_=pitchCorrection_=correctionScale_=0;walkOffset_.valid=false;imuStartUs_=now;compensatedUs_=0;}
+      // Recheck the actual pose after I/O in the same certified WALK box.
+      if(!pointSafe(measured())||!contains(kWalkBox,measured())){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
+      recoverUs_=now;}
     // Same C2 ease as the WALK start ramp: gait rate 0->1 over one second.
     const double t=(now-recoverUs_)/1e6,u=std::fmin(1.,t);
     cycles_=recoverCycles_+(t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5)/kWalkPeriodS;
     fade=1-quinticTimeLaw(u,1).progress;
   }else cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
-  const bool done=walkStopping_&&cycles_>=end;if(done)cycles_=end;
-  auto f=solveGait(g,gaitCartesian(g,cycles_,done?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
-  if(!f.target.valid||!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
+  const bool clockDone=walkStopping_&&cycles_>=end;if(clockDone)cycles_=end;
+  // A STOP in WALK_SETTLE can restart at the terminal clock itself. Finish
+  // the existing held-RAW bridge before handing off, even with no gait left.
+  const bool done=clockDone&&(!walkRecover_||now-recoverUs_>=1000000);
+  auto f=solveGait(g,gaitCartesian(g,cycles_,clockDone?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
+  if(!f.target.valid||!contains(kWalkBox,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
+  if(offPending_)return;
+  if(firstRecovery)for(unsigned i=0;i<12;++i){double held=0;if(!port_->decodeRaw(i,commandedRaw_[i],held)){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
+    jointSlot(recoverOffset_,i)=held-jointSlot(f.target,i);}
   if(fade>0){for(unsigned i=0;i<12;++i)jointSlot(f.target,i)+=fade*jointSlot(recoverOffset_,i);
-    if(!contains(collision::kWalk,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}}
+    if(!contains(kWalkBox,f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}}
+  if(walkRecover_&&!compensationSafe(f.target,kWalkBox)){fault("WALK_IK_OR_WORKSPACE");return;}
   if(!send(f.target,kWalkDrive,now))return;
   if(done){
     walkRecover_=false;state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
     // correction and a fixed completion deadline. Reuse the same generator.
-    beginNative(Phase::WALK_HOLD,walkPrevious_.target,collision::kWalk,now,0,0,.15);
+    beginNative(Phase::WALK_HOLD,walkPrevious_.target,kWalkBox,now,0,0,baseLinkHeightFromNominalM(kWalkHeightM));
   }
 }
 void SimpleMotion::update(uint64_t now){
@@ -1074,7 +1142,7 @@ void SimpleMotion::update(uint64_t now){
   if(pendingGoalValid_){
     if((phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)&&holdNominal_.target.valid&&
        (rollCorrection_!=0||pitchCorrection_!=0)){
-      if(now>goalDeadlineUs_){fault("NATIVE_TARGET_NOT_REACHED");return;}
+      if(now>segmentDeadlineUs_){fault("NATIVE_TARGET_NOT_REACHED");return;}
       timing::Section section(timing::COMPENSATE);
       auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);return;
     }
@@ -1102,7 +1170,8 @@ void SimpleMotion::update(uint64_t now){
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
     // At a settled boundary generate only the next segment in this release.
-    if(arrived(now)||settledUnderLoad(now)){nextStand(now);return;}
+    const bool releasingLevel=phase_==Phase::WALK_HOLD&&std::abs(plannedHeight_-requestedHeight_)>1e-9&&(rollCorrection_!=0||pitchCorrection_!=0);
+    if(!releasingLevel&&(arrived(now)||settledUnderLoad(now))){nextStand(now);return;}
     if(segmentBox_)generateStand(now);
     if(offPending_||stop_.load())return;
     if(now>(segmentBox_?segmentDeadlineUs_:goalDeadlineUs_)){fault("NATIVE_TARGET_NOT_REACHED");return;}

@@ -29,6 +29,7 @@ struct StopReferenceProbe {
   static const motion::LocomotionFrame& hold(const SimpleMotion& m){return m.holdNominal_;}
   static bool pending(const SimpleMotion& m){return m.pendingGoalValid_;}
   static const motion::JointTargetFrame& segmentTo(const SimpleMotion& m){return m.segmentTo_;}
+  static const motion::LocomotionFrame& walkNominal(const SimpleMotion& m){return m.walkPrevious_;}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -256,7 +257,8 @@ static void standHoldTilt(){
     Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);plant.settle(0,8*degree,700);
     const auto enables=r.p.enables,off=r.p.offCalls;
     assert(prone?!r.m.prone(r.p.now):!r.m.stand(.15,r.p.now));assert(simple::StopReferenceProbe::pending(r.m));
-    for(unsigned n=0;n<50;++n)plant.step(0,8*degree);
+    const auto unwindDeadline=r.m.deadlineUs();assert(unwindDeadline>r.p.now);
+    for(unsigned n=0;n<50;++n){plant.step(0,8*degree);assert(r.m.deadlineUs()==unwindDeadline);}
     if(stopDuringUnwind){r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n)plant.step(0,8*degree);
       assert(r.m.stopVerified()&&r.m.energized());assert(!r.m.stand(.10,r.p.now));
       for(unsigned n=0;n<2000&&r.m.state()!=simple::State::STANDING;++n)plant.step(0,8*degree);
@@ -296,13 +298,90 @@ static void standHoldTilt(){
     assert(r.m.offVerified()&&!r.m.energized()&&r.p.frames==frames&&r.p.enables==enables&&r.p.offCalls>off);}
   std::puts("production closed-loop STAND board plant PASS: quantized 0.1s servo lag, signed/combined/slow tilt, saturation reversal, flat return, stale IMU, height/PRONE unwind, STOP and explicit STAND; no hardware stability claim");
 }
+// Moving-board WALK plant: only labelled stance anchors constrain the body.
+// The newest touchdown is excluded during each four-contact window, matching
+// production's use of the other three settled references. This models slow
+// planar/no-slip contact, not impact, friction, COM or physical stability.
+struct WalkBoardPlant {
+  Rig& r;motion::BodyPose actual{};double q[12]{};unsigned maxRawStep=0;double maxSteadyError=0;
+  explicit WalkBoardPlant(Rig& rig):r(rig){assert(r.m.state()==simple::State::WALKING);for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;}
+  motion::BodyPose measuredBody(){
+    const auto& f=simple::StopReferenceProbe::walkNominal(r.m);assert(f.target.valid);bool stance[4];unsigned count=0,newest=0;
+    for(unsigned l=0;l<4;++l){stance[l]=f.cartesian.phases[l].stance;if(stance[l]){++count;if(f.cartesian.phases[l].phase<f.cartesian.phases[newest].phase)newest=l;}}
+    if(count==4)stance[newest]=false;unsigned ids[3],n=0;for(unsigned l=0;l<4;++l)if(stance[l]){assert(n<3);ids[n++]=l;}assert(n==3);
+    motion::Vector3 anchors[4],feet[4];for(unsigned i=0;i<3;++i)anchors[i]=f.cartesian.feet[ids[i]];const auto support=LevelBoardPlant::triad(anchors);
+    for(unsigned iteration=0;iteration<8;++iteration){const motion::Vector3 normal{actual.rotation[2][0],actual.rotation[2][1],actual.rotation[2][2]};
+      for(unsigned i=0;i<3;++i){const unsigned l=ids[i];const motion::LegJointAngles angles{r.p.observed[l*3].q,r.p.observed[l*3+1].q,r.p.observed[l*3+2].q};
+        const auto fk=motion::contactForwardKinematics(static_cast<motion::LegId>(l),angles,normal);assert(fk.status==motion::ContactStatus::OK);feet[i]=fk.referenceM;}
+      const auto body=LevelBoardPlant::triad(feet);motion::BodyPose fit;
+      for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j){fit.rotation[i][j]=0;for(unsigned k=0;k<3;++k)fit.rotation[i][j]+=body.rotation[j][k]*support.rotation[i][k];}actual=fit;}
+    return actual;
+  }
+  motion::BodyPose step(double boardRoll,double boardPitch){
+    std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
+    for(unsigned i=0;i<12;++i){const double target=(int(r.p.target[i])-2048)*simple::kTickRad;q[i]+=.2*(target-q[i]);r.p.observed[i].raw=2048+std::lround(q[i]/simple::kTickRad);r.p.observed[i].q=(int(r.p.observed[i].raw)-2048)*simple::kTickRad;}
+    const auto world=LevelBoardPlant::multiply(motion::bodyPoseFromRollPitch({},boardRoll,boardPitch),measuredBody());LevelBoardPlant::quaternion(world,r.in.quaternion);r.tick(false);
+    if(r.m.state()==simple::State::FAULT){std::printf("WALK board fault=%s phase=%s board=%.6f,%.6f accepted=%.6f,%.6f cycles=%.6f\n",r.m.reason(),r.m.phase(),boardRoll,boardPitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.walkCycles());std::fflush(stdout);}assert(r.m.state()!=simple::State::FAULT);
+    for(unsigned i=0;i<12;++i){const double target=motion::jointSlot(r.m.target(),i),decoded=(int(r.p.target[i])-2048)*simple::kTickRad;
+      assert(target>=r.in.minRad[i]&&target<=r.in.maxRad[i]&&decoded>=r.in.minRad[i]&&decoded<=r.in.maxRad[i]);
+      assert(target>=simple::kWalkBox.lo[i]&&target<=simple::kWalkBox.hi[i]&&decoded>=simple::kWalkBox.lo[i]&&decoded<=simple::kWalkBox.hi[i]);
+      const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*simple::kPeriodUs/1e6))+1);}
+    const auto frames=r.p.frames;const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m);r.m.update(r.p.now);
+    assert(r.p.frames==frames&&simple::StopReferenceProbe::roll(r.m)==roll&&simple::StopReferenceProbe::pitch(r.m)==pitch);return world;
+  }
+  void hold(double roll,double pitch,unsigned count=1000){double e=0,rollError=0;const unsigned cycle=unsigned(std::ceil(simple::kWalkPeriodS*1e6/simple::kPeriodUs));assert(count>=cycle);
+    for(unsigned n=0;n<count;++n){const auto world=step(roll,pitch);if(n+cycle>=count){e=std::fmax(e,LevelBoardPlant::error(world));rollError=std::fmax(rollError,std::abs(std::atan2(world.rotation[2][1],world.rotation[2][2])));}}
+    // A whole final gait cycle covers all support changes; a single favorable
+    // sample must not hide a periodic attitude error at another foot phase.
+    maxSteadyError=std::fmax(maxSteadyError,e);if(e>=.005||rollError>=.0025){std::printf("WALK board steadyerror=%.9f rollerror=%.9f board=%.6f,%.6f accepted=%.6f,%.6f\n",e,rollError,roll,pitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));std::fflush(stdout);}assert(e<.005&&rollError<.0025);
+    if(roll!=0)assert(roll*simple::StopReferenceProbe::roll(r.m)<0&&std::abs(simple::StopReferenceProbe::roll(r.m))>std::abs(roll)*.25);
+    if(pitch!=0)assert(pitch*simple::StopReferenceProbe::pitch(r.m)<0&&std::abs(simple::StopReferenceProbe::pitch(r.m))>std::abs(pitch)*.75);}
+  void ramp(double fromRoll,double fromPitch,double toRoll,double toPitch){const unsigned count=std::max(1u,unsigned(std::ceil(std::fmax(std::abs(toRoll-fromRoll),std::abs(toPitch-fromPitch))/.0001)));
+    for(unsigned n=1;n<=count;++n)step(fromRoll+(toRoll-fromRoll)*n/count,fromPitch+(toPitch-fromPitch)*n/count);}
+  void holdLimited(double pitch,unsigned count=1000){double minimum=10,maximum=0;unsigned limited=0;const unsigned cycle=unsigned(std::ceil(simple::kWalkPeriodS*1e6/simple::kPeriodUs));
+    for(unsigned n=0;n<count;++n){const auto world=step(0,pitch);if(n+cycle>=count){const double e=LevelBoardPlant::error(world);minimum=std::fmin(minimum,e);maximum=std::fmax(maximum,e);limited+=r.m.stabilizationLimited();}}
+    // Positive board pitch reaches the real front-joint/STOP boundary sooner.
+    // Outside that demonstrated domain require a declared bounded residual,
+    // rather than calling a non-level body fully compensated.
+    assert(limited>cycle/2&&minimum>.25*3.14159265358979323846/180&&maximum<std::abs(pitch));
+    assert(pitch*simple::StopReferenceProbe::pitch(r.m)<0&&std::abs(simple::StopReferenceProbe::pitch(r.m))>.001);
+    std::printf("WALK board bounded pitch=%.3fdeg residual=[%.6f,%.6f]deg limited_tail=%u/%u\n",pitch*180/3.14159265358979323846,minimum*180/3.14159265358979323846,maximum*180/3.14159265358979323846,limited,cycle);}
+};
+static void walkLevelBoard(){
+  constexpr double degree=3.14159265358979323846/180;
+  for(unsigned stride:{1u,2u}){
+    // One explicit WALK owns the height transition and starts the gait only
+    // after its120mm stand is reached; admission itself emits no RAW frame.
+    Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const auto enables=r.p.enables,off=r.p.offCalls,frames=r.p.frames;
+    assert(!r.m.walk(stride,r.p.now)&&r.p.frames==frames);bool entry=false;std::array<uint16_t,12> before;
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){entry|=!std::strcmp(r.m.phase(),"HEIGHT");std::copy(r.p.target,r.p.target+12,before.begin());r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(entry&&r.m.state()==simple::State::WALKING&&r.m.requestedHeightM()==simple::kWalkHeightM&&r.p.enables==enables&&r.p.offCalls==off);
+    for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(before[i]))<=1);
+    WalkBoardPlant plant(r);plant.hold(0,0,650);
+    for(double pitch:{(stride==1?2.:.3)*degree,-2*degree,-4*degree}){plant.ramp(0,0,0,pitch);plant.hold(0,pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    for(double pitch:{2*degree,4*degree}){if(stride==1&&pitch==2*degree)continue;plant.ramp(0,0,0,pitch);plant.holdLimited(pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    for(double sign:{1.,-1.}){plant.ramp(0,0,sign*.25*degree,0);plant.hold(sign*.25*degree,0,650);plant.ramp(sign*.25*degree,0,sign*.25*degree,-2*degree);plant.hold(sign*.25*degree,-2*degree);plant.ramp(sign*.25*degree,-2*degree,0,0);plant.hold(0,0,650);}
+    plant.ramp(0,0,.25*degree,-2*degree);plant.hold(.25*degree,-2*degree);r.m.walkStop();
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n)plant.step(.25*degree,-2*degree);
+    assert(r.m.state()==simple::State::STANDING&&!std::strcmp(r.m.reason(),"STAND_REACHED")&&r.m.requestedHeightM()==simple::kWalkHeightM);plant.hold(.25*degree,-2*degree,650);
+    assert(r.p.enables==enables&&r.p.offCalls==off);
+    std::printf("WALK%u closed-loop movingboard feasible pitch %.1f/-2/-4deg, bounded +4%s, roll+/-0.25deg/combined, HOLD%.0f reached; max_RAW=%u max_steady_error=%.6fdeg\n",unsigned(simple::kStrideM[stride]*1000),stride==1?2.:.3,stride==2?"/+2":"",simple::kWalkHeightM*1000,plant.maxRawStep,plant.maxSteadyError/degree);
+  }
+  for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const auto enables=r.p.enables,off=r.p.offCalls;assert(!r.m.walk(stride,r.p.now));for(unsigned n=0;n<10;++n)r.tick();assert(r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.phase(),"HEIGHT"));
+    r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
+    for(unsigned n=0;n<100;++n)r.tick();assert(r.m.state()==simple::State::STOPPED&&r.m.stopVerified());
+    assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(r.m.requestedHeightM()==.15&&r.p.enables==enables&&r.p.offCalls==off);}
+  std::puts("WALK profile entry STOP and production closed-loop board tests PASS; no hardware contact/stability qualification");
+}
+
 int main(){standHoldTilt();
+  walkLevelBoard();
   proneHandoverWait();
   // Exercise the production gait + IK across every join: swing lift-off and
   // touchdown, four-contact sway windows, end of the start ramp, decel start,
   // terminal touchdown and recentring end, for each stride and quarter stop.
   for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
-    motion::GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(.15);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
+    motion::GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
     g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=simple::kWalkStartCycles;g.stopCycles=simple::kWalkStopCycles;
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
@@ -480,13 +559,16 @@ int main(){standHoldTilt();
    for(unsigned i=0;i<12;++i){assert(std::abs(motion::jointSlot(simple::StopReferenceProbe::hold(low.m).target,i)-motion::jointSlot(s,i))<1e-9);
      uint16_t raw=0;assert(low.p.resolve(i,motion::jointSlot(s,i),raw));assert(std::abs(int(low.p.target[i])-int(raw))<=3);}}
   std::printf("PRONE->STAND50: %s(%.2f s replay)\n",lowPhases.c_str(),lowSeconds);
-  // WALK STOP ends recentred on the canonical 150 mm stand.
+  // WALK STOP ends recentred on the canonical profile height.
   Rig centred;assert(!centred.m.walk(2,centred.p.now));
   for(unsigned k=0;k<3000&&centred.m.state()!=simple::State::WALKING;++k)centred.tick();
   for(unsigned k=0;k<500;++k)centred.tick();centred.m.walkStop();
   for(unsigned k=0;k<2000&&strcmp(centred.m.phase(),"WALK_SETTLE");++k)centred.tick();assert(!strcmp(centred.m.phase(),"WALK_SETTLE"));
-  {const double body=simple::baseLinkHeightFromNominalM(.15);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;  // last gait sample
-   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(centred.m.target(),i)-motion::jointSlot(s,i))<1e-6);}
+  {const double body=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);auto d=motion::canonicalStandDefinition();d.lowBodyHeightM=body/2;d.standBodyHeightM=body;const auto s=motion::generateStandTarget(d).target;  // last gait sample
+   // Canonical gait recentring is exact before attitude compensation. Its
+   // measured-world terminal orientation is checked by the closed-loop plant;
+   // a prescribed identity IMU with moving encoders is not that physical plant.
+   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(simple::StopReferenceProbe::walkNominal(centred.m).target,i)-motion::jointSlot(s,i))<1e-6);}
   assert(centred.reachStand());
   // Repeated healthy STOPs keep the same controlled arrest and evidence dwell;
   // the dedicated STOP tests compare the entire single/duplicate reference.
@@ -499,7 +581,8 @@ int main(){standHoldTilt();
     while(!s.m.stopVerified()&&updates<150){s.m.stop();s.tick();++updates;}
     assert(s.m.stopVerified()&&s.p.offCalls==off&&s.m.energized()&&s.m.stopping());
     assert(s.p.enables==enables&&s.m.state()==simple::State::STOPPED&&!s.m.stopSupportVerified());
-    if(during==0){assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());for(unsigned i=0;i<100;++i)s.tick();}else if(during==1)assert(s.m.stand(.15,s.p.now));else{assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());}
+    assert(!s.m.stand(.15,s.p.now));assert(s.reachStand());
+    assert(s.p.enables==enables&&s.p.offCalls==off);if(during==0)for(unsigned i=0;i<100;++i)s.tick();
   }
   // One servo fails its read-back: SAFE_OFF stays pending and re-broadcasts;
   // repeated STOPs keep the 12 verified servos; nothing can re-enable; the
@@ -654,7 +737,10 @@ int main(){standHoldTilt();
        if(i>2&&r.m.state()==simple::State::STANDING){assert(std::abs(r.m.requestedHeightM()-h)<1e-9);for(unsigned k=0;k<15;++k)step(r,scale);return;}}assert(false);};
    for(double scale:{0.,1.,1.5}){Rig r;for(double h:{.05,.07,.11,.10,.15,.10,.05,.10,.15,.05,.15,.07,.05,.052,.05,.053,.054,.05,.073,.127})reach(r,h,scale);}
    Rig r;reach(r,.05,1);assert(!r.m.walk(1,r.p.now));for(unsigned i=0;i<1500&&r.m.state()!=simple::State::WALKING;++i)step(r,1);assert(r.m.state()==simple::State::WALKING);
-   for(unsigned i=0;i<200;++i)step(r,1);r.m.walkStop();for(unsigned i=0;i<1500&&r.m.state()!=simple::State::STANDING;++i)step(r,1);assert(r.m.state()==simple::State::STANDING);
+   for(unsigned i=0;i<200;++i)step(r,1);r.m.walkStop();for(unsigned i=0;i<1500&&r.m.state()!=simple::State::STANDING;++i)step(r,1);
+   if(r.m.state()!=simple::State::STANDING){std::printf("loaded WALK_STOP state=%s phase=%s reason=%s now=%llu deadline=%llu\n",simple::name(r.m.state()),r.m.phase(),r.m.reason(),(unsigned long long)r.p.now,(unsigned long long)r.m.deadlineUs());
+     for(unsigned i=0;i<12;++i)std::printf("loaded WALK_STOP slot=%u observed_raw=%u goal_raw=%u load=%u torque=%u\n",i,r.p.observed[i].raw,r.p.target[i],r.p.observed[i].load,r.p.observed[i].torque);std::fflush(stdout);}
+   assert(r.m.state()==simple::State::STANDING);
    reach(r,.05,1);assert(!r.m.prone(r.p.now));for(unsigned i=0;i<2500&&r.m.state()!=simple::State::PRONE;++i){step(r,1);assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::PRONE);
    reach(r,.05,1);assert(!r.m.stand(.10,r.p.now));for(unsigned i=0;i<30;++i)step(r,1);r.m.stop();for(unsigned i=0;i<150&&!r.m.stopVerified();++i)step(r,1);assert(r.m.stopVerified()&&r.m.energized());
    std::puts("STAND height changes from loaded holds: 50<->150 and intermediate heights, WALK and PRONE from low holds, STOP mid-change");}

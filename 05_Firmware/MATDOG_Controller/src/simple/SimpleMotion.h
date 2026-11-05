@@ -13,7 +13,10 @@ constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
 // geometric stride ramps over one cycle at start and at WALK STOP; fore/aft
 // and lateral body offsets change only with four feet down.
 constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
-constexpr double kWalkSwayXM=.010, kWalkSwayYM=.0035, kWalkStartCycles=1, kWalkStopCycles=1;
+// Lower WALK posture stays in the existing HEIGHT joint box. The 2 mm
+// lateral sway leaves room for STOP and the recorded loaded HIP residuals.
+constexpr double kWalkHeightM=.120, kWalkSwayXM=.010, kWalkSwayYM=.002, kWalkStartCycles=1, kWalkStopCycles=1;
+static constexpr const collision::Box& kWalkBox=collision::kHeight;
 constexpr double kStrideM[]={.030,.045,.060};
 constexpr double kMinStandM=.050;
 // Nominal height, the height of commands, status and route tables: the front HIP
@@ -145,7 +148,7 @@ class SimpleMotion {
   Drive commandedDrive() const { return commandedDrive_; }
   uint64_t goalSentUs() const { return goalSentUs_; }
   uint64_t settleUs() const { return settleUs_; }
-  uint64_t deadlineUs() const { return stopActive_?stopDeadlineUs_:segmentBox_?segmentDeadlineUs_:goalDeadlineUs_; }
+  uint64_t deadlineUs() const { return stopActive_?stopDeadlineUs_:(pendingGoalValid_||segmentBox_)?segmentDeadlineUs_:goalDeadlineUs_; }
   // Last boundary completed under a static load: joint mask and phase.
   uint16_t loadedMask() const { return loadedMask_; }
   const char* loadedPhase() const { return loadedPhase_; }
@@ -197,7 +200,7 @@ class SimpleMotion {
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false);
-  bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&) const;
+  bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&,bool stopProof=true) const;
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void serviceOff();
@@ -270,6 +273,5 @@ class SimpleMotion {
   bool walkRecover_=false; double recoverCycles_=0; uint64_t recoverUs_=0; motion::JointTargetFrame recoverOffset_{};
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
-  motion::JointTargetFrame walkOffset_;
 };
 } }
