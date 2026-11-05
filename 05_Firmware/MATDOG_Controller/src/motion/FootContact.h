@@ -7,6 +7,16 @@ struct FootContactModel {
   double radiusM, treadWidthM, filletRadiusM, supportWidthM, nominalTiltRad;
 };
 const FootContactModel& footContactModel();
+// Edge contact (dev.15). Past the nominal strip the lowest point of the real
+// tread is on its end fillet: the rigid strip reference then stands
+// (s/2)sin(t) + rf(1 - cos(t)) above the ground (t axis tilt, s central
+// support width, rf fillet radius; matches the foot STL within 0.03 mm).
+// Counted beyond the strip's own allowance at nominalTiltRad: zero inside
+// the strip, continuous at its edge. Contact on the fillet is admitted up
+// to kEdgeContactMaxTiltRad, where the lower leg still clears the ground by
+// >= 2 mm in the canonical meshes (scripts/offline_motion/foot_edge_contact.py).
+constexpr double kEdgeContactMaxTiltRad = 0.20943951023931956;  // 12 deg
+double edgeContactLiftM(double axisTiltRad);
 const char* contactGeometrySha256();
 enum class ContactStatus : uint8_t {
   OK, INVALID_INPUT, JOINT_LIMIT, DEGENERATE,

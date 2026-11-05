@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Offline collision certificate of the steered WALK joint box kSteer (dev.15).
+
+Input: the per-joint envelopes written by joystick_envelope.cpp (JOY_ENVELOPE,
+one line per scenario: 12 x "min max", nominal targets and IMU-corrected
+targets at the steered tilt-envelope rays). The box is their union widened by
+--tube-rad on every joint, inside the URDF limits. Proven with the existing
+tools, unchanged: every one of the 120 non-adjacent canonical link pairs keeps
+>= --clearance-mm (base_link pairs + --ventral-extra-mm) for ANY combination of
+joints in the box (certify_measured_entry_region.Region), and every adjacent
+revolute pair is continuously clear (certify_adjacent_axis.certify). Writes
+the certificate JSON and, only if it passes, src/simple/SteerCollisionData.h.
+Geometry only: no device, no dynamics, no fixture/cables/cover.
+"""
+from pathlib import Path
+import argparse,hashlib,json,sys,time
+HERE=Path(__file__).resolve().parent;FW=HERE.parents[1];ROOT=FW.parents[1]
+sys.path.insert(0,str(ROOT/'06_Software/Matdog_Core/motion/paired_prone'))
+from paired_prone_model import PairModel,LEGS
+from certify_adjacent_axis import certify
+from certify_measured_entry_region import Region,sha,URDF
+
+PARTS=('hip','upper_leg','lower_leg')
+def main():
+    a=argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
+    a.add_argument('envelopes',type=Path);a.add_argument('--tube-rad',type=float,default=.040)
+    a.add_argument('--clearance-mm',type=float,default=3.);a.add_argument('--ventral-extra-mm',type=float,default=3.)
+    a.add_argument('--pair-budget-s',type=float,default=600);a.add_argument('--adjacent-budget-s',type=float,default=180)
+    a.add_argument('--output',type=Path,required=True);a.add_argument('--header',type=Path,default=FW/'src/simple/SteerCollisionData.h')
+    args=a.parse_args()
+    if args.output.exists():raise SystemExit('output exists; certificates are never overwritten')
+    rows=[list(map(float,l.split())) for l in args.envelopes.read_text().splitlines() if l.strip()]
+    if not rows or any(len(r)!=24 for r in rows):raise SystemExit('bad envelope file')
+    lo=[min(r[2*i] for r in rows) for i in range(12)];hi=[max(r[2*i+1] for r in rows) for i in range(12)]
+    m=PairModel();s=m.scene;box={};keys=[]
+    for k,(leg,part) in enumerate((l,p) for l in LEGS for p in PARTS):
+        j=f'{leg}_{part}_joint';joint=s.model.joints[j];keys.append(j)
+        box[j]=(max(lo[k]-args.tube_rad,joint.lower_limit_rad),min(hi[k]+args.tube_rad,joint.upper_limit_rad))
+    r=Region(s,box);pairs=[];t0=time.monotonic()
+    for la,lb in s.model.clearance_pairs():
+        req=args.clearance_mm*1e-3+(args.ventral_extra_mm*1e-3 if 'base_link' in (la,lb) else 0.)
+        row=r.certify_pair(la,lb,req,args.pair_budget_s);pairs.append(row)
+        print(la,lb,row['status'],round(row.get('minimum_centre_distance_m',row.get('witness_distance_m',row.get('centre_distance_m',float('nan'))))*1e3,3),'mm',flush=True)
+    adjacent=[]
+    for j,(l,h) in box.items():
+        res=certify(s,j,l,h,args.adjacent_budget_s);adjacent.append(dict(joint=j,domain_rad=[l,h],**res));print(j,res['status'],flush=True)
+    passed=[x for x in pairs if x['status']=='PASS']
+    result=dict(schema='MATDOG_STEER_WALK_REGION_CERTIFICATE_V1',scope='every configuration in the per-joint box of the steered JOYSTICK WALK (nominal + IMU tilt envelope, all scenarios) +/- tube',
+        envelope_sha256=sha(args.envelopes),scenarios=len(rows),box_rad={j:list(v) for j,v in box.items()},tube_rad=args.tube_rad,clearance_m=args.clearance_mm*1e-3,ventral_extra_m=args.ventral_extra_mm*1e-3,
+        nonadjacent_pairs=len(pairs),nonadjacent_pass=len(passed),adjacent_pass=sum(x['status']=='PASS_CONTINUOUS' for x in adjacent),
+        minimum_centre_distance_m=min(x['minimum_centre_distance_m'] for x in passed) if passed else None,
+        all_pass=len(passed)==len(pairs) and all(x['status']=='PASS_CONTINUOUS' for x in adjacent),
+        distance_calls=r.calls,elapsed_s=round(time.monotonic()-t0,1),
+        identity=dict(urdf_sha256=sha(URDF),tool_sha256=sha(Path(__file__)),meshes={n:sha(s.model.collision_mesh_path(n)) for n in s.model.collision_link_names}),
+        not_modelled=['fixture','cables','battery','reprinted cover beyond the ventral allowance','servo horn hardware'],
+        hardware_authorized=False,nonadjacent=pairs,adjacent=adjacent)
+    raw=(json.dumps(result,indent=1)+'\n').encode();args.output.write_bytes(raw)
+    print('STEER_WALK_REGION',('PASS' if result['all_pass'] else 'FAIL'),f"nonadjacent={result['nonadjacent_pass']}/{len(pairs)}",
+          f"adjacent={result['adjacent_pass']}/{len(adjacent)}",f"min_mm={result['minimum_centre_distance_m']*1e3 if passed else float('nan'):.2f}",flush=True)
+    if not result['all_pass']:return 1
+    fmt=lambda v:','.join(repr(x) for x in v)
+    args.header.write_text(f'''#pragma once
+// Steered WALK joint box (dev.15). Generated by scripts/offline_motion/certify_steer_box.py
+// from the joystick_envelope.cpp scenarios; continuous CAD/FCL proof, no measured
+// tracking constraint. Canonical MATDOG geometry only.
+#include "CollisionData.h"
+namespace matdog {{ namespace simple {{ namespace collision {{
+constexpr Box kSteer={{{{{fmt(box[k][0] for k in keys)}}},{{{fmt(box[k][1] for k in keys)}}}}};
+constexpr char kSteerProof[]="{hashlib.sha256(raw).hexdigest()}";
+}} }} }}
+''')
+    return 0
+if __name__=='__main__':sys.exit(main())

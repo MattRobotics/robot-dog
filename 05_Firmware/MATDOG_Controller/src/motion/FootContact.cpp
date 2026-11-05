@@ -30,6 +30,13 @@ ContactStatus convert(KinematicsStatus s) {
 }
 const FootContactModel& footContactModel() { return generated::kContact; }
 const char* contactGeometrySha256() { return generated::kContactSha256; }
+double edgeContactLiftM(double tilt) {
+  const auto& m = footContactModel();
+  tilt = std::abs(tilt);
+  if (!std::isfinite(tilt) || tilt <= m.nominalTiltRad) return 0.0;
+  auto rigid = [&](double t) { return .5*m.supportWidthM*std::sin(t) + m.filletRadiusM*(1.0 - std::cos(t)); };
+  return rigid(tilt) - rigid(m.nominalTiltRad);
+}
 
 ContactResult contactForwardKinematics(LegId leg, const LegJointAngles& q, Vector3 normal) {
   ContactResult result;

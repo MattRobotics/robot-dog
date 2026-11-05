@@ -28,6 +28,10 @@ struct GaitParameters {
   // rate rises 0->1 over startCycles and, with a terminal cycle T, falls 1->0
   // over the stopCycles that end at T. Zero keeps the legacy law.
   double startCycles = 0, stopCycles = 0;
+  // > 0: stance contact may leave the nominal strip for the tread fillet up
+  // to this foot-axis tilt (<= kEdgeContactMaxTiltRad); every foot target
+  // then carries edgeContactLiftM. 0 keeps the nominal strip.
+  double edgeTiltRad = 0;
   // WALK only: the time reverse of the forward leg order (LF, LH, RF, RH
   // instead of RH, RF, LH, LF), for backward travel. Same swing and four-contact
   // windows and fore/aft offsets; the lateral offset still moves away from
@@ -71,10 +75,10 @@ struct GaitTrack {
   double touchdown[4]{-1,-1,-1,-1};     // touchdown cycle of each leg's anchor
   Vector3 anchor[4]{},target[4]{};      // world; target valid from lift-off
   bool targetValid[4]{};
-  // Caller's fore/aft limiter: advanceXM approaches goalAdvanceXM at
-  // goalRate (m per cycle per cycle). A lift-off plans its foothold on that
+  // Caller's limiter: advanceXM, advanceYM, yawRad approach goal[] at
+  // goalRate[] (per cycle per cycle). A lift-off plans its foothold on that
   // ramp, so it is centred at mid-stance unless the goal changes. 0: none.
-  double goalAdvanceXM=0,goalRate=0;
+  double goal[3]{},goalRate[3]{};
 };
 CartesianSample gaitTrackCartesian(GaitTrack& track,const GaitParameters& p,double cycles,
                                    double cyclesPerS,double cyclesPerS2,double terminalCycle=-1);

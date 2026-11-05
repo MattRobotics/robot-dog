@@ -4,6 +4,7 @@
 #include "../motion/MotionContract.h"
 #include "../motion/Gait.h"
 #include "CollisionData.h"
+#include "SteerCollisionData.h"
 #include "ViaPlan.h"
 #include "StopPlan.h"
 
@@ -18,17 +19,20 @@ constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
 constexpr double kWalkHeightM=.120, kWalkSwayXM=.010, kWalkSwayYM=.002, kWalkStartCycles=1, kWalkStopCycles=1;
 static constexpr const collision::Box& kWalkBox=collision::kHeight;
 constexpr double kStrideM[]={.030,.045,.060};
-// JOYSTICK: the same WALK law with a continuous signed fore/aft stride up to
-// the 45 mm preset, rate limited to full scale over two gait cycles. A swing
-// target is fixed at lift-off, so a stride change moves later footholds off
-// centre: with these two values every planted foot stays inside the steady
-// 60 mm footprint (offline, scripts/offline_motion/joystick_envelope.cpp),
-// where both IMU tilt envelopes hold. The Controller ends the walk with WALK
-// STOP when no admitted joystick command arrives for kJoystickTimeoutUs (ESP
-// clock). Lateral and yaw velocity are refused: each needs HIP abduction, and
-// the WALK box (+/-25 mrad) and the 2-degree nominal foot strip are already
-// spent by the lateral sway and the IMU roll correction.
-constexpr double kJoystickStrideM=kStrideM[1], kJoystickRampCycles=2;
+// JOYSTICK: the same WALK law steered in SE(2). Displacement per cycle inside
+// the ellipsoid (x/kJoystickStrideM)^2+(y/kJoystickLateralM)^2+(yaw/
+// kJoystickYawRad)^2 <= 1, each axis rate limited to full scale over two gait
+// cycles; swing targets are planned on that ramp. A steered walk keeps the
+// WALK height, duty, lift and stride ramps and differs from WALK STANDARD only
+// where lateral and turning steps need it: 12 mm lateral sway and stance
+// contact on the tread fillet (FootContact.h), inside its own certified joint
+// box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
+// the URDF COM, steady commands keep >= +0.8 mm static support in every
+// direction (scripts/offline_motion/run_joystick_envelope.sh). The Controller
+// ends the walk with WALK STOP when no admitted joystick command arrives for
+// kJoystickTimeoutUs (ESP clock).
+constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
+constexpr double kJoystickSwayYM=.012;
 constexpr uint64_t kJoystickTimeoutUs=1000000;
 constexpr double kMinStandM=.050;
 // Nominal height, the height of commands, status and route tables: the front HIP
@@ -144,6 +148,8 @@ class SimpleMotion {
   double walkCycles() const { return cycles_; }
   // Fore/aft body velocity of the walking law (m/s), not a measurement.
   double walkVelocityX() const { return phase_==Phase::WALK?gait_.advanceXM/kWalkPeriodS:0; }
+  double walkVelocityY() const { return phase_==Phase::WALK?gait_.advanceYM/kWalkPeriodS:0; }
+  double walkYawRate() const { return phase_==Phase::WALK?gait_.yawRad/kWalkPeriodS:0; }
   // A joystick intent holds the walk: walking or rising to walk, not stopping.
   bool joystickActive() const { return joystick_&&(walkRequested_||(state_==State::WALKING&&!walkStopping_)); }
   uint32_t releases() const { return releases_; }
@@ -218,12 +224,13 @@ class SimpleMotion {
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
-  motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false);
+  motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
   bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&,bool stopProof=true) const;
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void steerWalk(uint64_t);
   bool limitWalkTilt(double& roll,double& pitch) const;
+  const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
   void serviceOff();
   bool serviceStop();
   void beginStop(uint64_t);
@@ -290,7 +297,7 @@ class SimpleMotion {
   motion::GaitParameters gait_{};
   motion::GaitTrack track_{};
   bool joystick_=false,steered_=false;
-  double joystickStrideM_=0,steeredCycles_=0;
+  double joystickGoal_[3]{},steeredCycles_=0;  // displacement per cycle: x, y (m), yaw (rad)
   uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
   motion::LocomotionFrame holdNominal_{};

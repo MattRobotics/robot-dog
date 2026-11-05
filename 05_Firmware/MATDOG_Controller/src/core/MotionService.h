@@ -20,7 +20,7 @@ struct MotionStatusSnapshot {
   bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
   const char* standResumeReason="STOP_NOT_ACTIVE";
   uint16_t offMask=0,referenceFaultRaw=0;
-  double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,quaternion[4]{};
+  double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,walkVelocityY=0,walkYawRate=0,quaternion[4]{};
   bool joystick=false;
   unsigned referenceFaultSlot=12;
   simple::Feedback feedback[12]{},referenceFaultFeedback{};

@@ -127,15 +127,22 @@ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double 
         track->touchdown[i]=td;track->targetValid[i]=false;
       }
       if(!phase.stance&&!track->targetValid[i]){
-        Vector3 b=anchor(p,i,td+1,terminal);
-        if(track->goalRate>0&&terminal<0&&p.yawRad==0){
-          // Advance still to come on the planned ramp up to that mid-stance.
-          const double gap=track->goalAdvanceXM-p.advanceXM,mid=td+1+p.duty*.5;double r0=progress(p,D(cycles),terminal,true).p,shift=0;
-          for(unsigned k=1;k<=16;++k){const double c=cycles+(mid-cycles)*k/16,r1=progress(p,D(c),terminal,true).p;
-            const double ramp=std::copysign(std::fmin(std::abs(gap),track->goalRate*(c-cycles-(mid-cycles)/32)),gap);shift+=ramp*(r1-r0);r0=r1;}
-          b.x+=shift;
+        Vector3 b=place(frame,anchor(p,i,td+1,terminal));
+        const double now[3]={p.advanceXM,p.advanceYM,p.yawRad};bool ramp=false;
+        for(unsigned j=0;j<3;++j)ramp=ramp||(track->goalRate[j]>0&&track->goal[j]!=now[j]);
+        if(ramp&&terminal<0){
+          // Integrate the planned twist from now to that step's mid-stance.
+          const double mid=td+1+p.duty*.5;double r0=progress(p,D(cycles),terminal,true).p;
+          const Planar w=place(frame,nominal(p,D(r0)));double x=w.x.p,y=w.y.p,yaw=w.yaw.p;
+          for(unsigned k=1;k<=16;++k){const double c=cycles+(mid-cycles)*k/16,r1=progress(p,D(c),terminal,true).p,t=c-cycles-(mid-cycles)/32,dr=r1-r0;r0=r1;
+            double xi[3];for(unsigned j=0;j<3;++j){const double g=track->goal[j]-now[j];xi[j]=now[j]+std::copysign(std::fmin(std::abs(g),track->goalRate[j]*t),g);}
+            const double a=xi[2]*dr,si=std::abs(xi[2])>1e-9?std::sin(a)/xi[2]:dr,co=std::abs(xi[2])>1e-9?(1-std::cos(a))/xi[2]:0;
+            const double bx=xi[0]*si-xi[1]*co,by=xi[0]*co+xi[1]*si;
+            x+=std::cos(yaw)*bx-std::sin(yaw)*by;y+=std::sin(yaw)*bx+std::cos(yaw)*by;yaw+=a;}
+          const Vector3 f=canonicalStandDefinition().contactsWorldM[i];
+          b={x+std::cos(yaw)*f.x-std::sin(yaw)*f.y,y+std::sin(yaw)*f.x+std::cos(yaw)*f.y,0};
         }
-        track->target[i]=place(frame,b);track->targetValid[i]=true;}
+        track->target[i]=b;track->targetValid[i]=true;}
       a=track->anchor[i];b=track->target[i];
     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
     out.feet[i]=a;
@@ -186,7 +193,8 @@ bool validGaitParameters(const GaitParameters& p) {
     p.duty>=(p.type==GaitType::WALK?.75:.5)&&p.maxCondition>=1&&p.swayXM>=0&&
     (p.swayXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
     p.swayYM>=0&&(p.swayYM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
-    p.startCycles>=0&&p.stopCycles>=0&&(!p.reverse||p.type==GaitType::WALK);
+    p.startCycles>=0&&p.stopCycles>=0&&(!p.reverse||p.type==GaitType::WALK)&&
+    std::isfinite(p.edgeTiltRad)&&p.edgeTiltRad>=0&&p.edgeTiltRad<=kEdgeContactMaxTiltRad;
 }
 double gaitSettleCycles(const GaitParameters& p){return p.type==GaitType::WALK&&(p.swayXM>0||p.swayYM>0)?p.duty-.75:0;}
 bool validGaitPeriod(double t){double v=1/t;return std::isfinite(t)&&t>0&&std::isfinite(v*v)&&v*v>0;}
@@ -214,7 +222,7 @@ CartesianSample gaitTrackCartesian(GaitTrack& track,const GaitParameters& p,doub
 bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParameters& to,double cycles,double terminal){
   if(!validGaitParameters(from)||!validGaitParameters(to)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(terminal)||
      from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||from.swayXM!=to.swayXM||
-     from.swayYM!=to.swayYM||from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse)return false;
+     from.swayYM!=to.swayYM||from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad)return false;
   // Same world pose of the nominal body at this progress under both laws.
   const D r(progress(from,D(cycles),terminal,true).p);
   const Planar world=place(track.frame,nominal(from,r)),next=nominal(to,r);
@@ -245,8 +253,17 @@ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const
     if(s.phases[i].phase<0||s.phases[i].phase>=1||s.phases[i].swingProgress<0||s.phases[i].swingProgress>1){out.status=GaitStatus::INVALID_PARAMETER;return out;}
     if(!finite(s.feet[i])||!finite(s.velocity[i])||!finite(s.acceleration[i])){out.status=GaitStatus::NONFINITE;return out;}
     ContactIkOptions opts;opts.kinematics.seed=prev?prev->target.legs[i]:canonicalStandDefinition().standSeed[i];
-    opts.requireNominalStrip=s.phases[i].stance||s.phases[i].boundary;
-    const auto ik=worldContactInverseKinematics(leg,s.feet[i],s.body,opts);const auto& b=ik.baseResult;
+    opts.requireNominalStrip=p.edgeTiltRad==0&&(s.phases[i].stance||s.phases[i].boundary);
+    // Edge contact: the fillet point, not the strip reference, meets the
+    // target. The flat body keeps the foot axis tilt equal to |HIP|; the seed's
+    // lift is exact to ~1e-5 m, else one more solve with the solved tilt.
+    double lift=p.edgeTiltRad>0?edgeContactLiftM(opts.kinematics.seed.hip):0;
+    auto ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);
+    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>1e-5){
+      lift=edgeContactLiftM(ik.baseResult.joints.hip);opts.kinematics.seed=ik.baseResult.joints;
+      ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);}
+    const auto& b=ik.baseResult;
+    if(ik.status==WorldContactIkResult::Status::OK&&p.edgeTiltRad>0&&b.contact.axisTiltRad>p.edgeTiltRad){out.status=GaitStatus::CONTACT_INVALID;return out;}
     if(ik.status!=WorldContactIkResult::Status::OK){out.status=b.status==ContactStatus::UNREACHABLE_LIMITS||b.status==ContactStatus::JOINT_LIMIT?GaitStatus::JOINT_LIMIT:
       b.status==ContactStatus::CONTACT_MODE?GaitStatus::CONTACT_INVALID:GaitStatus::IK_UNREACHABLE;return out;}
     if(prev&&(prev->branches[i].hip!=b.branch.hip||prev->branches[i].elbow!=b.branch.elbow)){out.status=GaitStatus::BRANCH_CHANGE;return out;}

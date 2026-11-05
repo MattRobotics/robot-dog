@@ -34,5 +34,12 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
 struct WorldTiltedIkResult { TiltedIkResult::Status status = TiltedIkResult::Status::INVALID_INPUT; TiltedIkResult base{}; Vector3 achievedWorldM{}; };
 WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose,
                                                        const TiltedIkOptions& options);
+// Edge contact (dev.15): the tread fillet point, not the strip reference,
+// meets worldTarget (edgeContactLiftM of the foot-axis tilt in this pose).
+// The lift starts from the seed's tilt; one more solve only when the solved
+// tilt moves it by more than 20 um. The nominal-strip option is not applied:
+// the caller bounds the returned contact.axisTiltRad.
+WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose,
+                                                           TiltedIkOptions options);
 } }
 #endif

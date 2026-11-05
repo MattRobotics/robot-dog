@@ -32,6 +32,8 @@ struct StopReferenceProbe {
   static const motion::LocomotionFrame& walkNominal(const SimpleMotion& m){return m.walkPrevious_;}
   static bool reverse(const SimpleMotion& m){return m.gait_.reverse;}
   static double stride(const SimpleMotion& m){return m.gait_.advanceXM;}
+  static const motion::GaitParameters& gait(const SimpleMotion& m){return m.gait_;}
+  static const collision::Box& box(const SimpleMotion& m){return m.walkBox();}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -327,7 +329,8 @@ struct WalkBoardPlant {
     if(r.m.state()==simple::State::FAULT){std::printf("WALK board fault=%s phase=%s board=%.6f,%.6f accepted=%.6f,%.6f cycles=%.6f\n",r.m.reason(),r.m.phase(),boardRoll,boardPitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.walkCycles());std::fflush(stdout);}assert(r.m.state()!=simple::State::FAULT);
     for(unsigned i=0;i<12;++i){const double target=motion::jointSlot(r.m.target(),i),decoded=(int(r.p.target[i])-2048)*simple::kTickRad;
       assert(target>=r.in.minRad[i]&&target<=r.in.maxRad[i]&&decoded>=r.in.minRad[i]&&decoded<=r.in.maxRad[i]);
-      assert(target>=simple::kWalkBox.lo[i]&&target<=simple::kWalkBox.hi[i]&&decoded>=simple::kWalkBox.lo[i]&&decoded<=simple::kWalkBox.hi[i]);
+      const auto& box=simple::StopReferenceProbe::box(r.m);  // the walk's own certified box
+      assert(target>=box.lo[i]&&target<=box.hi[i]&&decoded>=box.lo[i]&&decoded<=box.hi[i]);
       const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*simple::kPeriodUs/1e6))+1);}
     const auto frames=r.p.frames;const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m);r.m.update(r.p.now);
     assert(r.p.frames==frames&&simple::StopReferenceProbe::roll(r.m)==roll&&simple::StopReferenceProbe::pitch(r.m)==pitch);return world;
@@ -405,117 +408,126 @@ static void walkTxLatency(){
   std::puts("TX latency 7 ms / alternating 0-7 ms / late releases: WALK45/60 pre-check, STOP in WALK and long HOLD PASS (software timing only)");
 }
 
-// JOYSTICK (dev.15): continuous signed fore/aft velocity on the WALK law, the
-// ESP clock deadline, the leg order latched per walk, lateral/yaw refused.
+// JOYSTICK (dev.15): continuous BASE_VELOCITY (vx, vy, yaw_rate) on the WALK
+// law, the ESP clock deadline, the fore/aft leg order latched per walk.
 // Scripted observation and a kinematic board plant: no motor or contact model.
 static void joystickWalk(){
-  constexpr double degree=3.14159265358979323846/180,vmax=simple::kJoystickStrideM/simple::kWalkPeriodS;
-  auto walkTo=[](Rig& r,double vx){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(vx,0,0,r.p.now);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+  constexpr double degree=3.14159265358979323846/180,T=simple::kWalkPeriodS;
+  const double lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  using V3=std::array<double,3>;
+  auto drive=[](Rig& r,V3 v){return r.m.drive(v[0],v[1],v[2],r.p.now);};
+  auto walkTo=[&](Rig& r,V3 v){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)drive(r,v);r.tick();assert(r.m.state()!=simple::State::FAULT);}
     assert(r.m.state()==simple::State::WALKING);};
-  auto hold=[](Rig& r,double vx,unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)assert(!r.m.drive(vx,0,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING);}};
-  auto bodyX=[](const Rig& r){return simple::StopReferenceProbe::walkNominal(r.m).cartesian.body.translationM.x;};
+  auto hold=[&](Rig& r,V3 v,unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)assert(!drive(r,v));r.tick();assert(r.m.state()==simple::State::WALKING);}};
+  auto pose=[](const Rig& r){const auto& b=simple::StopReferenceProbe::walkNominal(r.m).cartesian.body;return V3{b.translationM.x,b.translationM.y,std::atan2(b.rotation[1][0],b.rotation[0][0])};};
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());std::array<uint16_t,12> held;std::copy(r.p.target,r.p.target+12,held.begin());
-    assert(!std::strcmp(r.m.drive(0,vmax/2,0,r.p.now),"LATERAL_YAW_NOT_QUALIFIED"));assert(!std::strcmp(r.m.drive(vmax/2,0,-.05,r.p.now),"LATERAL_YAW_NOT_QUALIFIED"));
-    assert(!std::strcmp(r.m.drive(vmax*1.001,0,0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));assert(!std::strcmp(r.m.drive(-vmax*1.001,0,0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));
-    assert(!std::strcmp(r.m.drive(NAN,0,0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));
+    assert(!std::strcmp(drive(r,{.8*lim[0],.8*lim[1],0}),"JOYSTICK_VELOCITY_RANGE"));  // outside the ellipsoid
+    for(unsigned j=0;j<3;++j){V3 v{0,0,0};v[j]=1.001*lim[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));v[j]=-v[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));}
+    assert(!std::strcmp(drive(r,{NAN,0,0}),"JOYSTICK_VELOCITY_RANGE"));assert(!std::strcmp(drive(r,{0,0,INFINITY}),"JOYSTICK_VELOCITY_RANGE"));
     for(unsigned n=0;n<50;++n)r.tick();assert(r.m.state()==simple::State::STANDING&&!r.m.joystickActive());
     assert(std::equal(held.begin(),held.end(),r.p.target));}  // refusals move nothing
-  // Sign and proportionality: over two whole cycles the body advances exactly
-  // 2 x vx x period; backward walks take the time-reversed leg order.
-  for(double vx:{vmax,vmax/2,-vmax,-vmax/3}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,vx);
-    assert(simple::StopReferenceProbe::reverse(r.m)==(vx<0)&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK")&&r.m.joystickActive());
-    int first=-1;for(unsigned n=0;n<400&&first<0;++n){if(n%12==0)r.m.drive(vx,0,0,r.p.now);r.tick();const auto& f=simple::StopReferenceProbe::walkNominal(r.m);
+  // Sign and proportionality on all three axes: over two whole cycles the body
+  // moves by exactly the SE(2) exponential of 2 x (vx, vy, yaw_rate) x period.
+  // +x forward, +y left, +yaw counter-clockwise; backward takes the reversed order.
+  const V3 cases[]={{lim[0],0,0},{lim[0]/2,0,0},{-lim[0],0,0},{-lim[0]/3,0,0},{0,lim[1],0},{0,-lim[1]/2,0},{0,0,lim[2]},{0,0,-lim[2]/2},
+                    {lim[0]/2,lim[1]/2,lim[2]/2},{-lim[0]/2,-lim[1]/2,-lim[2]/2}};
+  for(const auto& v:cases){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,v);
+    assert(simple::StopReferenceProbe::reverse(r.m)==(v[0]<0)&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK")&&r.m.joystickActive());
+    int first=-1;for(unsigned n=0;n<400&&first<0;++n){if(n%12==0)drive(r,v);r.tick();const auto& f=simple::StopReferenceProbe::walkNominal(r.m);
       for(unsigned l=0;l<4;++l)if(!f.cartesian.phases[l].stance)first=int(l);}
-    assert(first==(vx<0?3:2));  // first swing: LH backward, RH forward
-    while(r.m.walkCycles()<1.5)hold(r,vx,1);
-    const double x0=bodyX(r);hold(r,vx,650);assert(std::abs(bodyX(r)-x0-2*vx*simple::kWalkPeriodS)<1e-9);assert(std::abs(r.m.walkVelocityX()-vx)<1e-12);
+    assert(first==(v[0]<0?3:2));  // first swing: LH backward, RH otherwise
+    while(r.m.walkCycles()<1.5)hold(r,v,1);
+    const auto a=pose(r);hold(r,v,650);const auto b=pose(r);
+    const double w=2*v[2]*T,si=w!=0?std::sin(w)/(v[2]*T):2,co=w!=0?(1-std::cos(w))/(v[2]*T):0;
+    const double dx=v[0]*T*si-v[1]*T*co,dy=v[0]*T*co+v[1]*T*si;
+    // The body sway (<= 16 mm, body frame) turns with the heading: |R(w)-I| x sway.
+    const double tol=1e-9+std::abs(w)*.016;
+    assert(std::abs(b[0]-a[0]-(std::cos(a[2])*dx-std::sin(a[2])*dy))<tol&&std::abs(b[1]-a[1]-(std::sin(a[2])*dx+std::cos(a[2])*dy))<tol&&std::abs(std::remainder(b[2]-a[2]-w,2*M_PI))<1e-9);
+    assert(std::abs(r.m.walkVelocityX()-v[0])<1e-12&&std::abs(r.m.walkVelocityY()-v[1])<1e-12&&std::abs(r.m.walkYawRate()-v[2])<1e-12);
     // Neutral stick: WALK STOP from the next touchdown, then HOLD at the WALK height.
     r.m.walkStop();assert(!std::strcmp(r.m.reason(),"WALK_STOPPING")&&!r.m.joystickActive());assert(r.reachStand());assert(r.m.requestedHeightM()==simple::kWalkHeightM);}
-  // Constant joystick velocity == WALK STANDARD: the same nominal gait/IK
-  // reference bit for bit at every release and, on the closed-loop flat board,
-  // byte-identical RAW frames and drives from the command to the final HOLD.
-  {Rig a,b;assert(!a.m.stand(.15,a.p.now)&&!b.m.stand(.15,b.p.now));assert(a.reachStand()&&b.reachStand());
-    const double v=simple::kStrideM[1]/simple::kWalkPeriodS;const auto from=a.p.sent.size();
-    assert(!a.m.walk(1,a.p.now)&&!b.m.drive(v,0,0,b.p.now));
-    for(unsigned n=0;n<3000&&a.m.state()!=simple::State::WALKING;++n){a.tick();if(n%12==0)assert(!b.m.drive(v,0,0,b.p.now));b.tick();}
-    assert(a.m.state()==simple::State::WALKING&&b.m.state()==simple::State::WALKING);
-    WalkBoardPlant pa(a),pb(b);unsigned nominal=0;
-    for(unsigned n=0;n<2400;++n){pa.step(0,0);if(n%12==0)assert(!b.m.drive(v,0,0,b.p.now));pb.step(0,0);
-      const auto& x=simple::StopReferenceProbe::walkNominal(a.m).target;const auto& y=simple::StopReferenceProbe::walkNominal(b.m).target;
-      for(unsigned i=0;i<12;++i)assert(motion::jointSlot(x,i)==motion::jointSlot(y,i));++nominal;}
-    a.m.walkStop();b.m.walkStop();
-    for(unsigned n=0;n<3000&&!(a.m.state()==simple::State::STANDING&&b.m.state()==simple::State::STANDING);++n){pa.step(0,0);pb.step(0,0);}
-    assert(a.m.state()==simple::State::STANDING&&b.m.state()==simple::State::STANDING&&a.p.sent.size()==b.p.sent.size());
-    for(size_t i=from;i<a.p.sent.size();++i)assert(a.p.sent[i]==b.p.sent[i]&&a.p.sentDrive[i].speed==b.p.sentDrive[i].speed&&a.p.sentDrive[i].acc==b.p.sentDrive[i].acc);
-    std::printf("JOYSTICK at the 45 mm preset == WALK STANDARD: nominal reference identical in %u releases, %zu RAW frames byte-identical (closed-loop flat board)\n",nominal,a.p.sent.size()-from);}
+  // The SE(2) track equals the closed-form law bit for bit with constant steered
+  // parameters (lateral, yaw, fillet contact), through WALK STOP and recentring.
+  {motion::GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;
+    g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kJoystickSwayYM;g.startCycles=g.stopCycles=1;g.edgeTiltRad=motion::kEdgeContactMaxTiltRad;
+    g.advanceXM=.02;g.advanceYM=-.01;g.yawRad=.1;motion::GaitTrack t;const double term=4,end=term+motion::gaitSettleCycles(g);
+    for(double c=0;c<=end+1e-12;c+=1/325.){const double cc=std::fmin(c,end),tm=cc>=2.9?term:-1;
+      const auto x=motion::gaitCartesian(g,cc,1/T,0,tm),y=motion::gaitTrackCartesian(t,g,cc,1/T,0,tm);assert(x.valid&&y.valid);
+      for(unsigned l=0;l<4;++l)assert(x.feet[l].x==y.feet[l].x&&x.feet[l].y==y.feet[l].y&&x.feet[l].z==y.feet[l].z&&x.velocity[l].x==y.velocity[l].x&&x.velocity[l].y==y.velocity[l].y);
+      assert(x.body.translationM.x==y.body.translationM.x&&x.body.translationM.y==y.body.translationM.y&&x.body.rotation[1][0]==y.body.rotation[1][0]&&x.yawVelocity==y.yawVelocity);}}
   // Refreshed for 30 s (30 deadlines) it keeps walking; silence ends it with
   // WALK STOP at the first release after the ESP deadline.
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,vmax);hold(r,vmax,1500);
-    const uint64_t last=r.p.now;assert(!r.m.drive(vmax,0,0,r.p.now));
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 v{lim[0]/2,lim[1]/2,-lim[2]/2};walkTo(r,v);hold(r,v,1500);
+    const uint64_t last=r.p.now;assert(!drive(r,v));
     for(unsigned n=0;n<200&&std::strcmp(r.m.reason(),"JOYSTICK_TIMEOUT");++n)r.tick();
     assert(!std::strcmp(r.m.reason(),"JOYSTICK_TIMEOUT")&&r.p.now-last>simple::kJoystickTimeoutUs&&r.p.now-last<=simple::kJoystickTimeoutUs+simple::kPeriodUs);
-    assert(!r.m.joystickActive()&&!std::strcmp(r.m.drive(vmax,0,0,r.p.now),"WALK_STOPPING"));assert(r.reachStand());}
+    assert(!r.m.joystickActive()&&!std::strcmp(drive(r,v),"WALK_STOPPING"));assert(r.reachStand());}
   // Silence while rising from PRONE: the stand completes, the walk never starts.
-  {Rig r;assert(!r.m.drive(-vmax,0,0,r.p.now));assert(r.m.joystickActive());bool walked=false;
+  {Rig r;assert(!drive(r,{0,0,lim[2]}));assert(r.m.joystickActive());bool walked=false;
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();walked|=r.m.state()==simple::State::WALKING;assert(r.m.state()!=simple::State::FAULT);}
     assert(!walked&&r.m.state()==simple::State::STANDING&&r.m.requestedHeightM()==simple::kWalkHeightM&&!r.m.joystickActive());
     for(unsigned n=0;n<500;++n){r.tick();assert(r.m.state()==simple::State::STANDING);}}
-  // Reversal: WALK STOP with the forward order, STANDING, then the reversed order.
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,vmax);hold(r,vmax,400);
-    assert(!r.m.drive(-vmax,0,0,r.p.now));assert(!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING")&&!r.m.joystickActive());
+  // Fore/aft reversal: WALK STOP with the forward order, STANDING, then the reversed
+  // order. Lateral and yaw reverse continuously inside one walk.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0],0,0});hold(r,{lim[0],0,0},400);
+    assert(!drive(r,{-lim[0],0,0}));assert(!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING")&&!r.m.joystickActive());
     bool stood=false;
     for(unsigned n=0;n<4000&&!(r.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(r.m));++n){
-      if(n%12==0){const char* why=r.m.drive(-vmax,0,0,r.p.now);assert(!why||!std::strcmp(why,"WALK_STOPPING")||!std::strcmp(why,"MOTION_BUSY"));}
+      if(n%12==0){const char* why=drive(r,{-lim[0],0,0});assert(!why||!std::strcmp(why,"WALK_STOPPING")||!std::strcmp(why,"MOTION_BUSY"));}
       r.tick();stood|=r.m.state()==simple::State::STANDING;assert(r.m.state()!=simple::State::FAULT);}
     assert(stood&&r.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(r.m)&&r.m.walkCycles()<1);
     r.m.walkStop();assert(r.reachStand());}
-  // Magnitude steps: the stride follows at the limited rate, never crosses zero
-  // inside a walk, and every RAW step stays below the WALK drive per release.
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,vmax);hold(r,vmax,300);
-    double prev=simple::StopReferenceProbe::stride(r.m),lo=prev,maxDs=0;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
-    for(unsigned n=0;n<3000;++n){const double vx=n<650?vmax/5:n<1300?vmax:n<2000?1e-6:vmax;if(n%12==0)assert(!r.m.drive(vx,0,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING);
-      const double s=simple::StopReferenceProbe::stride(r.m);maxDs=std::fmax(maxDs,std::abs(s-prev));prev=s;lo=std::fmin(lo,s);assert(s>=0);
+  // Steps on every axis: each follows at its limited rate, fore/aft never crosses
+  // zero inside a walk, every RAW step stays below the WALK drive per release.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0],0,0});hold(r,{lim[0],0,0},300);
+    double prev[3]={simple::StopReferenceProbe::stride(r.m),0,0},maxD[3]{};std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
+    const V3 seq[]={{lim[0]/5,lim[1]*.9,0},{lim[0]*.6,-lim[1]*.6,lim[2]*.5},{1e-9,0,-lim[2]},{lim[0],0,0}};
+    for(unsigned n=0;n<3200;++n){const V3 v=seq[std::min(3u,n/700)];if(n%12==0)assert(!drive(r,v));r.tick();assert(r.m.state()==simple::State::WALKING);
+      const auto& g=simple::StopReferenceProbe::gait(r.m);const double now[3]={g.advanceXM,g.advanceYM,g.yawRad};
+      for(unsigned j=0;j<3;++j){maxD[j]=std::fmax(maxD[j],std::abs(now[j]-prev[j]));prev[j]=now[j];}assert(g.advanceXM>=0);
       for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
-    const double rate=simple::kJoystickStrideM/simple::kJoystickRampCycles*simple::kPeriodUs/1e6/simple::kWalkPeriodS;
-    assert(maxDs<=rate*(1+1e-6)&&lo<.2*simple::kJoystickStrideM&&std::abs(prev-simple::kJoystickStrideM)<1e-12);
-    assert(maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    const double perRelease=simple::kPeriodUs/1e6/T/simple::kJoystickRampCycles,full[3]={simple::kJoystickStrideM,simple::kJoystickLateralM,simple::kJoystickYawRad};
+    for(unsigned j=0;j<3;++j)assert(maxD[j]<=full[j]*perRelease*(1+1e-6));
+    assert(std::abs(prev[0]-simple::kJoystickStrideM)<1e-12&&prev[1]==0&&prev[2]==0&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
     r.m.walkStop();assert(r.reachStand());
-    std::printf("JOYSTICK magnitude steps: stride rate %.6f m/cycle per release (limit %.6f), max RAW step %u ticks/release\n",maxDs,rate,maxRaw);}
+    std::printf("JOYSTICK axis steps: rates %.6f m %.6f m %.6f rad per release (limits %.6f %.6f %.6f), max RAW step %u ticks/release\n",
+      maxD[0],maxD[1],maxD[2],full[0]*perRelease,full[1]*perRelease,full[2]*perRelease,maxRaw);}
   // STOP is independent of the joystick and of its deadline: immediate
   // contextual arrest, refreshes refused, explicit STAND completes the gait.
-  for(unsigned when=0;when<325;when+=65){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,-vmax/2);hold(r,-vmax/2,300+when);
-    r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n){if(n%12==0)assert(r.m.drive(-vmax/2,0,0,r.p.now));r.tick();}
-    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.joystickActive()&&!std::strcmp(r.m.drive(-vmax/2,0,0,r.p.now),"STOP_LATCHED"));
+  for(unsigned when=0;when<325;when+=65){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 v{-lim[0]/2,lim[1]/2,lim[2]/2};walkTo(r,v);hold(r,v,300+when);
+    r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n){if(n%12==0)assert(drive(r,v));r.tick();}
+    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.joystickActive()&&!std::strcmp(drive(r,v),"STOP_LATCHED"));
     assert(!r.m.stand(.12,r.p.now));assert(r.reachStand());}
-  // IMU compensation during a steered walk on a moving board: pitch +2/-2 deg,
-  // roll 0.25 deg, a stride change, no fault (bounded when outside the envelope).
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,vmax);WalkBoardPlant plant(r);unsigned n=0;
-    auto go=[&](double roll0,double pitch0,double roll1,double pitch1,unsigned steps,double vx){for(unsigned k=0;k<steps;++k,++n){
-      if(n%12==0)assert(!r.m.drive(vx,0,0,r.p.now));const double u=double(k+1)/steps;plant.step(roll0+(roll1-roll0)*u,pitch0+(pitch1-pitch0)*u);assert(r.m.state()==simple::State::WALKING);}};
-    go(0,0,0,0,650,vmax);go(0,0,0,2*degree,325,vmax);go(0,2*degree,0,2*degree,650,vmax/3);go(0,2*degree,.25*degree,-2*degree,650,vmax);go(.25*degree,-2*degree,0,0,650,vmax/2);
+  // IMU compensation during steered walks on a moving board: pitch +2/-2 deg,
+  // roll 0.25 deg, lateral and turning commands, no fault (bounded outside the envelope).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0]/2,lim[1]/2,lim[2]/2});WalkBoardPlant plant(r);unsigned n=0;
+    auto go=[&](double roll0,double pitch0,double roll1,double pitch1,unsigned steps,V3 v){for(unsigned k=0;k<steps;++k,++n){
+      if(n%12==0)assert(!drive(r,v));const double u=double(k+1)/steps;plant.step(roll0+(roll1-roll0)*u,pitch0+(pitch1-pitch0)*u);assert(r.m.state()==simple::State::WALKING);}};
+    go(0,0,0,0,650,{lim[0]/2,lim[1]/2,lim[2]/2});go(0,0,0,2*degree,325,{0,lim[1],0});go(0,2*degree,0,2*degree,650,{0,0,-lim[2]});
+    go(0,2*degree,.25*degree,-2*degree,650,{lim[0]/2,-lim[1]/2,lim[2]/2});go(.25*degree,-2*degree,0,0,650,{lim[0],0,0});
     r.m.walkStop();for(unsigned k=0;k<3000&&r.m.state()!=simple::State::STANDING;++k)plant.step(0,0);assert(r.m.state()==simple::State::STANDING);
-    std::printf("JOYSTICK closed-loop movingboard pitch +2/-2deg roll 0.25deg with stride changes: no fault, max_RAW=%u\n",plant.maxRawStep);}
+    std::printf("JOYSTICK closed-loop movingboard pitch +2/-2deg roll 0.25deg, lateral/turn/combined: no fault, max_RAW=%u\n",plant.maxRawStep);}
   // Contract: BASE_VELOCITY gait JOYSTICK through the JSON parser and MotionService.
   {Rig api;core::MotionService service;service.begin(&api.m,nullptr,nullptr);service.setReady(true,"READY");assert(!api.m.stand(.15,api.p.now));assert(api.reachStand());
     unsigned seq=0;auto send=[&](const char* params){char json[400];const int n=std::snprintf(json,sizeof json,
       "{\"version\":1,\"id\":\"joy-%u\",\"sequence\":%u,\"issued_at_ms\":%lu,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":%s}",seq+1,seq+1,(unsigned long)(api.p.now/1000),params);++seq;
       motion::MotionCommand c;const char* why=nullptr;assert(core::parseMotionJson(json,size_t(n),&c,&why));test_clock_us=api.p.now;return service.command(c,api.p.now/1000);};
-    char p[160];
-    auto ack=send("{\"vx\":0.001,\"vy\":0.001,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}");assert(ack.outcome==motion::CommandOutcome::REJECTED&&!std::strcmp(ack.reason,"LATERAL_YAW_NOT_QUALIFIED"));
-    ack=send("{\"vx\":0.001,\"vy\":0,\"yaw_rate\":0.01,\"gait\":\"JOYSTICK\"}");assert(!std::strcmp(ack.reason,"LATERAL_YAW_NOT_QUALIFIED"));
+    char p[200];
+    std::snprintf(p,sizeof p,"{\"vx\":0,\"vy\":%.12f,\"yaw_rate\":%.12f,\"gait\":\"JOYSTICK\"}",lim[1],lim[2]);auto ack=send(p);
+    assert(ack.outcome==motion::CommandOutcome::REJECTED&&!std::strcmp(ack.reason,"JOYSTICK_VELOCITY_RANGE"));
     ack=send("{\"vx\":0.001,\"vy\":0,\"yaw_rate\":0,\"gait\":\"TROT\"}");assert(!std::strcmp(ack.reason,"GAIT_NOT_IN_SIMPLE_V1"));
     ack=send("{\"vx\":0.001,\"vy\":0,\"yaw_rate\":0}");assert(!std::strcmp(ack.reason,"STANDARD_STRIDE_REQUIRED"));  // untimed presets only without JOYSTICK
-    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}",-vmax);ack=send(p);assert(ack.outcome==motion::CommandOutcome::ACCEPTED);
+    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":%.12f,\"yaw_rate\":%.12f,\"gait\":\"JOYSTICK\"}",-lim[0]*.6,-lim[1]*.5,lim[2]*.5);ack=send(p);assert(ack.outcome==motion::CommandOutcome::ACCEPTED);
     for(unsigned n=0;n<3000&&api.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED||api.m.state()==simple::State::MOVING);api.tick();}
     assert(api.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(api.m));
     for(unsigned n=0;n<200;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED);api.tick();}
-    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/simple::kWalkPeriodS);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
+    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/T);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
     test_clock_us=api.p.now;service.update();char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,api.p.now/1000));
-    assert(std::strstr(status,"\"walk_velocity\":{\"vx_m_s\":-0.00692,\"joystick\":true}"));
-    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));assert(std::strstr(caps,"\"joystick\":{\"vx_max_m_s\":0.00692,\"vy_max_m_s\":0,\"yaw_rate_max_rad_s\":0,\"timeout_ms\":1000"));
+    assert(std::strstr(status,"\"walk_velocity\":{\"vx_m_s\":-0.00415,\"vy_m_s\":-0.00154,\"yaw_rate_rad_s\":0.01538,\"joystick\":true}"));
+    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));assert(std::strstr(caps,"\"joystick\":{\"vx_max_m_s\":0.00692,\"vy_max_m_s\":0.00308,\"yaw_rate_max_rad_s\":0.03077,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000"));
     ack=send("{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}");assert(ack.outcome==motion::CommandOutcome::ACCEPTED&&!std::strcmp(api.m.reason(),"WALK_STOPPING"));
     assert(api.reachStand());std::printf("JOYSTICK API status %zu bytes, capabilities %zu bytes\n",std::strlen(status),std::strlen(caps));}
-  std::puts("JOYSTICK PASS: sign/proportional fore-aft, saturation and lateral/yaw refusal, neutral WALK STOP, ESP deadline, rising timeout, reversal via WALK STOP, rate limit and RAW continuity, WALK STANDARD byte equality, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
+  std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
 }
 
 int main(){standHoldTilt();

@@ -159,4 +159,16 @@ WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3
   if (!pointToWorld(pose, out.base.contact.referenceM, out.achievedWorldM)) out.status = TiltedIkResult::Status::INVALID_INPUT;
   return out;
 }
+WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, TiltedIkOptions o) {
+  o.requireNominalStrip = false;
+  // Foot axis in the support frame: R * Rx(hip) * y (UPPER/LOWER keep it).
+  auto tilt = [&](double hip) { return std::asin(std::fmin(1.0, std::abs(pose.rotation[2][1]*std::cos(hip) + pose.rotation[2][2]*std::sin(hip)))); };
+  double lift = edgeContactLiftM(tilt(o.seed.hip));
+  auto r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
+  if (r.status == TiltedIkResult::Status::OK && std::abs(edgeContactLiftM(r.base.contact.axisTiltRad) - lift) > 2e-5) {
+    lift = edgeContactLiftM(r.base.contact.axisTiltRad); o.seed = r.base.joints;
+    r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
+  }
+  return r;
+}
 } }
