@@ -64,7 +64,7 @@ struct ScriptedObservationPort: simple::ServoPort {
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
   bool decodeRaw(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
   bool frame(const uint16_t raw[12],simple::Drive d) override{
-    assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;
+    assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;test_clock_us+=frameDelayUs;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}
     const bool drop=dropFrames>0;if(drop)--dropFrames;
     for(unsigned i=0;i<12;++i)if(!drop||static_cast<int>(i)!=dropFrameSlot)target[i]=raw[i];if(stopOnFrame&&motion){motion->stop();stopOnFrame=false;}return true;
@@ -72,6 +72,7 @@ struct ScriptedObservationPort: simple::ServoPort {
   bool enable(unsigned i) override{assert(frames>0);assert(std::abs(int(target[i])-int(observed[i].raw))<=12);observed[i].torque=1;++enables;if(stopOnEnable&&motion){motion->stop();stopOnEnable=false;return false;}return true;}
   bool off(unsigned first=0) override{++offCalls;offFirst.push_back(first);for(unsigned i=first;i<12;++i)if(int(i)!=stuckTorque)observed[i].torque=0;return true;}
   int stuckTorque=-1;
+  int64_t frameDelayUs=0;  // ESP time consumed by the SYNC_WRITE itself
   int failVerify=-1;  // one servo whose torque-OFF read-back fails
   bool verifyOff(unsigned i) override{return verify&&static_cast<int>(i)!=failVerify&&(i==12||observed[i].torque==0);}
   // Explicitly publish scripted encoder snapshots. No assertion is made that
@@ -374,8 +375,37 @@ static void walkLevelBoard(){
   std::puts("WALK profile entry STOP and production closed-loop board tests PASS; no hardware contact/stability qualification");
 }
 
+// TX/compute latency is not reference motion (dev.13 regression): with 7 ms
+// TX or alternating 0/7 ms and late releases, the WALK pre-check and STOP
+// take the secant on the sampling clock and neither fakes a stop failure.
+static void walkTxLatency(){
+  constexpr double degree=3.14159265358979323846/180;
+  for(unsigned stride:{1u,2u}){
+    {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
+      for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      WalkBoardPlant plant(r);r.p.frameDelayUs=7000;plant.ramp(0,0,.1*degree,-.3*degree);plant.hold(.1*degree,-.3*degree,650);
+      for(unsigned n=0;n<650;++n){r.p.frameDelayUs=n&1?0:7000;if(n%7==0)r.p.now+=15000;plant.step(.1*degree,-.3*degree);}
+      const uint64_t start=r.p.now;r.m.stop();
+      for(unsigned n=0;n<300&&!r.m.stopVerified();++n){r.p.frameDelayUs=n&1?0:7000;plant.step(.1*degree,-.3*degree);}
+      assert(r.m.stopVerified()&&r.m.energized()&&r.p.now-start<6000000);}
+    // STOP at every 13th release over two cycles under alternating TX latency.
+    for(unsigned when=0;when<650;when+=13){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
+      for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();
+      WalkBoardPlant plant(r);for(unsigned n=0;n<200+when;++n){r.p.frameDelayUs=n&1?0:7000;plant.step(.1*degree,-.3*degree);}
+      r.m.stop();for(unsigned n=0;n<300&&!r.m.stopVerified();++n){r.p.frameDelayUs=n&1?0:7000;plant.step(.1*degree,-.3*degree);}
+      if(!r.m.stopVerified())std::printf("WALK%u STOP at %u not verified: %s\n",unsigned(simple::kStrideM[stride]*1000),when,r.m.reason());
+      assert(r.m.stopVerified());}
+  }
+  // Long HOLD with unchanged RAW and TX latency: the levelled reference still
+  // follows a later board change (no stale-reference wedge, no fault).
+  {Rig r;assert(!r.m.stand(.12,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);r.p.frameDelayUs=7000;
+    plant.settle(0,0,3000);plant.settle(0,2*degree,1100);assert(simple::StopReferenceProbe::pitch(r.m)<-1.5*degree);plant.settle(0,0,1100);}
+  std::puts("TX latency 7 ms / alternating 0-7 ms / late releases: WALK45/60 pre-check, STOP in WALK and long HOLD PASS (software timing only)");
+}
+
 int main(){standHoldTilt();
   walkLevelBoard();
+  walkTxLatency();
   proneHandoverWait();
   // Exercise the production gait + IK across every join: swing lift-off and
   // touchdown, four-contact sway windows, end of the start ramp, decel start,

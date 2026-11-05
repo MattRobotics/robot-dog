@@ -177,6 +177,8 @@ bool SimpleMotion::serviceStop(){
 void SimpleMotion::rememberReference(uint64_t now){
   // Called BEFORE commandedRaw_ is replaced following a successful TX, or
   // for an unchanged RAW goal. Never publish a failed/preempted frame.
+  // now is the instant the reference was sampled at, not TX completion:
+  // compute/bus latency must not shorten the secant of the reference.
   if(issuedUs_&&now>issuedUs_){previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
   issuedUs_=now;
   if(stopActive_)return; // keep the revoked operation metadata, not stale RAW history
@@ -504,13 +506,13 @@ bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool 
   // Identical RAM goals need no retransmission, especially in HOLD. Always
   // write the measured reference with torque OFF before enabling.
   if(!holdReference&&goal_.valid&&drive.speed==commandedDrive_.speed&&drive.acc==commandedDrive_.acc&&
-     std::equal(raw,raw+12,commandedRaw_)){goal_=q;rememberReference(esp_timer_get_time());return true;}
+     std::equal(raw,raw+12,commandedRaw_)){goal_=q;rememberReference(now);return true;}
   if(!frameTimed(raw,drive)){
     // A repeated STOP may preempt even its authorized frame. Retry the same
     // arrest clock next release; intentional preemption is not a bus failure.
     if(port_->framePreempted()&&(stop_.load()||safeOffRequest_.load()))serviceStop();else fault("SYNC_WRITE_FAILED");return false;
   }
-  rememberReference(esp_timer_get_time());
+  rememberReference(now);
   commandedDrive_=drive;goal_=q;for(unsigned i=0;i<12;++i)commandedRaw_[i]=raw[i];goalSentUs_=now;
   if(serviceStop())return false; // include the completed atomic UART burst in STOP history
   // Native speed/acceleration transit estimate, conservative 2x + V25's
@@ -834,7 +836,9 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
   const uint64_t at=esp_timer_get_time();
   if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return false;
   const Drive drive=phase_==Phase::WALK?kWalkDrive:kStandDrive;
-  StopPlan arrest;double lo[12],hi[12];const double dt=(at-issuedUs_)/1e6;
+  // Same secant STOP would take after this send: both samples on the reference clock.
+  if(nowUs_<=issuedUs_)return false;
+  StopPlan arrest;double lo[12],hi[12];const double dt=(nowUs_-issuedUs_)/1e6;
   for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
     arrest.q[i]=jointSlot(decoded,i);arrest.v[i]=std::clamp((arrest.q[i]-old)/dt,-drive.speed*kTickRad,drive.speed*kTickRad);
     lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
