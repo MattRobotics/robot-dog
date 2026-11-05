@@ -360,7 +360,14 @@ async function boot() {
   assert(!values().includes('13/13 verificato') && /\d+\/13 verificati/.test(values()), values());
   await refresh(fx.status_stopped_on);
   assert.strictEqual(q('#simple-state').textContent,'STOP COMPLETATO · COPPIA ON');
-  assert(q('#simple-stand').disabled&&values().includes('Compensazione IMUcongelata durante STOP'));
+  assert(!q('#simple-stand').disabled&&JSON.parse(fx.status_stopped_on).stop.stand_resume_allowed,
+    'explicit STAND follows Controller admission after a verified synchronous HEIGHT/WALK stop');
+  assert(values().includes('Compensazione IMUcongelata durante STOP'));
+  const refusedStop=JSON.parse(fx.status_stopped_on);
+  refusedStop.stop.stand_resume_allowed=false;refusedStop.stop.stand_resume_reason='STOP_RECOVERY_PATH_NOT_CLEAR';
+  await refresh(JSON.stringify(refusedStop));
+  assert(q('#simple-stand').disabled&&q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR'),
+    'UI preserves the Controller refusal and exposes its reason');
   await refresh(fx.status_stopped);
   assert(values().includes('SAFE_OFF13/13 verificato'), values());
   assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
