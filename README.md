@@ -2,9 +2,9 @@
 
 MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 trasforma i comandi della dashboard in traiettorie e comandi coordinati ai servo; raccoglie feedback e gestisce STOP e protezioni. Il Digital Twin mostra la posa misurata. L'obiettivo successivo è il comando direzionale continuo, senza affidare al browser il controllo degli attuatori.
 
-**Al 05/11/2026 il robot ha installata la dev.14.** STAND, PRONE e WALK STANDARD sono stati osservati sul robot reale; la stabilizzazione IMU è già implementata e attiva, ma non ancora adeguata per ampiezza e velocità. Il flash è verificato; la validazione Motion è **parziale**. Non è una release stable.
+**Al 06/11/2026 il robot ha installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
 
-[Report hardware dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [codice esatto installato, tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) · [problemi aperti](09_Logs/OPEN_ITEMS.md)
+[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
 
 ## Hardware e architettura
 
@@ -18,38 +18,40 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 | Geometria | URDF operativo REV01-FIX; mapping e calibrazione persistente gen-1 preservati |
 | Alto livello | Jetson Orin Nano Super previsto per integrazioni successive; nessuna autorità diretta browser → servo |
 
-## Cosa funziona e cosa resta da completare
+## Stato operativo dev.15
 
-| Funzione | Stato reale della dev.14 |
+| Funzione | Risultato verificato e limiti |
 |---|---|
-| STAND e PRONE | Transizioni osservate a terra, incluso PRONE → STAND150 e HOLD120. La prima prova STAND150 partiva dalla stessa posa sulla fixture. |
-| WALK STANDARD | WALK30 e WALK60 realmente eseguiti; appoggi regolari riferiti dall'operatore. Restano release perse persistenti e picchi superiori al periodo nominale di20ms. |
-| Stabilizzazione IMU | Correzione pitch/roll implementata e attiva. Pitch quasi assente a150mm; a100mm pitch e roll reagiscono, ma risposta lenta ed escursione laterale insufficiente secondo operatore. Ampiezza geometrica e velocità di risposta sono problemi distinti. |
-| STOP | Arresto controllato e coppia mantenuta osservati da STAND e WALK. Recupero WALK operativo ma lungo; recupero dopo STOP in PRONE intermedia incompleto. |
-| PRONE terminale | Coppia ON; appoggio non verificato. Nessun rilascio automatico della coppia qualificato soltanto dalla posa PRONE. |
-| Digital Twin | Segue la posa; Reset vista non ripristina ancora il riferimento frontale grafico +X richiesto. Nessun reset fisico IMU per correggere la UI. |
-| RESTORE NVS | Automatico gen-1 operativo; boot dev.14 con record integro e READY. Percorso manuale dashboard e manutenzione da qualificare separatamente. |
-| LED | Nessuna anomalia riferita nell'ultima sessione; il difetto intermittente storico resta aperto. |
+| STAND | STAND100 e STAND150 completati; STAND50 completato nel seguito, con risalita automatica PRONE→STAND100. |
+| WALK STANDARD | WALK45 e WALK60 eseguiti sul robot reale, WALK STOP operativo. La cadenza è bassa e le deadline a 20 ms sono ripetutamente perse. |
+| Joystick 3DOF | Avanti/indietro, strafe, yaw nei due sensi e composizioni proporzionali effettivamente provati. Rilascio del comando corretto; assestamento verso STAND fino a ~8,4 s, troppo lento. |
+| PRONE terminale | **INTERMITTENTE / NON QUALIFICATO**: due `PRONE_REST` con torque OFF13/13; due timeout verificati a ~52 mm con caduta al rilascio; terzo caso riferito senza JSON. Necessarie RCA fase e gestione sicura del supporto. |
+| Stabilizzazione IMU | Pitch/roll attivi e più reattivi secondo operatore; ampiezza roll limitata da `WORKSPACE`. Correzione applicata ≠ livellamento assoluto del corpo. |
+| STOP | Accessibile e verificato: STOP in STAND/WALK può lasciare coppia ON se supporto non verificato; dopo fault PRONE conferma SAFE_OFF 13/13 ma il fault resta latched. |
+| Digital Twin | Segue la posa, Reset vista frontale **+X verificato hardware**; restano eventuali verifiche UI/pavimento e badge LIVE della issue #62. |
+| NVS / BMS | gen-1 `VALID_ACKNOWLEDGED`, census 13/13, READY; BMS fresco in dev.15. Restore manuale da dashboard non qualificato. |
+| LED / termica | Sfarfallamento policromatico intermittente aperto; picchi termici isolati da indagare, non prova di surriscaldamento continuo. |
+| HostLink / Jetson | Bridge/USB non qualificati Motion hardware; Jetson prevista, **non installata**. |
 
-Le osservazioni fisiche non sono una misura di contatto o stabilità certificata. I test offline non equivalgono a prove hardware. Cause dei picchi temporali e delle letture termiche isolate restano da discriminare; non vanno nascoste riducendo le protezioni.
+Le evidenze sono specifiche di questa sessione; l'hardware non è ancora qualificato per operatività stabile o locomozione veloce. I file grezzi e il video sono attualmente locali, identificati con SHA256 nel manifest e non ancora pubblicati su GitHub.
 
 ## Quattro riferimenti da non confondere
 
 | Linea | Significato |
 |---|---|
-| **main** | Sorgente attualmente integrato, basato sulla linea dev.7 più documentazione. Questo closeout non integra il firmware dev.14 o dev.15. Una build di main non è l'APP installata. |
-| **dev.14** | Firmware realmente installato e parzialmente validato. Sorgente conservato dal tag annotato [checkpoint/matdog-dev14-hw-20261105](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105). |
-| **dev.15** | Sviluppo Motion direzionale in corso, separato e **NON validato hardware**; questo documento non ne attesta compilazione o qualifica. |
+| **main** | Sorgente remoto integrato, basato sulla linea dev.7 più documentazione. La PR dev.15 è **solo documentale**; main non è l'APP installata. |
+| **dev.14** | Firmware installato e validato parzialmente **il 05/11**, ora storico; sorgente sul [checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105). |
+| **dev.15** | **Firmware installato e parzialmente validato hardware il 06/11**. Build `7997ad4d4497`, APP SHA256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13`. Il commit sorgente `7997ad4` è tuttora solo locale, non su GitHub. |
 | **dev.7** | [Pre-release storica pubblicata](https://github.com/MattRobotics/robot-dog/releases/tag/matdog-controller-v1.0.1-dev.7), con [report del31/10](09_Logs/Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md). Non è più il firmware installato e non viene promossa a stable. |
 
-Identità dev.14: commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5decee`, build `4ff2aadf4ed9`, profilo ROBOT_POWERED, OTA ingest0. APP SHA256: `71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22`. Il tag conserva il sorgente; non è una nuova GitHub Release e non garantisce una ricompilazione bit-identica.
+Identità storica dev.14 (05/11): commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5decee`, build `4ff2aadf4ed9`, profilo ROBOT_POWERED, OTA ingest0. APP SHA256: `71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22`. Il tag conserva il sorgente; non è una nuova GitHub Release e non garantisce una ricompilazione bit-identica.
 
 ## Priorità aperte
 
-- [#52 — Motion](https://github.com/MattRobotics/robot-dog/issues/52): budget temporale, IMU, recuperi STOP e tracking.
-- [#62 — Dashboard, Twin e LED](https://github.com/MattRobotics/robot-dog/issues/62): Reset vista +X e difetto LED intermittente.
-- [#48 — RESTORE e manutenzione](https://github.com/MattRobotics/robot-dog/issues/48): percorso manuale, rifiuti motivati e sospensione dell'automatismo.
-- [#46 — Stable futura](https://github.com/MattRobotics/robot-dog/issues/46): accettazione e pubblicazione dopo qualifica del binario effettivo.
+- **[#52 — Motion](https://github.com/MattRobotics/robot-dog/issues/52):** PRONE intermittente con rilascio pericoloso della coppia a ~53 mm, fault recovery, costo `COMPENSATE`/deadline 20 ms e `MOTION_BUDGET_UNAVAILABLE` via HTTP, cadenza e sway WALK, risposta ROLL limitata e velocità utile da aumentare (target evolutivo fino a 5×, **non validato**).
+- **[#62 — Dashboard, Twin e LED](https://github.com/MattRobotics/robot-dog/issues/62):** Reset vista frontale +X **risolto e verificato dall'operatore sulla dev.15**; LED intermittente e altri criteri UI restano aperti. Non chiudere l'intera issue.
+- **[#48 — RESTORE e manutenzione](https://github.com/MattRobotics/robot-dog/issues/48):** automatico gen-1 verificato; percorso manuale, diagnosi di rifiuto e modalità manutenzione ancora da qualificare.
+- **[#46 — Stable futura](https://github.com/MattRobotics/robot-dog/issues/46):** richiede ancora integrazione sorgente/binario corrispondente, RCA e qualifica Motion prima della release.
 
 ## Orientarsi nel repository
 
