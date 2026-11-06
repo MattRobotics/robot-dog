@@ -4,7 +4,7 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 
 **Al 06/11/2026 il robot ha installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
 
-[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
+[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
 
 ## Hardware e architettura
 
