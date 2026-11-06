@@ -220,6 +220,12 @@ void CommandRouter::update(uint32_t now_ms) {
   }
 }
 
+namespace {
+// One USB Motion JSON line at a time (router thread only): @MOTION STATUS,
+// @MOTION CAPABILITIES.
+constexpr size_t kUsbMotionJsonBytes=6144;
+char* usbMotionJson(){static char out[kUsbMotionJsonBytes];return out;}
+}
 void CommandRouter::handleLine(String line) {
   line.trim();
   if (line.length() == 0) return;
@@ -293,8 +299,8 @@ void CommandRouter::handleLine(String line) {
     Serial.println(n>0&&static_cast<size_t>(n)<sizeof(out)?out:"HOSTLINK=UNAVAILABLE");return;
   }
   if(upper=="@MOTION CAPABILITIES"){
-    static char out[2048];
-    Serial.println(modules_.service&&modules_.service->motionCapabilities(out,sizeof(out))?out:"MOTION_CAPABILITIES=UNAVAILABLE");return;
+    char* out=usbMotionJson();  // shared with @MOTION STATUS: no extra RAM
+    Serial.println(modules_.service&&modules_.service->motionCapabilities(out,kUsbMotionJsonBytes)?out:"MOTION_CAPABILITIES=UNAVAILABLE");return;
   }
   if(upper.startsWith("@MOTION JSON ")){
     const char* body=line.c_str()+13;motion::MotionCommand c;const char* why=nullptr;
@@ -305,9 +311,9 @@ void CommandRouter::handleLine(String line) {
   }
   if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP") {
     if(upper=="@MOTION STATUS"){
-      static char out[6144];MotionStatusSnapshot snapshot;bool ok;
+      char* out=usbMotionJson();MotionStatusSnapshot snapshot;bool ok;
       {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
-      if(ok){simple::timing::Outside timer(simple::timing::USB_FORMAT);ok=MotionService::formatStatus(snapshot,out,sizeof(out));}
+      if(ok){simple::timing::Outside timer(simple::timing::USB_FORMAT);ok=MotionService::formatStatus(snapshot,out,kUsbMotionJsonBytes);}
       if(ok){simple::timing::Outside timer(simple::timing::USB_SERIAL);Serial.println(out);}return;
     }
     motion::MotionCommand c;c.owner=motion::ClientOwner::LOCAL;c.sequence=++simple_sequence_;c.issued_at_ms=millis();c.ttl_ms=1000;
