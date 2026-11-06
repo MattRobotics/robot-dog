@@ -388,7 +388,9 @@ class SocketClients(BridgeCase):
         self.sim()
         link = self.bridge()
         self.ready()
-        path = os.path.join(self.dir, "bridge.sock")
+        sockdir = tempfile.mkdtemp(prefix="mdb-", dir="/tmp")  # AF_UNIX paths are limited to 108 bytes
+        self.addCleanup(os.rmdir, sockdir)
+        path = os.path.join(sockdir, "bridge.sock")
         server = B.SocketServer(path, link)
         stop = threading.Event()
         t = threading.Thread(target=server.serve, args=(stop,), daemon=True)
