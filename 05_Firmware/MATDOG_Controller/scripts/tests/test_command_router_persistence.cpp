@@ -625,7 +625,86 @@ void source_identity_is_read_only() {
   before.checkUnchanged(f);
 }
 
+// HostLink (dev.15): the Motion contract v1 over USB through the real router,
+// the real MotionService and SimpleMotion. The servo port answers nothing:
+// no ServoBus call, no frame or enable may come from these lines.
+struct InertServoPort : matdog::simple::ServoPort {
+  unsigned frames = 0, enables = 0;
+  bool read(unsigned, bool, matdog::simple::Feedback&) override { return false; }
+  bool resolve(unsigned, double, uint16_t&) override { return false; }
+  bool frame(const uint16_t*, matdog::simple::Drive) override { ++frames; return false; }
+  bool enable(unsigned) override { ++enables; return false; }
+  bool off(unsigned) override { return true; }
+  bool verifyOff(unsigned) override { return true; }
+};
+std::string envelope(const char* id, const char* type, const char* params, long issued_offset_ms = 0,
+                     unsigned ttl = 1000, const char* owner = "local", unsigned version = 1) {
+  char out[400];
+  std::snprintf(out, sizeof out, "@MOTION JSON {\"version\":%u,\"id\":\"%s\",\"sequence\":1,\"issued_at_ms\":%lu,\"ttl_ms\":%u,\"owner\":\"%s\",\"type\":\"%s\",\"params\":%s}",
+                version, id, (unsigned long)(millis() + issued_offset_ms), ttl, owner, type, params);
+  return out;
+}
+void hostlink_motion_contract() {
+  framing_case = "hostlink";
+  Fixture f;
+  static InertServoPort port;
+  static matdog::simple::SimpleMotion motion;
+  motion.begin(&port);
+  MotionService service;
+  service.begin(&motion, nullptr, nullptr);
+  service.setReady(true, "READY");
+  f.telemetry.bindMotionService(&service);
+  const auto hardware_before = router_test::hardware_calls;
+  auto line = [&](const std::string& text) { return f.command(text.c_str()); };
+  auto one = [](const std::string& out) { return !out.empty() && out.back() == '\n' && out.find('\n') == out.size() - 1; };
+
+  const auto hello = line("@HOSTLINK HELLO");
+  CHECK(one(hello) && hello.rfind("{\"hostlink\":1,\"contract\":1,", 0) == 0);
+  CHECK(hello.find(std::string("\"version\":\"") + matdog::build::kFirmwareVersion + "\"") != std::string::npos);
+  CHECK(hello.find("\"usb_owner\":\"local\",\"line_max\":319,\"uptime_ms\":") != std::string::npos);
+  CHECK(hello.find("\"motion_stack\":\"MATDOG_SIMPLE_V1\"") != std::string::npos);
+  const auto caps = line("@MOTION CAPABILITIES");
+  CHECK(one(caps) && caps.rfind("{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",", 0) == 0);
+  CHECK(caps.find("\"terminal\":\"REST_TORQUE_OFF_SUPPORT_UNVERIFIED\",\"automatic_safe_off\":true") != std::string::npos);
+  CHECK(caps.find("\"timeout_ms\":1000") != std::string::npos);
+  const auto status = line("@MOTION STATUS");
+  CHECK(one(status) && status.rfind("{\"version\":1,\"now_ms\":", 0) == 0);
+
+  // Semantic commands: one JSON ack per line, id echoed, owner local.
+  const auto stand = line(envelope("h-stand", "POSTURE.STAND", "{\"target_height_m\":0.15}"));
+  CHECK(one(stand) && stand.find("\"ack\":true,\"id\":\"h-stand\"") != std::string::npos && stand.find("\"owner\":\"local\"") != std::string::npos);
+  const auto prone = line(envelope("h-prone", "POSTURE.LIE_DOWN", "{}"));
+  CHECK(one(prone) && prone.find("\"id\":\"h-prone\"") != std::string::npos);
+  const auto joy = line(envelope("h-joy", "BASE_VELOCITY", "{\"vx\":0.003,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}"));
+  CHECK(one(joy) && joy.find("\"id\":\"h-joy\"") != std::string::npos);
+  // The contract's own TTL bounds a velocity command: expired, future, too long.
+  CHECK(line(envelope("h-old", "BASE_VELOCITY", "{\"vx\":0.003,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}", -1000)).find("\"outcome\":\"REJECTED\",\"reason\":\"EXPIRED\"") != std::string::npos);
+  CHECK(line(envelope("h-fut", "BASE_VELOCITY", "{\"vx\":0.003,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}", 5)).find("\"reason\":\"FUTURE_TIMESTAMP\"") != std::string::npos);
+  CHECK(line(envelope("h-ttl", "BASE_VELOCITY", "{\"vx\":0.003,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}", 0, 2000)).find("\"reason\":\"TTL_RANGE\"") != std::string::npos);
+  CHECK(line(envelope("h-v2", "MOTION.STATUS", "{}", 0, 1000, "local", 2)).find("\"reason\":\"SCHEMA_VERSION\"") != std::string::npos);
+  // USB identifies its client: other owners are refused before MotionService.
+  CHECK(line(envelope("h-dash", "MOTION.STOP", "{}", 0, 1000, "dashboard")) == "MOTION=REJECTED REASON=LOCAL_OWNER_REQUIRED\n");
+  CHECK(line(envelope("h-jet", "MOTION.STOP", "{}", 0, 1000, "jetson")) == "MOTION=REJECTED REASON=LOCAL_OWNER_REQUIRED\n");
+  // Malformed envelopes: bounded parser, one refusal line, nothing executed.
+  for (const char* bad : {"@MOTION JSON {", "@MOTION JSON {}", "@MOTION JSON not-json",
+                          "@MOTION JSON {\"version\":1,\"version\":1}",
+                          "@MOTION JSON {\"version\":1,\"id\":\"x\",\"sequence\":1,\"issued_at_ms\":0,\"ttl_ms\":1,\"owner\":\"local\",\"type\":\"MOTION.STOP\",\"params\":{}} trailing"})
+    CHECK(line(bad) == "MOTION=REJECTED REASON=INVALID_JSON_SCHEMA\n");
+  CHECK(f.command((std::string("@MOTION JSON ") + std::string(400, 'x')).c_str()) == "ERROR=COMMAND_LINE_OVERFLOW\n");
+  CHECK(one(line("@HOSTLINK HELLO")));  // the reader recovers on the next line
+  // STOP is accepted with any timestamp/TTL (contract) and latches the Motion owner.
+  const auto stop = line(envelope("h-stop", "MOTION.STOP", "{}", -1000, 1));  // issued_at 0, TTL 1 ms: long expired
+  CHECK(one(stop) && stop.find("\"id\":\"h-stop\"") != std::string::npos && stop.find("\"outcome\":\"ACCEPTED\",\"reason\":\"STOP_REQUESTED\"") != std::string::npos);
+  CHECK(line("@MOTION STOP").find("\"outcome\":\"ACCEPTED\"") != std::string::npos);  // the existing text STOP is unchanged
+  // A replayed id after a reconnect is answered from the replay slot, never re-executed.
+  CHECK(line(envelope("h-joy", "BASE_VELOCITY", "{\"vx\":0.003,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}")) == joy);
+  CHECK(port.frames == 0 && port.enables == 0 && router_test::hardware_calls == hardware_before);
+  f.telemetry.bindMotionService(nullptr);
+  std::printf("HOSTLINK USB contract: hello, capabilities, status, STAND/LIE_DOWN/JOYSTICK/STOP acks, TTL/owner/schema refusals, overflow recovery; no ServoBus call\n");
+}
+
 int main() {
+  hostlink_motion_contract();
   source_identity_is_read_only();
   network_quiet_reservation();
   parser_and_read_only(); identical_recapture_through_real_commands(); authorization_gates();

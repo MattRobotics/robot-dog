@@ -19,6 +19,7 @@
 #include "../actuator/OperationalEnvelope.h"
 
 #include "../config/BuildConfig.h"
+#include "MotionJson.h"
 #include "../update/OtaLayoutContract.h"
 #include "../config/Pins.h"
 #include "../network/HttpTransport.h"
@@ -279,6 +280,28 @@ void CommandRouter::handleLine(String line) {
       Serial.printf("SERVO_SAFE_OFF id=%d scope=GLOBAL_13 result=REQUESTED_VERIFY_MOTION_STATUS\n",id);return;
     }
     printServoSafeOff(id);return;
+  }
+  // HostLink (dev.15): a USB host (the future Jetson bridge) speaks the Motion
+  // contract v1 the Dashboard sends over HTTP, through the same MotionService.
+  // USB identifies its client as LOCAL, like the @MOTION text commands: no new
+  // owner, authority, session, heartbeat or state. One line in, one line out,
+  // inside the existing 320 B line reader and the zero-timeout TX ring.
+  if(upper=="@HOSTLINK HELLO"){
+    char out[512];
+    const int n=snprintf(out,sizeof(out),"{\"hostlink\":%u,\"contract\":%u,\"firmware\":\"%s\",\"version\":\"%s\",\"git_sha\":\"%s\",\"git_dirty\":%s,\"build_id\":\"%s\",\"build_utc\":\"%s\",\"profile\":\"%s\",\"motion_stack\":\"%s\",\"usb_owner\":\"local\",\"line_max\":%u,\"uptime_ms\":%lu}",
+      kHostLinkProtocol,(unsigned)motion::kMotionContractVersion,build::kFirmwareName,build::kFirmwareVersion,build::kGitSha,build::kGitDirty?"true":"false",build::kBuildId,build::kBuildUtc,build::kTestProfile,build::kMotionStack,(unsigned)(kLineBufSize-1),(unsigned long)millis());
+    Serial.println(n>0&&static_cast<size_t>(n)<sizeof(out)?out:"HOSTLINK=UNAVAILABLE");return;
+  }
+  if(upper=="@MOTION CAPABILITIES"){
+    static char out[2048];
+    Serial.println(modules_.service&&modules_.service->motionCapabilities(out,sizeof(out))?out:"MOTION_CAPABILITIES=UNAVAILABLE");return;
+  }
+  if(upper.startsWith("@MOTION JSON ")){
+    const char* body=line.c_str()+13;motion::MotionCommand c;const char* why=nullptr;
+    if(!modules_.service||!parseMotionJson(body,strlen(body),&c,&why)){Serial.printf("MOTION=REJECTED REASON=%s\n",modules_.service?why:"NOT_INITIALIZED");return;}
+    if(c.owner!=motion::ClientOwner::LOCAL){Serial.println("MOTION=REJECTED REASON=LOCAL_OWNER_REQUIRED");return;}
+    const auto ack=modules_.service->motionCommand(c,millis());char out[512];
+    Serial.println(modules_.service->motionAck(ack,out,sizeof(out))?out:"MOTION=REJECTED REASON=ACK_UNAVAILABLE");return;
   }
   if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP") {
     if(upper=="@MOTION STATUS"){
@@ -1420,6 +1443,9 @@ void CommandRouter::printHelp() {
   Serial.println("  @ACTUATOR STATUS       (read-only; no command can plan/commit/execute)");
   Serial.println("  @SYSTEM SOURCE_SIGNATURE  (read-only build/source identity)");
   Serial.println("  @HOSTLINK READINESS    (read-only; BLOCKED/TO_TEST/READY per capability)");
+  Serial.println("  @HOSTLINK HELLO        (JSON identity: protocol, contract, build, uptime)");
+  Serial.println("  @MOTION CAPABILITIES   (JSON, as GET /api/motion/capabilities)");
+  Serial.println("  @MOTION JSON <envelope> (Motion contract v1, owner \"local\"; JSON ack)");
   Serial.println("  @SERVO SCAN <lo> <hi>   (MAINTENANCE mode only; incremental, bounded");
   Serial.println("                           per-ID blocking, result follows asynchronously)");
   Serial.println("  @SERVO CENSUS           (MAINTENANCE mode only; canonical 11-55 scan,");
