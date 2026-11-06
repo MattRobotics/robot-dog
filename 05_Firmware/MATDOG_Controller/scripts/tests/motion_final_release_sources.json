@@ -1,14 +1,18 @@
 {
   "baseline_commit": "4634de8007bd086ce07f8874119f47569f76ea1c",
   "updated_copied_sources": {
-    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "b17d64d9f302e75ae70a5a509dd2051d3a594f37be978ceac8ffe5eec7a2f9da",
-    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "15f8e0e32628e315b607cef79dc17432ca760cdf3588252148686fbfdcdd0bd8",
-    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e7bac278388373cd48916efee1a2b7d4f0c3eeae18df13aae2df703cfe63e457",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "f45fb50b35ff10d4c5d27d35ed3025f6ea58ec0dc832f9f1fd351cd62c020437",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "944e04e45af834f5abfea5975d258ea6691542e55566b49b4423f936c1caa948",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "9554d0600dc4cc90d0e78edcc5d79538d964a4b480fe93634ba6cd16fd6d5ac3",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "2c80fcbba9a8fcb8b44cd4888505453c819c7f7a0eb7be45f1568c0e4949bd5b",
+    "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "30be4aadd9d06fa6781fef97143fc13af4b2324014825964f32e42034fcc41ea",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "90b86005366a3230ec9c14f0a890a06abee7e4e62e05cf5ad42ed1e4e9407097",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "bbe099cea1d7b6c52b07ee3f1449c297860f4f072917a34225b43e2ebc83f720",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "9ec52c28c3191617ee633a1919897faeca0689d091488bd55277f2ac48f94ced",
-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "ef0d4c2773aae63e3f585b53824c25b1f46ce2745290011a6cfc7559d36436ed"
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "6577354fdd69cbca414d9f23691c65611fd52224fa2a6a8b8225fe17c2c5cd3b",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "6a1dfcafbd76bc4ab5e8172b3be3635d9b40a9a21951843c13f005dab8daf61d"
   },
   "removed_copied_sources": [
     "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",

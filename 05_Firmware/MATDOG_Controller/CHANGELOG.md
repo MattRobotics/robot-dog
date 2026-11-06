@@ -8,6 +8,17 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — MATDOG Controller 1.0.1-dev.15 candidate: joystick Motion, PRONE STOP recovery, runtime cost (on dev.14 `4ff2aad`) — 2026-11-06
+
+> Offline candidate, IMPLEMENTED NOT VALIDATED HW. dev.14 (`4ff2aad`, APP `71028f95…`) stays the installed reference. Calibration gen-1, mapping, Geometry V5/URDF, partitions, STOP/SAFE_OFF and physical limits unchanged.
+
+- **JOYSTICK.** `BASE_VELOCITY` with `gait:"JOYSTICK"`: continuous `vx`, `vy`, `yaw_rate` on the existing SE(2) WALK law, inside the ellipsoid 45 mm / 20 mm / 0.20 rad per 6.5 s cycle, per-axis rate limit over two cycles, swing targets planned on the ramp, planted feet never moved by a retarget. Backward walks use the time-reversed leg order; a fore/aft reversal ends the walk with WALK STOP. The ESP ends the walk with WALK STOP 1 s after the last admitted command; STOP independent. Presets without `gait` keep WALK STANDARD unchanged.
+- **Steered geometry.** Stance contact on the 2 mm tread fillet beyond the 2° strip (closed form, STL agreement 0.03 mm, up to 12°); joint box `kSteer` certified CAD/FCL 120/120 pairs ≥ 3 mm (min 10.87 mm) + 12/12 adjacent; 12 mm lateral sway and an IMU tilt envelope for steered walks only. Fixed the level correction dropping the gait heading (latent in dev.14, yaw always 0).
+- **STOP recovery.** STAND after a STOP in PRONE_HEIGHT/LIFT/DEPLOY/LAND or a planned STAND_DEPLOY/LIFT segment restarts the existing route of the certified region holding the held RAW and the measured pose, torque ON, no ACQUIRE/ENABLE.
+- **Runtime cost.** Analytic IK verifies only the seed-nearest candidates and no longer runs FK on the seed; squared Newton residuals; one Gauss-Jordan pass for condition inverses. WALK release: sin/cos 282→242, inverse trig 72→64, sqrt 118→94 (host count), joint targets identical.
+- **IMU.** Slew 0.040 rad/s in physical time (dev.14 0.020 rad/s per release), capped after missed releases; correction reason, requested/applied roll/pitch exported.
+- **Diagnostics/UI.** Status: MotionTiming max-work/first-miss partitions, thermal counters, walk law velocity. Dashboard three-axis pad + rotation buttons; telemetry provenance. Twin Reset vista faces canonical +X via the robot anchor yaw reference.
+
 ## Unreleased — MATDOG Controller 1.0.0-rc.4 candidate: operational firmware, no operator-presence gates (on `f838f67`, SIMPLE 1.0.0-rc.3) — 2026-10-23
 
 > Embedded Motion & Robot Control Firmware. Offline candidate, not hardware-qualified; 1.0.0 follows hardware qualification. SIMPLE 1.0.0-rc.3 (`f838f677`, APP `e244f9b8…`) stays the historical/installed reference. Motion stack unchanged (`MATDOG_SIMPLE_V1`: gait, IK, geometry, servo mapping, calibration untouched).
