@@ -27,8 +27,9 @@ constexpr double kStrideM[]={.030,.045,.060};
 // where lateral and turning steps need it: 12 mm lateral sway and stance
 // contact on the tread fillet (FootContact.h), inside its own certified joint
 // box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
-// the URDF COM, steady commands keep >= +0.8 mm static support in every
-// direction (scripts/offline_motion/run_joystick_envelope.sh). The Controller
+// the URDF COM, steady commands keep >= +0.35 mm static support (pure clockwise
+// turn the lowest); random multi-axis command changes reach -0.9 mm in
+// transients (scripts/offline_motion/run_joystick_envelope.sh). The Controller
 // ends the walk with WALK STOP when no admitted joystick command arrives for
 // kJoystickTimeoutUs (ESP clock).
 constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
