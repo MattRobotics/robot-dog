@@ -43,6 +43,16 @@ Ogni file conserva tipicamente gli ultimi 240 snapshot (~84–90 s) e gli ultimi
 
 L'analisi ricostruita nel repository è [VIDEO_AUDIT.md](VIDEO_AUDIT.md); non equivale al file originale sopra e non ne condivide lo SHA. CSV per-frame e video sono conservati localmente, non sincronizzati da questa PR.
 
+## Archivio integrale di consegna (conversazione, non GitHub)
+
+È stato creato e verificato un archivio ZIP unico di **51.647.794 byte**, 22 elementi (15 JSON grezzi, video originale, sei derivati/manifest), con test di integrità ZIP superato:
+
+- Nome: `MATDOG_DEV15_HW_EVIDENZE_COMPLETE_2026-11-06.zip`
+- SHA256: `32e280e3a83c02bb8d86c80c917f4394d73e872a51affc76ae4231c613d992aa`
+- Collocazione: allegato scaricabile dalla conversazione ChatGPT, **non presente nel repository e non attestato sul filesystem ASUS**.
+
+L'operatore può conservarlo come pacchetto grezzo prima della successiva integrazione dal computer ASUS. Contiene un filmato domestico: non spostarlo in un repository pubblico senza revisione privacy.
+
 ## Firmware da pubblicare in fase successiva (non qui)
 
 - Sorgente locale `7997ad4`; worktree `~/MATDOG/worktrees/matdog-dev15-joystick-motion-20261105`.
