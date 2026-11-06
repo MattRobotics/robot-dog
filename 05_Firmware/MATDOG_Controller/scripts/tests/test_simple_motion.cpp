@@ -455,6 +455,21 @@ static void joystickWalk(){
       const auto x=motion::gaitCartesian(g,cc,1/T,0,tm),y=motion::gaitTrackCartesian(t,g,cc,1/T,0,tm);assert(x.valid&&y.valid);
       for(unsigned l=0;l<4;++l)assert(x.feet[l].x==y.feet[l].x&&x.feet[l].y==y.feet[l].y&&x.feet[l].z==y.feet[l].z&&x.velocity[l].x==y.velocity[l].x&&x.velocity[l].y==y.velocity[l].y);
       assert(x.body.translationM.x==y.body.translationM.x&&x.body.translationM.y==y.body.translationM.y&&x.body.rotation[1][0]==y.body.rotation[1][0]&&x.yawVelocity==y.yawVelocity);}}
+  // Fillet re-solve accounting: the edge IK reports both solves and the sum of
+  // their Newton steps and FK evaluations; its joints are the second solve's.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{0,lim[1],0});unsigned found=0;
+    for(unsigned n=0;n<325&&found<4;++n){hold(r,{0,lim[1],0},1);const auto& f=simple::StopReferenceProbe::walkNominal(r.m);
+      for(double roll:{-.06,.06})for(unsigned l=0;l<4;++l){const auto L=static_cast<motion::LegId>(l);
+        const auto body=motion::bodyPoseFromRollPitch(f.cartesian.body.translationM,roll,0);
+        motion::TiltedIkOptions o;o.seed=f.target.legs[l];o.toleranceM=1e-6;o.maxIterations=8;o.requireNominalStrip=false;
+        const auto ik=motion::worldEdgeContactInverseKinematicsTilted(L,f.cartesian.feet[l],body,o);
+        if(ik.status!=motion::TiltedIkResult::Status::OK||ik.solves!=2)continue;
+        auto tilt=[&](double hip){return std::asin(std::fmin(1.,std::abs(body.rotation[2][1]*std::cos(hip)+body.rotation[2][2]*std::sin(hip))));};
+        auto t=f.cartesian.feet[l];t.z+=motion::edgeContactLiftM(tilt(o.seed.hip));const auto a=motion::worldContactInverseKinematicsTilted(L,t,body,o);
+        o.seed=a.base.joints;t=f.cartesian.feet[l];t.z+=motion::edgeContactLiftM(a.base.contact.axisTiltRad);const auto b=motion::worldContactInverseKinematicsTilted(L,t,body,o);
+        assert(a.solves==1&&b.solves==1&&ik.base.newtonSteps==a.base.newtonSteps+b.base.newtonSteps&&ik.base.fkEvaluations==a.base.fkEvaluations+b.base.fkEvaluations);
+        assert(ik.base.joints.hip==b.base.joints.hip&&ik.base.joints.upper==b.base.joints.upper&&ik.base.joints.lower==b.base.joints.lower);++found;}}
+    assert(found>0);r.m.walkStop();assert(r.reachStand());}
   // Refreshed for 30 s (30 deadlines) it keeps walking; silence ends it with
   // WALK STOP at the first release after the ESP deadline.
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 v{lim[0]/2,lim[1]/2,-lim[2]/2};walkTo(r,v);hold(r,v,1500);

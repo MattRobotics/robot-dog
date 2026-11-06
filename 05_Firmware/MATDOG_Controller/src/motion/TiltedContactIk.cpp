@@ -155,6 +155,7 @@ WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3
   // World +Z expressed in base_link is the third row of the rotation: R^T e_z.
   const Vector3 normal = {pose.rotation[2][0], pose.rotation[2][1], pose.rotation[2][2]};
   out.base = contactInverseKinematicsGroundNormal(leg, base, normal, o);
+  out.solves = 1;
   out.status = out.base.status;
   if (out.status != TiltedIkResult::Status::OK) return out;
   if (!pointToWorld(pose, out.base.contact.referenceM, out.achievedWorldM)) out.status = TiltedIkResult::Status::INVALID_INPUT;
@@ -168,7 +169,9 @@ WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vec
   auto r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
   if (r.status == TiltedIkResult::Status::OK && std::abs(edgeContactLiftM(r.base.contact.axisTiltRad) - lift) > 2e-5) {
     lift = edgeContactLiftM(r.base.contact.axisTiltRad); o.seed = r.base.joints;
+    const auto first = r;
     r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
+    r.solves += first.solves; r.base.newtonSteps += first.base.newtonSteps; r.base.fkEvaluations += first.base.fkEvaluations;
   }
   return r;
 }
