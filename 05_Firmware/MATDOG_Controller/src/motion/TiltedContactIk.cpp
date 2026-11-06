@@ -98,7 +98,7 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
   if (!inLimits(leg, o.seed)) return out;  // a seed outside the limits is rejected, never clamped
   LegJointAngles q = o.seed;
   Vector3 r{}; ContactResult c{};
-  ++out.fkEvaluations;
+  out.solves = 1; ++out.fkEvaluations;
   if (!residual(leg, q, n, target, r, c)) { out.status = TiltedIkResult::Status::NO_CONVERGENCE; return out; }
   // Squared residuals: the same order and acceptance, no sqrt per comparison.
   const double tol2 = o.toleranceM * o.toleranceM;
@@ -155,7 +155,6 @@ WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3
   // World +Z expressed in base_link is the third row of the rotation: R^T e_z.
   const Vector3 normal = {pose.rotation[2][0], pose.rotation[2][1], pose.rotation[2][2]};
   out.base = contactInverseKinematicsGroundNormal(leg, base, normal, o);
-  out.solves = 1;
   out.status = out.base.status;
   if (out.status != TiltedIkResult::Status::OK) return out;
   if (!pointToWorld(pose, out.base.contact.referenceM, out.achievedWorldM)) out.status = TiltedIkResult::Status::INVALID_INPUT;
@@ -169,9 +168,11 @@ WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vec
   auto r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
   if (r.status == TiltedIkResult::Status::OK && std::abs(edgeContactLiftM(r.base.contact.axisTiltRad) - lift) > 2e-5) {
     lift = edgeContactLiftM(r.base.contact.axisTiltRad); o.seed = r.base.joints;
-    const unsigned solves = r.solves, newton = r.base.newtonSteps, fk = r.base.fkEvaluations;  // counts only: no result copy on the stack
+    // Counts only, inside TiltedIkResult: a result copy, or a field added to
+    // WorldTiltedIkResult, costs ~300 B of Xtensa stack here.
+    const unsigned solves = r.base.solves, newton = r.base.newtonSteps, fk = r.base.fkEvaluations;
     r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
-    r.solves += solves; r.base.newtonSteps += newton; r.base.fkEvaluations += fk;
+    r.base.solves += solves; r.base.newtonSteps += newton; r.base.fkEvaluations += fk;
   }
   return r;
 }

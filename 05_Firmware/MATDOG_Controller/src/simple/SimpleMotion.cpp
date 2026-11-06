@@ -873,7 +873,7 @@ JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const
     // Edge contact: the tread fillet point meets the ground.
     const auto ik=edgeTilt>0?worldEdgeContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],body,opt):
                              worldContactInverseKinematicsTilted(static_cast<LegId>(l),f.cartesian.feet[l],body,opt);
-    timing::count(timing::IK,ik.solves);timing::count(timing::NEWTON,ik.base.newtonSteps);timing::count(timing::FK,ik.base.fkEvaluations);
+    timing::count(timing::IK,ik.base.solves);timing::count(timing::NEWTON,ik.base.newtonSteps);timing::count(timing::FK,ik.base.fkEvaluations);
     // Cylinder axis depends only on HIP. Reserve its exact half-RAW rounding
     // interval so the transmitted pose retains the same contact mode.
     const double tiltLimit=edgeTilt>0?edgeTilt:footContactModel().nominalTiltRad;

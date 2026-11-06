@@ -469,11 +469,11 @@ static void joystickWalk(){
         const auto body=motion::bodyPoseFromRollPitch(f.cartesian.body.translationM,roll,0);
         motion::TiltedIkOptions o;o.seed=f.target.legs[l];o.toleranceM=1e-6;o.maxIterations=8;o.requireNominalStrip=false;
         const auto ik=motion::worldEdgeContactInverseKinematicsTilted(L,f.cartesian.feet[l],body,o);
-        if(ik.status!=motion::TiltedIkResult::Status::OK||ik.solves!=2)continue;
+        if(ik.status!=motion::TiltedIkResult::Status::OK||ik.base.solves!=2)continue;
         auto tilt=[&](double hip){return std::asin(std::fmin(1.,std::abs(body.rotation[2][1]*std::cos(hip)+body.rotation[2][2]*std::sin(hip))));};
         auto t=f.cartesian.feet[l];t.z+=motion::edgeContactLiftM(tilt(o.seed.hip));const auto a=motion::worldContactInverseKinematicsTilted(L,t,body,o);
         o.seed=a.base.joints;t=f.cartesian.feet[l];t.z+=motion::edgeContactLiftM(a.base.contact.axisTiltRad);const auto b=motion::worldContactInverseKinematicsTilted(L,t,body,o);
-        assert(a.solves==1&&b.solves==1&&ik.base.newtonSteps==a.base.newtonSteps+b.base.newtonSteps&&ik.base.fkEvaluations==a.base.fkEvaluations+b.base.fkEvaluations);
+        assert(a.base.solves==1&&b.base.solves==1&&ik.base.newtonSteps==a.base.newtonSteps+b.base.newtonSteps&&ik.base.fkEvaluations==a.base.fkEvaluations+b.base.fkEvaluations);
         assert(ik.base.joints.hip==b.base.joints.hip&&ik.base.joints.upper==b.base.joints.upper&&ik.base.joints.lower==b.base.joints.lower);++found;}}
     assert(found>0);r.m.walkStop();assert(r.reachStand());}
   // Refreshed for 30 s (30 deadlines) it keeps walking; silence ends it with

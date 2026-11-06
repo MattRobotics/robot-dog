@@ -24,16 +24,16 @@ struct TiltedIkResult {
   ContactResult contact{};
   double residualM = 0.0, condition = 0.0;
   unsigned iterations = 0;
-  // Work counters for diagnostics only; no decision reads them.
-  unsigned newtonSteps = 0, fkEvaluations = 0;
+  // Work counters for diagnostics only; no decision reads them. solves: contact
+  // IK solves behind this result (2 after a fillet re-solve), the other counters
+  // add up all of them.
+  unsigned newtonSteps = 0, fkEvaluations = 0, solves = 0;
 };
 // target and groundNormal are in base_link; the normal points away from the ground (up). Use joints only when status == OK.
 TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& targetBaseM, const Vector3& groundNormalBase,
                                                     const TiltedIkOptions& options);
 // Flat world ground (+Z) and any valid body pose: the ground normal in base_link is R^T e_z.
-// solves: contactInverseKinematicsGroundNormal calls made; base.newtonSteps and
-// base.fkEvaluations add up the work of all of them (diagnostics only).
-struct WorldTiltedIkResult { TiltedIkResult::Status status = TiltedIkResult::Status::INVALID_INPUT; TiltedIkResult base{}; Vector3 achievedWorldM{}; unsigned solves = 0; };
+struct WorldTiltedIkResult { TiltedIkResult::Status status = TiltedIkResult::Status::INVALID_INPUT; TiltedIkResult base{}; Vector3 achievedWorldM{}; };
 WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose,
                                                        const TiltedIkOptions& options);
 // Edge contact (dev.15): the tread fillet point, not the strip reference,
