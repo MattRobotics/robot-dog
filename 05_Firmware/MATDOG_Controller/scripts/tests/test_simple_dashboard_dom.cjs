@@ -104,7 +104,7 @@ async function boot() {
   assert.strictEqual(p.dom.window.getComputedStyle(q('header')).position, 'sticky', 'header STOP remains reachable while scrolling');
   assert.strictEqual(q('#simple-prone').textContent, 'PRONE');
   assert(!/sperimentale/i.test(q('#simple-motion').textContent + q('#simple-prone').title), 'PRONE copy reflects dev.7 validation');
-  assert(/coppia ON/.test(q('#simple-prone').title) && /Appoggio non verificato/.test(q('#simple-prone').title), 'PRONE remains explicit about support and torque');
+  assert(/coppia viene rilasciata/.test(q('#simple-prone').title) && /Appoggio non verificato/.test(q('#simple-prone').title), 'PRONE remains explicit about support and torque');
   const ready = JSON.parse(fx.status_ready);
   // Twelve joints in degrees from the real status rad values; measured pose and session rows.
   const jrows = [...q('#simple-joints').tBodies[0].rows];
@@ -576,12 +576,12 @@ async function boot() {
   assert(!q('#simple-prone').disabled, 'PRONE offered from STANDING');
   await send('prone', () => q('#simple-prone').click(), ok(fx.ack_prone), 'POSTURE.LIE_DOWN', {}, 5000);
   assert(/REJECTED.*PRONE_REQUIRES_STAND_HOLD/.test(last())); // Controller refusal still rendered
-  await refresh(fx.status_prone_unverified);
-  assert(/Appoggio non verificato/.test(q('#simple-reason').textContent));
-  // Held PRONE terminal (state PRONE, torque ON): STAND/WALK offered without STOP; nothing to WALK STOP.
-  assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND after PRONE without STOP');
+  await refresh(fx.status_prone_rest);
+  assert(/PRONE a riposo: coppia OFF/.test(q('#simple-reason').textContent) && /Appoggio passivo non misurato/.test(q('#simple-reason').textContent));
+  // PRONE rest (READY, torque OFF verified): STAND/WALK offered (they re-acquire the pose); nothing to WALK STOP.
+  assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND after PRONE rest');
   assert(q('#simple-prone').disabled && q('#simple-walk-stop').disabled);
-  assert(/goal fissi; appoggio non verificato/.test(q('#simple-values').textContent));
+  assert(/Compensazione IMUnon attiva/.test(q('#simple-values').textContent));
   assert(!q('#simple-stop').disabled);
   // A new HTTP response with old controller feedback is not fresh.
   const stale=JSON.parse(fx.status_ready);stale.stale=true;

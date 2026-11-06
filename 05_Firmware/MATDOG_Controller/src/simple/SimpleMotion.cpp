@@ -142,9 +142,9 @@ bool SimpleMotion::stopFrameAuthorized(const uint16_t raw[12],Drive drive) const
   return raw&&stopRaw_&&stopActive_&&stopFrame_&&stopIo_&&!safeOffRequest_.load()&&!stop_.load()&&!offPending_&&!faultLatched_&&
     drive.speed==stopDrive_.speed&&drive.acc==stopDrive_.acc&&std::equal(raw,raw+12,stopRaw_);
 }
-const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";case State::PRONE:return "PRONE";}return "FAULT";}
+const char* name(State s){switch(s){case State::READY:return "READY";case State::MOVING:return "MOVING";case State::STANDING:return "STANDING";case State::WALKING:return "WALKING";case State::STOPPED:return "STOPPED";case State::FAULT:return "FAULT";}return "FAULT";}
 const char* SimpleMotion::phase() const {
-  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE","PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND","PRONE_CONTACT_UNVERIFIED","STOP"};
+  static const char* const p[]={"IDLE","ACQUIRE","REFERENCE","ENABLE","DISENGAGE","ALIGN","STAND_DEPLOY","STAND_LIFT","HEIGHT","HOLD","WALK_STANDARD","WALK_SETTLE","PRONE_HEIGHT","PRONE_LIFT","PRONE_DEPLOY","PRONE_LAND","STOP"};
   return p[static_cast<unsigned>(phase_)];
 }
 void SimpleMotion::stop(const char* reason) { stopReason_.store(reason);stop_.store(true,std::memory_order_release); }
@@ -169,7 +169,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=0;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
-  phase_=Phase::IDLE;offPending_=true;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
+  phase_=Phase::IDLE;offPending_=true;proneRest_=false;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
   walkRequested_=joystick_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
 }
 void SimpleMotion::serviceOff(){
@@ -183,11 +183,13 @@ void SimpleMotion::serviceOff(){
 bool SimpleMotion::serviceStop(){
   if(safeOffRequest_.exchange(false,std::memory_order_acq_rel)){
     stop_.store(false,std::memory_order_release);operatorStopped_=true;
-    if(!offPending_)enterOff(false,faultLatched_?reason_:"SAFE_OFF_REQUESTED");
+    if(!offPending_||proneRest_)enterOff(false,faultLatched_?reason_:"SAFE_OFF_REQUESTED");
     serviceOff();return true;
   }
   if(!stop_.exchange(false,std::memory_order_acq_rel))return false;
-  if(faultLatched_||offPending_){serviceOff();return true;}
+  // An explicit STOP during the PRONE rest SAFE_OFF becomes the operator latch
+  // (same OFF progress, no new broadcast).
+  if(faultLatched_||offPending_){if(proneRest_)enterOff(false,stopReason_.load());serviceOff();return true;}
   if(stopActive_)return false; // duplicate never restarts the clock or dwell
   beginStop(esp_timer_get_time());return true;
 }
@@ -218,9 +220,9 @@ void SimpleMotion::beginStop(uint64_t now){
   // Never pretend that a distant goal is the current pose. Retain the existing
   // fail-closed SAFE_OFF if control cannot construct an authorized reference.
   // WALK_SETTLE re-sends the final gait frame each release, like HOLD: same WALK origin.
-  const auto source=(phase_==Phase::HOLD||phase_==Phase::PRONE_WAIT)?phase_:issuedPhase_==Phase::WALK_HOLD?Phase::WALK:issuedPhase_;
+  const auto source=phase_==Phase::HOLD?phase_:issuedPhase_==Phase::WALK_HOLD?Phase::WALK:issuedPhase_;
   if(!goal_.valid||!issuedUs_||now<issuedUs_||now-issuedUs_>100000||
-      (!issuedPlanned_&&source!=Phase::WALK&&source!=Phase::HOLD&&source!=Phase::PRONE_WAIT)){
+      (!issuedPlanned_&&source!=Phase::WALK&&source!=Phase::HOLD)){
     fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;
   }
   // The authoritative reference is what the writer accepted, including
@@ -427,26 +429,11 @@ const char* SimpleMotion::stand(double h,uint64_t now){
       segmentTo_=held;plannedHeight_=pose[14];
       rollCorrection_=pitchCorrection_=correctionScale_=0;imuStartUs_=now;compensatedUs_=0;
     }
-    // Explicit, admitted recovery with existing torque: reuse HEIGHT or the
-    // held-PRONE entry. ACQUIRE/REFERENCE/ENABLE are never entered here.
+    // Explicit, admitted recovery with existing torque: reuse HEIGHT.
+    // ACQUIRE/REFERENCE/ENABLE are never entered here.
     stopActive_=stopVerified_=false;operatorStopped_=false;
-    if(stopOrigin_==Phase::HOLD||stopOrigin_==Phase::HEIGHT){state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;}
-    else {state_=State::PRONE;phase_=Phase::PRONE_WAIT;}
+    state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;
     rememberReference(now); // seed the held writer reference for an immediate new STOP
-  }
-  if(state_==State::PRONE){
-    // Rise from the held terminal through the same DISENGAGE->ALIGN->DEPLOY->
-    // LIFT route as a STAND from PRONE_ENTRY, keeping torque ON (no SAFE_OFF,
-    // no re-enable). Admitted only from a fresh measured pose in the certified
-    // entry region whose DISENGAGE transition is clear; the release re-checks.
-    if(phase_!=Phase::PRONE_WAIT||!energized_||!segmentTo_.valid)return "MOTION_BUSY";
-    if(!fresh(now))return "PRONE_FEEDBACK_UNAVAILABLE";
-    InitialRoute route=InitialRoute::ENTRY;JointTargetFrame d;
-    if(!certifiedRegion(measured(),route)||route!=InitialRoute::ENTRY||!proneDisengage(d)||!transitionSafe(measured(),d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";
-    referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;reason_="STAND_FROM_PRONE";
-    pendingGoalValid_=true; // intent only; DISENGAGE starts at the next Motion release
-    timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_="";
-    return nullptr;
   }
   if(state_==State::STANDING){
     JointTargetFrame actual;actual.valid=true;for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
@@ -456,7 +443,8 @@ const char* SimpleMotion::stand(double h,uint64_t now){
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
     segmentDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
-  }else{referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
+  }else{  // from torque OFF (boot, PRONE rest): the measured pose decides the route
+    referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;proneRest_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
     std::fill(controlFailures_,controlFailures_+12,0);}
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
   return nullptr;
@@ -497,7 +485,7 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& rec
   }
   if(stoppedInProneDescent()){JointTargetFrame held;InitialRoute route;return proneRecovery(held,route);}
   const bool height=stopOrigin_==Phase::HEIGHT&&issuedPlanned_&&stopBox_==&collision::kHeight;
-  if(stopOrigin_!=Phase::HOLD&&stopOrigin_!=Phase::PRONE_WAIT&&!height)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
+  if(stopOrigin_!=Phase::HOLD&&!height)return "STOP_RECOVERY_POSTURE_UNQUALIFIED";
   InitialRoute route;const auto actual=measured();
   if(!certifiedRegion(actual,route)||!pointSafe(actual))return "STAND_PATH_NOT_CLEAR";
   if(height){
@@ -506,8 +494,7 @@ const char* SimpleMotion::standResumeRefusal(uint64_t now,WalkRecoveryStart& rec
       if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return "STAND_PATH_NOT_CLEAR";
     if(!pointSafe(held)||!contains(collision::kHeight,held))return "HEIGHT_PATH_NOT_CLEAR";
   }
-  if(stopOrigin_==Phase::HOLD||height){if(!heightStartClear(actual,segmentTo_))return "HEIGHT_PATH_NOT_CLEAR";}
-  else {JointTargetFrame d;if(route!=InitialRoute::ENTRY||!proneDisengage(d)||!transitionSafe(actual,d,collision::kEntry))return "STAND_PATH_NOT_CLEAR";}
+  if(!heightStartClear(actual,segmentTo_))return "HEIGHT_PATH_NOT_CLEAR";
   return nullptr;
 }
 const char* SimpleMotion::prone(uint64_t now){
@@ -798,13 +785,6 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
   beginPlan(next,*box,now,next==Phase::PRONE_LAND?.10:kStandSpeedRadS,
                          next==Phase::PRONE_LAND?.20:kStandAccelerationRadS2);
 }
-bool SimpleMotion::proneDisengage(JointTargetFrame& q) const {
-  // Same DISENGAGE target rule as ENABLE (ENTRY): hips/uppers stay, lower
-  // joints go to the route head. Reference = last nominal PRONE_LAND goal.
-  if(!segmentTo_.valid)return false;
-  q=segmentTo_;const auto h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
-  return pointSafe(q)&&contains(collision::kEntry,q);
-}
 void SimpleMotion::nextStand(uint64_t now){
   timing::Section section(timing::NOMINAL);
   const JointTargetFrame actual=measured();
@@ -814,11 +794,13 @@ void SimpleMotion::nextStand(uint64_t now){
     case Phase::PRONE_LIFT:beginProne(Phase::PRONE_DEPLOY,now);return;
     case Phase::PRONE_DEPLOY:beginProne(Phase::PRONE_LAND,now);return;
     case Phase::PRONE_LAND:
-      // Deliberately NOT SAFE_OFF and NOT a contact assertion: the rigid CAD
-      // endpoint still needs rear-foot support. Freeze the final written goal;
-      // fresh feedback, native/electrical/IMU guards and STOP remain serviced.
-      phase_=Phase::PRONE_WAIT;state_=State::PRONE;reason_="PRONE_CONTACT_UNVERIFIED";planned_=false;
-      heightValid_=false;return;
+      // PRONE rest: the verified arrival (arrived/settledUnderLoad, as every
+      // segment) releases the torque through the ordinary SAFE_OFF: no target
+      // is generated or written from here, OFF broadcast, 13/13 readback, the
+      // same retries and faults. Not an operator STOP: once verified the state
+      // returns to READY and an explicit STAND starts from the settled pose
+      // through ACQUIRE/REFERENCE/ENABLE. Passive support is not measured.
+      enterOff(false,"PRONE_REST");operatorStopped_=false;proneRest_=true;serviceOff();return;
     case Phase::ENABLE:{  // folded entry: lower joints to the route head first
       auto q=reference_,h=routePoint(0);for(unsigned l=0;l<4;++l)q.legs[l].lower=h.legs[l].lower;
       if(!transitionSafe(actual,q,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
@@ -1104,7 +1086,7 @@ void SimpleMotion::update(uint64_t now){
   // Electrical supervision is not gated by the 20 ms trajectory release.
   if(engaged()&&!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!engaged()&&state_==State::READY&&(!input_.ready||!input_.powerOk||!input_.imuValid)){state_=State::STOPPED;reason_=input_.refusal;}
-  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_="READY";}
+  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_=proneRest_?"PRONE_REST":"READY";}
   if(!input_.ready&&!engaged())return;
   if(!nextUs_)nextUs_=now;
   if(now<nextUs_)return;
@@ -1262,12 +1244,6 @@ void SimpleMotion::update(uint64_t now){
     }
     pendingGoalValid_=false;
     if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
-    if(phase_==Phase::PRONE_WAIT){
-      // Nominal terminal goal, not the sagging encoder pose (as for HEIGHT).
-      JointTargetFrame d;if(!proneDisengage(d)||!transitionSafe(measured(),d,collision::kEntry)){fault("DISENGAGE_PATH_NOT_CLEAR");return;}
-      const double* head=paired_data::kKnots[0].p;initialRoute_=InitialRoute::ENTRY;imuStartUs_=now;
-      beginNative(Phase::LOWER,d,collision::kEntry,now,head[4],head[5],head[6]);return;
-    }
     JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!heightStartClear(actual,pendingGoal_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
@@ -1279,7 +1255,6 @@ void SimpleMotion::update(uint64_t now){
   }
   if(returningProne()){
     if(!segmentBox_||!pointSafe(measured())||!contains(*segmentBox_,measured())){fault("PRONE_MEASURED_OUTSIDE_BOX");return;}
-    if(phase_==Phase::PRONE_WAIT){rememberReference(esp_timer_get_time());return;} // constant reference, no automatic recovery
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){

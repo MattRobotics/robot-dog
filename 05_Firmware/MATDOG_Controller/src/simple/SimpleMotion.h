@@ -62,9 +62,9 @@ struct Drive { uint16_t speed; uint8_t acc; };
 // STAND rc.10: register ceilings above the planner (above); inside the WALK
 // pair already used in operation. WALK retains the STANDARD reference's ceilings.
 constexpr Drive kStandDrive{480,13}, kWalkDrive{1000,50}, kCalibrationDrive{160,8};
-// PRONE: held PRONE terminal, torque ON, contact unverified; not MOVING (a new
-// STAND may rise from it), never an automatic SAFE_OFF.
-enum class State : uint8_t { READY, MOVING, STANDING, WALKING, STOPPED, FAULT, PRONE };
+// PRONE ends at rest (dev.15): after the verified PRONE_LAND arrival the
+// ordinary SAFE_OFF releases the torque (STOPPED, then READY, reason PRONE_REST).
+enum class State : uint8_t { READY, MOVING, STANDING, WALKING, STOPPED, FAULT };
 const char* name(State);
 struct Feedback {
   bool valid=false; uint64_t stampUs=0,controlStampUs=0;
@@ -121,7 +121,8 @@ class SimpleMotion {
   void begin(ServoPort* p,bool powered=true) { port_=p; if(powered)enterOff(false,"BOOTING");else reason_="USB_ONLY"; }
   void inputs(const Inputs& i) { input_=i; }
   const char* stand(double height,uint64_t now);
-  // Experimental: arrival is not proof of ventral support; torque stays ON.
+  // Descent to the PRONE terminal, then rest with torque OFF (proneRest). Arrival
+  // is not proof of ventral or passive support.
   const char* prone(uint64_t now);
   const char* walk(unsigned stride,uint64_t now);
   // JOYSTICK base velocity (SI). Starts like walk() or refreshes the target
@@ -202,6 +203,10 @@ class SimpleMotion {
   // Unconfirmed hot samples rejected by a later normal sample; joints whose
   // hot window is open.
   uint32_t tempSpikes() const { return tempSpikes_; }
+  // Torque released by the PRONE rest, not by an operator STOP: a STAND
+  // re-acquires the settled pose (ACQUIRE/REFERENCE/ENABLE). Cleared by any
+  // later STOP, SAFE_OFF, fault or accepted STAND.
+  bool proneRest() const { return proneRest_; }
   uint16_t hotPendingMask() const { uint16_t m=0;for(unsigned i=0;i<12;++i)if(hotSinceUs_[i])m|=1u<<i;return m; }
   // Direct temperature confirmations made by the Motion reads: count and the
   // last two (latest first), whatever their outcome.
@@ -209,7 +214,7 @@ class SimpleMotion {
   const TempCheck& tempCheck(unsigned latest) const { return tempCheck_[(tempChecks_+1-latest)%2]; }
  private:
   friend struct StopReferenceProbe; // offline read-only verification of the generator handoff
-  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT, STOP };
+  enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, STOP };
   enum class InitialRoute:uint8_t { ENTRY, HEIGHT, WALK, LIFT, DEPLOY };
   bool readTimed(unsigned slot,bool control,Feedback&);
   bool readDeferred() const { return readInterrupted_||port_->readDeferred(); }
@@ -240,8 +245,7 @@ class SimpleMotion {
   bool heightVias(double from,double to);
   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
   void beginProne(Phase,uint64_t);
-  bool proneDisengage(motion::JointTargetFrame&) const;
-  bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_WAIT; }
+  bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_LAND; }
   // A STOP in a planned route segment (the PRONE descent or the STAND_DEPLOY/
   // STAND_LIFT rise): the held RAW restarts the STAND route of the certified
   // region that holds it (proneRecovery). Native moves have no held reference.
@@ -279,7 +283,7 @@ class SimpleMotion {
   std::atomic<const char*> stopReason_{"STOP_REQUESTED"};
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
-  bool operatorStopped_=false;
+  bool operatorStopped_=false,proneRest_=false;
   bool stopActive_=false,stopVerified_=false,stopIo_=false,stopFrame_=false,readInterrupted_=false;
   const uint16_t* stopRaw_=nullptr;
   Drive stopDrive_=kStandDrive;

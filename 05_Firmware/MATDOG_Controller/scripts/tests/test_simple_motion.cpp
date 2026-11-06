@@ -283,9 +283,10 @@ static void standHoldTilt(){
       // Beyond the unwind this test returns to the existing scripted route
       // observations; body/board contact during PRONE is not modeled here.
       r.in.quaternion[0]=1;r.in.quaternion[1]=r.in.quaternion[2]=r.in.quaternion[3]=0;
-      for(unsigned n=0;n<2500&&r.m.state()!=(prone?simple::State::PRONE:simple::State::STANDING);++n)r.tick();
-      assert(r.m.state()==(prone?simple::State::PRONE:simple::State::STANDING));}
-    assert(r.p.enables==enables&&r.p.offCalls==off);
+      auto done=[&]{return prone?r.m.proneRest()&&r.m.state()==simple::State::READY:r.m.state()==simple::State::STANDING;};
+      for(unsigned n=0;n<2500&&!done();++n)r.tick();
+      assert(done());}
+    assert(r.p.enables==enables&&r.p.offCalls==off+(prone&&!stopDuringUnwind?1:0));  // the PRONE rest is one OFF broadcast
   }
   {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());LevelBoardPlant plant(r);plant.settle(0,-8*degree,700);
     const auto enables=r.p.enables,off=r.p.offCalls;r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n)plant.step(0,-8*degree);
@@ -607,6 +608,82 @@ static void proneStopRecovery(){
   std::printf("PRONE STOP -> STAND: %u admitted, %u refused with a precise reason (software only)\n",admitted,refused);
 }
 
+// PRONE rest (dev.15): the verified PRONE_LAND arrival releases the torque
+// through the ordinary SAFE_OFF (never earlier, never during an interrupted
+// descent); no position write after the OFF broadcast and no re-enable without
+// an explicit STAND; an operator STOP during or after the rest is the usual
+// latch; a STAND from the settled pose re-acquires it and re-enables through
+// ACQUIRE/REFERENCE/ENABLE; outside the certified regions the existing refusal
+// INITIAL_POSE_OUTSIDE_SAFE_ENTRY keeps the torque OFF. Software only.
+static void proneRest(){
+  auto descend=[](Rig& r,core::MotionService* service=nullptr){assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());assert(!r.m.prone(r.p.now));
+    const auto offs=r.p.offCalls;bool landed=false;
+    for(unsigned n=0;n<8000&&!r.m.proneRest();++n){r.tick();if(service){test_clock_us=r.p.now;service->update();}
+      assert(r.m.state()!=simple::State::FAULT);landed|=!std::strcmp(r.m.phase(),"PRONE_LAND");
+      if(!r.m.proneRest())assert(r.p.offCalls==offs&&r.m.state()==simple::State::MOVING&&r.m.energized());}  // no OFF before the verified arrival
+    assert(landed&&r.p.offCalls==offs+1&&r.m.proneRest()&&!std::strcmp(r.m.reason(),"PRONE_REST"));};
+  auto ack=[](Rig& r,core::MotionService& service){test_clock_us=r.p.now;service.update();static char status[core::kMotionStatusJsonBytes];
+    assert(service.statusJson(status,sizeof status,r.p.now/1000));const char* a=std::strstr(status,"\"active_command\":{");assert(a);return std::string(a,std::strcspn(a,"}"));};
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());
+    char json[200];const int n=std::snprintf(json,sizeof json,"{\"version\":1,\"id\":\"prone-1\",\"sequence\":1,\"issued_at_ms\":%lu,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"POSTURE.LIE_DOWN\",\"params\":{}}",(unsigned long)(r.p.now/1000));
+    motion::MotionCommand c;const char* why=nullptr;assert(core::parseMotionJson(json,size_t(n),&c,&why));
+    test_clock_us=r.p.now;{const auto a=service.command(c,r.p.now/1000);if(a.outcome!=motion::CommandOutcome::ACCEPTED)std::fprintf(stderr,"LIE_DOWN %s\n",a.reason);assert(a.outcome==motion::CommandOutcome::ACCEPTED);}
+    const auto offs=r.p.offCalls;bool landed=false;
+    for(unsigned k=0;k<8000&&!r.m.proneRest();++k){r.tick();test_clock_us=r.p.now;service.update();landed|=!std::strcmp(r.m.phase(),"PRONE_LAND");
+      if(!r.m.proneRest())assert(r.p.offCalls==offs&&r.m.energized());}
+    assert(r.p.offCalls==offs+1&&r.m.energized()&&!std::strcmp(r.m.phase(),"IDLE"));  // OFF broadcast; readback pending
+    assert(landed&&r.m.proneRest()&&r.m.state()==simple::State::STOPPED);
+    assert(ack(r,service).find("\"outcome\":\"ACCEPTED\"")!=std::string::npos);  // OFF readback pending: not complete, not aborted
+    // Readback 13/13 with one lost OFF verification on the way: re-broadcast, then verified.
+    r.p.failVerify=4;for(unsigned k=0;k<40;++k){r.tick();assert(!r.m.offVerified());}
+    r.p.failVerify=-1;const auto frames=r.p.sent.size();const auto enables=r.p.enables;
+    for(unsigned k=0;k<40&&!r.m.offVerified();++k)r.tick();
+    assert(r.m.offVerified()&&!r.m.energized()&&r.p.offCalls>offs+1);
+    for(unsigned k=0;k<5;++k)r.tick();
+    const auto done=ack(r,service);
+    assert(r.m.state()==simple::State::READY&&!std::strcmp(r.m.reason(),"PRONE_REST")&&done.find("\"outcome\":\"COMPLETED\",\"reason\":\"PRONE_REST\",\"id\":\"prone-1\"")!=std::string::npos);
+    // Rest: no position write, no enable, torque OFF, reads continue; a neutral joystick does not take over the command.
+    {char j[200];const int n=std::snprintf(j,sizeof j,"{\"version\":1,\"id\":\"joy-0\",\"sequence\":2,\"issued_at_ms\":%lu,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",(unsigned long)(r.p.now/1000));
+     motion::MotionCommand c;const char* why=nullptr;assert(core::parseMotionJson(j,size_t(n),&c,&why));test_clock_us=r.p.now;assert(!std::strcmp(service.command(c,r.p.now/1000).reason,"NOT_WALKING"));
+     assert(ack(r,service)==done);}
+    r.p.missing=true;for(unsigned k=0;k<100;++k)r.tick();r.p.missing=false;
+    for(unsigned k=0;k<400;++k){r.tick();assert(r.m.state()==simple::State::READY);}
+    assert(r.p.sent.size()==frames&&r.p.enables==enables);for(unsigned i=0;i<12;++i)assert(r.p.observed[i].torque==0);
+    std::printf("PRONE rest: OFF after the verified PRONE_LAND arrival, one lost readback re-broadcast, 13/13 verified, READY/PRONE_REST, ack COMPLETED, 500 releases without a frame or enable\n");}
+  // Operator STOP during the rest SAFE_OFF, and after it: the ordinary latch.
+  for(bool during:{true,false}){Rig r;descend(r);
+    if(!during){for(unsigned k=0;k<40&&r.m.state()!=simple::State::READY;++k)r.tick();assert(r.m.state()==simple::State::READY);}
+    const auto offs=r.p.offCalls,frames=r.p.frames;r.m.stop();r.m.stop();
+    for(unsigned k=0;k<60;++k)r.tick();
+    assert(r.m.offVerified()&&!r.m.energized()&&!r.m.proneRest()&&r.m.state()==simple::State::STOPPED&&r.p.frames==frames);
+    assert(!std::strcmp(r.m.stand(.10,r.p.now),"SAFE_OFF_STAND_REFUSED"));if(during)assert(r.p.offCalls==offs);}
+  // STAND from the settled pose: every joint moved by a few ticks with torque
+  // OFF (inside the entry region), RAW re-acquired, REFERENCE from it, 12 enables, STANDING.
+  {Rig r;descend(r);for(unsigned k=0;k<40&&r.m.state()!=simple::State::READY;++k)r.tick();
+    r.p.holdObservation=true;
+    // Terminal slack to the entry box, per joint: the settling the next STAND tolerates.
+    double rest[12];{const auto& b=simple::collision::kEntry;for(unsigned i=0;i<12;++i)rest[i]=std::fmin(r.p.observed[i].q-b.lo[i],b.hi[i]-r.p.observed[i].q);}
+    std::printf("PRONE rest terminal slack to kEntry (mrad, slot order LF RF RH LH hip/upper/lower):");for(double x:rest)std::printf(" %.1f",x*1e3);std::printf("\n");
+    for(unsigned i=0;i<12;++i){auto& f=r.p.observed[i];f.raw=uint16_t(int(f.raw)+(i%2?6:-6));f.q=(int(f.raw)-2048)*simple::kTickRad;}
+    for(unsigned k=0;k<20;++k)r.tick();assert(!std::strcmp(r.m.poseRegion(r.p.now),"PRONE_ENTRY"));
+    double slack=1e9;{const auto& b=simple::collision::kEntry;for(unsigned i=0;i<12;++i)slack=std::fmin(slack,std::fmin(r.p.observed[i].q-b.lo[i],b.hi[i]-r.p.observed[i].q));}
+    const size_t frames=r.p.sent.size();const unsigned enables=r.p.enables;std::array<uint16_t,12> settled;for(unsigned i=0;i<12;++i)settled[i]=r.p.observed[i].raw;
+    assert(!r.m.stand(.10,r.p.now)&&!r.m.proneRest()&&!std::strcmp(r.m.reason(),"ACQUIRING_REAL_POSE"));
+    for(unsigned k=0;k<200&&r.p.sent.size()==frames;++k)r.tick();
+    assert(r.p.sent.size()==frames+1&&std::equal(settled.begin(),settled.end(),r.p.sent[frames].begin())&&r.p.sentTorqueOn[frames]==0);  // REFERENCE = settled RAW, torque OFF
+    r.p.holdObservation=false;assert(r.reachStand()&&r.p.enables==enables+12);
+    std::printf("PRONE rest -> STAND: settled pose (+/-6 ticks, entry-box slack %.1f mrad) re-acquired, REFERENCE = settled RAW with torque OFF, 12 enables, STANDING\n",slack*1e3);}
+  // Settled outside every certified region: the existing refusal, torque never enabled.
+  {Rig r;descend(r);for(unsigned k=0;k<40&&r.m.state()!=simple::State::READY;++k)r.tick();
+    r.p.holdObservation=true;auto& f=r.p.observed[1];f.q+=.6;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));
+    for(unsigned k=0;k<20;++k)r.tick();assert(!std::strcmp(r.m.poseRegion(r.p.now),"OUTSIDE_CERTIFIED"));
+    const auto enables=r.p.enables,frames=r.p.frames;assert(!r.m.stand(.10,r.p.now));
+    for(unsigned k=0;k<200&&r.m.state()!=simple::State::FAULT;++k)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.enables==enables&&r.p.frames==frames&&!r.m.energized());}
+  std::puts("PRONE REST PASS: automatic torque OFF only after the verified terminal, STOP latch kept, STAND from the settled pose through ACQUIRE/ENABLE; passive support NOT validated");
+}
+
 // Thermal diagnostics (dev.15): each direct confirmation of a bulk >= 70 C is
 // kept with bulk, direct, servo, time and bus outcome, including a failed
 // direct read; thresholds, windows and faults are unchanged.
@@ -629,7 +706,7 @@ static void temperatureChecks(){
   std::printf("THERMAL diagnostics: %s (status %zu bytes)\n",expect,std::strlen(status));
 }
 
-int main(){temperatureChecks();standHoldTilt();
+int main(){proneRest();temperatureChecks();standHoldTilt();
   proneStopRecovery();
   imuSlewTime();
   joystickWalk();
@@ -980,8 +1057,8 @@ int main(){temperatureChecks();standHoldTilt();
   for(double roll:{0.,.0175,-.0175})for(double pitch:{0.,-.0175}){Rig r;
     r.in.quaternion[0]=std::cos(roll/2)*std::cos(pitch/2);r.in.quaternion[1]=std::sin(roll/2)*std::cos(pitch/2);r.in.quaternion[2]=std::cos(roll/2)*std::sin(pitch/2);r.in.quaternion[3]=-std::sin(roll/2)*std::sin(pitch/2);
     assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());for(unsigned i=0;i<100;++i)r.tick();
-    assert(!r.m.prone(r.p.now));for(unsigned i=0;i<6000&&r.m.state()!=simple::State::PRONE;++i){r.tick();assert(r.m.state()!=simple::State::FAULT);}
-    assert(r.m.state()==simple::State::PRONE);}
+    assert(!r.m.prone(r.p.now));for(unsigned i=0;i<6000&&!r.m.proneRest();++i){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.proneRest());}
   std::puts("PRONE from STAND100 under +-1 deg roll/pitch: handover inside kLift, no fault");
   // Height changes from real loaded holds: follower with the HOLD residuals of
   // the robot (commanded-raw, 31/10/2026) at 50/100/150 mm, signed by servo direction.
@@ -1005,7 +1082,7 @@ int main(){temperatureChecks();standHoldTilt();
    if(r.m.state()!=simple::State::STANDING){std::printf("loaded WALK_STOP state=%s phase=%s reason=%s now=%llu deadline=%llu\n",simple::name(r.m.state()),r.m.phase(),r.m.reason(),(unsigned long long)r.p.now,(unsigned long long)r.m.deadlineUs());
      for(unsigned i=0;i<12;++i)std::printf("loaded WALK_STOP slot=%u observed_raw=%u goal_raw=%u load=%u torque=%u\n",i,r.p.observed[i].raw,r.p.target[i],r.p.observed[i].load,r.p.observed[i].torque);std::fflush(stdout);}
    assert(r.m.state()==simple::State::STANDING);
-   reach(r,.05,1);assert(!r.m.prone(r.p.now));for(unsigned i=0;i<2500&&r.m.state()!=simple::State::PRONE;++i){step(r,1);assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::PRONE);
+   reach(r,.05,1);assert(!r.m.prone(r.p.now));for(unsigned i=0;i<2600&&!(r.m.proneRest()&&r.m.state()==simple::State::READY);++i){step(r,1);assert(r.m.state()!=simple::State::FAULT);}assert(r.m.proneRest()&&r.m.state()==simple::State::READY);
    reach(r,.05,1);assert(!r.m.stand(.10,r.p.now));for(unsigned i=0;i<30;++i)step(r,1);r.m.stop();for(unsigned i=0;i<150&&!r.m.stopVerified();++i)step(r,1);assert(r.m.stopVerified()&&r.m.energized());
    std::puts("STAND height changes from loaded holds: 50<->150 and intermediate heights, WALK and PRONE from low holds, STOP mid-change");}
   std::puts("PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION");

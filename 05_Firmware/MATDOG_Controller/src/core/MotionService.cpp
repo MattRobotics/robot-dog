@@ -28,10 +28,11 @@ void MotionService::update(){
    activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED";active_=false;
   }else activeAck_.reason="STOP_IN_PROGRESS";
  }else{
- // PRONE terminal completes the LIE_DOWN command: torque ON, contact NOT verified.
- if(motion_->state()==simple::State::PRONE){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_CONTACT_UNVERIFIED";active_=false;}
- if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
- if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ // The PRONE rest completes the LIE_DOWN command once torque OFF is verified
+ // on the 13 servos; support is NOT verified.
+ if(motion_->proneRest()){if(!motion_->stopping()&&motion_->offVerified()&&!motion_->energized()){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_REST";active_=false;}}
+ else if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
+ else if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
  }
  if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
  activeAck_.executor_state=simple::name(motion_->state());
@@ -72,8 +73,8 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
-   // Nothing to stop in the held PRONE terminal: never take over the active command.
-   if(motion_->state()==simple::State::PRONE)return result("NOT_WALKING");
+   // Nothing to stop at the PRONE rest: never take over the active command.
+   if(motion_->proneRest())return result("NOT_WALKING");
    motion_->walkStop();return result(nullptr);}
  // Continuous base velocity: only an explicit JOYSTICK command, so an exact
  // preset velocity from it never becomes an untimed WALK STANDARD.

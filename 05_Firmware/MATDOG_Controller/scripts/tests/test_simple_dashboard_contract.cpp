@@ -142,9 +142,10 @@ int fixtures(const char* path) {
     Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
     check(!rig.m.stand(.05,rig.p.now)&&rig.reachStand(),"PRONE terminal fixture starts in HOLD");
     auto c=semantic(motion::Intent::LIE_DOWN,rig);check(service.command(c,c.issued_at_ms).outcome==motion::CommandOutcome::ACCEPTED,"PRONE accepted from HOLD");
-    for(unsigned i=0;i<4000&&strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED");++i)rig.tick();
-    service.update();check(!strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED"),"PRONE trajectory ends torque ON, no contact claim");
-    put("status_prone_unverified",statusJson(service,rig));
+    for(unsigned i=0;i<4100&&rig.m.state()!=simple::State::READY;++i){rig.tick();service.update();}
+    for(unsigned i=0;i<15;++i){rig.tick();service.update();}  // the OFF readback pauses FAST reads: one population later
+    check(rig.m.proneRest()&&rig.m.state()==simple::State::READY&&rig.m.offVerified()&&!strcmp(rig.m.reason(),"PRONE_REST"),"PRONE ends at rest: torque OFF verified 13/13, no contact claim");
+    put("status_prone_rest",statusJson(service,rig));
   }
   {
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr);

@@ -180,18 +180,20 @@ void stopPlanBounds(){
 }
 void holdAndProne(){
   for(double h:{.05,.10,.15}){Rig r;r.stand(h);r.ticks(100);checkHeldStop(r);}
-  Rig prone;prone.stand(.05);assert(!prone.m.prone(prone.p.now));prone.phase("PRONE_CONTACT_UNVERIFIED");
-  checkHeldStop(prone);
-  // PRONE has a fixed reference without UART traffic; STOP remains available.
-  Rig longProne;longProne.stand(.05);assert(!longProne.m.prone(longProne.p.now));
-  longProne.phase("PRONE_CONTACT_UNVERIFIED");longProne.ticks(100);checkHeldStop(longProne);
+  // PRONE ends at rest (dev.15): STOP there is the ordinary OFF latch, no held
+  // reference and no frame; STAND then needs the usual SAFE_OFF recovery.
+  for(unsigned wait:{0u,100u}){Rig prone;prone.stand(.05);assert(!prone.m.prone(prone.p.now));
+    for(unsigned n=0;n<8000&&!prone.m.proneRest();++n)prone.tick();assert(prone.m.proneRest());prone.ticks(wait);
+    const auto frames=prone.p.frames;prone.m.stop();prone.ticks(40);
+    assert(!prone.m.stopActive()&&!prone.m.proneRest()&&prone.m.offVerified()&&!prone.m.energized()&&prone.p.frames==frames);
+    assert(!strcmp(prone.m.stand(.10,prone.p.now),"SAFE_OFF_STAND_REFUSED"));}
   // Loaded low HOLD outside kHeight, already admitted by dev.7 inside kLift.
   Rig loaded;loaded.stand(.05);loaded.ticks(100);
   loaded.p.observed[2].raw+=7;loaded.p.observed[2].q+=7*simple::kTickRad;
   loaded.p.freeze=true;loaded.p.observed[2].load=1024+176;
   const auto nominal=loaded.m.target();checkHeldStop(loaded);
   for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(loaded.m.target(),i)-motion::jointSlot(nominal,i))<=simple::kTickRad/2);
-  std::puts("STOP HOLD50/100/150 and PRONE: torque maintained, endpoint observed, support unverified, WALK/PRONE refused; explicit STAND tested separately");
+  std::puts("STOP HOLD50/100/150: torque maintained, endpoint observed, support unverified, WALK/PRONE refused; STOP at the PRONE rest: OFF latch, no frame; explicit STAND tested separately");
 }
 void movementAndDuplicates(){
   for(unsigned scenario=0;scenario<3;++scenario){Rig one,repeated;
@@ -429,7 +431,7 @@ void safeOffAndRecovery(){
   {Rig r;r.walk();r.ticks(380);r.p.failStopFrame=r.p.failWithSafeOff=true;r.m.stop();
     for(unsigned n=0;n<20&&r.m.state()!=simple::State::FAULT;++n)r.tick();
     assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"SYNC_WRITE_FAILED"));r.finishOff();}
-  for(bool prone:{false,true}){Rig r;r.stand(.10);r.ticks(100);if(prone){assert(!r.m.prone(r.p.now));r.phase("PRONE_CONTACT_UNVERIFIED");}
+  {Rig r;r.stand(.10);r.ticks(100);
     r.m.stop();r.tick();assert(!strcmp(r.m.stand(.15,r.p.now),"STOP_IN_PROGRESS"));assert(r.finishStop());
     const auto enables=r.p.enables,off=r.p.offCalls,frames=r.p.frames;r.ticks(30);assert(r.p.frames==frames);
     assert(!r.m.standResumeRefusal(r.p.now));assert(!r.m.stand(.15,r.p.now));
