@@ -68,6 +68,10 @@ struct Feedback {
   uint16_t raw=0; int torqueLimit=-1; double q=0; // LOADDIAG: RAM 48 of the existing control read
   int speed=0,load=0,current=0,temp=0,voltage=0,status=0,torque=-1,goal=-1,goalSpeed=-1,acc=-1;
 };
+// Direct confirmation of a bulk PresentTemperature >= 70 C by an existing read:
+// bulk value, direct value (-1 without a valid reply) and the bus outcome of
+// the direct read (servo::BusOutcome). Evidence only, never a decision input.
+struct TempCheck { uint64_t stampUs=0; uint8_t slot=12,outcome=0; int16_t bulk=-1,direct=-1; };
 // The Controller thread alone implements this port and owns UART1. Tests can
 // exercise command ordering/failure handling without asserting physical motion.
 class ServoPort {
@@ -88,6 +92,8 @@ class ServoPort {
   virtual bool verifyOff(unsigned slot)=0;  // slots 0..12, includes neck
   // One fault event, after the SAFE_OFF broadcast; no extra servo acquisition.
   virtual void referenceFault(unsigned,const Feedback&,double,uint16_t) {}
+  // The temperature confirmation made by the last read(), if it made one.
+  virtual bool tempCheck(TempCheck&) const { return false; }
 };
 struct Inputs {
   bool ready=false,powerOk=false,authorityOk=false,imuValid=false;
@@ -194,6 +200,10 @@ class SimpleMotion {
   // hot window is open.
   uint32_t tempSpikes() const { return tempSpikes_; }
   uint16_t hotPendingMask() const { uint16_t m=0;for(unsigned i=0;i<12;++i)if(hotSinceUs_[i])m|=1u<<i;return m; }
+  // Direct temperature confirmations made by the Motion reads: count and the
+  // last two (latest first), whatever their outcome.
+  uint32_t tempChecks() const { return tempChecks_; }
+  const TempCheck& tempCheck(unsigned latest) const { return tempCheck_[(tempChecks_+1-latest)%2]; }
  private:
   friend struct StopReferenceProbe; // offline read-only verification of the generator handoff
   enum class Phase:uint8_t { IDLE, ACQUIRE, REFERENCE, ENABLE, LOWER, ALIGN, DEPLOY, LIFT, HEIGHT, HOLD, WALK, WALK_HOLD, PRONE_HEIGHT, PRONE_LIFT, PRONE_DEPLOY, PRONE_LAND, PRONE_WAIT, STOP };
@@ -293,7 +303,7 @@ class SimpleMotion {
   uint16_t referenceFaultRaw_=0;
   ExitSnapshot exit_{};
   uint64_t loadedSinceUs_=0; uint16_t loadedMask_=0,loadedRaw_[12]{}; const char* loadedPhase_="";
-  uint64_t hotSinceUs_[12]{},hotLastUs_[12]{}; uint32_t tempSpikes_=0;
+  uint64_t hotSinceUs_[12]{},hotLastUs_[12]{}; uint32_t tempSpikes_=0,tempChecks_=0; TempCheck tempCheck_[2]{};
   unsigned pollNext_=0,controlNext_=0,acquire_=0,enable_=0;
   unsigned referenceOffRetries_=0;
   motion::JointTargetFrame goal_{},reference_{},pendingGoal_{};

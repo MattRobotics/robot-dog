@@ -126,7 +126,9 @@ bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   // A latched FAULT still permits these bounded, read-only observations after
   // SAFE_OFF. A newly pending STOP/OFF always preempts them through the bus hook.
   const bool previous=stopIo_;stopIo_=true;
-  const bool ok=port_->read(slot,control,out);readInterrupted_=stop_.load()||safeOffRequest_.load();stopIo_=previous;return ok;
+  const bool ok=port_->read(slot,control,out);readInterrupted_=stop_.load()||safeOffRequest_.load();stopIo_=previous;
+  if(port_->tempCheck(tempCheck_[tempChecks_%2]))++tempChecks_;
+  return ok;
 }
 bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
   timing::Section section(timing::FRAME);

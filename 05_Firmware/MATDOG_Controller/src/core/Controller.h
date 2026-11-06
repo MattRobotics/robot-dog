@@ -211,6 +211,8 @@ class Controller {
     bool off(unsigned first=0) override;
     bool verifyOff(unsigned) override;
     void referenceFault(unsigned,const simple::Feedback&,double,uint16_t) override;
+    bool tempCheck(simple::TempCheck& t) const override { if(temp_checked)t=temp_check;return temp_checked; }
+    simple::TempCheck temp_check{};bool temp_checked=false;
   } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false

@@ -1,6 +1,7 @@
 #include "MotionService.h"
 #include "../simple/MotionTiming.h"
 #include "../actuator/CalibrationTargetResolver.h"
+#include "../servo/BusTransaction.h"
 #include <esp_timer.h>
 #include <cmath>
 #include <cstdio>
@@ -122,6 +123,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.walkVelocityX=motion_->walkVelocityX();s.walkVelocityY=motion_->walkVelocityY();s.walkYawRate=motion_->walkYawRate();s.joystick=motion_->joystickActive();
  s.stabilizationLimited=motion_->stabilizationLimited();
  s.tempSpikes=motion_->tempSpikes();s.hotPendingMask=motion_->hotPendingMask();
+ s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -179,7 +181,13 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    for(unsigned k=0;k<16;++k)add("%s%lu",k?",":"[",(unsigned long)s.timing[i][k]);add("%s","]");}
  add("%s","}");
  // Existing thermal confirmation counters: isolated hot samples rejected, joints whose hot window is open.
- add(",\"thermal\":{\"spikes\":%lu,\"hot_pending_mask\":%u}",(unsigned long)s.tempSpikes,(unsigned)s.hotPendingMask);
+ // Direct confirmations of bulk >= 70 C, latest first: [servo id, bulk C,
+ // direct C (-1: no valid reply), bus outcome of the direct read, age ms].
+ add(",\"thermal\":{\"spikes\":%lu,\"hot_pending_mask\":%u,\"checks\":%lu,\"last\":[",(unsigned long)s.tempSpikes,(unsigned)s.hotPendingMask,(unsigned long)s.tempChecks);
+ for(unsigned i=0;i<2&&i<s.tempChecks;++i){const auto& t=s.tempCheck[i];const auto* unit=t.slot<12?actuator::slotServo(t.slot):nullptr;
+   add("%s[%u,%d,%d,\"%s\",%llu]",i?",":"",unit?unit->bus_id:0,t.bulk,t.direct,servo::toString(static_cast<servo::BusOutcome>(t.outcome)),
+       (unsigned long long)(s.capturedUs>=t.stampUs?(s.capturedUs-t.stampUs)/1000:0));}
+ add("%s","]}");
  add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));

@@ -14,7 +14,7 @@ uint8_t slotId(unsigned i){const auto* s=actuator::slotServo(i);return s?s->bus_
 }
 bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback& out){
   if(!owner||i>=12)return false;
-  auto& c=*owner;auto& bus=c.servo_bus_;
+  auto& c=*owner;auto& bus=c.servo_bus_;temp_checked=false;
   if(control){servo::ServoBus::ControlFeedbackSnapshot r;
     if(!bus.readControlFeedbackBudgeted(slotId(i),&r,simple::kReadTimeoutMs))return false;
     out.raw=r.present_position;out.speed=r.present_speed;out.load=r.present_load;out.current=r.present_current;
@@ -27,7 +27,10 @@ bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback&
   }
   // Full Calibration recorded isolated corrupt bulk temperatures. Confirm
   // the physical temperature directly, within the same 2 ms reply budget.
-  if(out.temp>=70){int direct=-1;if(!bus.readPresentTemperatureDirect(slotId(i),&direct,2))return false;out.temp=direct;}
+  // Each confirmation is kept with its outcome (tempCheck): no extra read.
+  if(out.temp>=70){int direct=-1;const bool ok=bus.readPresentTemperatureDirect(slotId(i),&direct,2);
+    temp_check={static_cast<uint64_t>(esp_timer_get_time()),static_cast<uint8_t>(i),static_cast<uint8_t>(bus.lastBusOutcome()),static_cast<int16_t>(out.temp),static_cast<int16_t>(ok?direct:-1)};
+    temp_checked=true;if(!ok)return false;out.temp=direct;}
   simple::timing::Section conversion(simple::timing::CONVERT);
   if(!decodeRaw(i,out.raw,out.q))return false;
   // Acquiring a folded pose can observe a contact outside the URDF. This

@@ -58,11 +58,16 @@ struct ScriptedObservationPort: simple::ServoPort {
     for(unsigned l=0;l<4;++l){const double q[3]={((l==0||l==3)?-1:1)*p[7],p[l<2?2:0],std::fmax((l<2?-88.5:-89.)*3.14159265358979323846/180,p[l<2?3:1])};
       for(unsigned j=0;j<3;++j){auto& f=observed[l*3+j];f.q=q[j];f.raw=2048+std::lround(q[j]/simple::kTickRad);f.torque=0;f.temp=30;f.voltage=120;f.valid=true;f.goal=f.raw;target[l*3+j]=f.raw;}}
   }
+  // A bulk PresentTemperature >= 70 C on slot bulkSlot, confirmed like the
+  // Controller port: direct value (-1 = no valid reply, read fails) and outcome.
+  int bulkSlot=-1,bulkTemp=0,directTemp=0;uint8_t directOutcome=1;bool checked=false;
+  bool tempCheck(simple::TempCheck& t) const override{if(checked)t={now,uint8_t(bulkSlot),directOutcome,int16_t(bulkTemp),int16_t(directTemp)};return checked;}
   bool read(unsigned i,bool control,simple::Feedback& out) override {
-    ++reads;if((stopOnRead||(control&&stopOnControl))&&motion){motion->stop();stopOnRead=stopOnControl=false;return false;}
+    checked=false;++reads;if((stopOnRead||(control&&stopOnControl))&&motion){motion->stop();stopOnRead=stopOnControl=false;return false;}
     if(missing)return false;
     if(control&&static_cast<int>(i)==missControlSlot&&missControlReads){--missControlReads;return false;}
     out=observed[i];out.stampUs=now;out.goal=target[i];out.goalSpeed=drive.speed;out.acc=drive.acc;
+    if(int(i)==bulkSlot){checked=true;if(directTemp<0)return false;out.temp=directTemp;}
     if(control)out.controlStampUs=now;return true;
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
@@ -602,7 +607,29 @@ static void proneStopRecovery(){
   std::printf("PRONE STOP -> STAND: %u admitted, %u refused with a precise reason (software only)\n",admitted,refused);
 }
 
-int main(){standHoldTilt();
+// Thermal diagnostics (dev.15): each direct confirmation of a bulk >= 70 C is
+// kept with bulk, direct, servo, time and bus outcome, including a failed
+// direct read; thresholds, windows and faults are unchanged.
+static void temperatureChecks(){
+  Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());
+  r.p.bulkSlot=5;r.p.bulkTemp=94;r.p.directTemp=27;
+  for(unsigned n=0;n<12&&!r.m.tempChecks();++n)r.tick();
+  const uint64_t okAt=r.p.now;assert(r.m.tempChecks()==1);r.p.directTemp=-1;r.p.directOutcome=2;  // NO_RESPONSE
+  for(unsigned n=0;n<12&&r.m.tempChecks()<2;++n)r.tick();
+  r.p.bulkSlot=-1;for(unsigned n=0;n<60;++n)r.tick();
+  const auto& a=r.m.tempCheck(0);const auto& b=r.m.tempCheck(1);
+  assert(r.m.tempChecks()==2&&r.m.state()==simple::State::STANDING&&!r.m.tempSpikes()&&!r.m.hotPendingMask());
+  assert(a.slot==5&&a.bulk==94&&a.direct==-1&&a.outcome==2&&b.slot==5&&b.bulk==94&&b.direct==27&&b.outcome==1&&b.stampUs==okAt&&a.stampUs>b.stampUs);
+  core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");test_clock_us=r.p.now;service.update();
+  char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,r.p.now/1000));
+  char expect[160];const unsigned id=actuator::slotServo(5)->bus_id;
+  std::snprintf(expect,sizeof expect,"\"thermal\":{\"spikes\":0,\"hot_pending_mask\":0,\"checks\":2,\"last\":[[%u,94,-1,\"NO_RESPONSE\",%llu],[%u,94,27,\"OK\",%llu]]}",
+    id,(unsigned long long)((r.p.now-a.stampUs)/1000),id,(unsigned long long)((r.p.now-okAt)/1000));
+  if(!std::strstr(status,expect)){std::fprintf(stderr,"%s\n",std::strstr(status,"\"thermal\""));assert(false);}
+  std::printf("THERMAL diagnostics: %s (status %zu bytes)\n",expect,std::strlen(status));
+}
+
+int main(){temperatureChecks();standHoldTilt();
   proneStopRecovery();
   imuSlewTime();
   joystickWalk();
