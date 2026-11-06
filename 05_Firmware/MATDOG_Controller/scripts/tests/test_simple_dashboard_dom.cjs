@@ -96,7 +96,7 @@ async function boot() {
   assert.strictEqual(q('#simple-controls').className, 'command-panel');
   const joystick = q('#simple-joystick');
   assert(joystick && q('#joy-pad') && joystick.textContent.includes('NON VALIDATO SU HARDWARE') && joystick.textContent.includes('Rotazione'), 'joystick panel shipped, marked not hardware-validated');
-  assert(q('#joy-left').disabled && q('#joy-right').disabled && /LATERAL_YAW_NOT_QUALIFIED/.test(q('#joy-left').title + q('#joy-right').title), 'rotation visible, disabled with the Controller refusal');
+  assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
   const diagnostics = q('#simple-diagnostics');
   assert(diagnostics && !diagnostics.open && diagnostics.contains(q('#simple-values')) && diagnostics.contains(q('#simple-joints')) && diagnostics.contains(q('#simple-detail')), 'technical details remain in one closed diagnostic panel');
   assert(!q('#simple-state').closest('details') && !q('#simple-reason').closest('details') && !q('#simple-last').closest('details') && !q('#simple-stop').closest('details'), 'state, command result and STOP remain visible outside diagnostics');
@@ -346,42 +346,59 @@ async function boot() {
   assert.strictEqual(q('#simple-state').textContent, 'WALKING');
   assert(!q('#simple-walk-stop').disabled);
   await send('walk_stop', () => q('#simple-walk-stop').click(), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0 }, 1000);
-  // 4b. JOYSTICK (dev.15): fore/aft intent with ttl 1 s, refreshed at 240 ms,
-  // neutral on release, dead zone silent; disabled over WALK STANDARD and STOP.
+  // 4b. JOYSTICK (dev.15): vx (pad up), vy (pad left), yaw_rate (held buttons),
+  // ttl 1 s, refreshed at 240 ms, scaled into the Controller ellipsoid, neutral
+  // on release, dead zone silent; disabled over WALK STANDARD and STOP.
   await refresh(fx.status_ready);
   {
-    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), vmax = .045 / 6.5;
-    const pointer = (type, y) => pad.dispatchEvent(new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientY: y }));
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pointer = (el, type, x, y) => el.dispatchEvent(new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
+    assert(!q('#joy-left').disabled && !q('#joy-right').disabled, 'rotation buttons enabled with the joystick');
     const before = commands().length;
-    pointer('pointerdown', 90); pointer('pointerup', 90); await settle();
+    pointer(pad, 'pointerdown', 90, 90); pointer(pad, 'pointerup', 90, 90); await settle();
     assert.strictEqual(commands().length, before, 'dead-zone press and release issue no request');
-    await send('joystick_forward', () => pointer('pointerdown', 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: vmax, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
-    assert(/JOYSTICK avanti 6\.9 mm\/s \(100 %\)/.test(last()), last());
+    await send('joystick_forward', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    assert(/JOYSTICK avanti 6\.9 mm\/s/.test(last()), last());
     const tick = p.intervals.filter(i => i.ms === 240).at(-1);
     assert(tick, 'refresh period inside the Controller 1 s deadline');
-    await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: vmax, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
-    pointer('pointermove', 119);  // half way back: proportional beyond the dead zone
-    await send('joystick_backward', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: Math.sign(-.5) * Math.min(1, (.5 - .12) / (1 - .12)) * vmax, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
-    await send('joystick_release', () => pointer('pointerup', 119), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
+    await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    pointer(pad, 'pointermove', 90, 119);  // half way back: proportional beyond the dead zone
+    await send('joystick_backward', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(-.5, 0, 0)), 1000);
+    pointer(pad, 'pointermove', 61, 90);   // half way left
+    await send('joystick_lateral', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, .5, 0)), 1000);
+    // Pad full forward-right with the clockwise button held: scaled into the ellipsoid.
+    pointer(pad, 'pointermove', 148, 32);
+    await send('', () => pointer(q('#joy-right'), 'pointerdown', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1 / Math.SQRT2, -1 / Math.SQRT2, -1)), 1000);
+    // Button released, pad still held: the pad intent alone is sent at once, no neutral.
+    await send('', () => pointer(q('#joy-right'), 'pointerup', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1 / Math.SQRT2, -1 / Math.SQRT2, 0)), 1000);
+    await send('joystick_release', () => pointer(pad, 'pointerup', 148, 32), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
     assert.strictEqual(q('#joy-knob').getAttribute('cy'), '90', 'knob back to neutral');
-    const released = commands().length; tick.fn(); await settle();
+    // Rotation alone from a held button, then neutral on its release.
+    await send('joystick_turn', () => pointer(q('#joy-left'), 'pointerdown', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, 0, 1)), 1000);
+    assert(/antiorario 1\.76°\/s/.test(last()), last());
+    await send('', () => pointer(q('#joy-left'), 'pointerup', 0, 0), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
+    const released = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
     assert.strictEqual(commands().length, released, 'no refresh after release');
     await refresh(fx.status_walking);
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'true', 'no joystick over WALK STANDARD');
-    pointer('pointerdown', 32); pointer('pointerup', 32); await settle();
+    assert(q('#joy-left').disabled && q('#joy-right').disabled, 'rotation disabled with the joystick');
+    pointer(pad, 'pointerdown', 90, 32); pointer(pad, 'pointerup', 90, 32); await settle();
     assert.strictEqual(commands().length, released, 'disabled joystick issues no request');
-    const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: vmax, joystick: true }; steered.reason = 'WALK_JOYSTICK';
+    const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: L[0], vy_m_s: 0, yaw_rate_rad_s: 0, joystick: true }; steered.reason = 'WALK_JOYSTICK';
     await refresh(JSON.stringify(steered));
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'Controller joystick walk keeps the joystick operable');
-    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo 6\.9 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
-    await send('', () => pointer('pointerdown', 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: vmax, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
+    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 6\.9 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    await send('', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
     // Admission lost while pressed (STOP in progress): one neutral command, then disabled.
     device.replies.push(ok(fx.ack_walk_stop)); const pressed = commands().length;
     await refresh(fx.status_stopping); ++sequence;
     assert.strictEqual(commands().length, pressed + 1, 'one neutral command when admission is lost');
     assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'true', 'joystick disabled while STOP is active');
+    assert(values().includes('Correzione IMU (richiesta → applicata, mrad)') && values().includes('Provenienza giunti'), 'IMU correction and joint provenance in diagnostics');
     await refresh(fx.status_walking);
   }
   // 5. STOP button; 9. admission is not presented as verified arrest.

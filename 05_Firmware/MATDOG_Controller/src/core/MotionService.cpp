@@ -121,6 +121,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.walkCycles=motion_->walkCycles();
  s.walkVelocityX=motion_->walkVelocityX();s.walkVelocityY=motion_->walkVelocityY();s.walkYawRate=motion_->walkYawRate();s.joystick=motion_->joystickActive();
  s.stabilizationLimited=motion_->stabilizationLimited();
+ s.tempSpikes=motion_->tempSpikes();s.hotPendingMask=motion_->hotPendingMask();
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -177,6 +178,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    if(!s.timingValid[i]){add("%s","null");continue;}
    for(unsigned k=0;k<16;++k)add("%s%lu",k?",":"[",(unsigned long)s.timing[i][k]);add("%s","]");}
  add("%s","}");
+ // Existing thermal confirmation counters: isolated hot samples rejected, joints whose hot window is open.
+ add(",\"thermal\":{\"spikes\":%lu,\"hot_pending_mask\":%u}",(unsigned long)s.tempSpikes,(unsigned)s.hotPendingMask);
  add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));

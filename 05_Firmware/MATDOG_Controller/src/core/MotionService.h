@@ -22,6 +22,7 @@ struct MotionStatusSnapshot {
   uint16_t offMask=0,referenceFaultRaw=0;
   double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,walkVelocityY=0,walkYawRate=0,quaternion[4]{};
   bool joystick=false;
+  uint32_t tempSpikes=0;uint16_t hotPendingMask=0;
   const char* imuReason="";float imuWanted[2]{},imuApplied[2]{};
   // MotionTiming records (same release): parts us, previous release parts us,
   // work counters. Copies of data already held; USB @MOTION TIMING has the rest.
