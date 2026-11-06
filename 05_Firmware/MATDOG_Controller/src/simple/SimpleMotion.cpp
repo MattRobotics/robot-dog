@@ -187,9 +187,10 @@ bool SimpleMotion::serviceStop(){
     serviceOff();return true;
   }
   if(!stop_.exchange(false,std::memory_order_acq_rel))return false;
-  // An explicit STOP during the PRONE rest SAFE_OFF becomes the operator latch
-  // (same OFF progress, no new broadcast).
-  if(faultLatched_||offPending_){if(proneRest_)enterOff(false,stopReason_.load());serviceOff();return true;}
+  // An explicit STOP at the PRONE rest is the operator latch: while its OFF is
+  // pending the progress is kept, once verified the usual SAFE_OFF restarts.
+  if(proneRest_)enterOff(false,stopReason_.load());
+  if(faultLatched_||offPending_){serviceOff();return true;}
   if(stopActive_)return false; // duplicate never restarts the clock or dwell
   beginStop(esp_timer_get_time());return true;
 }
