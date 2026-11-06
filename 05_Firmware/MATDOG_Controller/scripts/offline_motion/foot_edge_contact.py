@@ -3,12 +3,13 @@
 
 `mesh`: lowest point of the real foot STL vs the firmware fillet model
 (FootContact.h edgeContactLiftM) and lower-leg clearance versus foot-axis tilt.
-`frames DIR NAME FILE ...`: joystick_envelope.cpp dumps (body heading frame). For
+`frames JSON NAME FILE ...`: joystick_envelope.cpp dumps (body heading frame). For
 every 3rd release: static support margin of the URDF COM inside the polygon
 of the REAL stance contacts (strip reference within the nominal strip, the
 lowest fillet point beyond it), the lowest non-foot mesh point above the
-ground, and the lowest foot point (penetration). Rigid flat ground; no
-compliance, friction or dynamics.
+ground, and the lowest foot point (penetration). A dump without WALK frames
+is NOT_APPLICABLE (no value). Rigid flat ground; no compliance, friction or
+dynamics.
 """
 import sys,math,json
 from pathlib import Path
@@ -51,7 +52,8 @@ def mesh():
             print(f'{leg} {hd:5.1f} {1e3*(low-ref[2]):9.3f} {1e3*model:9.3f} {1e3*ll:9.2f}');out.append((leg,hd,1e3*(low-ref[2]),1e3*model,1e3*ll))
     return out
 def check(path):
-    a=np.loadtxt(path);res=dict(support_mm=1e9,support_cycle=0,clearance_mm=1e9,clearance_link='',penetration_mm=0,max_tilt_deg=0)
+    if Path(path).stat().st_size==0:return None
+    a=np.loadtxt(path,ndmin=2);res=dict(support_mm=1e9,support_cycle=0,clearance_mm=1e9,clearance_link='',penetration_mm=0,max_tilt_deg=0)
     for k in range(0,len(a),3):
         row=a[k];bz=row[3];q=row[4:16];ft=row[16:].reshape(4,4)
         fr=frames(q);V,com=G.geometry(q);pts=[];ground=[]
@@ -74,5 +76,6 @@ if __name__=='__main__':
         out=Path(sys.argv[2]);rep={}
         for name,f in zip(sys.argv[3::2],sys.argv[4::2]):
             r=check(f);rep[name]=r
+            if r is None:print(f"{name} support NOT_APPLICABLE | non-foot clearance NOT_APPLICABLE (no WALK frame)",flush=True);continue
             print(f"{name} support {r['support_mm']:.2f} mm c{r['support_cycle']:.3f} | non-foot clearance {r['clearance_mm']:.2f} mm ({r['clearance_link']}) | foot penetration {r['penetration_mm']:.3f} mm | stance tilt {r['max_tilt_deg']:.2f} deg",flush=True)
-        (out/'edge-contact.json').write_text(json.dumps(rep,indent=1)+'\n')
+        out.write_text(json.dumps(rep,indent=1)+'\n')

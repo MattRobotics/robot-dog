@@ -125,6 +125,7 @@ int main(int argc,char** argv){
   if(r.end.empty())r.end=std::string(simple::name(m.state()))+" "+m.reason();
   std::fclose(out);
   if(const char* env=std::getenv("JOY_ENVELOPE")){FILE* e=std::fopen(env,"a");if(e){for(unsigned i=0;i<12;++i)std::fprintf(e,"%s%.9f %.9f",i?" ":"",r.lo[i],r.hi[i]);std::fprintf(e,"\n");std::fclose(e);}}
+  if(!r.frames){std::printf("frames=0 walk=NOT_APPLICABLE end=%s\n",r.end.c_str());return r.end.rfind("FAULT",0)==0?1:0;}  // never reached WALK_STANDARD
   std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad end=%s\n",
     r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.end.c_str());
   return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0?1:0;

@@ -6,9 +6,10 @@
 # scenario: no fault, end in STANDING, joint margin >= 0 to the walk box, no
 # IMU tilt-envelope ray outside the box/fillet limit. foot_edge_contact.py then
 # reports, per scenario, the static support margin with the real fillet
-# contacts and the URDF COM (> 0 required for the steady scenarios; random
-# transients reported, not gated) and the non-foot ground clearance
-# (>= 2 mm required). Usage: run_joystick_envelope.sh [output-dir]. Geometry only.
+# contacts and the URDF COM (> 0 required, steady and random) and the non-foot
+# ground clearance (>= 2 mm required); a scenario that never reaches WALK
+# (release in start) is NOT_APPLICABLE there and still gated on sequencing.
+# Usage: run_joystick_envelope.sh [output-dir]. Geometry only.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)"
 out="${1:-$(mktemp -d /tmp/matdog-joystick.XXXXXX)}";mkdir -p "$out"
@@ -34,12 +35,16 @@ fail=0;steady=();random=()
 for line in "${lines[@]}"; do name=${line%% *};args=${line#* }
   [[ "$name" == random_* ]] && random+=("$name" "$out/$name.txt") || steady+=("$name" "$out/$name.txt")
   res=$("$out/joy" "$out/$name.txt" $args 1:0,0,0 || true);echo "$name $res" | tee -a "$out/envelope.log"
-  [[ "$res" == *"end=STANDING"* && "$res" == *"tilt_fail=0 "* && "$res" != *"box_margin=-"* ]] || fail=1
+  [[ "$res" == *"end=STANDING"* && ( "$res" == *"walk=NOT_APPLICABLE"* || ( "$res" == *"tilt_fail=0 "* && "$res" != *"box_margin=-"* ) ) ]] || fail=1
 done
-contact=(env PYTHONDONTWRITEBYTECODE=1 python3 "$here/foot_edge_contact.py" frames "$out")
-"${contact[@]}" "${steady[@]}" | tee "$out/contact_steady.log"
-"${contact[@]}" "${random[@]}" | tee "$out/contact_random.log"
-awk '{for(i=1;i<=NF;i++){if($i=="support"&&$(i+1)+0<=0)bad=1;if($i=="clearance"&&$(i+1)+0<2)bad=1}} END{exit bad}' "$out/contact_steady.log" || fail=1
-awk '{for(i=1;i<=NF;i++)if($i=="clearance"&&$(i+1)+0<2)bad=1} END{exit bad}' "$out/contact_random.log" || fail=1
+contact=(env PYTHONDONTWRITEBYTECODE=1 python3 "$here/foot_edge_contact.py" frames)
+"${contact[@]}" "$out/contact_steady.json" "${steady[@]}" | tee "$out/contact_steady.log"
+"${contact[@]}" "$out/contact_random.json" "${random[@]}" | tee "$out/contact_random.log"
+# Numeric values only: NOT_APPLICABLE carries none.
+gate='{for(i=1;i<NF;i++)if($(i+1)~/^-?[0-9.]+$/){if($i=="support"&&$(i+1)+0<=0)bad=1;if($i=="clearance"&&$(i+1)+0<2)bad=1}} END{exit bad}'
+awk "$gate" "$out/contact_steady.log" "$out/contact_random.log" || fail=1
+summary=$(cat "$out/contact_steady.log" "$out/contact_random.log" | awk '$3~/^-?[0-9.]+$/{if(s==""||$3+0<s){s=$3+0;sn=$1}if(c==""||$9+0<c){c=$9+0;cn=$1}} END{printf "min support %.2f mm (%s), min non-foot clearance %.2f mm (%s)",s,sn,c,cn}')
+tilt=$(grep -o 'compensated=[0-9.]*/[0-9.]*' "$out/envelope.log" | cut -d/ -f2 | sort -n | tail -1)
+echo "summary: $summary, max compensated stance-foot tilt $tilt deg" | tee -a "$out/envelope.log"
 echo "JOYSTICK envelope $([[ $fail == 0 ]] && echo PASS || echo FAIL): geometry and sequencing only, no hardware motion validation ($out)"
 exit $fail

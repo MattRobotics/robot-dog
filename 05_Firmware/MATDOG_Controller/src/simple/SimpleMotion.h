@@ -24,16 +24,19 @@ constexpr double kStrideM[]={.030,.045,.060};
 // kJoystickYawRad)^2 <= 1, each axis rate limited to full scale over two gait
 // cycles; swing targets are planned on that ramp. A steered walk keeps the
 // WALK height, duty, lift and stride ramps and differs from WALK STANDARD only
-// where lateral and turning steps need it: 12 mm lateral sway and stance
+// where lateral and turning steps need it: 14 mm lateral sway and stance
 // contact on the tread fillet (FootContact.h), inside its own certified joint
 // box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
-// the URDF COM, steady commands keep >= +0.35 mm static support (pure clockwise
-// turn the lowest); random multi-axis command changes reach -0.9 mm in
-// transients (scripts/offline_motion/run_joystick_envelope.sh). The Controller
+// the URDF COM, the binding support edge is the RF-LH diagonal while RH swings;
+// the lateral sway moves the COM away from it by ~0.75 mm per mm and tilts the
+// stance feet (hip roll), so 15 mm already leaves the fillet limit at the IMU
+// envelope boundary. At 14 mm steady commands keep >= +1.8 mm static support
+// and the random multi-axis set >= +0.5 mm, a static model margin, not a
+// dynamic stability claim (scripts/offline_motion/run_joystick_envelope.sh). The Controller
 // ends the walk with WALK STOP when no admitted joystick command arrives for
 // kJoystickTimeoutUs (ESP clock).
 constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
-constexpr double kJoystickSwayYM=.012;
+constexpr double kJoystickSwayYM=.014;
 constexpr uint64_t kJoystickTimeoutUs=1000000;
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances

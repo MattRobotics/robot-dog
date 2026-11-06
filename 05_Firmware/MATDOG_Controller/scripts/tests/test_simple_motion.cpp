@@ -445,8 +445,8 @@ static void joystickWalk(){
     const auto a=pose(r);hold(r,v,650);const auto b=pose(r);
     const double w=2*v[2]*T,si=w!=0?std::sin(w)/(v[2]*T):2,co=w!=0?(1-std::cos(w))/(v[2]*T):0;
     const double dx=v[0]*T*si-v[1]*T*co,dy=v[0]*T*co+v[1]*T*si;
-    // The body sway (<= 16 mm, body frame) turns with the heading: |R(w)-I| x sway.
-    const double tol=1e-9+std::abs(w)*.016;
+    // The body sway (<= 18 mm, body frame) turns with the heading: |R(w)-I| x sway.
+    const double tol=1e-9+std::abs(w)*.018;
     assert(std::abs(b[0]-a[0]-(std::cos(a[2])*dx-std::sin(a[2])*dy))<tol&&std::abs(b[1]-a[1]-(std::sin(a[2])*dx+std::cos(a[2])*dy))<tol&&std::abs(std::remainder(b[2]-a[2]-w,2*M_PI))<1e-9);
     assert(std::abs(r.m.walkVelocityX()-v[0])<1e-12&&std::abs(r.m.walkVelocityY()-v[1])<1e-12&&std::abs(r.m.walkYawRate()-v[2])<1e-12);
     // Neutral stick: WALK STOP from the next touchdown, then HOLD at the WALK height.
