@@ -169,9 +169,9 @@ WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vec
   auto r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
   if (r.status == TiltedIkResult::Status::OK && std::abs(edgeContactLiftM(r.base.contact.axisTiltRad) - lift) > 2e-5) {
     lift = edgeContactLiftM(r.base.contact.axisTiltRad); o.seed = r.base.joints;
-    const auto first = r;
+    const unsigned solves = r.solves, newton = r.base.newtonSteps, fk = r.base.fkEvaluations;  // counts only: no result copy on the stack
     r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
-    r.solves += first.solves; r.base.newtonSteps += first.base.newtonSteps; r.base.fkEvaluations += first.base.fkEvaluations;
+    r.solves += solves; r.base.newtonSteps += newton; r.base.fkEvaluations += fk;
   }
   return r;
 }
