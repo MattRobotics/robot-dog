@@ -1,5 +1,7 @@
 # dev.17 — flash APP-only e collaudo minimo (PREPARATO, NON ESEGUITO)
 
+> **Esito (07/11/2026, aggiunto dopo il collaudo; il testo sotto resta quello della candidata):** questa candidata `17db0ef` è stata flashata APP-only, avviata e collaudata sul robot, poi rilasciata senza ricompilazione come prima Stable GitHub `v1.0.1`. Evidenze e limiti: [Dev17_HW_2026-11-07/REPORT.md](../Dev17_HW_2026-11-07/REPORT.md) · [manifest firmware/release](../Dev17_HW_2026-11-07/RELEASE_MANIFEST.md).
+
 Nulla di quanto segue è stato eseguito. Ogni passo hardware richiede l'**autorizzazione esplicita dell'operatore nella sessione attiva** e il **supporto fisico anticaduta** già posizionato (non dedotto dalla telemetria). Candidata: [REPORT.md](REPORT.md). Stessa procedura qualificata di dev.14, dev.15 e dev.16.
 
 ## A. Flash APP-only

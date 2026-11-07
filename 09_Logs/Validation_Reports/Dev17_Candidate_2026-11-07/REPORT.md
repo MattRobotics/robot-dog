@@ -1,5 +1,7 @@
 # MATDOG Controller 1.0.1-dev.17 — candidata di stabilizzazione operativa (07/11/2026)
 
+> **Esito (07/11/2026, aggiunto dopo il collaudo; il testo sotto resta quello della candidata):** questa candidata `17db0ef` è stata flashata APP-only, avviata e collaudata sul robot, poi rilasciata senza ricompilazione come prima Stable GitHub `v1.0.1`. Evidenze e limiti: [Dev17_HW_2026-11-07/REPORT.md](../Dev17_HW_2026-11-07/REPORT.md) · [manifest firmware/release](../Dev17_HW_2026-11-07/RELEASE_MANIFEST.md).
+
 > **Aggiornamento pre-flash (07/11/2026 notte):** candidata consolidata **`17db0ef`**, stessa versione `1.0.1-dev.17` (mai installata): comandi joystick ammessi solo in ordine di pagina (§2.6), STOP durante il caricamento del Twin misurato (§2.7), pagine di stato verificate solo-RAM (§2.8), `input_ms` dello STOP nella traccia. La build di `7503bfc` (APP `f49b531a…`) è **SUPERATA per il flash**: conservata con `NOT_FOR_FLASH.txt`, rifiutata dallo script di flash.
 
 > **IMPLEMENTATA, NON VALIDATA SU HARDWARE.** In questo mandato nessun flash, riavvio o movimento; robot spento con KEY OFF del BMS. **dev.16** (`e0ddbb1`, APP `73952eec…`) resta il firmware installato e il riferimento validato su hardware il 07/11 ([dossier](../Dev16_HW_2026-11-07/REPORT.md)). Calibrazione gen-1, mapping dei 13 servo, geometria REV01-FIX/URDF, FK/IK, box di collisione, limiti, partizioni, NVS/EEPROM, STOP/SAFE_OFF/deadman/watchdog: invariati. Collaudo proposto: [FLASH_AND_TEST.md](FLASH_AND_TEST.md).

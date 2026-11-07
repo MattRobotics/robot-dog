@@ -8,7 +8,17 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## v1.0.1 — First Stable GitHub Release: firmware 1.0.1-dev.17 promoted unchanged — 2026-11-07
+
+> **Stable for the current MATDOG, qualified functional scope (VERIFIED HARDWARE).** Release tag `v1.0.1` promotes the exact installed APP — internal version `1.0.1-dev.17`, build `17db0efe2324`, source commit `17db0efe23242ae8932b5549546a9758d9aa4645`, 1,707,808 B, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, `app0` @ `0x010000`. **Not recompiled**: the firmware string stays `1.0.1-dev.17`; the tag names the promotion of these bytes. No source change relative to the dev.17 entry below. Rollback: dev.16 `e0ddbb1791d0` (APP `73952eec…`).
+
+- **Hardware (07/11/2026):** APP-only flash with independent digest verification, boot READY/RUN, NVS gen-1 `VALID_ACKNOWLEDGED`, census 13/13, 91 s IDLE audit (160/160 HTTP 200, 0 missed/overruns); operator session: STAND100/125 and HOLD, WALK STANDARD 45/60, WALK STOP, STOP during motion and direct WALK after STOP, proportional joystick and release, PRONE with SAFE_OFF 13/13, Twin recovered after a reload in HOLD with torque ON, ViewCube/Reset view. No fault in retained samples.
+- **Known limitations, accepted for this release:** release budget not held under gait/joystick load (joystick window +64 missed, +491 overruns, max work 47.2 ms; loop stack minimum 2,060 B), slow gait, joystick lateral sway, rare HTTP delays with torque ON (cause not attributed), STOP during a cold Twin load not measured end-to-end on a phone; IMU rotations, LEDs, manual RESTORE and multi-generation not re-tested.
+- Evidence: [hardware report](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [release manifest](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md) · [evidence manifest](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/EVIDENCE_MANIFEST.md).
+
 ## Unreleased — MATDOG Controller 1.0.1-dev.17 candidate: operational stabilization — HTTP, dashboard input, Twin refresh, STOP→WALK, Motion Cockpit (on dev.16 `e0ddbb1`) — 2026-11-07
+
+> **Released on 2026-11-07 as GitHub Stable `v1.0.1`** (see the entry above). The text of this entry is kept as written for the candidate.
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**. dev.16 (`e0ddbb1`, APP `73952eec…`, hardware-validated 2026-11-07 in the STAND/PRONE/WALK/STOP perimeter) stays the installed reference until an authorized flash. Calibration gen-1, mapping, Geometry V5/URDF REV01-FIX, FK/IK, collision boxes, limits, partitions, NVS/EEPROM, STOP/SAFE_OFF/deadman/watchdog unchanged. Evidence: dev.16 traces 23–32 (`09_Logs/Validation_Reports/Dev16_HW_2026-11-07/`).
 

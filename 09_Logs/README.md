@@ -1,6 +1,8 @@
 # MATDOG logs and evidence
 
-Aggiornamento corrente 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [RCA timing 07/11](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente solo ASUS locale, main non sincronizzato al device; nessuna stable.
+Stato corrente 07/11/2026: **prima Stable GitHub `v1.0.1`** = APP `1.0.1-dev.17` / `17db0efe2324` installata e collaudata, promossa senza ricompilazione — [report HW](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest release](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md) · [evidenze](Validation_Reports/Dev17_HW_2026-11-07/EVIDENCE_MANIFEST.md); rollback dev.16 ([report](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md)). Indice completo: [Validation_Reports](Validation_Reports/README.md).
+
+Storico 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [RCA timing 07/11](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente solo ASUS locale, main non sincronizzato al device; nessuna stable.
 
 Historical scoped closeout (11/10/2026): [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 

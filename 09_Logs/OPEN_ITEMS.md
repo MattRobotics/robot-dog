@@ -1,4 +1,30 @@
-# Stato operativo corrente — 07/11/2026, validazione hardware dev.16
+# Stato operativo corrente — 07/11/2026: prima Stable `v1.0.1` (firmware 1.0.1-dev.17)
+
+**Installata, VERIFIED HARDWARE nel perimetro qualificato e rilasciata:** `1.0.1-dev.17`, build `17db0efe2324`, sorgente `17db0ef`, APP SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, promossa senza ricompilazione come GitHub Release `v1.0.1`. Rollback: dev.16 `e0ddbb1791d0`. [Report HW](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest release](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md).
+
+## Checklist della prima Stable (chiusa con `v1.0.1`)
+
+- [x] APP installata identificata (commit, build ID, SHA256, profilo, slot) e flash APP-only verificato con digest.
+- [x] Boot, NVS gen-1 `VALID_ACKNOWLEDGED`, census 13/13, SAFE_OFF 8191, audit IDLE.
+- [x] STAND100/125, WALK STANDARD 45/60, WALK STOP, STOP e WALK diretto dopo STOP, joystick e rilascio, PRONE con SAFE_OFF, Twin dopo refresh con coppia ON, ViewCube.
+- [x] `/status` senza 503 sotto slack Motion, letture oltre il recupero TCP, joystick senza reflow e in ordine (dev.17).
+- [x] Sorgente su `main`, tag e Release con APP originale, manifest e checksum; dev.16 conservata come rollback.
+
+## Lavoro residuo per il prossimo ciclo (non prerequisiti della `v1.0.1`)
+
+| Area | Stato | Issue |
+|---|---|---|
+| Timing Motion | overrun/perse in WALK e joystick (finestra `(36)`: +64 perse, +491 overrun, lavoro max 47,2 ms); variabilità HOLD UNKNOWN | #52 |
+| Stack del loop | minimo osservato 2.060 B durante joystick/WALK (dev.16 ≥ 4.208 B): da misurare e ridurre prima di aggiungere lavoro al loop | #52 |
+| Velocità e qualità del gait | gait lento (obiettivo fino a 5× non qualificato), sway laterale del joystick, WALK_SETTLE ~8,9 s | #52 |
+| HTTP con coppia ON | rari stalli e risposte lunghe (max 1,68 s); causa delle perdite TCP UNKNOWN, serve cattura pacchetti HOLD vs IDLE | #62 |
+| STOP durante il caricamento Twin | misurato solo in Chrome (fino a ~0,5 s); misura end-to-end su telefono reale a cache fredda mancante | #62 |
+| UX Twin | overlay leggermente trasparente dei comandi dentro il Twin; zampe posteriori sospese sul pavimento grafico in PRONE | #62 |
+| LED | verde stabile osservato in dev.17, nessuna qualificazione del sottosistema | #62 |
+| RESTORE e manutenzione | RESTORE manuale da dashboard, rifiuti per giunto, multigenerazione non qualificati | #48 |
+| Non ricollaudati in dev.17 | rotazioni IMU pitch/roll, quote STAND diverse da 100/125, WALK FAST, funzioni avanzate | — |
+
+## Storico — stato del 07/11/2026, validazione hardware dev.16
 
 **Installata e validata sul robot nel perimetro provato:** `1.0.1-dev.16`, build `e0ddbb1791d0`, APP SHA256 `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d`. NVS gen-1/census 13/13 preservati; STAND, WALK STANDARD45/60, PRONE con SAFE_OFF e STOP da movimenti sono riusciti nei casi registrati. Ultimo stato `READY/PRONE_REST`, `safe_off_mask=8191`, 0 fault; robot spento via KEY OFF (discharge MOS BMS alimenta/disalimenta anche ESP32-S3 in configurazione attuale). **NON dichiarata release stabile**. Dossier [HW 07/11](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) · [manifest](Validation_Reports/Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [metriche](Validation_Reports/Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv). La PR #64 resta DRAFT; main non integrato, APP/manifest binari su ASUS.
 
