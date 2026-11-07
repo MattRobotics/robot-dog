@@ -20,11 +20,34 @@ double norm(const Vector3& p) { return std::hypot(std::hypot(p.x, p.y), p.z); }
 // The generator requires every limit interval to be strictly inside (-pi, pi).
 // Hence each angle has at most one equivalent representative in that interval.
 bool boundedAngle(double raw, const JointLimit& limit, double& value) {
-  value = std::remainder(raw, 2.0 * kPi);
+  // |raw| <= pi: the nearest multiple of 2pi is 0 (at exactly pi the
+  // round-half-even quotient is 0 too), so remainder(raw, 2pi) == raw bit for
+  // bit. The soft-double remainder is only paid for angles outside (-pi, pi].
+  value = std::abs(raw) <= kPi ? raw : std::remainder(raw, 2.0 * kPi);
   if (value < limit.lower - kLimitEpsilonRad ||
       value > limit.upper + kLimitEpsilonRad) return false;
   value = clamp(value, limit.lower, limit.upper);
   return true;
+}
+// Constants of one virtual chain: b = planar foot offset, phi = its angle,
+// outer = reach of the chain. They depend only on the generated model and on
+// the caller's hipFrameZ (0 or -radius), never on the target. Memoized exactly
+// (same inputs, same bits) so the analytic IK pays hypot/atan2 for them once
+// per chain instead of on every solve. Motion, STAND planning and the offline
+// tools call the IK from one task; no other context solves IK.
+struct ChainConstants { double fx, fz, lateral, a, hipFrameZ, b, phi, outer; bool valid; };
+const ChainConstants& chainConstants(const LegModel& m, double a, double lateral, double hipFrameZ) {
+  static ChainConstants cache[8]{};
+  static unsigned next = 0;
+  for (const auto& c : cache)
+    if (c.valid && c.fx == m.footOrigin.x && c.fz == m.footOrigin.z && c.lateral == lateral && c.a == a && c.hipFrameZ == hipFrameZ) return c;
+  auto& c = cache[next]; next = (next + 1) % 8;
+  c.fx = m.footOrigin.x; c.fz = m.footOrigin.z; c.lateral = lateral; c.a = a; c.hipFrameZ = hipFrameZ;
+  c.b = std::hypot(m.footOrigin.x, m.footOrigin.z);
+  c.phi = std::atan2(m.footOrigin.x, -m.footOrigin.z);
+  c.outer = std::hypot(lateral, a + c.b) + std::abs(hipFrameZ);
+  c.valid = true;
+  return c;
 }
 }  // namespace
 
@@ -59,10 +82,11 @@ IkResult detail::inverseWithModel(const LegModel& geometry, const Vector3& targe
                      target.y - model->hipOrigin.y,
                      target.z - model->hipOrigin.z};
   const double a = -model->lowerOrigin.z;
-  const double b = std::hypot(model->footOrigin.x, model->footOrigin.z);
   const double lateral = model->upperOrigin.y + model->footOrigin.y;
+  const auto& chain = chainConstants(geometry, a, lateral, hipFrameZ);
+  const double b = chain.b;
   const double radius = std::hypot(p.y, p.z);
-  const double outer = std::hypot(lateral, a + b) + std::abs(hipFrameZ);
+  const double outer = chain.outer;
   result.status = KinematicsStatus::UNREACHABLE_GEOMETRY;
   result.reachability = Reachability::UNREACHABLE;
   // Reject huge finite inputs before squaring; hypot is overflow-safe.
@@ -71,7 +95,7 @@ IkResult detail::inverseWithModel(const LegModel& geometry, const Vector3& targe
 
   const double alpha = std::atan2(p.z, p.y);
   const double hipDelta = std::acos(clamp(lateral / radius, -1.0, 1.0));
-  const double phi = std::atan2(model->footOrigin.x, -model->footOrigin.z);
+  const double phi = chain.phi;
   bool geometryExists = false;
   bool limitedCandidateExists = false;
   struct Candidate { LegJointAngles q; double distance; AnalyticBranch branch; };
@@ -88,11 +112,14 @@ IkResult detail::inverseWithModel(const LegModel& geometry, const Vector3& targe
     if (cosine < -1.0 - kDomainEpsilon || cosine > 1.0 + kDomainEpsilon) continue;
     geometryExists = true;
     const double elbow = std::acos(clamp(cosine, -1.0, 1.0));
-    // sin is odd, cos even: one evaluation serves both elbow branches.
+    // sin is odd, cos even: one evaluation serves both elbow branches, and
+    // atan2 is odd in its first argument (the sign is applied after the
+    // reduction in every libm), so one atan2 serves both too, bit for bit.
     const double toTarget = std::atan2(-p.x, -v), se = std::sin(elbow), ce = std::cos(elbow);
+    const double elbowAngle = std::atan2(b * se, a + b * ce);
     for (unsigned elbowBranch = 0; elbowBranch < 2; ++elbowBranch) {
       const double beta = elbowBranch == 0 ? elbow : -elbow;
-      const double u = toTarget - std::atan2(b * (elbowBranch == 0 ? se : -se), a + b * ce);
+      const double u = toTarget - (elbowBranch == 0 ? elbowAngle : -elbowAngle);
       LegJointAngles q{};
       if (!boundedAngle(h, model->limits[0], q.hip) ||
           !boundedAngle(u, model->limits[1], q.upper) ||
