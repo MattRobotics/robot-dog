@@ -1,6 +1,9 @@
 # MATDOG Controller
 
-**Branch `matdog/simple-motion-v1`:** il percorso operativo corrente è descritto in [SIMPLE_MOTION_V1.md](SIMPLE_MOTION_V1.md). STAND/WALK STANDARD usano `src/simple`; le note Motion Core qui sotto sono storiche. Nessuna autorizzazione hardware è implicita nella build.
+> **STATO CORRENTE — Stable `v1.0.1` (07/11/2026):** su MATDOG è installata e hardware-verificata l'APP **`1.0.1-dev.17`**, build `17db0efe2324`, commit sorgente `17db0efe23242ae8932b5549546a9758d9aa4645`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. [Release e APP](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) · [validazione hardware](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest installazione/rollback](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Motion operativo via `src/simple`: STAND/WALK STANDARD/STOP/PRONE qualificati nel perimetro report; NVS gen-1 conservata. **Non flashare una ricompilazione di `main` come se fosse la stessa APP**; utilizzare artefatto originale, checksum e procedura supervisionata. *Le sezioni su branch `matdog/simple-motion-v1`, dev.3 e V0.1 sotto sono record delle loro date e non descrivono il Controller attuale.*
+
+
+**Snapshot del branch storico `matdog/simple-motion-v1`:** il percorso operativo è descritto in [SIMPLE_MOTION_V1.md](SIMPLE_MOTION_V1.md). STAND/WALK STANDARD usano `src/simple`; le note Motion Core qui sotto sono storiche. Nessuna autorizzazione hardware è implicita nella build.
 
 The first unified operational ESP32-S3 runtime for MATDOG. It replaces the previous
 one-sketch-per-peripheral workflow (ST3215 bench tools, BNO085 Phase C3, DALY probes)
@@ -44,7 +47,7 @@ MATDOG Controller
 └── status/          LedRing — WS2812B ring, boots OFF, non-blocking effects
 ```
 
-## Current hardware status — 2026-10-01
+## Historical hardware status — 2026-10-01
 
 > **Historical snapshot (2026-10-01), not the current hardware state.** The results below are
 > kept unchanged as evidence of that date. The robot has since been migrated to layout
@@ -64,7 +67,7 @@ is distinct from the later development firmware validated in this session.
 The [2026-09-29 calibration overview](#calibration-on-main-2026-09-29) below is retained as a
 historical software-only snapshot, not the current project status.
 
-## Official baseline
+## Historical official baseline — Controller V0.1 (2026-09-15)
 
 | Identity | Value |
 |---|---|
