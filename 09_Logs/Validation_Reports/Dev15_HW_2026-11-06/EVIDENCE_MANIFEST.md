@@ -30,6 +30,8 @@ Il repository GitHub è pubblico: evitare di pubblicare indiscriminatamente vide
 - (19)–(22): sessione iniziata `2026-11-06T17:51:55.745Z`.
 Ogni file conserva tipicamente gli ultimi 240 snapshot (~84–90 s) e gli ultimi 48 comandi; **non** rappresenta l'intera sessione e i delta da log sovrapposti **non** sono sommabili indiscriminatamente. L'ultimo fallimento PRONE riferito dopo la sessione video non è contenuto in un JSON di queste acquisizioni.
 
+**Pubblicazione 07/11/2026:** i 15 JSON sopra, invariati, sono pubblicati nell'archivio [`raw/MATDOG_DEV15_TIMING_RCA_INPUTS_2026-11-07.zip`](raw/MATDOG_DEV15_TIMING_RCA_INPUTS_2026-11-07.zip): 1.379.942 byte, SHA256 `d0e52dfdb9d8a0a40df22d97def5d45c8dc824f74235d90c1db0b662678a6dc5`, ZIP integro. Contiene anche `SHA256SUMS`, `README_RCA.md` e `reference/VIDEO_AUDIT.md` (testo, SHA `d555d1f4…98cb`, uguale all'audit originale sotto). Ogni campo stringa è stato rivisto: nessuna credenziale, IP privato, cookie, token o dato personale; solo telemetria, nomi giunto, etichette comando e ID casuali di istanza browser. **Nessun video** nell'archivio.
+
 ## Video e analisi derivata
 
 | File locale | Dimensione (byte) | SHA-256 |
@@ -53,7 +55,11 @@ L'analisi ricostruita nel repository è [VIDEO_AUDIT.md](VIDEO_AUDIT.md); non eq
 
 L'operatore può conservarlo come pacchetto grezzo prima della successiva integrazione dal computer ASUS. Contiene un filmato domestico: non spostarlo in un repository pubblico senza revisione privacy.
 
-## Firmware da pubblicare in fase successiva (non qui)
+## Firmware: stato aggiornato al 07/11/2026
+
+Il sorgente esatto **è ora pubblicato su questo branch** (PR #64, draft) tramite il merge `e5b0644` con secondo genitore `7997ad4`; il tree firmware è identico a `7997ad4` (verifica blob per blob in [TIMING_RCA_2026-11-07.md](TIMING_RCA_2026-11-07.md) §1). APP, ELF, manifest e `sdkconfig` della build installata restano **solo locali** sull'ASUS (`build-output/dev15-joystick-motion-20261105/hostlink-build-7997ad4/artifacts/ROBOT_POWERED-ota0/`, `SHA256SUMS` verificato): nessuna release firmware è stata creata. La sezione seguente è conservata come stato al 06/11.
+
+## Firmware da pubblicare in fase successiva (stato al 06/11, superato)
 
 - Sorgente locale `7997ad4`; worktree `~/MATDOG/worktrees/matdog-dev15-joystick-motion-20261105`.
 - APP flashata e verificata su app0: 1.691.328 byte, SHA256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13`; profilo `ROBOT_POWERED`.

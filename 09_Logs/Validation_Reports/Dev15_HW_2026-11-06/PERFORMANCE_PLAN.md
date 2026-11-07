@@ -32,6 +32,8 @@
 
 ### P1 — Motion 20 ms sostenibile e comandi raggiungibili
 
+> **RCA eseguita il 07/11/2026:** [TIMING_RCA_2026-11-07.md](TIMING_RCA_2026-11-07.md). Sintesi: il calcolo double software di IK nominale + IK di compensazione supera i 20 ms (WALK45 ≥ 18,4 ms, joystick ≥ 28,2 ms); regressione `2a630a0` (rimosso il solve IMU a release alterne di dev.7); 503 = assenza di slack di 5 ms. Patch minima raccomandata T0 + T1, non implementata.
+
 1. Profilare una release reale con attribuzione **prima deadline saltata**: READ, NOMINAL, COMPENSATE, CONVERT, FRAME, REST, numero solve, stile di letture UART; verificare `maxWorkUs`, `maxGapUs`, `missedReleases`, heap/stack e latenza STOP prima/dopo patch.
 2. Cercare il lavoro ripetuto o non necessario in `COMPENSATE` (risoluzione IK, verifiche duplicate, calcolo nel HOLD, aggiornamenti che non cambiano i target). Priorità a caching/cadenza corretta e diff minimi; **non** rimuovere limiti, feedback stale, termica, collisioni o STOP.
 3. Distinguere CPU/servo bus da **HTTP 503 `MOTION_BUDGET_UNAVAILABLE`** dopo ~100 ms: verificare dispatch, lock contesi, starvation e motivo preciso di rifiuto. Il comando deve arrivare all'autorità Motion senza deadline artificiali spurie.

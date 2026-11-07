@@ -1,6 +1,6 @@
 # MATDOG logs and evidence
 
-Aggiornamento corrente 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente solo ASUS locale, main non sincronizzato al device; nessuna stable.
+Aggiornamento corrente 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [RCA timing 07/11](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente solo ASUS locale, main non sincronizzato al device; nessuna stable.
 
 Historical scoped closeout (11/10/2026): [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 

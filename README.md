@@ -4,7 +4,7 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 
 **Al 06/11/2026 il robot ha installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
 
-[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
+[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [RCA timing 20 ms](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
 
 ## Hardware e architettura
 
@@ -33,15 +33,15 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 | LED / termica | Sfarfallamento policromatico intermittente aperto; picchi termici isolati da indagare, non prova di surriscaldamento continuo. |
 | HostLink / Jetson | Bridge/USB non qualificati Motion hardware; Jetson prevista, **non installata**. |
 
-Le evidenze sono specifiche di questa sessione; l'hardware non è ancora qualificato per operatività stabile o locomozione veloce. I file grezzi e il video sono attualmente locali, identificati con SHA256 nel manifest e non ancora pubblicati su GitHub.
+Le evidenze sono specifiche di questa sessione; l'hardware non è ancora qualificato per operatività stabile o locomozione veloce. I 15 JSON Motion grezzi sono pubblicati come archivio con SHA256 ([raw/](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/raw/)); il video domestico resta locale, identificato nel manifest.
 
 ## Quattro riferimenti da non confondere
 
 | Linea | Significato |
 |---|---|
-| **main** | Sorgente remoto integrato, basato sulla linea dev.7 più documentazione. La PR dev.15 è **solo documentale**; main non è l'APP installata. |
+| **main** | Sorgente remoto integrato, basato sulla linea dev.7 più documentazione. Non contiene dev.15; main non è l'APP installata. La [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (draft, non mergiata) integra documentazione **e** sorgente dev.15. |
 | **dev.14** | Firmware installato e validato parzialmente **il 05/11**, ora storico; sorgente sul [checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105). |
-| **dev.15** | **Firmware installato e parzialmente validato hardware il 06/11**. Build `7997ad4d4497`, APP SHA256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13`. Il commit sorgente `7997ad4` è tuttora solo locale, non su GitHub. |
+| **dev.15** | **Firmware installato e parzialmente validato hardware il 06/11**. Build `7997ad4d4497`, APP SHA256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13`. Il sorgente esatto `7997ad4` è pubblicato sul branch `docs/dev15-hardware-validation-20261106` (PR #64) tramite il merge `e5b0644`: tree firmware identico a `7997ad4`, **non su main**. Una ricompilazione non è dichiarata byte-identica all'APP installata. |
 | **dev.7** | [Pre-release storica pubblicata](https://github.com/MattRobotics/robot-dog/releases/tag/matdog-controller-v1.0.1-dev.7), con [report del31/10](09_Logs/Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md). Non è più il firmware installato e non viene promossa a stable. |
 
 Identità storica dev.14 (05/11): commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5decee`, build `4ff2aadf4ed9`, profilo ROBOT_POWERED, OTA ingest0. APP SHA256: `71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22`. Il tag conserva il sorgente; non è una nuova GitHub Release e non garantisce una ricompilazione bit-identica.

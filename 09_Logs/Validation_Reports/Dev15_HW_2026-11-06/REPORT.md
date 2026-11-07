@@ -8,6 +8,7 @@
 |---|---|
 | **VERIFIED HARDWARE — firmware installato** | MATDOG Controller `1.0.1-dev.15`, build `7997ad4d4497`, riconosciuta dopo flash tramite HTTP |
 | **Sorgente candidato locale (non pubblicato su remoto)** | commit `7997ad4`, branch locale `matdog/dev15-joystick-motion`, worktree ASUS `~/MATDOG/worktrees/matdog-dev15-joystick-motion-20261105`; associazione alla build da manifest/preflight locale |
+| **Sorgente pubblicato (aggiornamento 07/11)** | merge `e5b0644` su questo branch (PR #64), secondo genitore `7997ad4`: i 43 commit `4634de8..7997ad4` conservano SHA e autore; tree `src`, `.ino`, `scripts`, `host_bridge`, `viewer` identici a `7997ad4`; unico conflitto `CHANGELOG.md` (non compilato) risolto a mano. Manifest di build: `SOURCE_COMMIT=7997ad4d4497…`, `SOURCE_STATE=CLEAN`, APP SHA uguale. **Non su main.** Ricompilazione non dichiarata byte-identica. |
 | **APP candidata** | 1.691.328 byte, SHA-256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13` |
 | **Flash verificato** | 06/11, APP-only su app0 attivo, offset `0x010000`; lettura otadata/layout, una scrittura ROM esptool `--no-stub`, `verify-flash` indipendente; nessuna scrittura NVS/otadata/bootloader |
 | **Calibrazione/attività** | NVS gen-1 `VALID_ACKNOWLEDGED`, census 13/13, RUN/READY, IMU/BMS/SERVO/LED PASS al boot, SAFE_OFF iniziale 13/13; nessun restore necessario |
@@ -61,6 +62,8 @@ Periodo richiesto **20 ms / 50 Hz**. Dalle acquisizioni:
 - Log (17) STAND150 in successiva sessione: rifiuti HTTP 503 separati dal superamento della deadline; controller rimane operativamente pronto finché non entra in PRONE fallito.
 
 Questi valori sono **delta per finestra / massimi cumulativi**, non somme indipendenti di tutte le acquisizioni. Le tracce hanno snapshot sovrapposti e contatori di uptime che ripartono a ogni reboot. `COMPENSATE` può consumare più dei 20 ms; serve attribuzione per release e prima divergenza nel firmware locale, non benchmark che elimini controlli fisici reali.
+
+> **Aggiornamento RCA 07/11/2026** ([TIMING_RCA_2026-11-07.md](TIMING_RCA_2026-11-07.md)): il 503 `MOTION_BUDGET_UNAVAILABLE` è la conseguenza deterministica dell'overrun Motion (regola di 5 ms di slack entro un budget di 100 ms, `HttpTransport.cpp:426-427,551-555,488`), non un evento indipendente; i 20 ms si consumano in NOMINAL+COMPENSATE (calcolo double software), non nell'I/O servo. Le chiavi JSON `timing.max_work` e `timing.first_miss` risultano invertite (`MotionService.cpp:139/180`); `WINDOW_METRICS.csv` non ne è affetto.
 
 La UI può restituire `MOTION_BUDGET_UNAVAILABLE` in ~101–102 ms. Confrontare codice del percorso HTTP admission, lock e scheduling: un rifiuto lato trasporto NON è un insuccesso dell'attuazione. Registrati anche timeout/skips di polling, senza fault associati in tutti i casi.
 
