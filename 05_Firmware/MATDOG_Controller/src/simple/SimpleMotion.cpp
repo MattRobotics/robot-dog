@@ -1115,17 +1115,16 @@ bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
 // caller faults WALK_IK_OR_WORKSPACE, as before). Stack: the result is built
 // in the caller's frame (return value elision); this frame holds at most one
 // Cartesian sample and the look-ahead frame while it is copied to walkAhead_.
-LocomotionFrame SimpleMotion::resyncExact(const GaitParameters& g,const CartesianSample& s,uint64_t gridUs,double terminal){
-  LocomotionFrame f=solveGait(g,s,walkExactUs_?&walkExact_:&walkPrevious_,false);
+void SimpleMotion::resyncExact(LocomotionFrame& f,const GaitParameters& g,const CartesianSample& s,uint64_t gridUs,double terminal){
+  solveGaitInto(f,g,s,walkExactUs_?&walkExact_:&walkPrevious_,false);
   walkExact_=f;walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
-  return f;
 }
-LocomotionFrame SimpleMotion::nominalRelease(const GaitParameters& g,double terminal,bool clockDone){
+void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,double terminal,bool clockDone){
   // The eased recovery clock and the terminal frame are solved exactly at the
   // release clock, as before T2; the terminal frame also ends the look-ahead.
   if(walkRecover_||clockDone){
     resetLookahead();++lookaheadStats_.exact;
-    return solveGait(g,gaitTrackCartesian(track_,g,cycles_,0,0,terminal),&walkPrevious_,false);
+    solveGaitInto(f,g,gaitTrackCartesian(track_,g,cycles_,0,0,terminal),&walkPrevious_,false);return;
   }
   // The law is sampled at this release's 20 ms grid point (update() advanced
   // nextUs_ before the release), so the look-ahead of one period is the next
@@ -1134,42 +1133,40 @@ LocomotionFrame SimpleMotion::nominalRelease(const GaitParameters& g,double term
   const double c=double(gridUs-walkStartUs_)/1e6/kWalkPeriodS,stepC=double(kPeriodUs)/1e6/kWalkPeriodS;
   if(walkAheadValid_&&walkAheadUs_==gridUs&&walkAheadTerminal_==terminal&&sameLawShape(walkAheadGait_,g)){
     // Exact solution computed one release ago for this very grid point.
-    walkExact_=walkAhead_;walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;
-    walkAheadValid_=false;nominalSolved_=false;++lookaheadStats_.exact;return walkAhead_;
+    f=walkAhead_;walkExact_=walkAhead_;walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;
+    walkAheadValid_=false;nominalSolved_=false;++lookaheadStats_.exact;return;
   }
   walkAheadValid_=false;
   const bool consecutive=walkExactUs_&&walkExactUs_+kPeriodUs==gridUs&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g)&&
     (terminal<0||c+stepC<=terminal+gaitSettleCycles(g));
   if(consecutive){
-    // Exact Cartesian sample of this grid point (track advanced in order),
-    // then the exact solution one period ahead, seeded by the last exact one.
-    // The result is the named return object (elided into the caller's frame):
-    // this release's exact Cartesian sample goes straight into it, the
-    // look-ahead solve straight into walkAhead_; only statement temporaries
-    // remain on this frame.
-    LocomotionFrame out;out.cartesian=gaitTrackCartesian(track_,g,c,0,0,terminal);
-    if(out.cartesian.valid){
-      walkAhead_=solveGait(g,gaitTrackCartesian(track_,g,c+stepC,0,0,terminal),&walkExact_,false);
+    // Exact Cartesian sample of this grid point (track advanced in order)
+    // straight into the caller's frame, then the exact solution one period
+    // ahead straight into walkAhead_, seeded by the last exact one. Only the
+    // sample temporaries live on this frame (loop task stack).
+    f.cartesian=gaitTrackCartesian(track_,g,c,0,0,terminal);
+    if(f.cartesian.valid){
+      solveGaitInto(walkAhead_,g,gaitTrackCartesian(track_,g,c+stepC,0,0,terminal),&walkExact_,false);
       if(walkAhead_.target.valid){
         walkAheadUs_=gridUs+kPeriodUs;walkAheadTerminal_=terminal;walkAheadGait_=g;walkAheadValid_=true;
         // Joint-space midpoint of two exact solutions one period apart on
         // each side; branches and conditioning are those of the look-ahead.
-        out.status=walkAhead_.status;out.failedLeg=walkAhead_.failedLeg;out.minJointMarginRad=walkAhead_.minJointMarginRad;out.maxResidualM=walkAhead_.maxResidualM;
-        for(unsigned l=0;l<4;++l){out.branches[l]=walkAhead_.branches[l];out.condition[l]=walkAhead_.condition[l];}
-        out.target.valid=true;
-        for(unsigned i=0;i<12;++i)jointSlot(out.target,i)=.5*(jointSlot(walkExact_.target,i)+jointSlot(walkAhead_.target,i));
+        f.status=walkAhead_.status;f.failedLeg=walkAhead_.failedLeg;f.minJointMarginRad=walkAhead_.minJointMarginRad;f.maxResidualM=walkAhead_.maxResidualM;
+        for(unsigned l=0;l<4;++l){f.branches[l]=walkAhead_.branches[l];f.condition[l]=walkAhead_.condition[l];}
+        f.target.valid=true;
+        for(unsigned i=0;i<12;++i)jointSlot(f.target,i)=.5*(jointSlot(walkExact_.target,i)+jointSlot(walkAhead_.target,i));
 #ifdef MATDOG_T2_SHADOW
-        {const auto exact=solveGait(g,out.cartesian,&walkExact_,false);
-         if(exact.target.valid)for(unsigned i=0;i<12;++i)lookaheadStats_.maxShadowRad=std::fmax(lookaheadStats_.maxShadowRad,std::abs(jointSlot(exact.target,i)-jointSlot(out.target,i)));}
+        {const auto exact=solveGait(g,f.cartesian,&walkExact_,false);
+         if(exact.target.valid)for(unsigned i=0;i<12;++i)lookaheadStats_.maxShadowRad=std::fmax(lookaheadStats_.maxShadowRad,std::abs(jointSlot(exact.target,i)-jointSlot(f.target,i)));}
 #endif
-        nominalSolved_=true;++lookaheadStats_.interp;return out;
+        nominalSolved_=true;++lookaheadStats_.interp;return;
       }
       // The look-ahead did not solve: this release is exact at its own grid point.
-      return resyncExact(g,out.cartesian,gridUs,terminal);
+      const CartesianSample mid=f.cartesian;resyncExact(f,g,mid,gridUs,terminal);return;
     }
   }
   // Re-synchronisation: first release, missed release, structural law change.
-  return resyncExact(g,gaitTrackCartesian(track_,g,c,0,0,terminal),gridUs,terminal);
+  resyncExact(f,g,gaitTrackCartesian(track_,g,c,0,0,terminal),gridUs,terminal);
 }
 void SimpleMotion::generateWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
@@ -1196,7 +1193,7 @@ void SimpleMotion::generateWalk(uint64_t now){
   // A STOP in WALK_SETTLE can restart at the terminal clock itself. Finish
   // the existing held-RAW bridge before handing off, even with no gait left.
   const bool done=clockDone&&(!walkRecover_||now-recoverUs_>=1000000);
-  LocomotionFrame f=nominalRelease(g,terminal,clockDone);
+  LocomotionFrame f;nominalRelease(f,g,terminal,clockDone);
   if(!f.target.valid||!contains(walkBox(),f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(offPending_)return;

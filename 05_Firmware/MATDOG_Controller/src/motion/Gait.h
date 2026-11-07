@@ -104,6 +104,10 @@ struct LocomotionFrame {
 // canonical stand. An error leaves target.valid false; there is no clipping.
 LocomotionFrame solveGait(const GaitParameters& p, const CartesianSample& sample,
                          const LocomotionFrame* previous=nullptr,bool derivatives=true);
+// Same solve written into an existing frame: no temporary frame on the
+// caller's stack when the destination is a member or an out-parameter.
+void solveGaitInto(LocomotionFrame& out, const GaitParameters& p, const CartesianSample& sample,
+                   const LocomotionFrame* previous=nullptr,bool derivatives=true);
 // derivatives=false omits unused joint velocity/acceleration output for native
 // position-profile control; IK, branch, contact and conditioning gates stay on.
 struct GaitAssessment {
