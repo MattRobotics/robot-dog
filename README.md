@@ -2,9 +2,17 @@
 
 MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 trasforma i comandi della dashboard in traiettorie e comandi coordinati ai servo; raccoglie feedback e gestisce STOP e protezioni. Il Digital Twin mostra la posa misurata. Il joystick direzionale continuo è ora operativo nella dev.15; i prossimi obiettivi sono PRONE affidabile, timing real-time, gait più rapido e integrazione futura della Jetson, mantenendo l'autorità degli attuatori sull'ESP32-S3.
 
-**Al 06/11/2026 il robot ha installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
+**Alla data del 06/11/2026 il robot aveva installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
 
 [Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze e SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [RCA timing 20 ms](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [Candidata dev.16 (non flashata)](09_Logs/Validation_Reports/Dev16_Candidate_2026-11-07/REPORT.md)
+
+## Stato corrente — 07/11/2026: dev.16 installata e collaudata sul robot
+
+**Firmware realmente installato:** `MATDOG Controller 1.0.1-dev.16` / build `e0ddbb1791d0`; APP SHA256 `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d` (`ROBOT_POWERED`, APP-only, NVS gen-1 preservata). **VERIFIED HARDWARE** per boot, STAND100/150 e altre quote provate, WALK STANDARD45/60, WALK STOP, più PRONE conclusi con SAFE_OFF 13/13 e STOP supervisionati anche durante movimenti. Fine sessione: READY / PRONE_REST, torque OFF, nessun fault; robot spento con KEY OFF via discharge MOS BMS, che nel cablaggio attuale interrompe anche l'alimentazione ESP32-S3.
+
+**Non ancora stable:** durante locomozione persistono release oltre 20 ms e alcune perse; `/status` intermittente (HTTP 503 e risposte tardive/incomplete), anche quando `/api/motion/status` risponde 20/20; avvisi UI spostano il joystick; refresh durante torque ON fa sparire il Twin; ripartenza WALK dopo STOP richiede inutilmente STAND selezionato (anche 150→120 mm). Dossier: [Validazione dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) · [Metriche per finestra](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv) · [Manifest SHA](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (DRAFT, non mergiata). Firmware sorgente dev.16 è nel branch PR, **non ancora in main**. APP/ELF qualificati restano locali sull'ASUS e non sono asset GitHub Release.
+
+### Snapshot precedente — 06/11/2026: dev.15
 
 ## Hardware e architettura
 
@@ -18,7 +26,7 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 | Geometria | URDF operativo REV01-FIX; mapping e calibrazione persistente gen-1 preservati |
 | Alto livello | Jetson Orin Nano Super previsto per integrazioni successive; nessuna autorità diretta browser → servo |
 
-## Stato operativo dev.15
+## Storico: stato operativo dev.15 al 06/11/2026
 
 | Funzione | Risultato verificato e limiti |
 |---|---|
