@@ -1,6 +1,6 @@
 # Dev.15 — manifest delle evidenze grezze locali
 
-Sessione hardware 06/11/2026. **Manifest informativo**: SHA-256 calcolati sui file originali presenti nell'ambiente della conversazione. **Nessuno dei file di questo elenco è stato caricato automaticamente nel repository**: questo documento ne consente la successiva identificazione byte-identica nell'ASUS/archivio, ma non prova da solo che esistano ancora sull'ASUS.
+Sessione hardware 06/11/2026. **Manifest informativo**: SHA-256 calcolati sui file originali presenti nell'ambiente della conversazione. **Stato aggiornato al 07/11:** i 15 JSON Motion sono stati pubblicati nell'archivio `raw/` con checksum verificato (vedi sotto); video e derivati restano locali. Il manifesto non prova da solo che gli originali siano presenti sul filesystem ASUS.
 
 Il repository GitHub è pubblico: evitare di pubblicare indiscriminatamente video integrali domestici, eventuali voci/persone, credenziali e log con informazioni sensibili. Il caricamento futuro delle evidenze grezze richiede selezione e verifica dei contenuti. I report testuali aggregati sono presenti in questo branch.
 
