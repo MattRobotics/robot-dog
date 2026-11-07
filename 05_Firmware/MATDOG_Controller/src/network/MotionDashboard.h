@@ -208,7 +208,7 @@ by('simple-detail').textContent=JSON.stringify({period_us:s.period_us,missed_rel
 }
 // The last command result is kept apart from the telemetry render: an HTTP
 // answer or an ACK is never proof of motion, and a poll never hides it.
-async function command(type,params={},priority=false,label=type,retried=false){
+async function command(type,params={},priority=false,label=type,retried=false,inputMs=null){
 let record=null;
 const result=(kind,text)=>{if(record&&latestCommand!==record)return;lastShow(kind,'Ultimo comando · '+label+' · '+new Date().toLocaleTimeString('it-IT')+' · '+text);
  // The banner shows only the latest command: an earlier refusal stays in the Motion diagnostics, not here.
@@ -221,7 +221,8 @@ const uptime=status?Math.floor(status.now_ms+performance.now()-received):0;
 const body={version:1,id:'simple-'+session+'-'+(++sequence),sequence,issued_at_ms:uptime,ttl_ms:type==='BASE_VELOCITY'?1000:5000,owner:'dashboard',type,params};
 // Longer than the Controller's own budgets (STOP lane 0.6 s, command 3 s,
 // plus one read ahead in the HTTP task): a late answer is not a refusal.
-record={id:body.id,sequence:body.sequence,label,type,sent_ms:performance.now(),issued_at_ms:uptime};latestCommand=record;keep(trace.commands,record,48);
+// input_ms (dev.17): the click/key event time, same clock as sent_ms: STOP input -> request in the trace.
+record={id:body.id,sequence:body.sequence,label,type,input_ms:inputMs,sent_ms:performance.now(),issued_at_ms:uptime};latestCommand=record;keep(trace.commands,record,48);
 const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),5000);
 const why=c=>c+(reasons[c]?' ('+reasons[c]+')':'');let renew=false;
 // HttpTransport refuses these strictly before a command can run: every 400,
@@ -246,7 +247,7 @@ finally{clearTimeout(timer);if(!priority)sending=false;render()}
 if(!renew||latestCommand!==record)return;
 result('pending','sessione non valida: rinnovo e nuovo invio…');
 const renewed=await resume();if(latestCommand!==record)return;
-if(renewed)return command(type,params,priority,label,true);
+if(renewed)return command(type,params,priority,label,true,inputMs);
 result('bad','HTTP 403 · RIFIUTATO PRIMA DELL’ESECUZIONE · AUTH_FAILED: sessione non rinnovabile, accedere di nuovo'+(type==='MOTION.STOP'?'. Usare @STOP via USB o il KEY OFF.':'.'));needLogin();
 }
 // The status poll is telemetry and admin-session upkeep only: no Motion
@@ -331,9 +332,9 @@ by('simple-stand').onclick=()=>{const mm=Number(height.value);command('POSTURE.S
 by('simple-prone').onclick=()=>command('POSTURE.LIE_DOWN',{},false,'PRONE');
 by('simple-walk').onclick=()=>{const i=stride();command('BASE_VELOCITY',{vx:[.030,.045,.060][i]/6.5,vy:0,yaw_rate:0},false,'WALK STANDARD '+[30,45,60][i]+' mm')};
 by('simple-walk-stop').onclick=()=>command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true,'WALK STOP');
-stop.onclick=()=>command('MOTION.STOP',{},true,'STOP');
+stop.onclick=e=>command('MOTION.STOP',{},true,'STOP',false,e.timeStamp);
 // Each Escape press is a STOP; the key autorepeat of a held key is not.
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.repeat)command('MOTION.STOP',{},true,'STOP (Esc)')});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.repeat)command('MOTION.STOP',{},true,'STOP (Esc)',false,e.timeStamp)});
 Promise.resolve(authReady).finally(()=>{poll();setInterval(()=>{render();poll()},350)});
 })();
 </script>)MOTION"

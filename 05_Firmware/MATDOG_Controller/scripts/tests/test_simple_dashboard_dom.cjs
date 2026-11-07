@@ -499,6 +499,10 @@ async function boot(initialStatus = fx.status_ready) {
   }
   // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
+  { const r = p.dom.window.matdogMotionTrace.commands.at(-1);  // dev.17: STOP input -> request measurable on the phone
+    // jsdom stamps events with the real epoch clock, a browser with performance.now()'s origin:
+    // the clock agreement is checked in Chrome (test_stop_twin_load_browser.cjs), presence here.
+    assert(r.type === 'MOTION.STOP' && Number.isFinite(r.input_ms), 'STOP trace record carries the input event time: ' + JSON.stringify(r)); }
   assert(/STOP · .* · HTTP 200 · ACCEPTED · STOP_REQUESTED/.test(last()) && /arresto da verificare/.test(last()), last());
   await refresh(fx.status_stopping);
   assert(!values().includes('13/13 verificato') && /\d+\/13 verificati/.test(values()), values());

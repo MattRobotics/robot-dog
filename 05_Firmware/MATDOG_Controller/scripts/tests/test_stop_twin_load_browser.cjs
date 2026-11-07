@@ -95,12 +95,15 @@ async function scenario(browser, base, { warm, throttle, input }) {
     const allowed = new Set(['/', '/status', '/wifi/status', '/wifi/session', '/api/motion/status', '/api/motion/command', ...Object.keys(assets)]);
     const foreign = [...new Set(device.log.map(r => r.url).filter(u => !allowed.has(u)))];
     const twinRequests = device.log.filter(r => r.url.startsWith('/twin')).length;
-    const page_ = await page.evaluate(() => ({ inputs: window.__inputs, sent: window.matdogMotionTrace.commands.filter(c => c.type === 'MOTION.STOP').map(c => c.sent_ms) }));
+    const page_ = await page.evaluate(() => ({ inputs: window.__inputs, sent: window.matdogMotionTrace.commands.filter(c => c.type === 'MOTION.STOP').map(c => c.sent_ms),
+      traced: window.matdogMotionTrace.commands.filter(c => c.type === 'MOTION.STOP').map(c => c.input_ms) }));
     const pairs = (from, to) => from.map((t, i) => to[i] - t);
     const all = [...loading, ...idle];
     const serverLat = stops.length === all.length ? pairs(all, stops) : null;
     const pageLat = page_.sent.length === page_.inputs.length ? pairs(page_.inputs, page_.sent) : null;
-    const r = { warm, throttle, input, twin_ready_after_reload: ready, script_requested_ms_after_reload: scriptAt ? Math.round(scriptAt - (device.log[0]?.at ?? scriptAt)) : null,
+    // The page's own trace (input_ms, used on the phone) must agree with the event times seen here.
+    const traceAgrees = page_.traced.length === page_.inputs.length && page_.traced.every((t, i) => Number.isFinite(t) && Math.abs(t - page_.inputs[i]) < 1);
+    const r = { warm, throttle, input, trace_input_ms_agrees: traceAgrees, twin_ready_after_reload: ready, script_requested_ms_after_reload: scriptAt ? Math.round(scriptAt - (device.log[0]?.at ?? scriptAt)) : null,
       stops_sent: stops.length, inputs: all.length, joystick_commands: joystick, foreign_requests: foreign, twin_requests: twinRequests, errors: errors.length,
       server_ms_loading: serverLat && serverLat.slice(0, 4).map(Math.round), server_ms_idle: serverLat && serverLat.slice(4).map(Math.round),
       page_ms_loading: pageLat && pageLat.slice(0, 4).map(Math.round), page_ms_idle: pageLat && pageLat.slice(4).map(Math.round) };
@@ -122,7 +125,7 @@ async function scenario(browser, base, { warm, throttle, input }) {
   for (const r of results) {
     // Every input sends exactly one STOP (none lost, none doubled), no joystick
     // command, no request outside the page's reads, Twin files and STOP.
-    const ok = r.stops_sent === r.inputs && r.joystick_commands === 0 && r.foreign_requests.length === 0 && r.errors === 0 && r.server_ms_loading && r.page_ms_loading;
+    const ok = r.stops_sent === r.inputs && r.joystick_commands === 0 && r.foreign_requests.length === 0 && r.errors === 0 && r.server_ms_loading && r.page_ms_loading && r.trace_input_ms_agrees;
     if (!ok) failures++;
     if (r.server_ms_loading) worst = Math.max(worst, ...r.server_ms_loading);
     console.log('STOP_TWIN_LOAD ' + JSON.stringify(r) + ' -> ' + (ok ? 'PASS' : 'FAIL'));
