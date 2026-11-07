@@ -22,13 +22,13 @@ const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 const CSRF = 'c'.repeat(64);
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise(r => setImmediate(r)); };
 
-async function boot() {
+async function boot(initialStatus = fx.status_ready) {
   let clock = 1000;
   const timers = [], intervals = [], calls = [], errors = [];
   // inflight: requests issued and not yet answered (each needs its own
   // HTTP/1.1 connection); holdUrl keeps every matching request pending until
   // release() (all) or releaseFirst() (the oldest); an abort clears holdUrl.
-  const device = { status: fx.status_ready, replies: [], inflight: 0, reads: 0, holdUrl: null, release: null, releaseFirst: null, held: [], sessionOk: true };
+  const device = { status: initialStatus, replies: [], inflight: 0, reads: 0, holdUrl: null, release: null, releaseFirst: null, held: [], sessionOk: true };
   const dom = new JSDOM(html, { url: 'http://192.168.4.1/', runScripts: 'dangerously', pretendToBeVisual: true,
     beforeParse(w) {
       w.localStorage.setItem('md_login', '1');  // the page resumes its session at start
@@ -743,6 +743,48 @@ async function boot() {
     assert.deepStrictEqual(sent,['POSTURE.STAND','MOTION.STOP'],'no stale authenticated retry after STOP');
     assert(/STOP_REQUESTED/.test(r.q('#simple-last').textContent));
     assert.deepStrictEqual(r.errors,[]);r.dom.window.close();
+  }
+  // dev.17: the Twin after a page reload with torque ON (dev.16 hardware: it
+  // stayed unavailable until SAFE_OFF). Started at the first poll in HOLD (the
+  // Controller serves its large files as 304 from the browser cache, otherwise
+  // defers them), never during WALK/MOVING or a held joystick, never reloaded
+  // while torque is ON, retried once at torque OFF, kept once ready.
+  {
+    const spy = r => { let n = 0; const el = r.q('#simple-twin-frame'), d = Object.getOwnPropertyDescriptor(r.dom.window.HTMLIFrameElement.prototype, 'src');
+      Object.defineProperty(el, 'src', { configurable: true, get() { return d.get.call(this); }, set(v) { n++; d.set.call(this, v); } }); return () => n; };
+    assert(JSON.parse(fx.status_standing).torque_active === true && JSON.parse(fx.status_standing).state === 'STANDING', 'real HOLD fixture with torque ON');
+    const hold = await boot(fx.status_standing);
+    assert.strictEqual(hold.q('#simple-twin-frame').getAttribute('src'), '/twin/?feed=parent', 'a reload in HOLD with torque ON starts the Twin');
+    assert(/coppia ON: solo dalla cache del browser/.test(hold.q('#simple-twin-state').title), hold.q('#simple-twin-state').title);
+    const navs = spy(hold);
+    for (let i = 0; i < 4; i++) await hold.poll();
+    assert.strictEqual(navs(), 0, 'no reload loop while torque is ON');
+    hold.device.status = fx.status_ready; await hold.poll();
+    assert.strictEqual(navs(), 1, 'not ready: one retry at torque OFF');
+    await hold.poll(); await hold.poll();
+    assert.strictEqual(navs(), 1, 'no repeated reload');
+    const walking = await boot(fx.status_walking);
+    assert(!walking.q('#simple-twin-frame').getAttribute('src'), 'no Twin load during WALK');
+    assert(/a robot fermo/.test(walking.q('#simple-twin-state').title), walking.q('#simple-twin-state').title);
+    walking.device.status = fx.status_standing; await walking.poll();
+    assert.strictEqual(walking.q('#simple-twin-frame').getAttribute('src'), '/twin/?feed=parent', 'started at the next HOLD, torque ON');
+    const frame = walking.q('#simple-twin-frame'), navs2 = spy(walking), win = { postMessage() {} };
+    Object.defineProperty(frame, 'contentWindow', { configurable: true, get: () => win });
+    walking.dom.window.dispatchEvent(new walking.dom.window.MessageEvent('message', { origin: 'http://192.168.4.1', source: win, data: { type: 'MATDOG_TWIN_READY' } }));
+    walking.device.status = fx.status_ready; await walking.poll(); await walking.poll();
+    assert.strictEqual(navs2(), 0, 'a ready Twin is kept, never reloaded at torque OFF');
+    const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: .045 / 6.5, vy_m_s: 0, yaw_rate_rad_s: 0, joystick: true }; steered.reason = 'WALK_JOYSTICK';
+    const js = await boot(JSON.stringify(steered)), pad = js.q('#joy-pad');
+    const press = (type, id) => { const ev = new js.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: 90, clientY: 32 }); Object.defineProperty(ev, 'pointerId', { value: id }); pad.dispatchEvent(ev); };
+    assert(!js.q('#simple-twin-frame').getAttribute('src'), 'no Twin load during a joystick walk');
+    js.device.replies.push({ status: 200, body: fx.ack_walk_accepted }); press('pointerdown', 1); await settle();
+    js.device.status = fx.status_standing; await js.poll();
+    assert(!js.q('#simple-twin-frame').getAttribute('src'), 'no Twin load while the joystick is held');
+    js.device.replies.push({ status: 200, body: fx.ack_walk_stop }); press('pointerup', 1); await settle(); await js.poll();
+    assert.strictEqual(js.q('#simple-twin-frame').getAttribute('src'), '/twin/?feed=parent', 'started after the release, in HOLD');
+    assert.deepStrictEqual(js.calls.filter(c => c.url === '/api/motion/command').map(c => JSON.parse(c.body).params.vx > 0 ? 'move' : 'neutral'), ['move', 'neutral']);
+    assert.deepStrictEqual([hold, walking, js].flatMap(r => r.errors), []);
+    for (const r of [hold, walking, js]) r.dom.window.close();
   }
   fs.writeFileSync(envelopesPath, envelopes.join('\n') + '\n');
   console.log('SIMPLE_DASHBOARD_DOM = PASS (' + envelopes.length + ' envelopes captured from the shipped page; real MotionService fixtures; ' + (sequence) + ' commands)');

@@ -141,6 +141,9 @@ int fixtures(const char* path) {
   {
     Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
     check(!rig.m.stand(.05,rig.p.now)&&rig.reachStand(),"PRONE terminal fixture starts in HOLD");
+    service.update();
+    check(rig.m.state()==simple::State::STANDING&&rig.m.energized(),"fixture STANDING HOLD, torque ON");
+    put("status_standing",statusJson(service,rig));  // dev.17: page reload in HOLD
     auto c=semantic(motion::Intent::LIE_DOWN,rig);check(service.command(c,c.issued_at_ms).outcome==motion::CommandOutcome::ACCEPTED,"PRONE accepted from HOLD");
     for(unsigned i=0;i<4100&&rig.m.state()!=simple::State::READY;++i){rig.tick();service.update();}
     for(unsigned i=0;i<15;++i){rig.tick();service.update();}  // the OFF readback pauses FAST reads: one population later

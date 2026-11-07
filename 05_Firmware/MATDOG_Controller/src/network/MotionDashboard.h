@@ -43,7 +43,7 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 (()=>{'use strict';const by=id=>document.getElementById(id);
 const card=document.createElement('div');card.className='card';card.id='simple-motion';
 card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-state="STOPPED" data-tone="muted">COLLEGAMENTO…</span></h2>
-<div class="cockpit"><div id="simple-twin" aria-labelledby="simple-twin-title"><h3 id="simple-twin-title">Digital Twin 3D</h3><iframe id="simple-twin-frame" title="MATDOG Digital Twin"></iframe><p id="simple-twin-state" role="status">Modello non ancora caricato: attesa torque OFF.</p></div><div class="command-panel" id="simple-controls" tabindex="-1" aria-label="Comandi Motion">
+<div class="cockpit"><div id="simple-twin" aria-labelledby="simple-twin-title"><h3 id="simple-twin-title">Digital Twin 3D</h3><iframe id="simple-twin-frame" title="MATDOG Digital Twin"></iframe><p id="simple-twin-state" role="status">Modello 3D non ancora caricato.</p></div><div class="command-panel" id="simple-controls" tabindex="-1" aria-label="Comandi Motion">
 
 <p id="simple-reason" role="status">Lettura dello stato reale dal Controller.</p>
 <p id="simple-last" role="status" data-kind="none">Ultimo comando: nessuno inviato da questa pagina.</p>
@@ -65,7 +65,7 @@ card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-sta
 </div></div>
 <p class="note">STOP richiede l’arresto al Controller: può mantenere la coppia ON. SAFE_OFF verifica coppia OFF sui 13 servo. WALK STOP mantiene STAND.</p>
 <details id="simple-diagnostics"><summary>Stato e diagnostica Motion</summary><h4>Ultimi esiti dei comandi (dal più recente)</h4><ol id="simple-log"></ol><dl id="simple-values"></dl>
-<p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello preparato a torque OFF e mantenuto durante Motion; a cache fredda attende SAFE_OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla propria quota nominale indicata dal Controller e poi usa il ciclo STANDARD di 6,5 s. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente circa 7–9 s, più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
+<p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello caricato a robot fermo (anche con coppia ON, dai file nella cache del browser) e mantenuto durante Motion; a cache fredda con coppia ON attende torque OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla propria quota nominale indicata dal Controller e poi usa il ciclo STANDARD di 6,5 s. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente circa 7–9 s, più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
 <p class="note">PRONE è disponibile da STAND/HOLD: esegue la discesa e, raggiunta la posa finale, rilascia la coppia con il SAFE_OFF ordinario (PRONE_REST, verifica OFF sui 13 servo). L'appoggio passivo non è misurato. STAND riparte dalla posa reale assestata: acquisizione, verifica della regione certificata, riabilitazione. La quota stimata deriva da encoder e IMU con ipotesi di piano di appoggio: non misura la distanza dal pavimento. La posa misurata è la regione geometrica certificata in cui si trovano gli encoder; non prova l'appoggio a terra.</p>
 <table id="simple-joints"><thead><tr><th>Giunto</th><th>ID</th><th>Angolo</th><th>RAW letto (FAST)</th><th>Temp.</th><th>Coppia</th><th>Età CONTROL (coppia/goal)</th><th>Età FAST (posizione)</th></tr></thead><tbody></tbody></table>
 
@@ -74,13 +74,22 @@ card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-sta
 const motionPage=document.createElement('section');motionPage.id='motion-page';motionPage.append(card);by('dashboard').before(motionPage);
 const tab=document.createElement('button');tab.dataset.page='motion-page';tab.textContent='Motion';tab.onclick=()=>page('motion-page');document.querySelector('nav').prepend(tab);
 PAGES.push('motion-page');page('motion-page');
-// Prepare at SAFE_OFF and keep the visible model during Motion. feed=parent
-// renders the status this page already polls; the Twin has no own read lane.
+// The Twin renders the status this page already polls (feed=parent: no read of
+// its own, no servo read) and is kept during Motion. dev.17: it is also started
+// with torque ON, so a page reload in STAND/HOLD keeps it. The Controller serves
+// its large files only at torque OFF or as 304 from the browser cache
+// (handleTwin); the load costs this page's main thread 0.2-0.4 s once (Chrome,
+// phone-class CPU throttling), so it never starts while the robot moves or
+// walks or the joystick is held. A load that could not complete (cold cache with
+// torque ON, or a transfer cut when Motion engaged) is retried once at torque OFF.
 let twinStarted=false,twinReady=false,twinRetryWhenIdle=false;
-const twinBusy=s=>!s||s.torque_active||s.state==='MOVING'||!s.safe_off_verified;
+const twinIdle=s=>!!s&&!s.torque_active&&s.state!=='MOVING'&&!!s.safe_off_verified;  // large files served
+const twinHold=s=>!s||s.state==='MOVING'||s.state==='WALKING'||joyActive;                // no load now
 function prepareTwin(){
- if(twinBusy(status)){if(twinStarted&&!twinReady)twinRetryWhenIdle=true;return}
- if(!twinStarted||twinRetryWhenIdle){twinStarted=true;twinRetryWhenIdle=false;by('simple-twin-frame').src='/twin/?feed=parent'}
+ if(twinReady)return;
+ if(twinStarted&&!twinIdle(status))twinRetryWhenIdle=true;
+ if(twinHold(status))return;
+ if(!twinStarted||(twinRetryWhenIdle&&twinIdle(status))){twinStarted=true;twinRetryWhenIdle=!twinIdle(status);by('simple-twin-frame').src='/twin/?feed=parent'}
 }
 // The Twin's own height is applied at once, except while the joystick is held
 // (dev.17): then it waits for the release, so the page never moves under it.
@@ -113,7 +122,8 @@ const snapshotAge=age+(Number.isFinite(s.snapshot_age_ms)?s.snapshot_age_ms:0);
 // delay since then is bounded separately by `linked` (<1500 ms): adding it to
 // the 250 ms limit with a 350 ms poll made data look stale ~90% of the time.
 const linked=snapshotAge<1500,fresh=linked&&s.stale===false&&(s.joints||[]).length===12&&s.joints.every(j=>j.valid&&Number.isFinite(j.age_ms)&&j.age_ms<=250);
-const twinNotice=twinReady?(fresh?'':'Dati Motion scaduti: posa non attuale.'):twinBusy(s)?'Modello non disponibile · caricamento rinviato fino a torque OFF':'Preparazione modello 3D…';
+const twinNotice=twinReady?(fresh?'':'Dati Motion scaduti: posa non attuale.'):!twinStarted?'Modello 3D: caricamento a robot fermo (non durante movimento, passo o joystick)':
+ twinIdle(s)?'Preparazione modello 3D…':'Caricamento modello 3D… (coppia ON: solo dalla cache del browser, altrimenti a torque OFF)';
 by('simple-twin-state').textContent=by('simple-twin-state').title=twinNotice;
 const ac=s.active_command||{},c=latestCommand;
 const commandReason=ac.reason+(reasons[ac.reason]?' ('+reasons[ac.reason]+')':'');
