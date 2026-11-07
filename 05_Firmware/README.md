@@ -1,5 +1,8 @@
 # MATDOG Firmware
 
+> **STATO CORRENTE — 07/11/2026:** il firmware operativo installato e hardware-validato è **MATDOG `1.0.1-dev.17`**, build `17db0efe2324`, pubblicato senza ricompilazione come **[Stable v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1)**. APP verificata: 1.707.808 byte, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, NVS gen-1 preservata. **STAND/WALK STANDARD/STOP/PRONE sono operativi nel perimetro qualificato**; [report hardware](../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md). Il compilato arbitrario di `main` non sostituisce l'APP originale distribuita. Le note su dev.3, V0.1 e LED-only *sotto* sono snapshot storici e non una descrizione del firmware oggi installato.
+
+
 This directory is reserved for low-level firmware that belongs specifically to MATDOG.
 
 > **⚠ Flash safety — 2026-10-08, updated for PR-3.** Do not build from or flash `main` to update
@@ -12,7 +15,7 @@ This directory is reserved for low-level firmware that belongs specifically to M
 >
 > See [`MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md`](MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
 
-## Current status
+## Historical firmware/bench status — 2026-10-01/10-10
 
 **Bench firmware exists and is frozen.** [`ST3215_Bench_Tools/`](ST3215_Bench_Tools/) holds three
 ESP32-S3 tools that have run on real hardware and are archived byte-for-byte:
@@ -26,14 +29,14 @@ ESP32-S3 tools that have run on real hardware and are archived byte-for-byte:
 These are **bench** tools: they run on a bench rig with a single servo attached, never on the
 assembled robot under power for motion.
 
-**Controller V0.1 is the frozen release baseline.** The current development Controller
+**Controller V0.1 was the frozen release baseline of that phase (historical).** The current development Controller
 passed TRUE Full Calibration 24/24 on real hardware on 2026-10-01 (build `dfcecb670d05`).
 [`MATDOG_Controller/`](MATDOG_Controller/) is the first unified operational ESP32-S3 firmware:
 one deployable image with modular ServoBus / BNO085 / DALY BMS / LED ring / USB diagnostics,
 adapted from the hardware-proven bench and bring-up sources above rather than rewritten from
 scratch. USB-only bench validation (boot, BNO085 live acquisition, existing viewer compatibility,
 expected-offline classification for DALY/ST3215/LED) is recorded in
-[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md). **Operational stand/gait motion and operational IK remain unimplemented** — V0.1 is an integration and platform milestone, not a
+[`MATDOG_Controller/VALIDATION.md`](MATDOG_Controller/VALIDATION.md). **At that historical phase, operational stand/gait motion and operational IK were unimplemented** — V0.1 is an integration and platform milestone, not a
 motion controller.
 
 The official tagged baseline and exact validated source are recorded in the
