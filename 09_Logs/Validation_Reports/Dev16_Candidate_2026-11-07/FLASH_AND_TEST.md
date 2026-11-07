@@ -1,3 +1,5 @@
+> **Esecuzione avvenuta il 07/11/2026:** il percorso A (preflight, APP-only, verify-flash, boot) è stato eseguito da Claude Code e riportato PASS; il percorso hardware B è stato eseguito in più prove supervisionate dall'operatore, con risultati e limiti nel [report HW dev.16](../Dev16_HW_2026-11-07/REPORT.md). Le istruzioni originali sotto restano come piano **storico pre-flash**, non come lavoro ancora da compiere. Non ripetere flash per aggiornare la documentazione.
+
 # dev.16 — flash APP-only e collaudo supervisionato (PREPARATO, NON ESEGUITO)
 
 Nulla di quanto segue è stato eseguito. Ogni passo hardware richiede l'**autorizzazione esplicita dell'operatore nella sessione attiva** e il **supporto fisico anticaduta** già posizionato. Candidata: [REPORT.md](REPORT.md).
