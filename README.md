@@ -1,14 +1,10 @@
 # MATDOG — quadrupede robotico di Matt Robotics
 
-MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 trasforma i comandi della dashboard in traiettorie e comandi coordinati ai servo; raccoglie feedback e gestisce STOP e protezioni. Il Digital Twin mostra la posa misurata. Il joystick direzionale continuo è ora operativo nella dev.15; i prossimi obiettivi sono PRONE affidabile, timing real-time, gait più rapido e integrazione futura della Jetson, mantenendo l'autorità degli attuatori sull'ESP32-S3.
+MATDOG è un quadrupede costruito da zero. Il Controller ESP32-S3 è l'unica autorità su Motion, servomotori, cinematica, limiti e STOP; la dashboard invia comandi ad alto livello e mostra telemetria e Digital Twin. **STAND, WALK STANDARD, PRONE e STOP sono operativi sulla prima release stabile qualificata per questo robot.**
 
-**Alla data del 06/11/2026 il robot aveva installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
+## Stato corrente — MATDOG v1.0.1, prima Stable (07/11/2026)
 
-[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze e SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [RCA timing 20 ms](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [Candidata dev.16 (non flashata)](09_Logs/Validation_Reports/Dev16_Candidate_2026-11-07/REPORT.md)
-
-## Current installed and hardware validated: MATDOG 1.0.1-dev.17 — First Stable GitHub Release
-
-**Release [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) — VERIFIED HARDWARE, CURRENT ROBOT, QUALIFIED FUNCTIONAL SCOPE (07/11/2026).** Sul robot è installata e collaudata l'APP `MATDOG Controller 1.0.1-dev.17`, build `17db0efe2324`, compilata dal commit `17db0efe23242ae8932b5549546a9758d9aa4645`: 1.707.808 B, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, `app0` @ `0x010000`. Il tag `v1.0.1` promuove **questi stessi byte** senza ricompilazione: la stringa interna del firmware resta `1.0.1-dev.17`. Da questa release `main` è la sorgente canonica.
+**Release [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) — VERIFIED HARDWARE, CURRENT ROBOT, QUALIFIED FUNCTIONAL SCOPE (07/11/2026).** Sul robot è installata e collaudata l'APP `MATDOG Controller 1.0.1-dev.17`, build `17db0efe2324`, compilata dal commit `17db0efe23242ae8932b5549546a9758d9aa4645`: 1.707.808 B, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, `app0` @ `0x010000`. Il tag `v1.0.1` promuove **questi stessi byte** senza ricompilazione: la stringa interna del firmware resta `1.0.1-dev.17`. Da questa release `main` è la sorgente canonica. Il tag pubblico `v1.0.1` resta immutabile; eventuali correzioni documentali successive su `main` non alterano il firmware rilasciato.
 
 **Provato sul robot:** flash APP-only con verifica del digest, boot READY/RUN, NVS gen-1 `VALID_ACKNOWLEDGED`, census 13/13; dashboard Motion Cockpit, STAND100/125 e HOLD, WALK STANDARD 45/60 mm, WALK STOP, STOP durante il moto e WALK diretto dopo STOP, joystick proporzionale e rilascio, PRONE con SAFE_OFF 13/13; Digital Twin recuperabile dopo refresh in HOLD con coppia ON, ViewCube e Reset vista. Nessun fault nei campioni conservati.
 
@@ -16,17 +12,13 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 
 [Validazione hardware dev.17](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [Manifest firmware/release](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md) · [Evidenze e SHA256](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [Candidata dev.17: cause e regressioni offline](09_Logs/Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [Installazione APP-only e rollback](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md#3-installazione-app-only-e-rollback-solo-questo-robot) · [Problemi aperti](09_Logs/OPEN_ITEMS.md)
 
-**Rollback:** dev.16 `e0ddbb1791d0` (APP `73952eec…`), VERIFIED HARDWARE il 07/11, conservata sull'ASUS con script qualificato.
+**Rollback:** dev.16 `e0ddbb1791d0` (APP `73952eec…`), VERIFIED HARDWARE il 07/11, conservata sull'ASUS con script qualificato. Il solo sorgente `main` non sostituisce l'APP binaria pubblicata e verificata.
 
-### Snapshot precedente — 07/11/2026: dev.16 installata (ora rollback)
+**Screenshot di validazione:** due PNG della dashboard reale sono conservati byte-identici nell'[archivio ZIP hardware dev.17](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/raw/MATDOG_DEV17_HARDWARE_VALIDATION_2026-11-07.zip); non sono ancora pubblicati come anteprime singole nel README.
 
-**Firmware realmente installato:** `MATDOG Controller 1.0.1-dev.16` / build `e0ddbb1791d0`; APP SHA256 `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d` (`ROBOT_POWERED`, APP-only, NVS gen-1 preservata). **VERIFIED HARDWARE** per boot, STAND100/150 e altre quote provate, WALK STANDARD45/60, WALK STOP, più PRONE conclusi con SAFE_OFF 13/13 e STOP supervisionati anche durante movimenti. Fine sessione: READY / PRONE_REST, torque OFF, nessun fault; robot spento con KEY OFF via discharge MOS BMS, che nel cablaggio attuale interrompe anche l'alimentazione ESP32-S3.
+## Contesto storico (non rappresenta il firmware corrente)
 
-**Non ancora stable:** durante locomozione persistono release oltre 20 ms e alcune perse; `/status` intermittente (HTTP 503 e risposte tardive/incomplete), anche quando `/api/motion/status` risponde 20/20; avvisi UI spostano il joystick; refresh durante torque ON fa sparire il Twin; ripartenza WALK dopo STOP richiede inutilmente STAND selezionato (anche 150→120 mm). Dossier: [Validazione dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) · [Metriche per finestra](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv) · [Manifest SHA](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (DRAFT, non mergiata). Firmware sorgente dev.16 è nel branch PR, **non ancora in main**. APP/ELF qualificati restano locali sull'ASUS e non sono asset GitHub Release.
-
-**Candidata dev.17 (stato prima del flash, storico; poi installata e rilasciata come `v1.0.1`, vedi sopra):** commit `17db0ef`, build `17db0efe2324`, APP SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83` (1.707.808 B, ROBOT_POWERED, CLEAN; partizioni, bootloader e sdkconfig identici a dev.16). Corregge `/status` 503 sotto slack Motion, letture abortite a 800 ms, reflow del joystick, Twin assente dopo refresh con coppia ON e comandi joystick fuori ordine; aggiunge WALK diretto dopo STOP, Motion Cockpit e ViewCube. La build precedente `7503bfc` (APP `f49b531a…`) è superata per il flash. [Dossier dev.17](09_Logs/Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [flash APP-only e collaudo minimo](09_Logs/Validation_Reports/Dev17_Candidate_2026-11-07/FLASH_AND_TEST.md). A quella data il firmware installato era ancora **dev.16**.
-
-### Snapshot precedente — 06/11/2026: dev.15
+Il [report dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) documenta il firmware precedente, ora conservato per rollback. Il [report dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) documenta i precedenti problemi di PRONE e HTTP, **già superati nel perimetro hardware verificato dalla dev.17**. I relativi log e le RCA rimangono nei dossier originali; le vecchie etichette DRAFT/non-flashata hanno valore soltanto alla loro data.
 
 ## Hardware e architettura
 
@@ -40,32 +32,15 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 | Geometria | URDF operativo REV01-FIX; mapping e calibrazione persistente gen-1 preservati |
 | Alto livello | Jetson Orin Nano Super previsto per integrazioni successive; nessuna autorità diretta browser → servo |
 
-## Storico: stato operativo dev.15 al 06/11/2026
-
-| Funzione | Risultato verificato e limiti |
-|---|---|
-| STAND | STAND100 e STAND150 completati; STAND50 completato nel seguito, con risalita automatica PRONE→STAND100. |
-| WALK STANDARD | WALK45 e WALK60 eseguiti sul robot reale, WALK STOP operativo. La cadenza è bassa e le deadline a 20 ms sono ripetutamente perse. |
-| Joystick 3DOF | Avanti/indietro, strafe, yaw nei due sensi e composizioni proporzionali effettivamente provati. Rilascio del comando corretto; assestamento verso STAND fino a ~8,4 s, troppo lento. |
-| PRONE terminale | **INTERMITTENTE / NON QUALIFICATO**: due `PRONE_REST` con torque OFF13/13; due timeout verificati a ~52 mm con caduta al rilascio; terzo caso riferito senza JSON. Necessarie RCA fase e gestione sicura del supporto. |
-| Stabilizzazione IMU | Pitch/roll attivi e più reattivi secondo operatore; ampiezza roll limitata da `WORKSPACE`. Correzione applicata ≠ livellamento assoluto del corpo. |
-| STOP | Accessibile e verificato: STOP in STAND/WALK può lasciare coppia ON se supporto non verificato; dopo fault PRONE conferma SAFE_OFF 13/13 ma il fault resta latched. |
-| Digital Twin | Visualizzato all'inizio della scheda Motion, segue la posa reale; Reset vista **+X verificato hardware**. L'operatore riferisce appoggio grafico corretto durante STAND; restano da qualificare completo PRONE/WALK swing, rendering mobile e stati stale/offline della issue #62. |
-| NVS / BMS | gen-1 `VALID_ACKNOWLEDGED`, census 13/13, READY; BMS fresco in dev.15. Restore manuale da dashboard non qualificato. |
-| LED / termica | Sfarfallamento policromatico intermittente aperto; picchi termici isolati da indagare, non prova di surriscaldamento continuo. |
-| HostLink / Jetson | Bridge/USB non qualificati Motion hardware; Jetson prevista, **non installata**. |
-
-Le evidenze sono specifiche di questa sessione; l'hardware non è ancora qualificato per operatività stabile o locomozione veloce. I 15 JSON Motion grezzi sono pubblicati come archivio con SHA256 ([raw/](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/raw/)); il video domestico resta locale, identificato nel manifest.
-
-## Riferimenti da non confondere
+## Provenienza del firmware e tag storici
 
 | Linea | Significato |
 |---|---|
 | **main** | **Sorgente canonica** dopo il merge della [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (07/11/2026): contiene dev.15, dev.16 e dev.17. Il tag [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) punta al commit di merge; l'APP rilasciata è compilata da `17db0ef`, il cui codice eseguibile è identico a quello su `main`. Non flashare una ricompilazione di `main` al posto dell'asset verificato. |
 | **dev.14** | Firmware installato e validato parzialmente **il 05/11**, ora storico; sorgente sul [checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105). |
-| **dev.15** | **Firmware installato e parzialmente validato hardware il 06/11**. Build `7997ad4d4497`, APP SHA256 `b81d3a4ffaa27a7690b196e77e7174c0cc7851563fcfd64cd3bddb40e62f9e13`. Il sorgente esatto `7997ad4` è pubblicato sul branch `docs/dev15-hardware-validation-20261106` (PR #64) tramite il merge `e5b0644`: tree firmware identico a `7997ad4`, **non su main**. Una ricompilazione non è dichiarata byte-identica all'APP installata. |
+| **dev.15** | Validata parzialmente il 06/11/2026; PRONE allora intermittente. Sorgente `7997ad4` incluso nella storia oggi mergiata su `main` con PR #64. Non è il firmware attualmente installato. [Dossier storico](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md). |
 | **dev.17** | **Installata, VERIFIED HARDWARE nel perimetro qualificato e rilasciata come prima Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1)** (07/11/2026): commit `17db0ef`, build `17db0efe2324`, APP `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. HTTP di stato senza slack, letture oltre il recupero TCP, joystick stabile e in ordine, Twin dopo refresh con coppia ON, WALK diretto dopo STOP, Motion Cockpit e ViewCube. [Dossier HW](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [candidata](09_Logs/Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md). La build `7503bfc` è superata e non rilasciata. |
-| **dev.16** | **Rollback.** Installata e validata hardware il 07/11 (prima della dev.17) nel perimetro STAND/PRONE/WALK/STOP provato (candidata del 07/11 mattina): commit `e0ddbb1`, APP `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d`, nella PR #64. Corregge la consegna PRONE a quota intermedia, aggiunge diagnostica timing (T0) e riuso IMU a release alterne (T1). [Dossier HW](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md). |
+| **dev.16** | **Rollback.** Installata e validata hardware il 07/11 (prima della dev.17) nel perimetro STAND/PRONE/WALK/STOP provato (candidata del 07/11 mattina): commit `e0ddbb1`, APP `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d`, ora nella storia di `main` dopo il merge della PR #64. Corregge la consegna PRONE a quota intermedia, aggiunge diagnostica timing (T0) e riuso IMU a release alterne (T1). [Dossier HW](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md). |
 | **dev.7** | [Pre-release storica pubblicata](https://github.com/MattRobotics/robot-dog/releases/tag/matdog-controller-v1.0.1-dev.7), con [report del31/10](09_Logs/Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md). Non è più il firmware installato e non viene promossa a stable. |
 
 Identità storica dev.14 (05/11): commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5decee`, build `4ff2aadf4ed9`, profilo ROBOT_POWERED, OTA ingest0. APP SHA256: `71028f95a8aee4b4ff7237f9420eec6aeeb0efa0aee5c00c00ca5a7bb947bd22`. Il tag conserva il sorgente; non è una nuova GitHub Release e non garantisce una ricompilazione bit-identica.
