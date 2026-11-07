@@ -1,5 +1,8 @@
 # MATDOG Controller V0.1 — Validation
 
+> **VALIDAZIONE CORRENTE — 07/11/2026:** [MATDOG v1.0.1 Hardware Validation](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) / [manifest](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md): firmware `1.0.1-dev.17` / `17db0efe2324` installato, STAND/WALK STANDARD/STOP/PRONE e dashboard verificati nel perimetro dichiarato. La release è **Stable** sull'hardware corrente, con limiti timing/stack/HTTP esplicitamente accettati. **Il resto di questo file registra prove precedenti (dev.3, V0.1, ecc.) e non è il gate operativo di v1.0.1.** Vedi [OPEN_ITEMS](../../09_Logs/OPEN_ITEMS.md).
+
+
 > **Reading guide (added 2026-10-08).** Sections are dated records; a result is valid for its own
 > date, build and scope. The PR-2 and PR-3 sections at the top describe offline verification of what
 > was integrated into `main`; they are not hardware results. Hardware results of the dev.2/dev.3
