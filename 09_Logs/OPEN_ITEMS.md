@@ -1,27 +1,37 @@
-# Stato operativo e problemi aperti — 05/11/2026
+# Stato operativo e problemi aperti — 06/11/2026 (agg. 07/11: RCA timing, sorgente dev.15 nella PR #64)
 
-Firmware installato: **dev.14**, flash APP-only verificato; Motion **PARTIAL HW VALIDATION**, non stable. [Report hardware](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [tag sorgente esatto](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) · [README corrente](../README.md).
+**Installed on robot: `MATDOG Controller 1.0.1-dev.15`, build `7997ad4d4497`**, flash APP-only `ROBOT_POWERED` verificato; sorgente esatto `7997ad4` pubblicato il 07/11 sul branch della [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (merge `e5b0644`, draft), **non su `main`**. **PARTIAL HW VALIDATION — NOT STABLE**. [Report dev.15](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest raw locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [README corrente](../README.md).
 
-## Funzioni osservate su hardware
+## Funzioni verificate sul robot reale
 
-STAND/HOLD, PRONE → STAND a terra, WALK30 e WALK60, STOP con coppia mantenuta, Census13/13, record NVS gen-1 integro e boot READY. RESTORE automatico operativo con evidenze hardware anche nelle sessioni precedenti. Digital Twin segue la posa; compensazione IMU già implementata e attiva. Le condizioni e i limiti di ogni osservazione sono nel report: non sono una qualifica generale di affidabilità.
+STAND50–150, WALK STANDARD 45/60 mm per ciclo, WALK STOP, sei versi del joystick + combinazioni proporzionali, ritorno a STAND, BNO085 pitch/roll correttivi, Digital Twin realtime e Reset vista frontale +X. STOP è sempre accessibile; semantiche di coppia diverse in `STOPPED_SUPPORT_UNVERIFIED` e `SAFE_OFF_VERIFIED_FAULT_LATCHED`. NVS gen-1 `VALID_ACKNOWLEDGED`, census 13/13 e boot READY. PRONE ha completato due volte con torque OFF13/13 e recupero PRONE→STAND100, **ma è fallito due volte con log e un'altra volta secondo osservazione operatore**: la funzione non è affidabile in tutte le condizioni.
 
-## Lavoro ancora aperto
+## Blocchi reali da correggere, nell'ordine
 
-| Area | Stato e riferimento autorevole |
+| Area | Evidenza e decisione |
 |---|---|
-| Motion e timing | Picchi WALK oltre20ms e release perse persistenti; ulteriori miss nel recupero. Cause interne da discriminare. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
-| Stabilizzazione IMU | Pitch/roll attivi, ma ampiezza e velocità insufficienti; pitch quasi assente a150mm, risposta lenta a100mm e roll modesto secondo operatore. Non aumentare dominio o gain per supposizione. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
-| STOP e recovery | STOP funziona; ritorno WALK lungo e recupero da STOP in PRONE intermedia mancante. PRONE resta a coppiaON con sostegno non verificato; rilascio sicuro da qualificare. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
-| Feedback e temperatura | Dati FAST/CONTROL di epoche diverse; picchi isolati94/128°C non confermano surriscaldamento reale. Preservare le protezioni termiche. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
-| Dashboard e Twin | Reset vista frontale+X ancora errato; mantenere diagnosi e stato senza effetti sul BNO085. [#62](https://github.com/MattRobotics/robot-dog/issues/62) |
-| LED | Difetto intermittente storico aperto, anche se non osservato nell'ultima sessione. [#62](https://github.com/MattRobotics/robot-dog/issues/62) |
-| RESTORE manuale/manutenzione | Automatismo non significa percorso manuale qualificato. Restano prove di dashboard, rifiuti e sospensione per manutenzione. [#48](https://github.com/MattRobotics/robot-dog/issues/48) |
-| Stable | Dev.7 pre-release storica; dev.14 parziale; nessuna stable qualificata da questo closeout. [#46](https://github.com/MattRobotics/robot-dog/issues/46) |
-| Dev.15 | Motion direzionale in sviluppo separato, NON validato hardware; nessun PASS di build o joystick attestato qui. |
+| **PRONE fallimento / rilascio da quota intermedia** | `PRONE_HEIGHT` si blocca attorno a 52–53 mm, poi `NATIVE_TARGET_NOT_REACHED` e SAFE_OFF con caduta o sostegno manuale. Due report JSON negativi e due `PRONE_REST` positivi su stessa dev.15; terzo negativo riferito senza JSON. Prima verificare arrived/settledUnderLoad, freshness, margini successivi e first divergence; poi patch minima. Proteggere la condizione di appoggio e consentire recovery sicuro da fault latched. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** **Candidata dev.16 (07/11, non flashata):** causa = consegna a 53 mm con target 2,2 tick dentro `kLift` e cedimento sotto carico fino a −0,8 tick fuori; consegna a 52 mm e sostegno con coppia invece di SAFE_OFF se il segmento non si completa. [Report](Validation_Reports/Dev16_Candidate_2026-11-07/REPORT.md) |
+| **Motion timing** | 50 Hz (20 ms) non mantenuti in molte prove joystick: max lavoro ~49,59 ms e centinaia di release perse per finestra; `COMPENSATE` ~31,24 ms perfino in HOLD. Indagine costo per-release e regressione mirata, senza eliminare STOP/feedback/limiti. **RCA 07/11** ([TIMING_RCA](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md)): NOMINAL+COMPENSATE (double software) oltre 20 ms anche nel caso migliore (WALK45 18,4 ms, joystick 28,2 ms); regressione `2a630a0`; patch T0+T1 raccomandata, non implementata. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** **dev.16 (non flashata):** T0 + T1 implementati, attesa verifica hardware; joystick previsto ancora oltre 20 ms. |
+| **HTTP admission** | A STAND150, `WALK45` e `STAND100` rifiutati `503 MOTION_BUDGET_UNAVAILABLE` dopo 101–102 ms. Comando NON arrivato all'attuazione. Verificare handler, lock, scheduling prima di incolpare servo. **RCA 07/11:** conseguenza dell'overrun (nessuno slack di 5 ms entro 100 ms); non lock, non starvation HTTPD, non servo/IK. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** **dev.16 (non flashata):** T0 + T1 implementati, attesa verifica hardware; joystick previsto ancora oltre 20 ms. |
+| **Velocità e sway WALK** | Sway laterale marcato, passo utile ridotto, ciclo visivo marker ~6,5 s; STOP via joystick rapido nel comando ma assestamento `WALK_SETTLE→STAND` ~7,3–8,7 s. Obiettivo prestazionale anche 5× richiesto dall'operatore, non provato. Ottimizzare cadenza e sequenza solo dopo timing e supporto verificati. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** |
+| **IMU pitch/roll** | Reattività migliore secondo operatore; roll applicato fino ~1,9° contro ~4,8° richiesti, limitazione `WORKSPACE`; pitch applicato ~13,5°. Margini reali da ricostruire, non disabilitare workspace. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** |
+| **Termica e servo feedback** | Spike termici isolati ID21/ID31 e altri; letture periodiche normalmente ~26–34°C. Non provato né escluso difetto servo/protocollo; mantenere protezioni. Rumore storico LF sulla fixture non osservato a terra, RCA non chiusa. **[#52](https://github.com/MattRobotics/robot-dog/issues/52)** |
+| **BMS / LED** | BMS dev.14 `BMS_TELEMETRY_STALE` rientrato dopo riavvio, causa UNKNOWN. LED fisici ancora soggetti a sfarfallio policromatico intermittente pur con `LED PASS`. **[#62](https://github.com/MattRobotics/robot-dog/issues/62)** |
+| **Dashboard / Twin** | **Reset vista +X è VERIFIED HARDWARE e può essere depennato**; altre UX, floor reference, badge LIVE e LED non tutti qualificati. Issue #62 resta aperta. |
+| **RESTORE manuale** | NVS gen-1 e startup automatico verificati; mancano prova RESTORE manuale dashboard, sospensione RAM per manutenzione e specifici rifiuti. **[#48](https://github.com/MattRobotics/robot-dog/issues/48)** |
+| **HostLink / Jetson** | Bridge USB no-reset e candidate offline, ma controllo Motion da USB non qualificato hardware (helper BrokenPipe, nessun ACK `STAND`). Jetson non ancora integrata. Riprendere soltanto con Controller Motion robusto. |
+| **Firmware / stable** | Sorgente dev.15 esatto ora nella PR #64 (tree firmware = `7997ad4`, manifest CLEAN, APP SHA coincidente), non su main; servono review, regressioni e fix prima di integrare; nessuna release stable prima dei fix e qualifica. **[#46](https://github.com/MattRobotics/robot-dog/issues/46)** |
 
-Nessuna nuova issue o duplicazione integrale: le discussioni collegate conservano dettagli e criteri. I risultati VERIFIED OFFLINE restano distinti da VERIFIED HARDWARE; spiegazioni non dimostrate sono HYPOTHESIS o UNKNOWN.
+## Sequenza raccomandata
 
-## Archivio degli stati precedenti
+1. RCA mirata PRONE fallito e **prevenzione caduta**; recupero supervisionato senza power cycle solo se sicuro.
+2. Eliminare il collo di bottiglia del periodo 20 ms e i falsi rifiuti HTTP: priorità STOP, deadman, limiti e servo watchdog restano invariati.
+3. Profilare performance fisiche e incrementare gait, ridurre sway superfluo e settle; obiettivo 5× eventuale, progressivo e verificato.
+4. Estendere ROLL entro workspace realmente utilizzabile.
+5. ~~Pubblicare sorgente dev.15~~ fatto il 07/11 nella PR #64 (draft, non su main); quindi integrare fix e host/Jetson a perimetro controllato.
 
-Il precedente OPEN_ITEMS, inclusi gli stati “Motion non collegato”, “0/12 limiti”, STAND/WALK bloccati e rilievi degli audit storici, è conservato **integralmente** con commit e SHA256 nello [snapshot storico](Historical/Dev14_Documentation_Closeout_2026-11-05/README.md). Non descrive la dev.14 installata. Non viene dichiarato risolto ogni vecchio item: i dettagli restano nelle evidenze datate; questa pagina evita di presentarli come stato corrente.
+Questa voce non autorizza flash, reset NVS, modifiche EEPROM o aumento dei limiti. I report sono fotografie delle rispettive date.
+
+## Archivio cronologico
+
+Precedenti stati: [dev.14 05/11](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [dev.7 31/10](Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md) · [snapshot storico](Historical/Dev14_Documentation_Closeout_2026-11-05/README.md). I loro esiti e limiti restano validi **per quelle versioni/date**. Nessun precedente documento viene cancellato o retroattivamente qualificato.

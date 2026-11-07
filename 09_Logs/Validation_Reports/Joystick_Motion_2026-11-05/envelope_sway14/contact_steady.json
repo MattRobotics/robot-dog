@@ -1,0 +1,131 @@
+{
+ "forward": {
+  "support_mm": 5.91747770847695,
+  "support_cycle": 0.12,
+  "clearance_mm": 2.340461108724448,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.18409663318319502,
+  "max_tilt_deg": 5.5556876096129875
+ },
+ "backward": {
+  "support_mm": 6.138271062643044,
+  "support_cycle": 0.249230769,
+  "clearance_mm": 2.3349324268877454,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.18682045000205372,
+  "max_tilt_deg": 5.5556876096129875
+ },
+ "left": {
+  "support_mm": 2.9319578175306273,
+  "support_cycle": 3.747692308,
+  "clearance_mm": 2.287289999142253,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.18441195563524693,
+  "max_tilt_deg": 8.467018749106494
+ },
+ "right": {
+  "support_mm": 2.452072944636067,
+  "support_cycle": 3.249230769,
+  "clearance_mm": 2.2883962015263632,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.18472304088271163,
+  "max_tilt_deg": 8.455672695072636
+ },
+ "ccw": {
+  "support_mm": 2.2974006360499017,
+  "support_cycle": 2.575384615,
+  "clearance_mm": 2.240241591465991,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.1841032224116218,
+  "max_tilt_deg": 9.650067275704332
+ },
+ "cw": {
+  "support_mm": 1.8459159272878907,
+  "support_cycle": 2.076923077,
+  "clearance_mm": 2.2394173817409517,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.1840917574211648,
+  "max_tilt_deg": 9.665266241727327
+ },
+ "octant_ppp": {
+  "support_mm": 4.186606187115547,
+  "support_cycle": 2.575384615,
+  "clearance_mm": 2.2292431647290694,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.18658207908735236,
+  "max_tilt_deg": 8.432564447758317
+ },
+ "octant_ppm": {
+  "support_mm": 4.501957490704176,
+  "support_cycle": 2.076923077,
+  "clearance_mm": 2.188568371540245,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.1855988086480187,
+  "max_tilt_deg": 9.743466271804198
+ },
+ "octant_pmp": {
+  "support_mm": 4.914142085663006,
+  "support_cycle": 2.575384615,
+  "clearance_mm": 2.188859376763788,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.1840978950328337,
+  "max_tilt_deg": 9.723095788722354
+ },
+ "octant_pmm": {
+  "support_mm": 3.7432197628776263,
+  "support_cycle": 2.076923077,
+  "clearance_mm": 2.2265585704816515,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.1848162989006863,
+  "max_tilt_deg": 8.418132385744105
+ },
+ "octant_mpp": {
+  "support_mm": 3.7457050122492,
+  "support_cycle": 3.747692308,
+  "clearance_mm": 2.227495525346887,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.18360098534306313,
+  "max_tilt_deg": 8.413654605983599
+ },
+ "octant_mpm": {
+  "support_mm": 4.9231545137714985,
+  "support_cycle": 3.249230769,
+  "clearance_mm": 2.1950245022424877,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.1802473145723349,
+  "max_tilt_deg": 9.729356785028644
+ },
+ "octant_mmp": {
+  "support_mm": 4.510970194178862,
+  "support_cycle": 3.747692308,
+  "clearance_mm": 2.1948467841841484,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.18092056933301237,
+  "max_tilt_deg": 9.748221878799564
+ },
+ "octant_mmm": {
+  "support_mm": 4.189094767114019,
+  "support_cycle": 3.249230769,
+  "clearance_mm": 2.2281978800879623,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.1854180601331551,
+  "max_tilt_deg": 8.428859072401426
+ },
+ "reverse_twice": {
+  "support_mm": 5.841616214133974,
+  "support_cycle": 2.076923077,
+  "clearance_mm": 2.3362260691836974,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.1850044806065848,
+  "max_tilt_deg": 5.5556876096129875
+ },
+ "silent_client": {
+  "support_mm": 4.476427617279456,
+  "support_cycle": 2.575384615,
+  "clearance_mm": 2.2571237916031577,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.18410202733828984,
+  "max_tilt_deg": 7.91152671292354
+ },
+ "release_in_start": null
+}

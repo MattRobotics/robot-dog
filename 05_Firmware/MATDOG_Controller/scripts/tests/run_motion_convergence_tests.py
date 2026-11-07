@@ -29,14 +29,21 @@ def check_sources():
     checks = []
     failures = []
     extensions=json.loads((HERE/"motion_final_release_sources.json").read_text())
-    approved={x["path"]:x for x in extensions["approved_original_source_changes"]}
+    updated = extensions["updated_copied_sources"]
+    removed = set(extensions["removed_copied_sources"])
+    copied = {row["path"] for row in pins["copied_sources"]}
+    if set(updated) & removed or (set(updated) | removed) - copied:
+        failures.append("SIMPLE baseline overrides must refer only to distinct PR-2 copied sources")
 
     for group in ("copied_sources", "canonical_inputs", "retained_dependencies", "protected_installation"):
         for row in pins[group]:
             path = ROOT / row["path"]
-            actual = digest(path) if path.is_file() else None
-            passed = actual == row["sha256"] or (row["path"] in approved and approved[row["path"]]["original_sha256"]==row["sha256"] and approved[row["path"]]["current_sha256"]==actual)
-            checks.append(dict(group=group, path=row["path"], expected=row["sha256"], actual=actual, passed=passed))
+            expected = row["sha256"]
+            if group == "copied_sources":
+                expected = "ABSENT" if row["path"] in removed else updated.get(row["path"], expected)
+            actual = digest(path) if path.is_file() else "ABSENT" if not path.exists() and not path.is_symlink() else "INVALID"
+            passed = actual == expected
+            checks.append(dict(group=group, path=row["path"], expected=expected, actual=actual, passed=passed))
             if not passed:
                 failures.append("source mismatch: " + row["path"])
     # Deferred artifacts are recorded by path and SHA-256 only. They must NOT be present: this
@@ -67,14 +74,9 @@ def check_sources():
     # Pure geometry remains bus/authority/network-free; no arbitrary owner is permitted.
     reviewed_adapters = {"core/Controller.h", "core/Controller.cpp", "core/ControllerService.h",
                          "core/MotionService.h", "core/MotionService.cpp", "core/MotionJson.h", "core/MotionJson.cpp",
-                         "execution/MotionExecutor.h", "execution/MotionExecutor.cpp",
-                         "execution/MotionCoordinator.h", "execution/MotionCoordinator.cpp",
-                         "execution/MotionSession.h", "execution/MotionSession.cpp", "execution/ReviewedMotionRuntime.h",
-                         "core/LocalValidation.cpp", "core/LocalMotionCommand.h", "execution/ValidationProfile.cpp", "execution/ValidationProfile.h",
-                         "network/HttpTransport.h", "network/HttpTransport.cpp",
-                         # 2026-10-14 fixture-commissioning runtime policy: Controller-owned,
-                         # same USB-only role as LocalValidation/ValidationProfile.
-                         "core/Commissioning.cpp", "execution/CommissioningPolicy.h", "execution/CommissioningPolicy.cpp"}
+                         "core/CommandRouter.cpp", "core/SimpleMotionIntegration.cpp",
+                         "simple/SimpleMotion.h", "simple/SimpleMotion.cpp",
+                         "network/HttpTransport.h", "network/HttpTransport.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):
             continue
@@ -84,7 +86,7 @@ def check_sources():
         if "esp_phy_erase_cal_data_in_nvs" in code:
             failures.append("diagnostic PHY erase imported: " + str(path.relative_to(ROOT)))
     return dict(passed=not failures, failures=failures, checks=checks,
-                source_commit=pins["source_commit"], baseline_commit=pins["baseline_commit"],
+                source_commit=pins["source_commit"], baseline_commit=extensions["baseline_commit"],
                 copied_file_count=len(pins["copied_sources"]),
                 deferred_file_count=len(pins["deferred_sources"]),
                 manifest_version=pins["manifest_version"],

@@ -62,7 +62,15 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 // rc.7 (5d208c36, not installed): rc.6 + compensate IK tolerance 1e-6 m + WALK STOP without slack wait.
 // rc.8: rc.7 + bounded HTTPD wait while Motion is engaged + dashboard 503 = paused telemetry.
 // dev.5: dev.4 + held PRONE terminal state (STAND without STOP) + dashboard source freshness.
-constexpr const char* kFirmwareVersion = "1.0.1-dev.7";
+// dev.14: dev.13 + reference secant on the sampling clock (STOP and its WALK/HOLD pre-check).
+// dev.15: dev.14 + JOYSTICK BASE_VELOCITY (vx, vy, yaw_rate) on the SE(2) WALK law, tread
+//   fillet contact and certified kSteer, STAND after STOP in PRONE/route segments,
+//   lighter IK, IMU slew in physical time, Reset vista +X, timing/IMU diagnostics.
+// dev.16: dev.15 + PRONE HEIGHT->LIFT handover at 52 mm and contextual STOP instead of
+//   SAFE_OFF when a PRONE segment cannot complete with support available; timing
+//   diagnostics (overruns, lateness, outside work; max_work/first_miss keys fixed);
+//   IMU correction reused on alternate settled WALK/HOLD releases (T1).
+constexpr const char* kFirmwareVersion = "1.0.1-dev.16"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

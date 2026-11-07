@@ -288,10 +288,12 @@ def main():
          r"class ServoBus \{",
          "class ServoBus {\n public:\n  void setPolicy(actuator::SafeActuatorPolicy*);",
          "SAFE_OFF")
-    case("SAFE_OFF branch consults the policy", "CommandRouter.cpp",
-         r"      printServoSafeOff\(id\);",
-         "      actuator::WriteDecision d{};\n      (void)d;\n      printServoSafeOff(id);",
+    case("global SAFE_OFF consults the ordinary write policy", "CommandRouter.cpp",
+         r"if\(modules_\.service&&modules_\.service->motionSafeOff\(\)\)",
+         "if(modules_.actuator_policy && modules_.service && modules_.service->motionSafeOff())",
          "SAFE_OFF")
+    case("explicit SAFE_OFF routed as an ordinary STOP", "CommandRouter.cpp",
+         r"modules_\.service->motionSafeOff\(\)", "modules_.service->motionEngaged()", "SAFE_OFF")
 
     # --- operation classes -------------------------------------------------
     case("a persistent write becomes expressible", POLICY_H,

@@ -71,7 +71,7 @@ class NetworkAuditTest(unittest.TestCase):
           ('PortalSecurity.cpp','if (!portalDeviceValid(digest, device))','if (false)'),
           ('PortalSecurity.cpp','diff |= raw[16 + i] ^ tag[i]','diff |= 0'),
           ('PortalSecurity.cpp','update::hmac256(digest, 32, message, sizeof(message), tag)','memcpy(tag, message, 32)'),
-          ('PortalSecurity.cpp','return current(now, peer, cookie) && tokenEqual(csrf, csrf_);','return current(now, peer, cookie);'),
+          ('PortalSecurity.cpp','if (!current(now, peer, cookie) || !tokenEqual(csrf, csrf_)) return false;','if (!current(now, peer, cookie)) return false;'),
           ('PortalSecurity.cpp','now - issued_ < 300000','now - issued_ < 4000000000'),
           ('HttpTransport.cpp','if (req.remember)','if (true)'),
           ('HttpTransport.cpp','md_device=%s; HttpOnly;','md_device=%s;'),
@@ -107,8 +107,10 @@ class NetworkAuditTest(unittest.TestCase):
           ('Controller.cpp','wifi_.setRunMode(operating_mode_.routerRole());','wifi_.setRunMode(true); operating_mode_.setMode(OperatingMode::RUN);'),
           ('WifiManager.h','void setRunMode(bool run) { run_mode_.store(run); }','void setRunMode(bool run) { run_mode_.store(run); } OperatingModeManager *mode_ = nullptr;'),
           ('HttpTransport.cpp','service_->wifiStatus();','service_->wifiStatus(); service_->wifi().setRunMode(true);'),
-          # 2026-10-15: a cookie-only poll (the read-only Twin) must never be the deadman heartbeat.
-          ('HttpTransport.cpp','const bool beat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);','const bool beat=req.ap_socket&&!readonly&&portal_.current(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie);'),
+          ('HttpTransport.cpp','resp.motion_session=!readonly&&portal_.authorize','resp.motion_session=portal_.current'),
+          ('HttpTransport.cpp','if(admitted&&req.local_authorized&&portal_.authorize','if(req.local_authorized&&portal_.authorize'),
+          ('HttpTransport.cpp','if(!tls)return deny("STA_TLS_REQUIRED");',''),
+          ('AdminAccess.h','if(g!=generation_.load())return deny("GATE_GENERATION_CHANGED");',''),
         ]
         for mutation in mutations:
             with self.subTest(mutation=mutation):self.assertTrue(self.check(mutation))

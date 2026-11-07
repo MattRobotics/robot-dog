@@ -58,3 +58,21 @@ FkResult detail::forwardWithModel(const LegModel& geometry, const LegJointAngles
 
 }  // namespace motion
 }  // namespace matdog
+
+namespace matdog { namespace motion { namespace detail {
+bool invert3(const double j[3][3], double inverse[3][3]) {
+  double m[3][6];
+  for (unsigned r = 0; r < 3; ++r) for (unsigned c = 0; c < 3; ++c) { m[r][c] = j[r][c]; m[r][3+c] = r == c ? 1.0 : 0.0; }
+  for (unsigned c = 0; c < 3; ++c) {
+    unsigned p = c;
+    for (unsigned r = c + 1; r < 3; ++r) if (std::abs(m[r][c]) > std::abs(m[p][c])) p = r;
+    if (!(std::abs(m[p][c]) > 1e-12)) return false;
+    for (unsigned k = 0; k < 6; ++k) { const double t = m[p][k]; m[p][k] = m[c][k]; m[c][k] = t; }
+    const double d = 1.0 / m[c][c];
+    for (unsigned k = c; k < 6; ++k) m[c][k] *= d;
+    for (unsigned r = 0; r < 3; ++r) if (r != c) { const double f = m[r][c]; for (unsigned k = c; k < 6; ++k) m[r][k] -= f * m[c][k]; }
+  }
+  for (unsigned r = 0; r < 3; ++r) for (unsigned c = 0; c < 3; ++c) { inverse[r][c] = m[r][3+c]; if (!std::isfinite(inverse[r][c])) return false; }
+  return true;
+}
+} } }

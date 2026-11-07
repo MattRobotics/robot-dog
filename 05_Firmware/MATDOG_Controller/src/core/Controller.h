@@ -203,11 +203,16 @@ class Controller {
     bool read(unsigned,bool,simple::Feedback&) override;
     bool readDeferred() const override;
     bool resolve(unsigned,double,uint16_t&) override;
+    bool decodeRaw(unsigned,uint16_t,double&) override;
     bool frame(const uint16_t[12],simple::Drive) override;
+    bool framePreempted() const override { return frame_preempted; }
+    bool frame_preempted=false;
     bool enable(unsigned) override;
     bool off(unsigned first=0) override;
     bool verifyOff(unsigned) override;
     void referenceFault(unsigned,const simple::Feedback&,double,uint16_t) override;
+    bool tempCheck(simple::TempCheck& t) const override { if(temp_checked)t=temp_check;return temp_checked; }
+    simple::TempCheck temp_check{};bool temp_checked=false;
   } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false

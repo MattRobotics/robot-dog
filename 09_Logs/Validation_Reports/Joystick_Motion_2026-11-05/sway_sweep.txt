@@ -1,0 +1,12 @@
+# JOYSTICK steering sway sweep (dev.15, offline, run_joystick_envelope.sh scenario set on copies of the sources)
+# yNN = kJoystickSwayYM NN mm; xNN = steered swayXM NN mm (WALK STANDARD unchanged). support/clearance: foot_edge_contact.py (real fillet contacts, URDF COM).
+# stanceTilt: nominal stance foot-axis tilt; compTilt: max over the kSteerTilt IMU envelope rays (fillet limit 12 deg); box/tiltM: nominal/compensated margin to kSteer, mrad; bad: scenarios failing a gate
+y12   steady +0.349(cw) random -0.904(random_1) clear 2.23(octant_ppm) pen 0.188 stanceTilt 9.28 compTilt 11.09 box 44.2 tiltM 35.4 step 0.0179 bad []
+y13   steady +1.098(cw) random -0.177(random_1) clear 2.21(octant_ppm) pen 0.188 stanceTilt 9.64 compTilt 11.48 box 45.3 tiltM 32.3 step 0.0182 bad []
+y14   steady +1.846(cw) random +0.550(random_1) clear 2.19(octant_ppm) pen 0.187 stanceTilt 10.01 compTilt 11.87 box 35.9 tiltM 26.2 step 0.0186 bad []
+y15   steady +2.595(cw) random +1.278(random_1) clear 2.17(octant_ppm) pen 0.186 stanceTilt 10.37 compTilt 11.95 box 27.9 tiltM 18.5 step 0.0189 bad ['ccw', 'cw', 'octant_mpm', 'octant_mmp', 'random_5']
+y16   steady +3.356(cw) random +3.580(random_6) clear 2.14(octant_ppm) pen 0.185 stanceTilt 10.73 compTilt 11.96 box 28.5 tiltM 12.4 step 0.0193 bad ['ccw', 'cw', 'octant_ppm', 'octant_pmp', 'octant_mpm', 'octant_mmp', 'random_1', 'random_5', 'random_6']
+y18   steady +5.464(right) random +5.578(random_7) clear 2.11(octant_mmp) pen 0.185 stanceTilt 11.45 compTilt 11.96 box 11.1 tiltM -3.0 step 0.0202 bad ['ccw', 'cw', 'octant_ppm', 'octant_pmp', 'octant_pmm', 'octant_mpp', 'octant_mpm', 'octant_mmp', 'octant_mmm', 'random_1', 'random_2', 'random_3', 'random_4', 'random_5', 'random_6', 'random_8']
+x6    steady -1.690(cw) random -3.022(random_1) clear 2.24(random_3) pen 0.187 stanceTilt 9.28 compTilt 11.07 box 51.0 tiltM 43.1 step 0.0131 bad []
+x14   steady +2.397(cw) random +1.223(random_1) clear 2.21(octant_ppm) pen 0.188 stanceTilt 9.28 compTilt 11.10 box 44.2 tiltM 3.2 step 0.0231 bad ['backward']
+x14 backward: end=FAULT WALK_IK_OR_WORKSPACE

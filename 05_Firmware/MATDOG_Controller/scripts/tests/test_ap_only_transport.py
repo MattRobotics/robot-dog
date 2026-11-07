@@ -21,7 +21,7 @@ def between(s,a,b):
     return s.split(a,1)[1].split(b,1)[0]
 tree=ast.parse((here/'test_ap_transport.py').read_text())
 fixture=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='fixture' for t in n.targets))
-fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "motion/MotionContract.h"\n#include "network/NetworkPolicy.h"')
+fixture=fixture.replace('#include <map>', '#include <map>\n#include <mutex>\n#include <memory>\n#include <vector>\n#include <atomic>\n#include <thread>\n#include <WiFi.h>\n#include <freertos/semphr.h>\n#include "network/AdminAccess.h"\n#include "core/MotionService.h"\n#include "network/NetworkPolicy.h"')
 fixture=fixture.replace('int httpd_resp_sendstr(', 'int httpd_resp_set_status(httpd_req_t*r,const char*s) { r->status=atoi(s);return 0; }\nint httpd_resp_sendstr(', 1)
 fixture=fixture.replace('memset(p,0x42,n)', 'static unsigned seed=0;memset(p,++seed,n)')
 fixture=fixture.replace('constexpr int ESP_OK=0, HTTP_GET=0','constexpr int HTTP_GET=0')
@@ -41,11 +41,12 @@ fixture=fixture.replace(' static esp_err_t handleWifi', ''' bool portal_sta_=fal
  bool deferred_=false;   // production: fence contention defers to a later Controller pass (test_http_fence_contention.py)
  bool http_readonly_=false;
  bool registerReadOnlyHandlers(void*);
- bool readOnlyAdmitted(const HttpTransportRequest&) const;
+ bool readOnlyAdmitted(const HttpTransportRequest&,bool=true) const;
  bool admitReadOnly(HttpTransportRequest&);
  bool admitMotion(HttpTransportRequest&,const char** failure=nullptr);
- bool motionStaAdmitted(const HttpTransportRequest&) const;
- bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** failure=nullptr) const;
+ bool motionStaAdmitted(const HttpTransportRequest&,bool=true) const;
+ bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** failure=nullptr,bool=true) const;
+ static constexpr uint32_t kDispatchTimeoutMs=3000;
  uint32_t portal_generation_=0;
  bool revoke_before_service=false;
  bool admitAdmin(HttpTransportRequest&,const char** failure=nullptr);
@@ -67,6 +68,8 @@ fixture=fixture.replace('sha.finish(s.service.digest);', 'sha.finish(s.service.d
 fixture=fixture.replace('  switch(req.kind){','''  if(revoke_before_service) service.gate.revoke();
   // PRODUCTION_SERVICE_ADMISSION
   switch(req.kind){''')
+fixture=fixture.replace('bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out){',
+                        'bool dispatch(const HttpTransportRequest&req,HttpTransportResponse*out,char* =nullptr,size_t=0,uint32_t=3000,const char** =nullptr){')
 # Prefix includes guard and generation-reset exactly as shipped, using response local.
 admission=between(c,'  resp.sequence = req.sequence;\n','  switch (req.kind) {')
 fixture=fixture.replace('// PRODUCTION_SERVICE_ADMISSION',admission)
@@ -82,7 +85,9 @@ BaseType_t xSemaphoreGive(SemaphoreHandle_t h) {static_cast<std::mutex*>(h)->unl
 namespace matdog { namespace config { constexpr bool kTlsIdentityPresent=true; const char kTlsCertificate[]="cert",kTlsPrivateKey[]="key"; } }
 constexpr int MALLOC_CAP_INTERNAL=1;
 size_t heap_caps_get_largest_free_block(int){return 200000;}
-struct httpd_config_t {int stack_size,max_uri_handlers,max_open_sockets,recv_wait_timeout,send_wait_timeout,task_priority;bool lru_purge_enable;};
+int sendBoundedResponse(httpd_req_t* r,const char*,size_t,const char* body,size_t size,const std::atomic<bool>*){return httpd_resp_send(r,body,size);}
+constexpr const char* kMotionBudgetUnavailable="MOTION_BUDGET_UNAVAILABLE";
+struct httpd_config_t {int core_id,stack_size,max_uri_handlers,max_open_sockets,recv_wait_timeout,send_wait_timeout,task_priority;bool lru_purge_enable;};
 struct httpd_ssl_config_t {httpd_config_t httpd;int tls_handshake_timeout_ms;const uint8_t *servercert,*prvtkey_pem;size_t servercert_len,prvtkey_len;};
 #define HTTPD_DEFAULT_CONFIG() httpd_config_t{}
 #define HTTPD_SSL_CONFIG_DEFAULT() httpd_ssl_config_t{}
@@ -262,12 +267,12 @@ json_error='esp_err_t HttpTransport::sendJsonError'+between(c,'esp_err_t HttpTra
 handler=json_error+'esp_err_t HttpTransport::handleWifi'+between(c,'esp_err_t HttpTransport::handleWifi','\n\n} // namespace network')
 cases='case HttpRequestKind::WIFI_STATUS:'+between(c,'case HttpRequestKind::WIFI_STATUS:','case HttpRequestKind::OTA_CHALLENGE:')
 lifecycle='void HttpTransport::lifecycleTick()'+between(c,'void HttpTransport::lifecycleTick()','bool HttpTransport::admitAdmin(')
-admit='bool HttpTransport::admitAdmin('+between(c,'bool HttpTransport::admitAdmin(','bool HttpTransport::dispatch(')
+admit='bool HttpTransport::admitAdmin('+between(c,'bool HttpTransport::admitAdmin(','// Served without Motion slack')
 register='bool HttpTransport::registerHandlers'+between(c,'bool HttpTransport::registerHandlers','void HttpTransport::lifecycle()')
 page='esp_err_t HttpTransport::handlePage'+between(c,'esp_err_t HttpTransport::handlePage','esp_err_t HttpTransport::handleMotion')
 verify='bool WifiManager::verifyAdminRadio('+between(w,'bool WifiManager::verifyAdminRadio(','// Arduino delivers role events asynchronously.')
 unit=fixture.replace('// PRODUCTION_TYPES',types).replace('// PRODUCTION_HELPERS',helpers+register+page+lifecycle+admit+verify).replace('// PRODUCTION_HANDLER',handler).replace('// PRODUCTION_SERVICE_CASES',cases)
 with tempfile.TemporaryDirectory(prefix='matdog-ap-only-') as d:
     cpp,exe=Path(d)/'probe.cpp',Path(d)/'probe';cpp.write_text(unit)
-    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),'-I',str(here/'network_stubs'),'-I',str(here/'nvs_stub'),str(cpp),str(src/'network/AdminAccess.cpp'),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
+    subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-O1','-pthread','-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),'-I',str(here/'network_stubs'),'-I',str(here/'nvs_stub'),str(cpp),str(src/'network/AdminAccess.cpp'),str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
     subprocess.run([str(exe)],check=True)

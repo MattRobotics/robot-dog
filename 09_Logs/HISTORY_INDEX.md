@@ -1,6 +1,6 @@
 # MATDOG history index — June to November 2026
 
-Estensione cronologica 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+Estensione cronologica 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) con [manifest SHA](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) e [video audit](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md). Storico: dev.7 pre-release → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata e parzialmente validata 06/11**, codice ancora solo ASUS locale. Nessuna stable, nessun merge firmware.
 
 One navigable chronology. It **indexes** existing documents; it adds no new evidence and does not
 change any recorded PASS/FAIL result. Where a document or report does not exist on `main`, the row
@@ -10,7 +10,7 @@ says so instead of describing it.
 > Open blockers: [`OPEN_ITEMS.md`](OPEN_ITEMS.md). Commits and recreated SHAs:
 > [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md). Material outside `main`:
 > [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md).
-> Le condizioni operative delle sezioni storiche valgono per le date riportate. Stato corrente e limiti della dev.14: [README](../README.md) e [OPEN_ITEMS](OPEN_ITEMS.md).
+> Le condizioni operative delle sezioni storiche valgono per le date riportate. Stato corrente e limiti della dev.15: [README](../README.md) e [OPEN_ITEMS](OPEN_ITEMS.md).
 
 > **Historical branch status (2026-10-09; not current inventory).** The 13 historical branches recorded by the consolidation have been deleted
 > from GitHub; 9 tags remain. While Draft PR #42 is open the branch `docs/c2-final-sync` also exists; the

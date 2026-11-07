@@ -169,7 +169,7 @@ private:
   std::atomic<bool> stop_lock_{false};   // tiny spin lock around stop_request_ copies
   HttpTransportRequest stop_request_{};
   std::atomic<bool> stop_pending_{false};
-  std::atomic<uint32_t> stop_epoch_{0}, stop_done_{0}, stop_ticket_{0};
+  std::atomic<uint32_t> stop_done_{0}, stop_ticket_{0};
   char stop_ack_[512]{};
   // applied: the STOP passed admission and reached MotionService; ack_ok: its
   // ACK was serialized. Applied without ACK is an unknown outcome, not AUTH_FAILED.

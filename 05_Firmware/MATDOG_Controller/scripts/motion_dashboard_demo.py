@@ -24,6 +24,7 @@ def portal_html() -> str:
     assert len(fragments) == 1 and motion
     return fragments[0] + motion[1] + "</html>"
 
+
 def dashboard_csp() -> str:
     policy = (SRC / "network/TwinHostPolicy.h").read_text()
     return "".join(re.findall(r'^\s*"([^"\n]*)"', policy, re.MULTILINE))
@@ -79,6 +80,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=5185)
     parser.add_argument("--trace", type=Path)
+    parser.add_argument("--layout-preview", action="store_true", help="compatibility option: the shipped page includes the non-operational joystick")
     args = parser.parse_args()
     frames = []
     if args.trace:

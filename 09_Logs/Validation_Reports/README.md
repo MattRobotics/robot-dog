@@ -1,3 +1,6 @@
+> **Nuovo (07/11/2026):** [Candidata dev.16 — IMPLEMENTED NOT VALIDATED HARDWARE, non flashata](Dev16_Candidate_2026-11-07/REPORT.md) · [procedura flash e collaudo](Dev16_Candidate_2026-11-07/FLASH_AND_TEST.md).
+> **Nuovo (06/11/2026):** [MATDOG dev.15 — hardware partial validation](Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Analisi video joystick](Dev15_HW_2026-11-06/VIDEO_AUDIT.md). Firmware installato dev.15; sorgente esatto nella PR #64 (non in main). PRONE intermittente, deadline 20 ms non mantenute; non stable. **07/11:** [RCA timing](Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [brief per confronto tecnico](Dev15_HW_2026-11-06/TIMING_DISCUSSION_BRIEF.md).
+
 # Validation reports — index
 
 Latest hardware checkpoint 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.

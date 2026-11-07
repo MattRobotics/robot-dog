@@ -3,6 +3,7 @@
 // These methods are retained by the real router's complete dispatch function,
 // but none should be called by PERSIST or RAM Q0 promotion. Any invocation is
 // counted and fails the test. No persistence/parser/promotion method is faked.
+extern "C" int64_t esp_timer_get_time() { return int64_t(router_test::now_ms) * 1000; }
 namespace matdog {
 namespace imu {
 core::AvailabilityStatus Bno085Imu::availability() const { ++router_test::hardware_calls; return {}; }
@@ -22,6 +23,7 @@ const char* toString(LedDiagnostic) { return "UNRELATED_LED_DIAGNOSTIC"; }
 namespace servo {
 core::AvailabilityStatus ServoBus::availability() const { ++router_test::hardware_calls; return {}; }
 bool ServoBus::startScan(int, int) { ++router_test::hardware_calls; return false; }
+bool ServoBus::readProfileRegister(int, uint8_t, uint8_t, int32_t*) { ++router_test::hardware_calls; return false; }
 bool ServoBus::readRuntimeState(int, RuntimeState*) { ++router_test::hardware_calls; return false; }
 SafeOffResult ServoBus::safeOff(int) { ++router_test::hardware_calls; return SafeOffResult::UNVERIFIED_NO_RESPONSE; }
 bool ServoCensus::start() { ++router_test::hardware_calls; return false; }
