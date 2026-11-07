@@ -14,22 +14,22 @@
 #pragma GCC diagnostic pop
 #include <chrono>
 #include "../../src/simple/MotionTiming.h"
-extern "C" { extern uint64_t op_trig,op_inv,op_sqrt; }
+extern "C" { extern uint64_t op_trig,op_inv,op_sqrt,op_hypot,op_rem,op_floor; }
 namespace {
 struct Stat {
-  std::vector<double> us,trig,inv,sq;uint32_t work[simple::timing::WORKS]{};
+  std::vector<double> us,trig,inv,sq,hyp,rem,flr;uint32_t work[simple::timing::WORKS]{};
   void release(Rig& r){r.p.now+=simple::kPeriodUs;r.in.imuStampUs=r.p.now;r.m.inputs(r.in);r.p.publishCommandedPose();test_clock_us=r.p.now;
-    const uint64_t t0=op_trig,i0=op_inv,s0=op_sqrt;const auto a=std::chrono::steady_clock::now();
+    const uint64_t t0=op_trig,i0=op_inv,s0=op_sqrt,h0=op_hypot,r0=op_rem,f0=op_floor;const auto a=std::chrono::steady_clock::now();
     r.m.update(r.p.now);
     us.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-a).count());
-    trig.push_back(double(op_trig-t0));inv.push_back(double(op_inv-i0));sq.push_back(double(op_sqrt-s0));
+    trig.push_back(double(op_trig-t0));inv.push_back(double(op_inv-i0));sq.push_back(double(op_sqrt-s0));hyp.push_back(double(op_hypot-h0));rem.push_back(double(op_rem-r0));flr.push_back(double(op_floor-f0));
     const auto& w=simple::timing::state.previousWork;for(unsigned i=0;i<simple::timing::WORKS;++i)work[i]=std::max(work[i],w[i]);
     r.m.updateTelemetry(r.p.now);}
   static double mean(const std::vector<double>& v){double s=0;for(double x:v)s+=x;return s/v.size();}
   static double max(const std::vector<double>& v){return *std::max_element(v.begin(),v.end());}
   void print(const char* name){
-    std::printf("%-16s n=%4zu trig mean/max=%6.1f/%4.0f  inv-trig=%5.1f/%3.0f  sqrt=%6.1f/%4.0f | host_us mean=%5.1f max=%6.1f | work max solves=%u ik=%u newton=%u fk=%u\n",
-      name,us.size(),mean(trig),max(trig),mean(inv),max(inv),mean(sq),max(sq),mean(us),max(us),
+    std::printf("%-16s n=%4zu trig mean/max=%6.1f/%4.0f  inv-trig=%5.1f/%3.0f  sqrt=%6.1f/%4.0f  hypot=%5.1f rem=%5.1f floor=%5.1f | libm mean=%6.1f | host_us mean=%5.1f max=%6.1f | work max solves=%u ik=%u newton=%u fk=%u\n",
+      name,us.size(),mean(trig),max(trig),mean(inv),max(inv),mean(sq),max(sq),mean(hyp),mean(rem),mean(flr),mean(trig)+mean(inv)+mean(sq)+mean(hyp)+mean(rem)+mean(flr),mean(us),max(us),
       work[simple::timing::SOLVES],work[simple::timing::IK],work[simple::timing::NEWTON],work[simple::timing::FK]);}};
 void tilt(Rig& r,double roll,double pitch){  // constant board tilt seen by the IMU
   const double cr=std::cos(roll/2),sr=std::sin(roll/2),cp=std::cos(pitch/2),sp=std::sin(pitch/2);
