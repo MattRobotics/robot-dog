@@ -44,6 +44,15 @@ constexpr uint64_t kJoystickTimeoutUs=1000000;
 constexpr double kImuSlewRadS=.040;  // .060 delays native arrival (NATIVE_TARGET_NOT_REACHED, STOP suite)
 constexpr uint64_t kImuSlewMaxDtUs=2*kPeriodUs;
 constexpr double kMinStandM=.050;
+// PRONE: HEIGHT -> LIFT handover height (dev.16). At 53 mm the nominal rear
+// UPPER target lay 2.2 ticks inside kLift and the recorded loaded sag (dev.15
+// hardware: LH_UPPER 3, LF_UPPER 14 ticks) left the measured pose 0.3-0.8 ticks
+// outside it: neither arrival nor loaded settle could hand over and the segment
+// deadline released the torque at 52 mm. Lower handovers move LF_LOWER towards
+// the kHeight floor instead. 52.0 mm keeps, against the worst recorded sag of
+// every joint (dev.14 HOLD 69 + 23 cases, dev.15 PRONE 4 cases), >= 4.7 ticks
+// inside kHeight and >= 3.5 ticks inside kLift (53 mm: -0.8). Same boxes.
+constexpr double kProneHandoverM=.052;
 // Nominal height, the height of commands, status and route tables: the front HIP
 // axes stand 46.5 mm above it. STAND 150 is that operating reference, the pose
 // qualified on the robot. base_link, the ventral plane, follows from the canonical
@@ -246,6 +255,7 @@ class SimpleMotion {
   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
   void beginProne(Phase,uint64_t);
   bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_LAND; }
+  void proneNotCompleted(uint64_t now,const char* held);
   // A STOP in a planned route segment (the PRONE descent or the STAND_DEPLOY/
   // STAND_LIFT rise): the held RAW restarts the STAND route of the certified
   // region that holds it (proneRecovery). Native moves have no held reference.
@@ -281,6 +291,7 @@ class SimpleMotion {
   std::atomic<bool> stop_{false};
   std::atomic<bool> safeOffRequest_{false};
   std::atomic<const char*> stopReason_{"STOP_REQUESTED"};
+  const char* holdReason_=nullptr; // automatic support hold (PRONE not completed); null for an operator STOP
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
   bool operatorStopped_=false,proneRest_=false;

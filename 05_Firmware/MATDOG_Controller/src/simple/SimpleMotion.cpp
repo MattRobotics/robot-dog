@@ -159,7 +159,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
     for(unsigned i=0;i<12;++i){e.commandedRaw[i]=commandedRaw_[i];e.fb[i]=fb_[i];}
     e.loadedMask=loadedMask_;e.loadedPhase=loadedPhase_;
   }
-  loadedSinceUs_=0;
+  loadedSinceUs_=0;holdReason_=nullptr;
   // A repeated STOP while the same SAFE_OFF is still pending keeps its
   // broadcast and 13-servo verification progress; a failed read still
   // re-broadcasts in serviceOff. A fault, or a STOP after a fault, during
@@ -192,7 +192,7 @@ bool SimpleMotion::serviceStop(){
   if(proneRest_)enterOff(false,stopReason_.load());
   if(faultLatched_||offPending_){serviceOff();return true;}
   if(stopActive_)return false; // duplicate never restarts the clock or dwell
-  beginStop(esp_timer_get_time());return true;
+  holdReason_=nullptr;beginStop(esp_timer_get_time());return true;
 }
 void SimpleMotion::rememberReference(uint64_t now){
   // Called BEFORE commandedRaw_ is replaced following a successful TX, or
@@ -289,8 +289,20 @@ void SimpleMotion::generateStop(uint64_t now){
     for(unsigned i=0;i<12;++i)if(std::abs(int(fb_[i].raw)-int(stopDwellRaw_[i]))>kLoadedCreepTicks)resting=false;
   }
   if(!resting){stopDwellUs_=0;stopVerified_=false;state_=State::MOVING;reason_="STOP_IN_PROGRESS";}
-  else if(now-stopDwellUs_>=kLoadedSettleUs){stopVerified_=true;state_=State::STOPPED;reason_="STOPPED_SUPPORT_UNVERIFIED";}
+  else if(now-stopDwellUs_>=kLoadedSettleUs){stopVerified_=true;state_=State::STOPPED;reason_=holdReason_?holdReason_:"STOPPED_SUPPORT_UNVERIFIED";}
   stopTimedOut(esp_timer_get_time());
+}
+// A PRONE segment that cannot hand over by its deadline, or whose loaded pose
+// leaves the segment box but stays in a certified box, is not a physical fault: the body is still carried by 12 torque-ON servos. Arrest it through
+// the ordinary contextual STOP (same reference, box, freshness, power, IMU and
+// deadline guards; any failed guard is the usual fault + SAFE_OFF) instead of
+// releasing the weight at an intermediate height. The hold keeps every
+// electrical, thermal, feedback and tracking guard; the operator chooses the
+// existing STAND recovery (certified region) or SAFE_OFF.
+void SimpleMotion::proneNotCompleted(uint64_t now,const char* held){
+  stopReason_.store("PRONE_NOT_COMPLETED");holdReason_=held;
+  beginStop(now);
+  if(stopActive_)reason_="PRONE_NOT_COMPLETED_STOPPING";
 }
 bool SimpleMotion::stopTimedOut(uint64_t now){
   if(stopActive_&&!stopVerified_&&now>stopDeadlineUs_){fault("STOP_NOT_SETTLED");return true;}
@@ -432,7 +444,7 @@ const char* SimpleMotion::stand(double h,uint64_t now){
     }
     // Explicit, admitted recovery with existing torque: reuse HEIGHT.
     // ACQUIRE/REFERENCE/ENABLE are never entered here.
-    stopActive_=stopVerified_=false;operatorStopped_=false;
+    stopActive_=stopVerified_=false;operatorStopped_=false;holdReason_=nullptr;
     state_=State::STANDING;phase_=Phase::HOLD;segmentBox_=nullptr;
     rememberReference(now); // seed the held writer reference for an immediate new STOP
   }
@@ -507,10 +519,10 @@ const char* SimpleMotion::prone(uint64_t now){
   if(!input_.imuValid||now<input_.imuStampUs||now-input_.imuStampUs>200000)return "IMU_UNAVAILABLE";
   if(state_!=State::STANDING||phase_!=Phase::HOLD||!energized_)return "PRONE_REQUIRES_STAND_HOLD";
   if(!fresh(now)||!segmentTo_.valid)return "PRONE_FEEDBACK_UNAVAILABLE";
-  const auto& box=plannedHeight_>.053?collision::kHeight:collision::kLift;
+  const auto& box=plannedHeight_>kProneHandoverM?collision::kHeight:collision::kLift;
   if(!pointSafe(measured())||!contains(box,measured())||!contains(box,segmentTo_))return "PRONE_PATH_NOT_CLEAR";
   // Intent only. Keep the preceding nominal support goals until a Motion release.
-  // 53 mm is inside both existing boxes, including the recorded STAND100 sag.
+  // kProneHandoverM is inside both existing boxes, including the recorded loaded sag.
   pendingGoalValid_=true;walkRequested_=false;state_=State::MOVING;phase_=Phase::PRONE_HEIGHT;
   segmentDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
   reason_="PRONE_DESCENT_NOT_VALIDATED";requestedHeight_=0;heightValid_=false;
@@ -764,8 +776,8 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
   plan_.clear();const collision::Box* box=nullptr;
   if(next==Phase::PRONE_HEIGHT){
     box=&collision::kHeight;
-    if(!via(segmentTo_,0,0,plannedHeight_)||!heightVias(plannedHeight_,.053)){fault("PRONE_PATH_NOT_CLEAR");return;}
-    plannedHeight_=.053;
+    if(!via(segmentTo_,0,0,plannedHeight_)||!heightVias(plannedHeight_,kProneHandoverM)){fault("PRONE_PATH_NOT_CLEAR");return;}
+    plannedHeight_=kProneHandoverM;
   }else if(next==Phase::PRONE_LIFT){
     box=&collision::kLift;
     if(!via(segmentTo_,0,0,plannedHeight_)){fault("PRONE_PATH_NOT_CLEAR");return;}
@@ -997,7 +1009,7 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   const double roll=rollCorrection_+std::clamp(imuWanted_[0]-rollCorrection_,-slew,slew),pitch=pitchCorrection_+std::clamp(imuWanted_[1]-pitchCorrection_,-slew,slew);
   if(roll!=imuWanted_[0]||pitch!=imuWanted_[1])imuReason_="SLEW";
   if(roll==0&&pitch==0){rollCorrection_=pitchCorrection_=correctionScale_=0;return;}
-  // PRONE_HEIGHT hands over to kLift, whose margin at 53 mm is 2.6 mrad: once the
+  // PRONE_HEIGHT hands over to kLift at kProneHandoverM (11.7 ticks inside): once the
   // nominal target is inside it, the correction stays inside it too.
   const auto& box=phase_==Phase::PRONE_HEIGHT&&contains(collision::kLift,f.target)?collision::kLift:segmentBox_?*segmentBox_:collision::kHeight;
   auto keep=[&](const JointTargetFrame& q){f.target=q;};
@@ -1239,12 +1251,12 @@ void SimpleMotion::update(uint64_t now){
   if(pendingGoalValid_){
     if((phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)&&holdNominal_.target.valid&&
        (rollCorrection_!=0||pitchCorrection_!=0)){
-      if(now>segmentDeadlineUs_){fault("NATIVE_TARGET_NOT_REACHED");return;}
+      if(now>segmentDeadlineUs_){if(returningProne())proneNotCompleted(now,"PRONE_NOT_COMPLETED_SUPPORT_HELD");else fault("NATIVE_TARGET_NOT_REACHED");return;}
       timing::Section section(timing::COMPENSATE);
       auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);return;
     }
     pendingGoalValid_=false;
-    if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>.053?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
+    if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>kProneHandoverM?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
     JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!heightStartClear(actual,pendingGoal_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
@@ -1255,7 +1267,12 @@ void SimpleMotion::update(uint64_t now){
     plannedHeight_=requestedHeight_;beginPlan(Phase::LIFT,collision::kLift,now);return;
   }
   if(returningProne()){
-    if(!segmentBox_||!pointSafe(measured())||!contains(*segmentBox_,measured())){fault("PRONE_MEASURED_OUTSIDE_BOX");return;}
+    const auto actual=measured();
+    if(!segmentBox_||!pointSafe(actual)||!contains(*segmentBox_,actual)){
+      // Loaded sag out of the segment box but inside a certified box: arrest
+      // with torque (STOP re-checks its box every release). Otherwise SAFE_OFF.
+      if(segmentBox_&&pointSafe(actual)&&(contains(collision::kHeight,actual)||contains(collision::kLift,actual))){proneNotCompleted(now,"PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD");return;}
+      fault("PRONE_MEASURED_OUTSIDE_BOX");return;}
   }
   if(phase_==Phase::WALK){generateWalk(now);return;}
   if(state_==State::MOVING){
@@ -1264,7 +1281,7 @@ void SimpleMotion::update(uint64_t now){
     if(!releasingLevel&&(arrived(now)||settledUnderLoad(now))){nextStand(now);return;}
     if(segmentBox_)generateStand(now);
     if(offPending_||stop_.load())return;
-    if(now>(segmentBox_?segmentDeadlineUs_:goalDeadlineUs_)){fault("NATIVE_TARGET_NOT_REACHED");return;}
+    if(now>(segmentBox_?segmentDeadlineUs_:goalDeadlineUs_)){if(returningProne())proneNotCompleted(now,"PRONE_NOT_COMPLETED_SUPPORT_HELD");else fault("NATIVE_TARGET_NOT_REACHED");return;}
   }
   if(phase_==Phase::HOLD){
     // Nominal height/contacts are constant in HOLD; only the IMU correction

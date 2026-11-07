@@ -11,7 +11,9 @@ int main(){
   if(admission){printf("REJECT,%d,%d,%s\n",c.height,c.ms,admission);++rejected;continue;}
   double mech[12],boxm[12];const char* mp[12],*bp[12];for(unsigned i=0;i<12;++i){mech[i]=boxm[i]=1;mp[i]=bp[i]="";}
   for(unsigned n=0;n<4000&&!r.m.proneRest()&&r.m.state()!=simple::State::FAULT;++n){r.tick();
-   const char* ph=r.m.phase();const auto& box=!strcmp(ph,"PRONE_HEIGHT")?simple::collision::kHeight:!strcmp(ph,"PRONE_LIFT")?simple::collision::kLift:!strcmp(ph,"PRONE_DEPLOY")?simple::collision::kDeploy:simple::collision::kEntry;
+   // From a hold at or below the handover height prone() admits the pose in kLift
+   // (the phase name stays PRONE_HEIGHT for the pending release only).
+   const char* ph=r.m.phase();const auto& box=!strcmp(ph,"PRONE_HEIGHT")?(c.height/1000.>simple::kProneHandoverM?simple::collision::kHeight:simple::collision::kLift):!strcmp(ph,"PRONE_LIFT")?simple::collision::kLift:!strcmp(ph,"PRONE_DEPLOY")?simple::collision::kDeploy:simple::collision::kEntry;
    for(unsigned i=0;i<12;++i){double q=r.m.feedback()[i].q;double a=std::fmin(q-r.in.minRad[i],r.in.maxRad[i]-q),b=std::fmin(q-box.lo[i],box.hi[i]-q);
     if(a<mech[i]){mech[i]=a;mp[i]=ph;}if(b<boxm[i]){boxm[i]=b;bp[i]=ph;}}
   }
