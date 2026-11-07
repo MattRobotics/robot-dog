@@ -159,6 +159,7 @@ private:
   std::atomic<uint32_t> loop_last_ms_{0}, loop_max_ms_{0}, dispatch_last_ms_{0},
       dispatch_max_ms_{0}, dispatch_late_{0}, dispatch_busy_{0};
   std::atomic<uint32_t> read_service_last_us_{0},read_service_max_us_{0};
+  std::atomic<uint32_t> status_service_last_us_{0},status_service_max_us_{0};  // /status, /wifi/status on the loop
   uint32_t last_update_ms_ = 0;
   // Set by the Controller thread each loop: a Motion torque sequence or motion
   // is in progress. The single httpd task then starts no large Twin download
@@ -169,7 +170,7 @@ private:
   std::atomic<bool> stop_lock_{false};   // tiny spin lock around stop_request_ copies
   HttpTransportRequest stop_request_{};
   std::atomic<bool> stop_pending_{false};
-  std::atomic<uint32_t> stop_epoch_{0}, stop_done_{0}, stop_ticket_{0};
+  std::atomic<uint32_t> stop_done_{0}, stop_ticket_{0};
   char stop_ack_[512]{};
   // applied: the STOP passed admission and reached MotionService; ack_ok: its
   // ACK was serialized. Applied without ACK is an unknown outcome, not AUTH_FAILED.

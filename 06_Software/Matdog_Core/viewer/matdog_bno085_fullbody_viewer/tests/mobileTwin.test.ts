@@ -45,15 +45,64 @@ describe('phone twin presentation (14 Oct counterexample)', () => {
   it('says UNMEASURED, keeps IMU and RAW fresh, prints null (never 0) per joint', () => {
     const f = describeTwin(parseMotionFrame(tel), 400, false, 'UNMEASURED', '', 0);
     expect(f.banner).toContain('UNMEASURED');
-    expect(f.chips.find((c) => c.id === 'chip-imu')).toMatchObject({ text: 'IMU 8 ms', tone: 'ok' });
-    expect(f.chips.find((c) => c.id === 'chip-raw')?.text).toBe('RAW 12/12');
-    expect(f.chips.find((c) => c.id === 'chip-link')?.tone).toBe('ok');
+    expect(f.chips).toEqual([{ id: 'twin-status', text: 'DATI N/D', tone: 'warn' }]);
+    expect(f.rows.find(([k]) => k === 'IMU')?.[1]).toBe('valida · 8 ms');
+    expect(f.rows.find(([k]) => k === 'RAW')?.[1]).toBe('12/12');
     expect(f.jointLines[0]).toContain('raw 2018');
     expect(f.jointLines.every((l) => l.includes('null (non misurato)'))).toBe(true);
   });
   it('reports transport problems by their real names', () => {
     expect(describeTwin(null, null, true, null, 'HTTP_503 CONTROLLER_LOOP_LATE', 1).banner).toContain('HTTP_503');
     const stale = describeTwin(parseMotionFrame(tel), 4000, true, 'UNMEASURED', 'HTTP_TIMEOUT', 3);
-    expect(stale.chips[0]).toMatchObject({ tone: 'bad' }); expect(stale.banner).toContain('STALE');
+    expect(stale.chips[0]).toMatchObject({ text: 'DATI SCADUTI', tone: 'bad' }); expect(stale.banner).toContain('scaduta');
+  });
+});
+
+describe('single truthful telemetry badge', () => {
+  const live = { version: 1, now_ms: 1000, stale: false, imu_valid: true, imu_age_ms: 10,
+    telemetry: { sampled_at_ms: 990, source: 'CONTROLLER', actual_rad: Array(12).fill(0), quaternion: [1, 0, 0, 0] } };
+  const facts = (body = live, age = 10, stale = false, error = '', failures = 0) =>
+    describeTwin(parseMotionFrame(body), age, stale, 'MEASURED', error, failures);
+  it('shows modern Controller state/phase ahead of obsolete legacy labels', () => {
+    const frame = parseMotionFrame({ ...live, state: 'STOPPED', phase: 'STOP', executor_state: 'OLD_EXECUTOR', stand_state: 'OLD_STAND' });
+    expect(frame?.executorState).toBe('STOPPED'); expect(frame?.standState).toBe('STOP');
+    expect(describeTwin(frame, 10, false, 'MEASURED', '', 0).rows.find(([key]) => key === 'Executor')?.[1]).toBe('STOPPED / STOP');
+  });
+  it('keeps the legacy Controller state contract readable when modern fields are absent', () => {
+    const frame = parseMotionFrame({ ...live, executor_state: 'OFF', stand_state: 'IDLE' });
+    expect(frame?.executorState).toBe('OFF'); expect(frame?.standState).toBe('IDLE');
+  });
+  it('retains modern FAULT and its original reason in fresh and expired diagnostics', () => {
+    const frame = parseMotionFrame({ ...live, state: 'FAULT', phase: 'IDLE', fault: true, reason: 'SERVO_COMMUNICATION_LOST' });
+    for (const stale of [false, true]) {
+      const f = describeTwin(frame, stale ? 1600 : 10, stale, 'MEASURED', '', 0);
+      expect(f.rows.find(([key]) => key === 'Executor')?.[1]).toBe('FAULT / IDLE');
+      expect(f.rows.find(([key]) => key === 'Motivo Controller')?.[1]).toBe('SERVO_COMMUNICATION_LOST');
+      if (stale) expect(f.chips[0]?.tone).toBe('bad');
+      else expect(f.banner).toContain('SERVO_COMMUNICATION_LOST');
+    }
+  });
+  it('shows only LIVE for measured, fresh hardware data, with technical details kept in diagnostics', () => {
+    const f = facts();
+    expect(f.chips).toEqual([{ id: 'twin-status', text: 'LIVE', tone: 'ok' }]);
+    expect(f.banner).toBe('');
+    expect(f.rows.map(([k]) => k)).toEqual(expect.arrayContaining(['Fonte telemetria', 'Età telemetria', 'IMU', 'Giunti', 'RAW', 'Quaternion BNO085 (w,x,y,z)', 'Riferimento pavimento']));
+  });
+  it('never calls an offline fixture, trace or unknown source LIVE', () => {
+    for (const source of ['OFFLINE_UI_FIXTURE', 'OFFLINE_SYNTHETIC', 'FAKE_AP_HOST_EMULATION']) {
+      expect(facts({ ...live, telemetry: { ...live.telemetry, source } }).chips).toEqual([{ id: 'twin-status', text: 'OFFLINE', tone: 'warn' }]);
+    }
+    expect(facts({ ...live, owner: 'offline_trace' } as typeof live).chips[0]?.text).toBe('OFFLINE');
+    expect(facts({ ...live, telemetry: { ...live.telemetry, source: '' } }).chips[0]?.text).toBe('DATI N/D');
+  });
+  it('drops LIVE on expiry, invalid IMU or receive error, and retains authentic faults', () => {
+    expect(facts(live, 1600).chips[0]?.text).toBe('DATI SCADUTI');
+    expect(facts(live, 10, true).chips[0]?.tone).toBe('bad');
+    expect(facts(live, 10, false, 'TELEMETRY_REJECTED').chips[0]?.text).toBe('ERRORE');
+    expect(facts(live, 10, false, '', 1).chips[0]?.tone).toBe('bad');
+    expect(facts({ ...live, imu_valid: false }).chips[0]?.text).toBe('DATI N/D');
+    expect(facts({ ...live, imu_age_ms: 201 }).chips[0]?.text).toBe('DATI N/D');
+    const fault = { ...live, fault: true, reason: 'SERVO_COMMUNICATION_LOST', telemetry: { ...live.telemetry, source: 'OFFLINE_UI_FIXTURE' } };
+    expect(facts(fault).banner).toContain('SERVO_COMMUNICATION_LOST');
   });
 });

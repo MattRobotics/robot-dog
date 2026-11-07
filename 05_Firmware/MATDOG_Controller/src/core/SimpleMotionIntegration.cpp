@@ -14,7 +14,7 @@ uint8_t slotId(unsigned i){const auto* s=actuator::slotServo(i);return s?s->bus_
 }
 bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback& out){
   if(!owner||i>=12)return false;
-  auto& c=*owner;auto& bus=c.servo_bus_;
+  auto& c=*owner;auto& bus=c.servo_bus_;temp_checked=false;
   if(control){servo::ServoBus::ControlFeedbackSnapshot r;
     if(!bus.readControlFeedbackBudgeted(slotId(i),&r,simple::kReadTimeoutMs))return false;
     out.raw=r.present_position;out.speed=r.present_speed;out.load=r.present_load;out.current=r.present_current;
@@ -27,21 +27,28 @@ bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback&
   }
   // Full Calibration recorded isolated corrupt bulk temperatures. Confirm
   // the physical temperature directly, within the same 2 ms reply budget.
-  if(out.temp>=70){int direct=-1;if(!bus.readPresentTemperatureDirect(slotId(i),&direct,2))return false;out.temp=direct;}
+  // Each confirmation is kept with its outcome (tempCheck): no extra read.
+  if(out.temp>=70){int direct=-1;const bool ok=bus.readPresentTemperatureDirect(slotId(i),&direct,2);
+    temp_check={static_cast<uint64_t>(esp_timer_get_time()),static_cast<uint8_t>(i),static_cast<uint8_t>(bus.lastBusOutcome()),static_cast<int16_t>(out.temp),static_cast<int16_t>(ok?direct:-1)};
+    temp_checked=true;if(!ok)return false;out.temp=direct;}
   simple::timing::Section conversion(simple::timing::CONVERT);
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
-  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  if(!tr||out.raw>=4096)return false;
-  actuator::MicroRad urad=0;
-  if(actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,out.raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  if(!decodeRaw(i,out.raw,out.q))return false;
   // Acquiring a folded pose can observe a contact outside the URDF. This
   // never expands command limits: only the unchanged recorded contact span
   // may be observed, then DISENGAGE moves LOWER inward before the route.
   const int contactMargin=c.simple_record_.repeatability[i]+calibration::LivePositionEvidence{}.extra_margin_ticks;
   if(static_cast<int>(out.raw)<static_cast<int>(c.simple_record_.contact_min[i])-contactMargin||
      static_cast<int>(out.raw)>static_cast<int>(c.simple_record_.contact_max[i])+contactMargin)return false;
-  out.q=actuator::microRadToRadians(urad);out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
+  out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
   return true;
+}
+bool Controller::SimpleServoPort::decodeRaw(unsigned i,uint16_t raw,double& q){
+  if(!owner||i>=12||raw>=4096)return false;auto& c=*owner;
+  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
+  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
+  actuator::MicroRad urad=0;
+  if(!tr||actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  q=actuator::microRadToRadians(urad);return true;
 }
 bool Controller::SimpleServoPort::readDeferred() const {
   // A two-block control read can answer block40 then defer block56. Its TX
@@ -56,10 +63,15 @@ bool Controller::SimpleServoPort::resolve(unsigned i,double q,uint16_t& raw){
   return tr&&lim&&actuator::resolveRadiansToRaw(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,q,&raw)==actuator::TargetResolveStatus::OK&&lim->contains(raw);
 }
 bool Controller::SimpleServoPort::frame(const uint16_t raw[12],simple::Drive drive){
-  if(!owner||owner->simple_motion_.stopping())return false;
+  // Only SimpleMotion's scoped, exact STOP frame may pass its operational
+  // revocation. ServoBus still checks the shared STOP/fault preemption hook.
+  frame_preempted=false;
+  if(!owner)return false;
+  if(owner->simple_motion_.stopping()&&!owner->simple_motion_.stopFrameAuthorized(raw,drive)){frame_preempted=true;return false;}
   uint8_t ids[12];for(unsigned i=0;i<12;++i)ids[i]=slotId(i);
   if(!owner->servo_bus_.setOperationalDrive(drive.speed,drive.acc))return false;
-  servo::ServoBus::FrameTx tx;return owner->servo_bus_.syncWriteGoalPositions(ids,raw,&tx)&&tx.complete;
+  servo::ServoBus::FrameTx tx;const bool sent=owner->servo_bus_.syncWriteGoalPositions(ids,raw,&tx);
+  frame_preempted=tx.preempted;return sent&&tx.complete;
 }
 bool Controller::SimpleServoPort::enable(unsigned i){
   if(!owner||i>=12||owner->simple_motion_.stopping())return false;

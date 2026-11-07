@@ -1,9 +1,11 @@
 #include "MotionService.h"
 #include "../simple/MotionTiming.h"
 #include "../actuator/CalibrationTargetResolver.h"
+#include "../servo/BusTransaction.h"
 #include <esp_timer.h>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 namespace matdog { namespace core {
 namespace {
@@ -11,12 +13,52 @@ const char* boolean(bool b){return b?"true":"false";}
 }
 void MotionService::update(){
  if(!active_||!motion_)return;
- // PRONE terminal completes the LIE_DOWN command: torque ON, contact NOT verified.
- if(motion_->state()==simple::State::PRONE){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_CONTACT_UNVERIFIED";active_=false;}
- if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
- if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ if(activeStop_){
+  // ACK revokes the old operation; only feedback-qualified arrest completes
+  // the contextual STOP. SAFE_OFF is a distinct, register-verified terminal.
+  if(activeStopFromFault_){
+   // This STOP was received AFTER the fault. Report its own OFF observation;
+   // state/reason still expose the original latched fault independently.
+   if(!motion_->stopping()&&motion_->offVerified()&&!motion_->energized()){
+    activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED_FAULT_LATCHED";active_=false;
+   }else activeAck_.reason="SAFE_OFF_IN_PROGRESS_FAULT_LATCHED";
+  }
+  else if(motion_->state()==simple::State::FAULT){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+  else if(motion_->stopVerified()){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STOPPED_SUPPORT_UNVERIFIED";active_=false;}
+  else if(!motion_->stopping()&&!motion_->stopActive()&&motion_->offVerified()&&!motion_->energized()){
+   activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="SAFE_OFF_VERIFIED";active_=false;
+  }else activeAck_.reason="STOP_IN_PROGRESS";
+ }else{
+ // The PRONE rest completes the LIE_DOWN command once torque OFF is verified
+ // on the 13 servos; support is NOT verified.
+ if(motion_->proneRest()){if(!motion_->stopping()&&motion_->offVerified()&&!motion_->energized()){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="PRONE_REST";active_=false;}}
+ else if(motion_->state()==simple::State::STANDING){activeAck_.outcome=motion::CommandOutcome::COMPLETED;activeAck_.reason="STAND_REACHED";active_=false;}
+ else if(motion_->state()==simple::State::FAULT||motion_->state()==simple::State::STOPPED){activeAck_.outcome=motion::CommandOutcome::ABORTED;activeAck_.reason=motion_->reason();active_=false;}
+ }
  if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
  activeAck_.executor_state=simple::name(motion_->state());
+}
+// Dashboard joystick order (dev.17). HTTP can deliver the page's joystick
+// commands out of order (one connection per request, TCP retransmission), so
+// a refresh sent before the release could be applied after it and restart the
+// walk for up to its 1 s TTL. The page numbers every command of one load:
+// id "<page session>-<sequence>". Within one page session a JOYSTICK command
+// (move or neutral) is admitted only above the newest sequence admitted:
+// duplicates, superseded and late updates are refused and never extend the
+// deadman. A command of another page session is admitted only if not issued
+// before the newest one (issued_at_ms, the Controller time the TTL already
+// checks): a reloaded page starts again at its own sequence 1, a late request
+// of an earlier page is refused. STOP never reaches this check.
+const char* MotionService::admitJoystickOrder(const motion::MotionCommand& c){
+ const char* dash=strrchr(c.id,'-');char* end=nullptr;
+ const unsigned long n=dash&&dash>c.id?strtoul(dash+1,&end,10):0;
+ if(!n||end==dash+1||*end||n!=c.sequence)return "JOYSTICK_SEQUENCE_REQUIRED";
+ const size_t key=static_cast<size_t>(dash-c.id);
+ auto& o=joystickOrder_;
+ const bool samePage=o.valid&&strlen(o.session)==key&&!strncmp(o.session,c.id,key);
+ if(samePage?c.sequence<=o.sequence:o.valid&&static_cast<int32_t>(c.issued_at_ms-o.issuedMs)<0)return "JOYSTICK_SUPERSEDED";
+ memcpy(o.session,c.id,key);o.session[key]=0;o.sequence=c.sequence;o.issuedMs=c.issued_at_ms;o.valid=true;
+ return nullptr;
 }
 motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t now){
  motion::MotionAck a;a.sequence=c.sequence;a.owner=c.owner;
@@ -25,29 +67,59 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  memcpy(a.id,c.id,sizeof(a.id));
  if(!motion_){a.reason="NOT_INITIALIZED";return a;}
  a.executor_state=simple::name(motion_->state());
- if(c.intent==motion::Intent::STOP){motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason="SAFE_OFF_REQUESTED";return last_=a;}
+ if(c.intent==motion::Intent::STOP){
+   // Every channel shares this fence, including STOP received over USB while
+   // an older HTTP motion request is waiting for its Controller turn.
+   stopEpoch_.fetch_add(1,std::memory_order_release);
+   const bool fromFault=motion_->state()==simple::State::FAULT;
+   motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason=fromFault?"STOP_REQUESTED_FAULT_LATCHED":"STOP_REQUESTED";
+   // Repeated STOPs acknowledge independently without restarting the first
+   // operation's timing, progress or identity (including its held terminal).
+   // A new receipt after OFF/FAULT is distinct from duplicating a held STOP.
+   if(!activeStop_||(!active_&&!motion_->stopActive())||(fromFault&&!activeStopFromFault_)){
+    activeAck_=a;active_=activeStop_=true;activeStopFromFault_=fromFault;acceptedMs_=now;finishedMs_=0;
+   }
+   return last_=a;
+ }
+ // An exact WALK STANDARD preset (forward stride, no gait name): -1 otherwise.
+ int preset=-1;
+ if(c.intent==motion::Intent::BASE_VELOCITY&&!c.gait[0]&&c.vy==0&&c.yaw_rate==0)
+   for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)preset=static_cast<int>(i);
+ // While STOP is latched only STAND and (dev.17) a WALK STANDARD preset reach
+ // SimpleMotion, which admits both through the same STOP-resume checks.
+ // WALK STOP, the joystick and PRONE stay refused.
+ if(motion_->stopActive()&&c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&preset<0){
+   a.reason=motion_->stopInProgress()?"STOP_IN_PROGRESS":"STOP_LATCHED";return last_=a;
+ }
  const unsigned owner=static_cast<unsigned>(c.owner);
  if(owner>=3){a.reason="INVALID_OWNER";return last_=a;}
  auto& replay=replay_[owner];
  // IDs include the browser instance; a page reload may restart sequence at 1.
  if(replay.sequence&&!strcmp(c.id,replay.id)){if(c.sequence==replay.sequence)return replay.ack;a.reason="COMMAND_ID_REUSED";return last_=a;}
+ const bool joystick=c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+ if(joystick&&c.owner==motion::ClientOwner::DASHBOARD)
+   if(const char* r=admitJoystickOrder(c)){a.reason=r;return last_=a;}
  auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;acceptedMs_=now;finishedMs_=0;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
-   // Nothing to stop in the held PRONE terminal: never take over the active command.
-   if(motion_->state()==simple::State::PRONE)return result("NOT_WALKING");
+   // Nothing to stop at the PRONE rest: never take over the active command.
+   if(motion_->proneRest())return result("NOT_WALKING");
    motion_->walkStop();return result(nullptr);}
+ // Continuous base velocity: only an explicit JOYSTICK command, so an exact
+ // preset velocity from it never becomes an untimed WALK STANDARD.
+ if(c.intent==motion::Intent::BASE_VELOCITY&&c.gait[0]&&!joystick)return result("GAIT_NOT_IN_SIMPLE_V1");
  if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY&&c.intent!=motion::Intent::LIE_DOWN)return result("COMMAND_NOT_IN_SIMPLE_V1");
  if(!ready_)return result(reason_);
- if(prepare_&&(why=prepare_(context_)))return result(why);
+ if(!motion_->stopActive()&&prepare_&&(why=prepare_(context_)))return result(why);
  if(c.intent==motion::Intent::LIE_DOWN)return result(motion_->prone(us));
  if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
+ if(joystick)return result(motion_->drive(c.vx,c.vy,c.yaw_rate,us));
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
- for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)return result(motion_->walk(i,us));
+ if(preset>=0)return result(motion_->walk(static_cast<unsigned>(preset),us));
  return result("STANDARD_STRIDE_REQUIRED");
 }
 bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) const {
@@ -56,7 +128,7 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"TORQUE_ON_CONTACT_UNVERIFIED\",\"automatic_safe_off\":false,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2]);
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"nominal_height_mm\":%.0f,\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":%lu,\"ramp_cycles\":%.0f},\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"REST_TORQUE_OFF_SUPPORT_UNVERIFIED\",\"automatic_safe_off\":true,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkHeightM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2],simple::kJoystickStrideM/simple::kWalkPeriodS,simple::kJoystickLateralM/simple::kWalkPeriodS,simple::kJoystickYawRad/simple::kWalkPeriodS,(unsigned long)(simple::kJoystickTimeoutUs/1000),simple::kJoystickRampCycles);
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
@@ -73,11 +145,19 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.offVerified=motion_->offVerified();
  s.offMask=motion_->offMask();
  s.energized=motion_->energized();
+ s.stopActive=motion_->stopActive();s.stopInProgress=motion_->stopInProgress();
+ s.stopVerified=motion_->stopVerified();s.stopSupportVerified=motion_->stopSupportVerified();
+ s.standResumeReason=s.stopActive?motion_->standResumeRefusal(s.capturedUs):"STOP_NOT_ACTIVE";
+ s.standResumeAllowed=s.stopActive&&!s.standResumeReason;
  s.heightValid=motion_->heightValid();
  s.requestedHeightM=motion_->requestedHeightM();
  s.heightM=motion_->heightM();
  s.walkCycles=motion_->walkCycles();
+ s.walkVelocityX=motion_->walkVelocityX();s.walkVelocityY=motion_->walkVelocityY();s.walkYawRate=motion_->walkYawRate();s.joystick=motion_->joystickActive();
  s.stabilizationLimited=motion_->stabilizationLimited();
+ s.tempSpikes=motion_->tempSpikes();s.hotPendingMask=motion_->hotPendingMask();
+ s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
+ s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
  s.releases=motion_->releases();
@@ -88,6 +168,15 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.maxReleaseWorkUs=motion_->maxReleaseWorkUs();
  {const auto& t=simple::timing::state;s.commandMissed=t.missed;
   if(t.firstMiss.valid){s.firstMissPhase=t.firstMiss.phase;s.firstMissLatenessUs=static_cast<uint32_t>(t.firstMiss.latenessUs);}
+  // Index 0 is serialized as "max_work", 1 as "first_miss" (dev.15 had them swapped).
+  for(unsigned i=0;i<2;++i){const auto& r=i?t.firstMiss:t.maximum;s.timingValid[i]=r.valid;
+    auto sat=[](uint32_t v){return static_cast<uint16_t>(v>65535?65535:v);};
+    for(unsigned k=0;k<simple::timing::PARTS;++k){s.timing[i][k]=sat(r.us[k]);s.timing[i][6+k]=sat(r.previousUs[k]);}
+    for(unsigned k=0;k<simple::timing::WORKS;++k)s.timing[i][12+k]=sat(r.work[k]);
+    uint64_t ext=0;for(unsigned k=0;k<simple::timing::EXTERNALS;++k)ext+=r.externalUs[k];
+    auto sat64=[](uint64_t v){return static_cast<uint16_t>(v>65535?65535:v);};
+    s.timingMeta[i][0]=sat64(r.latenessUs);s.timingMeta[i][1]=sat64(r.sinceReleaseUs);s.timingMeta[i][2]=sat64(ext);}
+  s.commandOverruns=t.overruns;s.overrunsTotal=simple::timing::overrunsTotal;
   if(t.maximum.valid){s.commandMaxWorkUs=t.maximum.workUs;s.commandMaxWorkPhase=t.maximum.phase;s.commandMaxCompensateUs=t.sectionMax[simple::timing::COMPENSATE];s.commandMaxSolves=t.maximum.work[simple::timing::SOLVES];}}
  s.offVerifiedUs=motion_->offVerifiedUs();
  s.referenceFaultSlot=motion_->referenceFaultSlot();
@@ -119,10 +208,33 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  for(unsigned i=0;i<12;++i){const auto& f=s.feedback[i];const auto* unit=actuator::slotServo(i);add("%s{\"slot\":%u,\"id\":%u,\"joint\":\"%s\",\"valid\":%s,\"raw\":%u,\"commanded_raw\":%u,\"speed\":%d,\"load\":%d,\"current\":%d,\"temperature\":%d,\"voltage_dv\":%d,\"status\":%d,\"goal\":%d,\"torque\":%d,\"age_ms\":%llu,\"control_age_ms\":%llu}",i?",":"",i,unit?unit->bus_id:0,unit?unit->joint:"UNKNOWN",boolean(f.valid),f.raw,s.commandedRaw[i],f.speed,f.load,f.current,f.temp,f.voltage,f.status,f.goal,f.torque,(unsigned long long)(f.valid&&us>=f.stampUs?(us-f.stampUs)/1000:0),(unsigned long long)(f.controlStampUs&&us>=f.controlStampUs?(us-f.controlStampUs)/1000:0));}
  add("%s","]");
  add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
- add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
-   (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
- add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
-   s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long long)s.offVerifiedUs);
+ add(",\"stop\":{\"active\":%s,\"in_progress\":%s,\"motion_verified\":%s,\"support_verified\":%s,\"stand_resume_allowed\":%s,\"stand_resume_reason\":\"%s\"}",
+   boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
+ add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu,\"overruns\":%lu}",
+   (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves,(unsigned long)s.commandOverruns);
+ // [read,nominal,compensate,convert,frame,rest] us of one release, the same six
+ // of the release before, then solves, ik, newton, fk of that release.
+ for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss\":":",\"timing\":{\"max_work\":");
+   if(!s.timingValid[i]){add("%s","null");continue;}
+   for(unsigned k=0;k<16;++k)add("%s%lu",k?",":"[",(unsigned long)s.timing[i][k]);add("%s","]");}
+ // [lateness, since previous release end, external loop work] us of the same two records.
+ for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss_meta\":":",\"max_work_meta\":");
+   if(!s.timingValid[i]){add("%s","null");continue;}
+   add("[%lu,%lu,%lu]",(unsigned long)s.timingMeta[i][0],(unsigned long)s.timingMeta[i][1],(unsigned long)s.timingMeta[i][2]);}
+ add("%s","}");
+ // Existing thermal confirmation counters: isolated hot samples rejected, joints whose hot window is open.
+ // Direct confirmations of bulk >= 70 C, latest first: [servo id, bulk C,
+ // direct C (-1: no valid reply), bus outcome of the direct read, age ms].
+ add(",\"thermal\":{\"spikes\":%lu,\"hot_pending_mask\":%u,\"checks\":%lu,\"last\":[",(unsigned long)s.tempSpikes,(unsigned)s.hotPendingMask,(unsigned long)s.tempChecks);
+ for(unsigned i=0;i<2&&i<s.tempChecks;++i){const auto& t=s.tempCheck[i];const auto* unit=t.slot<12?actuator::slotServo(t.slot):nullptr;
+   add("%s[%u,%d,%d,\"%s\",%llu]",i?",":"",unit?unit->bus_id:0,t.bulk,t.direct,servo::toString(static_cast<servo::BusOutcome>(t.outcome)),
+       (unsigned long long)(s.capturedUs>=t.stampUs?(s.capturedUs-t.stampUs)/1000:0));}
+ add("%s","]}");
+ add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
+ // Law velocity of the walk (not measured) and whether a joystick intent holds it.
+ add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
+ add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
+   s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long)s.overrunsTotal,(unsigned long long)s.offVerifiedUs);
  if(s.referenceFaultSlot<12){const auto& f=s.referenceFaultFeedback;
    add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
      s.referenceFaultSlot,f.raw,s.referenceFaultRaw,f.torque,f.goal,(unsigned long long)f.controlStampUs);}

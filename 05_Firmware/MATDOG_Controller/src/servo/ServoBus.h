@@ -276,7 +276,7 @@ class ServoBus {
   // commitFrame). No ACK exists: the report says whether every byte left the
   // UART (HardwareSerial::flush = TX complete), never that a servo applied it.
   // Refuses (zero bytes) without a validation drive pair or with invalid ids.
-  struct FrameTx { bool started=false, complete=false; uint32_t started_us=0, complete_us=0; uint16_t bytes=0; };
+  struct FrameTx { bool started=false, complete=false, preempted=false; uint32_t started_us=0, complete_us=0; uint16_t bytes=0; };
   bool syncWriteGoalPositions(const uint8_t ids[12], const uint16_t ticks[12], FrameTx* report);
   // Emergency de-escalation: ONE SYNC_WRITE TorqueEnable=0 to an explicit id
   // list (no reply, no readback, no retry). Never claims VERIFIED_OFF: each id

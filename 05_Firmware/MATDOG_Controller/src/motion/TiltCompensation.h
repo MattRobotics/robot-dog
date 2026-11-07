@@ -19,6 +19,15 @@ struct TiltCompensation {
   double maxContactDriftM = 0, minJointMarginRad = 0, maxCondition = 0;
   unsigned maxIterations = 0;
 };
+// Geometric level target in the existing support/gait frame. The labelled
+// stance anchors are not moved. Assumes at least three noncollinear planted,
+// no-slip contacts on one plane; encoders/IMU do NOT prove those assumptions.
+// previousBodyInSupport supplies the last accepted normal for contact FK.
+// No integration, retained estimator state, actuator access or admission veto.
+// Returns false with zero outputs if the required geometry is unavailable.
+bool supportLevelTarget(const Vector3 anchors[4], const JointTargetFrame& measured,
+                        const bool stance[4], const Vector3& worldUpBase,
+                        const BodyPose& previousBodyInSupport, double& roll, double& pitch);
 BodyPose bodyPoseFromRollPitch(const Vector3& translationM, double rollRad, double pitchRad);
 // seeds: the previous valid joint solution per leg (branch selector); pass the stand seeds for a cold start.
 TiltCompensation compensateStand(const StandDefinition& stand, double bodyHeightM, double rollRad, double pitchRad,

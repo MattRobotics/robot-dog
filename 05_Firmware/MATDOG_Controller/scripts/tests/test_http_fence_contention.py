@@ -17,12 +17,14 @@ c = (SRC/'network/HttpTransport.cpp').read_text()
 def between(text, start, end):
     assert text.count(start) == 1 and text.count(end) == 1, (start, end)
     return text.split(start, 1)[1].split(end, 1)[0]
-exempt = 'bool slackExempt(' + between(c, 'bool slackExempt(', '} // slackExempt') + '}'
+exempt = 'bool slackExempt(' + between(c, 'bool slackExempt(', '} // slackExempt') + '}\n'
+exempt += 'bool joystickRefresh(' + between(c, 'bool joystickRefresh(', '} // joystickRefresh') + '}'
 dispatch = 'bool HttpTransport::dispatch(' + between(c, 'bool HttpTransport::dispatch(', 'void HttpTransport::appendTransportStats')
 tail = '  // Keep Controller-side command/JSON work in slack.' + between(c, '  // Keep Controller-side command/JSON work in slack.', '\nvoid HttpTransport::serviceRequest')
 admission = between(c, 'void HttpTransport::serviceRequest(uint32_t now_ms) {\n', '  switch (req.kind) {')
 status_case = 'case HttpRequestKind::MOTION_STATUS:' + between(c, 'case HttpRequestKind::MOTION_STATUS:', 'case HttpRequestKind::MOTION_CAPABILITIES:')
 command_case = 'case HttpRequestKind::MOTION_COMMAND: {' + between(c, 'case HttpRequestKind::MOTION_COMMAND: {', 'case HttpRequestKind::CALIBRATION_RESTORE: {')
+sta_admission = 'bool HttpTransport::motionStaAdmitted(bool' + between(c, 'bool HttpTransport::motionStaAdmitted(bool', 'bool HttpTransport::admitMotion(')
 stop_lane = 'bool HttpTransport::serviceStopLane(' + between(c, 'bool HttpTransport::serviceStopLane(', 'esp_err_t HttpTransport::handleCalibrationRestore')
 fixture = r'''
 #include <atomic>
@@ -59,6 +61,11 @@ void vTaskDelay(TickType_t ms) { std::this_thread::sleep_for(std::chrono::millis
 namespace matdog { namespace network {
 std::atomic<bool> g_radio_ok{true};
 class WifiManager { public: static bool verifyAdminRadio(const char** failure=nullptr) { if(!g_radio_ok.load()&&failure)*failure="AP_NOT_EXCLUSIVE"; return g_radio_ok.load(); } };
+using wifi_mode_t=int;
+constexpr int WIFI_MODE_NULL=0,WIFI_MODE_STA=1,ESP_OK=0;
+struct wifi_ap_record_t {};
+int esp_wifi_get_mode(wifi_mode_t* mode){*mode=g_radio_ok.load()?WIFI_MODE_STA:WIFI_MODE_NULL;return ESP_OK;}
+int esp_wifi_sta_get_ap_info(wifi_ap_record_t*){return g_radio_ok.load()?ESP_OK:-1;}
 enum class HttpRequestKind : uint8_t { NONE, WEB_STATUS, OTA_CHALLENGE, OTA_BEGIN, OTA_CHUNK, OTA_FINISH, OTA_ABORT, WIFI_STATUS, WIFI_LOGIN,
   WIFI_CONFIG, WIFI_SCAN, WIFI_AP, WIFI_SESSION, WIFI_LOGOUT, MOTION_STATUS, MOTION_CAPABILITIES, MOTION_COMMAND, MOTION_LOGIN, MOTION_SESSION,
   MOTION_LOGOUT, CALIBRATION_RESTORE };
@@ -72,13 +79,14 @@ struct FakeService {
   AdminAccess gate;
   struct { bool run_mode=false,connected=false; uint32_t ipv4=0; uint8_t role_reason=0; } wifi;
   std::atomic<unsigned> statuses{0},commands{0},stops{0};
-  std::atomic<bool> slack{true};
+  std::atomic<bool> slack{true},joystick{false};
+  bool motionJoystickActive() const { return joystick.load(); }
   std::function<void()> beforeSlackReturn;
   bool motionSlack(uint64_t,uint32_t reserve) const { if(beforeSlackReturn)beforeSlackReturn(); return reserve==5000&&slack.load(); }
   FakeService() { gate.begin(); gate.open(); }
   AdminAccess& networkAdminAccess() { return gate; }
   const decltype(wifi)& wifiStatus() const { return wifi; }
-  void operatorHeartbeat(uint32_t) {}
+  uint32_t motionStopEpoch() const { return stops.load(); }
   bool motionSnapshot(core::MotionStatusSnapshot& s,uint32_t) { s.releases=++statuses;for(unsigned i=0;i<12;++i)s.feedback[i].raw=s.releases+i;return true; }
   motion::MotionAck motionCommand(const motion::MotionCommand& m,uint32_t) { (m.intent==motion::Intent::STOP?stops:commands)++; return motion::MotionAck{}; }
   bool motionAck(const motion::MotionAck&,char* out,size_t cap) { return std::snprintf(out,cap,"{\"ack\":true}")>0; }
@@ -93,6 +101,7 @@ class HttpTransport {
  public:
   FakeService service; FakeService* service_=&service; FakePortal portal_;
   std::atomic<uint32_t> read_service_last_us_{0},read_service_max_us_{0};
+  std::atomic<uint32_t> status_service_last_us_{0},status_service_max_us_{0};
   uint32_t portal_generation_=0; bool portal_sta_=false;
   SemaphoreHandle_t request_ready_=xSemaphoreCreateBinary(), response_ready_=xSemaphoreCreateBinary(), slot_free_=xSemaphoreCreateBinary();
   HttpMailbox mailbox_{};
@@ -102,20 +111,21 @@ class HttpTransport {
   char motion_capabilities_[kMotionCapabilitiesBytes]{};
   std::atomic<bool> stop_lock_{false},stop_pending_{false},stop_ack_ok_{false},stop_applied_{false};
   HttpTransportRequest stop_request_{}; char stop_ack_[128]{};
-  std::atomic<uint32_t> stop_epoch_{0},stop_done_{0},stop_ticket_{0};
+  std::atomic<uint32_t> stop_done_{0},stop_ticket_{0};
   static constexpr uint32_t kDispatchTimeoutMs=3000,kMotionBusyBudgetMs=100;
   std::atomic<bool> twin_deferred_{false};   // Motion engaged, as mirrored by update()
   HttpTransport() { xSemaphoreGive(slot_free_); }
   ~HttpTransport() { vSemaphoreDelete(request_ready_); vSemaphoreDelete(response_ready_); vSemaphoreDelete(slot_free_); }
   bool readOnlyAdmitted(const HttpTransportRequest&,bool=true) const { return false; }   // AP admin path only
-  bool motionStaAdmitted(const HttpTransportRequest&,bool=true) const { return false; }
-  bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** =nullptr,bool=true) const { return false; }
+  bool motionStaAdmitted(const HttpTransportRequest&,bool=true) const;
+  bool motionStaAdmitted(bool,uint32_t,uint32_t,const char** =nullptr,bool=true) const;
   void appendTransportStats(char*,size_t) {}
   bool dispatch(const HttpTransportRequest&,HttpTransportResponse*,char*,size_t,uint32_t,const char**);
   void updateTail(uint32_t now_ms);
   void serviceRequest(uint32_t now_ms);
   bool serviceStopLane(uint32_t now_ms);
 };
+// PRODUCTION_STA_ADMISSION
 // PRODUCTION_DISPATCH
 void HttpTransport::updateTail(uint32_t now_ms) {
   (void)now_ms;
@@ -151,19 +161,42 @@ struct Holder {
 };
 HttpTransportRequest apRequest(HttpTransport& t,HttpRequestKind k,motion::Intent intent=motion::Intent::STAND){
   HttpTransportRequest r;r.kind=k;r.ap_socket=true;r.local_authorized=true;r.peer=0x0204a8c0u;r.admin_generation=t.service.gate.generation();
-  r.motion_command.intent=intent;r.stop_epoch=t.stop_epoch_.load();return r;
+  r.motion_command.intent=intent;r.stop_epoch=t.service.motionStopEpoch();return r;
 }
 struct Result { bool ok=false; HttpTransportResponse resp{}; const char* failure=""; };
 std::thread reader(HttpTransport& t,HttpTransportRequest r,uint32_t budget,Result* out){
   return std::thread([&t,r,budget,out]{out->ok=t.dispatch(r,&out->resp,nullptr,0,budget,&out->failure);});
 }
-uint32_t publishStop(HttpTransport& t){   // as handleMotion's STOP lane writer
+uint32_t publishStop(HttpTransport& t,bool sta=false){   // as handleMotion's STOP lane writer
   auto r=apRequest(t,HttpRequestKind::MOTION_COMMAND,motion::Intent::STOP);
+  if(sta){r.ap_socket=false;r.tls=true;r.local_ipv4=t.service.wifi.ipv4;}
   const uint32_t ticket=t.stop_ticket_.fetch_add(1)+1;r.sequence=ticket;
   while(t.stop_lock_.exchange(true)){}
   t.stop_request_=r;t.stop_pending_.store(true);t.stop_lock_.store(false);return ticket;
 }
 int main(){
+  // Exercise RUN_STA with the production admission predicates on every retry.
+  for (unsigned scenario=0;scenario<5;++scenario) {
+    HttpTransport t;t.service.gate.phase.store(NetworkPhase::CLIENT_STA);
+    t.service.wifi={true,true,0x1001a8c0u,static_cast<uint8_t>(RoleReason::RUN_STA)};
+    Loop loop(t);Holder h(t.service.gate);Result result;
+    auto req=apRequest(t,HttpRequestKind::MOTION_COMMAND);req.ap_socket=false;req.tls=true;req.local_ipv4=t.service.wifi.ipv4;
+    auto th=reader(t,req,1200,&result);
+    const uint32_t since=millis();
+    while(!t.mailbox_.awaitingResponse() && millis()-since<150)std::this_thread::yield();
+    loop.waitPasses(5);
+    check(t.service.commands.load()==0,"RUN_STA authenticated command waits for admission fence");
+    if(scenario==1){t.service.gate.revoke();t.service.gate.open();t.service.gate.phase.store(NetworkPhase::CLIENT_STA);}
+    if(scenario==2)g_radio_ok.store(false);
+    if(scenario==3)t.portal_.valid.store(false);
+    if(scenario==4){publishStop(t,true);loop.waitPasses(5);check(t.stop_pending_.load()&&t.service.stops.load()==0,"STA STOP remains pending under contention");}
+    h.drop();th.join();g_radio_ok.store(true);
+    if(!scenario)check(result.ok&&result.resp.ok&&t.service.commands.load()==1,"RUN_STA command executes once after release");
+    else {
+      check(result.ok&&!result.resp.ok&&t.service.commands.load()==0,"revoked or superseded RUN_STA command never executes");
+      if(scenario==4)check(t.service.stops.load()==1&&!strcmp(result.resp.message,"SUPERSEDED_BY_STOP"),"STA STOP applied first via its priority lane");
+    }
+  }
   // 1. Valid Motion GET while md_http_life holds the fence: served when it is released, never a false 403.
   { HttpTransport t;Loop loop(t);Holder h(t.service.gate);Result r;auto th=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&r);
     loop.waitPasses(20);check(t.service.statuses.load()==0,"GET not served while the fence is held");
@@ -193,8 +226,8 @@ int main(){
     loop.waitPasses(20);
     check(t.stop_pending_.load()&&t.stop_done_.load()!=ticket&&t.service.stops.load()==0,"STOP not consumed nor acknowledged while the fence is held");
     h.drop();while(t.stop_done_.load()!=ticket)std::this_thread::sleep_for(std::chrono::microseconds(200));
-    check(t.stop_ack_ok_.load()&&t.service.stops.load()==1&&t.stop_epoch_.load()==1,"STOP applied (ACK only after application)");
-    std::printf("CONTENTION_STOP applied=%u ack=%d epoch=%u\n",t.service.stops.load(),t.stop_ack_ok_.load(),t.stop_epoch_.load()); }
+    check(t.stop_ack_ok_.load()&&t.service.stops.load()==1&&t.service.motionStopEpoch()==1,"STOP applied (ACK only after application)");
+    std::printf("CONTENTION_STOP applied=%u ack=%d epoch=%u\n",t.service.stops.load(),t.stop_ack_ok_.load(),t.service.motionStopEpoch()); }
   // 6. STOP racing a Motion command under contention: STOP first, the command superseded, never executed.
   { HttpTransport t;Loop loop(t);Result cmd;std::thread th;
     {Holder h(t.service.gate);th=reader(t,apRequest(t,HttpRequestKind::MOTION_COMMAND),3000,&cmd);loop.waitPasses(5);publishStop(t);loop.waitPasses(5);
@@ -215,7 +248,7 @@ int main(){
     {Holder h(t.service.gate);th=reader(t,apRequest(t,HttpRequestKind::MOTION_COMMAND),3000,&cmd);ticket=publishStop(t);loop.waitPasses(5);}
     th.join();while(t.stop_done_.load()!=ticket)std::this_thread::sleep_for(std::chrono::microseconds(200));
     check(cmd.ok&&!cmd.resp.ok&&!std::strcmp(cmd.resp.message,"AUTH_FAILED"),"invalid session: command AUTH_FAILED");
-    check(!t.stop_ack_ok_.load()&&t.service.stops.load()==0&&t.stop_epoch_.load()==0,"invalid session: STOP refused (handler 403), not applied");
+    check(!t.stop_ack_ok_.load()&&t.service.stops.load()==0&&t.service.motionStopEpoch()==0,"invalid session: STOP refused (handler 403), not applied");
     check(t.service.commands.load()==0,"nothing executed"); }
   // 9. No contention: ordinary request served on the first pass, once.
   { HttpTransport t;Loop loop(t);Result r;auto th=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&r);th.join();
@@ -260,25 +293,25 @@ int main(){
       check(free,"preempted admission: slot reclaimed");if(free)xSemaphoreGive(t.slot_free_);
     }
   }
-  // 13. No Motion slack: the legacy status reads are answered at once with
-  // MOTION_BUDGET_UNAVAILABLE and free the single slot, so a Motion GET queued
-  // behind them is served promptly. Commands keep waiting for slack; STOP keeps its lane.
+  // 13. No Motion slack (dev.17): the status pages format cached RAM facts only
+  // and are served in the next loop pass like the Motion GET, never refused
+  // MOTION_BUDGET_UNAVAILABLE (dev.16: ~40 % of /status in HOLD). They do not
+  // hold the single slot, so a Motion GET behind them is still served promptly.
+  // Commands keep waiting for slack; STOP keeps its lane.
   for(const auto kind:{HttpRequestKind::WEB_STATUS,HttpRequestKind::WIFI_STATUS}){
     HttpTransport t;t.service.slack.store(false);Loop loop(t);Result st,mo;
     const uint32_t started=millis();
     auto a=reader(t,apRequest(t,kind),3000,&st);a.join();const uint32_t took=millis()-started;
-    check(st.ok&&!st.resp.ok&&!std::strcmp(st.resp.message,"MOTION_BUDGET_UNAVAILABLE"),"status read without slack: explicit refusal");
+    check(st.ok&&std::strcmp(st.resp.message,"MOTION_BUDGET_UNAVAILABLE")&&!std::strcmp(st.resp.message,"UNSUPPORTED_IN_FIXTURE"),"status read without slack: served by serviceRequest, not refused");
     check(took<500,"status read without slack: answered within loop passes, not the 3 s budget");
+    check(t.status_service_max_us_.load()<1000000,"status read service time exported");
     auto b=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&mo);b.join();
-    check(mo.ok&&mo.resp.ok&&t.service.statuses.load()==1,"Motion GET after a refused status read: served, slot free");
+    check(mo.ok&&mo.resp.ok&&t.service.statuses.load()==1,"Motion GET after a status read: served, slot free");
     Result cmd;auto c=reader(t,apRequest(t,HttpRequestKind::MOTION_COMMAND),80,&cmd);c.join();
-    check(!cmd.ok&&!std::strcmp(cmd.failure,"CONTROLLER_LOOP_LATE")&&t.service.commands.load()==0,"command without slack still waits, never refused as a status read");
+    check(!cmd.ok&&!std::strcmp(cmd.failure,"CONTROLLER_LOOP_LATE")&&t.service.commands.load()==0,"command without slack still waits");
     const auto ticket=publishStop(t);loop.waitPasses(10);
     check(t.stop_done_.load()==ticket&&t.service.stops.load()==1,"STOP serviced without Motion slack");
-    t.service.slack.store(true);loop.waitPasses(5);Result ok;
-    auto d=reader(t,apRequest(t,kind),3000,&ok);d.join();
-    check(ok.ok&&!std::strcmp(ok.resp.message,"UNSUPPORTED_IN_FIXTURE"),"with slack the status read reaches serviceRequest");
-    std::printf("NO_SLACK_STATUS kind=%u refused_in_ms=%u motion_get=%d\n",unsigned(kind),took,mo.resp.ok); }
+    std::printf("NO_SLACK_STATUS kind=%u served_in_ms=%u motion_get=%d\n",unsigned(kind),took,mo.resp.ok); }
   // 14. WALK STOP (zero base velocity) does not wait for Motion slack: a WALK
   // release may never leave 5 ms and its TTL is <= 1 s. Other commands still wait;
   // a pending STOP still runs first and supersedes it.
@@ -341,11 +374,22 @@ int main(){
     check(!first.ok&&!std::strcmp(first.failure,"MOTION_BUDGET_UNAVAILABLE"),"ordinary read without budget refused explicitly");
     check(ws.ok&&ws.resp.ok&&t.service.commands.load()==1&&wsMs<600,"WALK STOP behind it reaches the Controller and executes");
     std::printf("BUSY_HTTPD_WALK_STOP executed_in_ms=%u\n",wsMs); }
+  // 17. JOYSTICK (dev.15): a refresh of the walk it already holds only latches a
+  // target and its deadline, so it is served without Motion slack; a starting
+  // JOYSTICK command still waits for slack like a WALK start.
+  { HttpTransport t;t.service.slack.store(false);Loop loop(t);
+    auto joy=apRequest(t,HttpRequestKind::MOTION_COMMAND,motion::Intent::BASE_VELOCITY);joy.motion_command.vx=.006;std::strcpy(joy.motion_command.gait,"JOYSTICK");
+    Result start;auto a=reader(t,joy,80,&start);a.join();
+    check(!start.ok&&t.service.commands.load()==0,"JOYSTICK start without slack still waits");
+    loop.waitPasses(5);t.service.joystick.store(true);Result refresh;const uint32_t started=millis();
+    auto b=reader(t,joy,3000,&refresh);b.join();const uint32_t took=millis()-started;
+    check(refresh.ok&&refresh.resp.ok&&t.service.commands.load()==1&&took<500,"JOYSTICK refresh of the active walk served without slack");
+    std::printf("NO_SLACK_JOYSTICK_REFRESH served_in_ms=%u commands=%u\n",took,t.service.commands.load()); }
   std::printf("HTTP_FENCE_CONTENTION %s checks=%d failures=%d (production dispatch/update/admission/STOP lane; threads; no hardware)\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;
 }
 '''
-fixture = (fixture.replace('// PRODUCTION_SLACK_EXEMPT', exempt).replace('// PRODUCTION_DISPATCH', dispatch).replace('// PRODUCTION_UPDATE_TAIL', tail)
+fixture = (fixture.replace('// PRODUCTION_SLACK_EXEMPT', exempt).replace('// PRODUCTION_DISPATCH', dispatch).replace('// PRODUCTION_STA_ADMISSION',sta_admission).replace('// PRODUCTION_UPDATE_TAIL', tail)
            .replace('// PRODUCTION_ADMISSION', admission).replace('// PRODUCTION_STATUS_CASE', status_case)
            .replace('// PRODUCTION_COMMAND_CASE', command_case).replace('// PRODUCTION_STOP_LANE', stop_lane))
 with tempfile.TemporaryDirectory(prefix='matdog-fence-') as d:

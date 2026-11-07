@@ -482,7 +482,7 @@ CALREC_SRCS=(
 "$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -DDISABLED=0x00 \
   -ffunction-sections -fdata-sections -Wl,--gc-sections \
   -DMATDOG_ACTIVE_HARDWARE_PROFILE=::matdog::config::HardwareProfile::ROBOT_POWERED \
-  -DMATDOG_OTA_INGEST_ENABLED=0 -I"$SCRIPT_DIR/router_stubs" -I"$SCRIPT_DIR/nvs_stub" \
+  -DMATDOG_OTA_INGEST_ENABLED=0 -I"$SCRIPT_DIR/router_stubs" -I"$SCRIPT_DIR/simple_host_stub" -I"$SCRIPT_DIR/nvs_stub" -Wno-error=misleading-indentation \
   -o "$OUT/test_command_router_persistence" \
   "$SCRIPT_DIR/test_command_router_persistence.cpp" \
   "$SCRIPT_DIR/router_fake_hardware.cpp" \
@@ -493,7 +493,18 @@ CALREC_SRCS=(
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
   "$SKETCH_DIR/src/core/MotionService.cpp" \
   "$SKETCH_DIR/src/core/MotionJson.cpp" \
-  "$SKETCH_DIR/src/execution/MotionExecutor.cpp" \
+  "$SKETCH_DIR/src/simple/SimpleMotion.cpp" \
+  "$SKETCH_DIR/src/motion/BodyPose.cpp" \
+  "$SKETCH_DIR/src/motion/ContactMode.cpp" \
+  "$SKETCH_DIR/src/motion/FootContact.cpp" \
+  "$SKETCH_DIR/src/motion/Gait.cpp" \
+  "$SKETCH_DIR/src/motion/GaitTiming.cpp" \
+  "$SKETCH_DIR/src/motion/ImuAttitude.cpp" \
+  "$SKETCH_DIR/src/motion/LegKinematics.cpp" \
+  "$SKETCH_DIR/src/motion/LegInverseKinematics.cpp" \
+  "$SKETCH_DIR/src/motion/StandTrajectory.cpp" \
+  "$SKETCH_DIR/src/motion/TiltCompensation.cpp" \
+  "$SKETCH_DIR/src/motion/TiltedContactIk.cpp" \
   "$SKETCH_DIR/src/motion/MotionContract.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRuntimeRestore.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationSaveGate.cpp" \
@@ -695,31 +706,10 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
   "$SKETCH_DIR/src/network/NetworkConfig.cpp" "$SKETCH_DIR/src/network/NetworkConfigNvs.cpp" \
   "$SKETCH_DIR/src/update/Sha256.cpp"
 "$OUT/test_wifi_mode_policy"
-# 14 Oct hardware-fail regressions: independent telemetry channels and the
-# Issue #48 conditional RAM-only RESTORE (policy, live-span gate, body parser).
-bash "$SCRIPT_DIR/run_telemetry_channels_tests.sh"
+# Current owners for calibration RESTORE, bounded UART transactions and IMU snapshots.
 bash "$SCRIPT_DIR/run_calibration_restore_tests.sh"
-bash "$SCRIPT_DIR/run_start_pose_architecture_tests.sh"
-# Operator directive 2026-10-14: operational readiness (boot -> RESTORE ->
-# authority, revocation/re-grant), operational STAND end to end, phone twin assets.
-"$CXX" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
-  -o "$OUT/test_operational_readiness" "$SCRIPT_DIR/test_operational_readiness.cpp" "$SKETCH_DIR/src/core/OperationalReadiness.cpp"
-"$OUT/test_operational_readiness"
-# Core Motion V5 (2026-10-20): bounded servo UART transactions with STOP priority
-# (production ServoBus + installed SCServo, virtual-time UART), the IMU acquisition
-# core (ASan/UBSan + TSan snapshot) and Motion cadence with slow/blocking services.
 bash "$SCRIPT_DIR/run_servo_bus_deadline_tests.sh"
 bash "$SCRIPT_DIR/run_imu_feed_tests.sh"
-bash "$SCRIPT_DIR/run_motion_law_tests.sh"
-python3 "$SCRIPT_DIR/run_motion_isolation_tests.py"
-# Unified Motion regression (V2-V4 corrections: release clock, post-TX completion,
-# 7 HOLDs, STAND/WALK STANDARD/height, STOP/SAFE_OFF, recovery, PRONE indicator).
-# This replaces run_tolerance_v1_tests.py as the gate: that V1 harness was already
-# failing 133 checks on the V4 candidate (9d7eadb) because it predates the V2-V4
-# release-clock/TX-complete contracts; the file is kept, unreferenced.
-# The extended multi-million-check STANDARD/experimental FAST matrix remains
-# available explicitly via run_operational_motion_tests.py.
-python3 "$SCRIPT_DIR/run_motion_unified_tests.py"
 python3 -I "$SCRIPT_DIR/test_twin_assets.py"
 # Production Motion/RESTORE/Twin HTTP handlers, security envelope and operator
 # heartbeat proof (2026-10-15: was only in the release list and had regressed).

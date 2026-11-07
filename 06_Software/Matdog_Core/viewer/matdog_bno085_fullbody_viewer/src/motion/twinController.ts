@@ -17,6 +17,11 @@ import { JOINT_NAMES, LEGS, type MotionFrame } from './telemetry';
  */
 export type LinkDisplayState = 'MEASURED' | 'UNMEASURED' | 'OUT_OF_RANGE' | 'IMPLAUSIBLE';
 export type ActualModelState = 'MEASURED' | 'PARTIAL' | 'UNMEASURED';
+export interface DisplayGrounding {
+  readonly source: 'reported' | 'controller-estimate' | 'visual-envelope' | 'unavailable';
+  readonly baseHeightM: number | null;
+  readonly adjustmentM: number;
+}
 const IMPLAUSIBLE_MARGIN_RAD = .35;
 const STATE_RANK: Record<LinkDisplayState, number> = { MEASURED: 0, UNMEASURED: 1, OUT_OF_RANGE: 2, IMPLAUSIBLE: 3 };
 
@@ -34,6 +39,9 @@ export class MotionTwinController {
   readonly linkStates = new Map<string, LinkDisplayState>();
   actualState: ActualModelState = 'UNMEASURED';
   orientationMeasured = false;
+  /** Mobile display only: align the rendered feet, never infer physical contact. */
+  groundFromFeet = false;
+  grounding: DisplayGrounding = { source: 'unavailable', baseHeightM: null, adjustmentM: 0 };
   private readonly tweens = new Map<MatdogRobot, { from: Record<string, number>; to: Readonly<Record<string, number>>; t0: number }>();
   private rejectedChannel = '';
   private readonly measuredMaterials = new Map<string, MeshStandardMaterial>();
@@ -116,10 +124,50 @@ export class MotionTwinController {
       if (alpha >= 1) this.tweens.delete(robot);
     }
   }
+  private ground(frame: MotionFrame): void {
+    this.grounding = { source: 'unavailable', baseHeightM: null, adjustmentM: 0 };
+    if (!this.groundFromFeet) return;
+    // Unknown/stale or clamped articulation is not evidence of a floor. Keep
+    // the previous placement, but explicitly mark its reference unavailable.
+    if (this.actualState !== 'MEASURED' || [...this.linkStates.values()].some((s) => s !== 'MEASURED') ||
+      !this.orientationMeasured || frame.channels.imuValid === false ||
+      frame.channels.imuAgeMs !== null && frame.channels.imuAgeMs > 200 || frame.stale || frame.jointsStale) return;
+    if (frame.baseHeightSource === 'reported') {
+      this.grounding = { source: 'reported', baseHeightM: frame.baseHeightM, adjustmentM: 0 };
+      return;
+    }
+    const meshes = LEGS.map((leg) => this.actual.visualMesh(`${leg.toLowerCase()}_foot_link`) ?? this.actual.collisionMesh(`${leg.toLowerCase()}_foot_link`));
+    if (meshes.some((mesh) => !mesh || !mesh.geometry.getAttribute('position')?.count)) return;
+    // Reuse the rendered URDF graph and its existing foot meshes. This is a
+    // visual envelope, not another FK/contact solver or a contact measurement.
+    // One root translation keeps all relative foot heights (including swing).
+    const base = frame.baseHeightM ?? 0;
+    this.actual.rootObject.position.set(0, 0, base);
+    this.actual.rootObject.updateMatrixWorld(true);
+    let lowest = Infinity;
+    const vertex = new Vector3();
+    for (const mesh of meshes) {
+      const positions = mesh!.geometry.getAttribute('position');
+      for (let i = 0; i < positions.count; i++) {
+        vertex.fromBufferAttribute(positions, i).applyMatrix4(mesh!.matrixWorld);
+        lowest = Math.min(lowest, vertex.z);
+      }
+    }
+    if (!Number.isFinite(lowest)) return;
+    // The Controller's mean contact estimate can leave an individual mesh a
+    // few mm below Z=0. Expose that display correction separately from it.
+    const adjustment = frame.baseHeightM === null ? -lowest : Math.max(0, -lowest);
+    const height = base + adjustment;
+    this.actual.rootObject.position.z = this.target.rootObject.position.z = height;
+    this.target.rootObject.position.x = this.target.rootObject.position.y = 0;
+    this.grounding = { source: frame.baseHeightM === null ? 'visual-envelope' : 'controller-estimate',
+      baseHeightM: frame.baseHeightM ?? height, adjustmentM: frame.baseHeightM === null ? 0 : adjustment };
+  }
   apply(frame: MotionFrame, nowMs?: number): void {
     this.rejectedChannel = '';
-    this.orientationMeasured = frame.quaternion !== null;
-    if (frame.quaternion) {
+    this.orientationMeasured = frame.quaternion !== null && frame.channels.imuValid !== false &&
+      (frame.channels.imuAgeMs === null || frame.channels.imuAgeMs <= 200);
+    if (frame.quaternion && this.orientationMeasured) {
       const q = sh2ToThree(frame.quaternion);
       this.actual.setRootOrientation(q); this.target.setRootOrientation(q);
     }
@@ -175,6 +223,7 @@ export class MotionTwinController {
       trail.geometry = new BufferGeometry().setFromPoints(foot.trajectory.map((p) => new Vector3(...p)));
       prior.dispose(); trail.visible = foot.trajectory.length > 1;
     }
+    this.ground(frame);
   }
   /**
    * Stale transport: overlays and the commanded ghost hide; the actual model

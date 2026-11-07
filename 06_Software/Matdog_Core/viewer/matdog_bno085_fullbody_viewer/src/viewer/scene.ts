@@ -21,6 +21,8 @@ import {
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { canonicalView } from './canonicalView';
+import { createViewCube, faceViewOffset, insideCube, type CubeFace } from './viewCube';
 
 export interface ViewerScene {
   readonly scene: Scene;
@@ -31,7 +33,10 @@ export interface ViewerScene {
   readonly robotAnchor: Object3D;
   start(): void;
   dispose(): void;
-  resetCamera(): void;
+  /** Face the robot's +X heading, without changing its measured orientation. */
+  resetCamera(headingRad?: number): void;
+  /** View cube: the camera looks at the same target, from the face's axis. */
+  setView(face: CubeFace): void;
   /** Renders a single frame, re-syncing the viewport to the container first. */
   renderFrame(): void;
   /** Visual-only per-frame hook (e.g. joint interpolation), called before each paced render. */
@@ -123,13 +128,59 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
   robotAnchor.name = 'robot_anchor';
   scene.add(robotAnchor);
 
-  const resetCamera = (): void => {
-    // Behind-left-above: the nose (+X) points away to the right of frame.
-    camera.position.set(-0.60, -0.65, 0.48);
-    controls.target.set(0, 0, 0.05);
+  const resetCamera = (headingRad = 0): void => {
+    // Drain pending orbit/pan damping before replacing the pose; otherwise a
+    // reset during an easing gesture keeps drifting away from the front view.
+    const damping = controls.enableDamping;
+    controls.enableDamping = false;
     controls.update();
+    const aspect = container.clientHeight > 0 ? container.clientWidth / container.clientHeight : camera.aspect;
+    const view = canonicalView(aspect, headingRad);
+    camera.position.fromArray(view.position);
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
+    controls.target.fromArray(view.target);
+    controls.update();
+    controls.enableDamping = damping;
+    container.dataset.view = 'reset';
   };
   resetCamera();
+
+  // View cube (dev.17): camera only, same target and distance; drags stay
+  // OrbitControls' rotation, a click or tap on a face snaps to its view.
+  const viewCube = createViewCube(AXIS_COLORS);
+  const setView = (face: CubeFace): void => {
+    const damping = controls.enableDamping;
+    controls.enableDamping = false;
+    controls.update();
+    const offset = faceViewOffset(face, camera.position.distanceTo(controls.target));
+    camera.position.set(controls.target.x + offset[0], controls.target.y + offset[1], controls.target.z + offset[2]);
+    controls.update();
+    controls.enableDamping = damping;
+    container.dataset.view = face;
+  };
+  const canvas = renderer.domElement;
+  let press: { id: number; x: number; y: number; t: number } | null = null;
+  const local = (e: PointerEvent): { x: number; y: number; w: number; h: number } => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height };
+  };
+  const onPointerDown = (e: PointerEvent): void => { press = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() }; };
+  const onPointerUp = (e: PointerEvent): void => {
+    const p = press;
+    press = null;
+    if (!p || p.id !== e.pointerId || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 6 || performance.now() - p.t > 700) return;
+    const at = local(e), face = viewCube.pick(at.x, at.y, at.w, at.h);
+    if (face) { setView(face); renderFrame(); }
+  };
+  const onPointerMove = (e: PointerEvent): void => {
+    if (e.buttons) return;
+    const at = local(e);
+    canvas.style.cursor = insideCube(at.x, at.y, at.w, at.h) ? 'pointer' : '';
+  };
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointerup', onPointerUp);
+  canvas.addEventListener('pointermove', onPointerMove);
 
   /**
    * Single authority for viewport size. Tracks the real container box, so
@@ -182,6 +233,7 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
     resize();
     controls.update();
     renderer.render(scene, camera);
+    viewCube.render(renderer, camera, lastWidth, lastHeight);
   };
 
   let lastRenderedMs = -Infinity;
@@ -201,6 +253,7 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
     controls,
     robotAnchor,
     resetCamera,
+    setView,
     renderFrame,
     setBeforeRender(callback: ((nowMs: number) => void) | null): void {
       beforeRender = callback;
@@ -215,6 +268,10 @@ export function createViewerScene(container: HTMLElement): ViewerScene {
       cancelAnimationFrame(animationHandle);
       resizeObserver.disconnect();
       window.removeEventListener('resize', resize);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
+      canvas.removeEventListener('pointermove', onPointerMove);
+      viewCube.dispose();
       controls.dispose();
       renderer.dispose();
       renderer.domElement.remove();

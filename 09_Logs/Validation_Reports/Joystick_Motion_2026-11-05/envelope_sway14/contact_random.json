@@ -1,0 +1,66 @@
+{
+ "random_1": {
+  "support_mm": 0.5503795150527124,
+  "support_cycle": 2.076923077,
+  "clearance_mm": 2.260909226865157,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.18461925502745447,
+  "max_tilt_deg": 9.620015410166603
+ },
+ "random_2": {
+  "support_mm": 4.060552376581668,
+  "support_cycle": 1.076923077,
+  "clearance_mm": 2.2103919416864573,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.18578387832307586,
+  "max_tilt_deg": 9.32501485401843
+ },
+ "random_3": {
+  "support_mm": 3.2952647697703994,
+  "support_cycle": 1.246153846,
+  "clearance_mm": 2.218604482848746,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.1858276562904243,
+  "max_tilt_deg": 9.52432034299853
+ },
+ "random_4": {
+  "support_mm": 4.13654140681476,
+  "support_cycle": 1.249230769,
+  "clearance_mm": 2.2634608814629114,
+  "clearance_link": "lh_lower_leg_link",
+  "penetration_mm": 0.18505673555327395,
+  "max_tilt_deg": 9.284828912070884
+ },
+ "random_5": {
+  "support_mm": 3.040055126392577,
+  "support_cycle": 1.089230769,
+  "clearance_mm": 2.204268591333394,
+  "clearance_link": "rh_lower_leg_link",
+  "penetration_mm": 0.1856023051076544,
+  "max_tilt_deg": 10.006050652073032
+ },
+ "random_6": {
+  "support_mm": 2.0850644016506097,
+  "support_cycle": 1.08,
+  "clearance_mm": 2.223940303325525,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.18453555214603679,
+  "max_tilt_deg": 9.400758957802253
+ },
+ "random_7": {
+  "support_mm": 2.5575936966451223,
+  "support_cycle": 1.575384615,
+  "clearance_mm": 2.2432225967774917,
+  "clearance_link": "rf_lower_leg_link",
+  "penetration_mm": 0.18593016930484874,
+  "max_tilt_deg": 8.83644755416619
+ },
+ "random_8": {
+  "support_mm": 2.473226990335,
+  "support_cycle": 2.166153846,
+  "clearance_mm": 2.2132176280381803,
+  "clearance_link": "lf_lower_leg_link",
+  "penetration_mm": 0.18558490215640766,
+  "max_tilt_deg": 8.991329276162837
+ }
+}

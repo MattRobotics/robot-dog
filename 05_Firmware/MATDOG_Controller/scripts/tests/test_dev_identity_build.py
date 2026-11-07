@@ -7,6 +7,7 @@ This also works in the calibration mutation fixture, which has no .git or docs.
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -96,6 +97,9 @@ class ExternalBuildTests(unittest.TestCase):
             target = self.sketch / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(SKETCH / name, target)
+        config = (self.sketch / "src/config/BuildConfig.h").read_text()
+        self.version, self.stack = [re.search(name + r'\s*=\s*"([^"]+)"', config)[1]
+                                    for name in ("kFirmwareVersion", "kMotionStack")]
         self.common = self.base / "git-common"
         self.common.mkdir()
         data = self.base / "offline-data"
@@ -141,9 +145,9 @@ def macro(name):
     m = re.search(r"-D" + name + r'=\"([^\"]+)\"', flags)
     assert m, (name, flags)
     return m.group(1)
-payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + "0.2.0-dev.5\\0" +
+payload = ("MATDOG_LAYOUT_ID=MATDOG_16M_2x5M_NVS_V1\\0" + os.environ["FAKE_VERSION"] + "\\0" +
            macro("MATDOG_GIT_SHA") + "\\0" + macro("MATDOG_BUILD_UTC") + "\\0" +
-           "G1_G5A_ADAPTIVE_SERVICE_EXECUTOR_GATED\\0" + flags).encode()
+           os.environ["FAKE_STACK"] + "\\0" + flags).encode()
 (out / "MATDOG_Controller.ino.bin").write_bytes(payload)
 shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partitions.bin")
 (out / "MATDOG_Controller.ino.elf").write_bytes(b"fake ELF")
@@ -156,7 +160,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
                         ARDUINO_CLI=str(cli), MATDOG_BUILD_ROOT=str(self.root),
                         MATDOG_ARDUINO_DATA_SOURCE=str(data),
                         MATDOG_ARDUINO_LIBRARY_ROOT=str(self.libraries), FAKE_HEAD=HEAD,
-                        FAKE_REPO=str(self.repo), FAKE_COMMON=str(self.common),
+                        FAKE_VERSION=self.version, FAKE_STACK=self.stack, FAKE_REPO=str(self.repo), FAKE_COMMON=str(self.common),
                         FAKE_CAPTURE=str(self.capture), FAKE_TABLE=str(self.table),
                         SOURCE_DATE_EPOCH="1791158400", PYTHONDONTWRITEBYTECODE="1")
         for name in ("MATDOG_BUILD_DIR", "MATDOG_OUTPUT_DIR", "MATDOG_BUILD_CACHE_DIR",
@@ -183,7 +187,8 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         result = self.run_build()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         fields = self.manifest()
-        self.assertEqual(fields["FW_VERSION"], "0.2.0-dev.5")
+        self.assertEqual(fields["FW_VERSION"], self.version)
+        self.assertEqual(fields["MOTION_STACK"], self.stack)
         self.assertEqual(fields["GIT_SHA"], HEAD)
         self.assertEqual(fields["GIT_DIRTY"], "0")
         self.assertEqual(fields["BUILD_ID"], HEAD[:12])
@@ -196,7 +201,7 @@ shutil.copyfile(os.environ["FAKE_TABLE"], out / "MATDOG_Controller.ino.partition
         args = json.loads(self.capture.read_text())
         self.assertNotIn("--export-binaries", args)
         self.assertNotIn("--output-dir", args)
-        self.assertIn("--clean", args)
+        self.assertTrue(Path(args[args.index("--build-path") + 1]).resolve().is_relative_to(self.root))
         self.assertTrue((self.root / "arduino/data/packages").is_symlink())
 
     def test_untracked_material_marks_dirty_and_profile_outputs_do_not_overwrite(self):

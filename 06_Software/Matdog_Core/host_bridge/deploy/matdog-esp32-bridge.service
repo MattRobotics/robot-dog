@@ -1,0 +1,30 @@
+# matdog-esp32-bridge - Jetson <-> ESP32-S3 USB CDC bridge (dev.16).
+# PREPARED, NOT INSTALLED, NOT ENABLED. Install only after an explicit
+# decision, following README_ESP32_BRIDGE.md. Never enable on a host used to
+# flash the Controller: stop the service first (it releases the tty).
+[Unit]
+Description=MATDOG ESP32-S3 USB CDC bridge (single serial owner)
+After=local-fs.target
+
+[Service]
+Type=simple
+User=matdog
+Group=matdog
+SupplementaryGroups=dialout
+RuntimeDirectory=matdog
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/python3 /opt/matdog/host_bridge/matdog_esp32_bridge.py --socket /run/matdog/esp32-bridge.sock --lock-dir /run/matdog --expect-version 1.0.1-dev.16
+# On failure only; a clean stop (flash, maintenance) stays stopped.
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/run/matdog
+
+[Install]
+# Deliberately no automatic start: enabling is a later, explicit step.
+WantedBy=multi-user.target

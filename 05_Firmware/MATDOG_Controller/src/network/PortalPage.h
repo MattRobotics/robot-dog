@@ -10,7 +10,7 @@
 // controller value; the page never causes a BMS, IMU or servo-bus transaction.
 //
 // Refresh. POLL_MS = 4000: the two requests are issued one after the other on
-// a single keep-alive connection (the listener allows two sockets), the DALY
+// a single keep-alive connection (one diagnostic lane, see mdNet), the DALY
 // poll cadence is 2 s, and polling stops while the tab is hidden. Failures
 // back off to 15 s. A 1 s local timer only repaints ages; it sends nothing.
 //
@@ -33,8 +33,8 @@ h1{font-size:22px;margin:0;color:var(--accent);letter-spacing:.04em}h2{font-size
 button{padding:11px 16px;background:#20384a;color:#fff;border:1px solid #456075;border-radius:8px;font:inherit;cursor:pointer}button:hover{background:#2a5663}button:disabled{opacity:.5;cursor:default}button.small{padding:6px 12px;font-size:14px}
 nav{display:flex;gap:8px;margin:12px 0;overflow-x:auto;padding-bottom:4px}nav button{white-space:nowrap;flex:0 0 auto}nav button.on{background:var(--accent);color:#06222a;border-color:var(--accent);font-weight:600}
 section{margin:12px 0}section.page{background:var(--card);padding:16px;border-radius:12px}section#dashboard{background:none;padding:0}
-.link{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--muted)}.dot{width:10px;height:10px;border-radius:50%;background:var(--na);flex:0 0 auto}.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
-#message{position:sticky;top:6px;z-index:2;margin-top:10px;padding:12px;border-radius:8px;background:#234e56;border-left:5px solid var(--accent);white-space:pre-line}#message.bad{background:#4a2326;border-color:var(--bad)}#message.warn{background:#4a3a1c;border-color:var(--warn)}#message.ok{background:#1d4233;border-color:var(--ok)}
+.link{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;color:var(--muted);flex-wrap:wrap}#linkText{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dot{width:10px;height:10px;border-radius:50%;background:var(--na);flex:0 0 auto}.dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}.link details{margin:0;font-size:12px}.link details[open]{flex-basis:100%}.link details p{margin:6px 0 0}
+header.top{position:relative}#message{position:absolute;left:0;right:0;top:100%;z-index:12;max-height:7.6em;overflow:auto;padding:8px 12px;font-size:14px;line-height:1.35;border-radius:8px;background:#234e56;border-left:5px solid var(--accent);white-space:pre-line;box-shadow:0 6px 18px #000a;cursor:pointer}#message.bad{background:#4a2326;border-color:var(--bad)}#message.warn{background:#4a3a1c;border-color:var(--warn)}#message.ok{background:#1d4233;border-color:var(--ok)}
 .chip{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--na);color:var(--na);text-transform:none;letter-spacing:0;white-space:nowrap}.chip.ok{border-color:var(--ok);color:var(--ok)}.chip.warn{border-color:var(--warn);color:var(--warn)}.chip.bad{border-color:var(--bad);color:#fff;background:var(--bad)}.chip.lock{border-color:var(--lock);color:var(--lock)}.chip.info{border-color:var(--accent);color:var(--accent)}
 .mode{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:12px;border:2px solid var(--na);background:var(--card)}.mode b{font-size:30px;line-height:1.1;letter-spacing:.03em}.mode.maint{border-color:var(--warn)}.mode.maint b{color:var(--warn)}.mode.run{border-color:var(--accent)}.mode.run b{color:var(--accent)}.mode.bad{border-color:var(--bad);background:#3a1d20}.mode.bad b{color:var(--bad)}
 .motion{padding:8px 12px;border-radius:8px;font-weight:700;border:2px solid var(--lock);color:var(--lock);text-align:center}.motion.live{border-color:var(--bad);color:#fff;background:var(--bad)}.motion span{display:block;font-weight:400;font-size:12px}
@@ -49,9 +49,8 @@ label{display:block;margin:12px 0;font-size:14px;color:var(--muted)}input,select
 fieldset{border:1px solid #456075;margin:14px 0;border-radius:8px;padding:6px 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:0 18px}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{color:var(--accent)}.result{white-space:pre-line;margin:12px 0;padding:12px;border-radius:8px;border-left:5px solid var(--na);background:#111c26}.result.ok{border-color:var(--ok)}.result.bad{border-color:var(--bad)}.result.warn{border-color:var(--warn)}
 [hidden]{display:none!important}</style>
-<header class="top"><div class="brand"><h1>MATDOG</h1><span id="build" class="mono muted">firmware …</span></div><div class="who"><span id="adminState" class="chip">Sola lettura</span><button id="loginOpen" class="small">Accedi</button><button id="logout" class="small" hidden>Esci</button></div></header>
-<div class="link" role="status"><span id="linkDot" class="dot"></span><span id="linkText">Connessione al dispositivo…</span></div>
-<div id="message" role="status" hidden></div>
+<header class="top"><div class="brand"><h1>MATDOG</h1><span id="build" class="mono muted">firmware …</span></div><div class="who"><span id="adminState" class="chip">Sola lettura</span><button id="loginOpen" class="small">Accedi</button><button id="logout" class="small" hidden>Esci</button></div><div id="message" role="status" hidden></div></header>
+<div class="link"><span id="linkDot" class="dot" aria-hidden="true" hidden></span><span id="linkText" role="status">Connessione al dispositivo…</span><details id="diagnostic-timing"><summary>Dettagli</summary><p id="diagnostic-time">Nessuna diagnostica ricevuta.</p></details></div>
 <nav><button data-page="dashboard" class="on">Dashboard</button><button data-page="wifi">Wi-Fi</button><button data-page="ap">Access Point</button><button data-page="performance">Performance</button><button data-page="ota">OTA</button><button data-page="diagnostics">Diagnostics</button></nav>
 <section id="login" class="page" hidden><h2>Accesso amministratore</h2><p class="muted">Serve solo per modificare la configurazione. Il token è quello univoco impostato via USB (64 cifre esadecimali). L'HTTP locale è protetto dal collegamento WPA2: chi conosce la password dell'AP può leggere lo stato, ma senza token non può modificare nulla.</p><form id="loginForm"><label>Token amministratore<input type="password" name="token" minlength="64" maxlength="64" autocomplete="off" autocapitalize="off" spellcheck="false" required></label><label class="check"><input type="checkbox" name="remember" checked>Ricorda questo dispositivo</label><p class="note">Con «Ricorda» questo browser viene riconosciuto senza reinserire il token, anche dopo il riavvio del robot, finché il token amministratore non viene cambiato. Senza, la sessione termina 5 minuti dopo l'ultimo utilizzo; la Dashboard aperta la mantiene attiva. La sessione serve solo per inviare comandi: STAND e WALK già accettati non dipendono da essa.</p><button>Accedi</button></form></section>
 <section id="dashboard"><div id="modeBar" class="mode"><div><small>Modalità operativa</small><b id="mode">—</b></div><div id="motion" class="motion">STATO MOTION IN ATTESA<span id="motionWhy"></span></div></div>
@@ -77,14 +76,18 @@ const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 let authReady=Promise.resolve();
 let budget=false,csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
-// One read at a time for the WHOLE page (portal + Motion): the AP listener has
-// two sockets with LRU purge, and two independent pollers plus any third
-// request forced purges of in-flight sockets (14 Oct HTTP_TIMEOUT). Motion
-// commands/STOP do not use this lane, so the second socket stays free for them.
-let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};
+// The portal's diagnostic lane: one request at a time (status reads, admin
+// posts). The Motion status poll has its own lane (MotionDashboard.h, dev.17).
+// window.mdReads counts the reads in flight of BOTH lanes: the page never has
+// more than two, so commands and STOP keep the rest of the 6 connections a
+// browser opens to one host. Listener: 7 sockets with LRU purge (HttpTransport),
+// one more than a browser opens, so a new connection never purges an unread STOP.
+let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};window.mdReads=0;
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const message=$('#message');
 function formatDiagnosticTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return 'N/D';try{const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'longOffset'}).formatToParts(d).map(x=>[x.type,x.value]));const off=p.timeZoneName.replace('GMT','')||'+00:00';return d.toISOString()+' · '+p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+off+' Europe/Rome '+(off==='+02:00'?'CEST':'CET')+' · fonte browser, non sincronizza il robot'}catch(e){return d.toISOString()+' · Europe/Rome non disponibile · fonte browser'}}
+// The message is an overlay under the header (dev.17): showing, changing or
+// dismissing it never moves the page below, so never a control under a finger.
 function show(text,kind){message.textContent=text;message.className=kind||'';message.hidden=!text}
 message.onclick=()=>show('');
 function page(name){PAGES.forEach(p=>$('#'+p).hidden=p!==name);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.page===name))}
@@ -201,28 +204,38 @@ function renderWifi(){
 }
 function link(){
  const age=lastOk?Date.now()-lastOk:0,dot=$('#linkDot'),text=$('#linkText');
+ dot.hidden=false;
+ $('#diagnostic-time').textContent=(lastOk?'Ultima ricezione diagnostica: '+formatDiagnosticTime(lastOk)+' · età '+dur(age):'Nessuna diagnostica ricevuta.')+' · cadenza normale ogni '+POLL_MS/1000+' s';
  if(watch&&(fails||age>2*POLL_MS)){dot.className='dot warn';text.textContent='Prova del router in corso da '+dur(Date.now()-watch.t)+': AP chiuso (previsto). Se il telefono non si ricollega da solo, riconnettilo a «'+watch.ap+'».'}
- else if(budget){dot.className='dot warn';text.textContent=(window.mdMotionHealth?.fresh?'Motion disponibile · snapshot '+window.mdMotionHealth.age+' ms. ':'Motion: consultare stato ed età nella scheda dedicata. ')+'Diagnostica generale sospesa durante il movimento (MOTION_BUDGET_UNAVAILABLE)'+(lastOk?' · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa), non aggiornati':'')}
+ else if(budget){dot.className='dot warn';text.textContent=(window.mdMotionHealth?.fresh?'Motion disponibile · snapshot '+window.mdMotionHealth.age+' ms. ':'Motion: consultare stato ed età nella scheda dedicata. ')+'Diagnostica generale sospesa durante il movimento (MOTION_BUDGET_UNAVAILABLE)'+(lastOk?' · dati non aggiornati':'')}
  else if(!lastOk){dot.className='dot '+(fails>1?'bad':'');text.textContent=fails>1?'Dispositivo non raggiungibile. Collega il telefono al Wi-Fi MATDOG e apri http://192.168.4.1':'Connessione al dispositivo…'}
- else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · ultimo aggiornamento '+formatDiagnosticTime(lastOk)}
- else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · dati delle '+formatDiagnosticTime(lastOk)+' ('+dur(age)+' fa)'}
- else{dot.className='dot ok';text.textContent='Aggiornato alle '+formatDiagnosticTime(lastOk)+' · '+dur(age)+' fa · ogni '+POLL_MS/1000+' s'}
+ else if(fails>=2||age>STALE_MS){dot.className='dot bad';text.textContent='Nessuna risposta da '+dur(age)+' · diagnostica non aggiornata'}
+ else if(fails){dot.className='dot warn';text.textContent='Ultimo tentativo senza risposta · diagnostica non aggiornata'}
+ else{dot.className='dot';dot.hidden=true;text.textContent='Diagnostica aggiornata'}
+ text.title=text.textContent;  // one line on screen (dev.17): the full text stays readable
  document.body.classList.toggle('stale',!!lastOk&&(budget||fails>=2||age>STALE_MS));
  $('#staleNote').textContent=budget?'Dati non aggiornati: durante il movimento il dispositivo sospende la diagnostica generale. La scheda Motion ha telemetria ed età indipendenti. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.':'Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.';
  // A temporary session ends on the controller SESSION_MS after its last
  // authenticated use; the Motion poll refreshes sessionAt on each one.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}
 }
-// Diagnostics get 800 ms: the 3 s deadman budget minus a 1 s poll and
-// the Controller's 1200 ms Motion-read budget. STOP has a separate socket.
-async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),800);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok){const e=Error(path);e.status=r.status;try{e.code=JSON.parse(await r.text()).error}catch(x){}throw e}return await r.text()}finally{clearTimeout(t)}})}
+// A read is aborted only after READ_ABORT_MS (dev.17). The Controller answers
+// within its own budgets (dev.16 hardware: dispatch <= 125 ms, 0 late), but its
+// lwIP recovers a lost TCP segment only by retransmission timeout (initial RTO
+// 3 s, 250 ms timer): the former 800 ms abort turned each lost segment into an
+// error plus a new connection. No command depends on a read: commands and STOP
+// use their own requests, outside this lane. A read that would be the page's
+// third in flight is deferred (READS_DEFERRED), not sent.
+const READ_ABORT_MS=3500;
+async function get(path){return window.mdNet(async()=>{if(window.mdReads>=2){const e=Error(path);e.code='READS_DEFERRED';throw e}const c=new AbortController(),t=setTimeout(()=>c.abort(),READ_ABORT_MS);window.mdReads++;try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok){const e=Error(path);e.status=r.status;try{e.code=JSON.parse(await r.text()).error}catch(x){}throw e}return await r.text()}finally{clearTimeout(t);window.mdReads--}})}
 async function refresh(){
- if(busy)return;busy=true;clearTimeout(timer);let ok=false;budget=false;
+ if(busy)return;busy=true;clearTimeout(timer);let ok=false,deferred=false;budget=false;
  // Sequential on purpose: one keep-alive connection, never two at once.
- try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){budget=e.status===503&&e.code==='MOTION_BUDGET_UNAVAILABLE'}
- if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else if(!budget)fails++;   // Motion budget: telemetry paused, not a lost link
+ try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){budget=e.status===503&&e.code==='MOTION_BUDGET_UNAVAILABLE';deferred=e.code==='READS_DEFERRED'}
+ // Motion budget: telemetry paused, not a lost link; deferred: two Motion reads in flight.
+ if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else if(!budget&&!deferred)fails++;
  link();busy=false;
- if(!document.hidden)timer=setTimeout(refresh,ok||budget?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
+ if(!document.hidden)timer=setTimeout(refresh,ok||budget||deferred?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(timer);else refresh()});
 // ---- Administrator session ---------------------------------------------------

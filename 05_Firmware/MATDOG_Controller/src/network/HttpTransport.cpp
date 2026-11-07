@@ -397,15 +397,28 @@ bool HttpTransport::admitMotion(HttpTransportRequest& r,const char** failure){
 // deceleration. LOGIN/SESSION verify one bounded digest/HMAC and copy the
 // cookie/CSRF, so the operator can keep or regain the session that STOP
 // needs while Motion leaves no window; the admission, radio, credential and
-// throttling checks are unchanged. Every other request needs 5 ms before the
+// throttling checks are unchanged. The two status pages (dev.17) format only
+// cached RAM facts (no bus, NVS or radio call); refusing them at once whenever
+// a loop pass fell inside the last 5 ms of a period answered ~40 % of /status
+// reads with 503 even in HOLD without any overrun (dev.16 hardware), and
+// making them wait would hold the single mailbox slot. Their service time is
+// exported (status_service_*_us). Every other request needs 5 ms before the
 // next release.
 static bool slackExempt(const HttpTransportRequest& r) {
   const auto& c=r.motion_command;
   if(r.kind==HttpRequestKind::WIFI_LOGIN||r.kind==HttpRequestKind::WIFI_SESSION||
-     r.kind==HttpRequestKind::MOTION_LOGIN||r.kind==HttpRequestKind::MOTION_SESSION)return true;
+     r.kind==HttpRequestKind::MOTION_LOGIN||r.kind==HttpRequestKind::MOTION_SESSION||
+     r.kind==HttpRequestKind::WEB_STATUS||r.kind==HttpRequestKind::WIFI_STATUS)return true;
   return r.kind==HttpRequestKind::MOTION_STATUS||(r.kind==HttpRequestKind::MOTION_COMMAND&&
          c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0);
 } // slackExempt
+// A JOYSTICK refresh of the walk it already holds only latches a velocity
+// target and its deadline, like WALK STOP. A starting one needs slack.
+// Controller thread only: reads the Motion owner's state.
+static bool joystickRefresh(const HttpTransportRequest& r) {
+  const auto& c=r.motion_command;
+  return r.kind==HttpRequestKind::MOTION_COMMAND&&c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+} // joystickRefresh
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response, char* large_text, size_t large_cap,
                              uint32_t budget_ms, const char** failure) {
@@ -484,11 +497,11 @@ void HttpTransport::appendTransportStats(char* text,size_t cap,uint32_t loop_sta
   // Windowed maxima: each report starts a new window.
   const size_t n=strlen(text);if(!n||text[n-1]!='}')return;
   char extra[512];
-  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu,\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu,\"read_service_last_us\":%lu,\"read_service_max_us\":%lu,\"httpd_stack_min_free\":%lu}}",
+  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu,\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu,\"read_service_last_us\":%lu,\"read_service_max_us\":%lu,\"status_service_last_us\":%lu,\"status_service_max_us\":%lu,\"httpd_stack_min_free\":%lu}}",
     (unsigned long)loop_last_ms_.load(),(unsigned long)loop_max_ms_.exchange(0),(unsigned long)dispatch_last_ms_.load(),
     (unsigned long)dispatch_max_ms_.exchange(0),(unsigned long)dispatch_late_.load(),(unsigned long)dispatch_busy_.load(),
     (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),(unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-    (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)loop_stack_free,(unsigned long)read_service_last_us_.load(),(unsigned long)read_service_max_us_.load(),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
+    (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)loop_stack_free,(unsigned long)read_service_last_us_.load(),(unsigned long)read_service_max_us_.load(),(unsigned long)status_service_last_us_.load(),(unsigned long)status_service_max_us_.load(),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
   if(k>0&&n-1+static_cast<size_t>(k)<cap)memcpy(text+n-1,extra,static_cast<size_t>(k)+1);
 }
 void HttpTransport::update(uint32_t now_ms) {
@@ -536,13 +549,11 @@ void HttpTransport::update(uint32_t now_ms) {
     deferred_ = false; xSemaphoreGive(slot_free_); return;
   }
   const bool motion_read=pending_request_.kind==HttpRequestKind::MOTION_STATUS;
-  // The legacy status pages have no qualified Motion budget. Without slack
-  // they are answered at once with an explicit error instead of holding the
-  // single HTTPD task, and every request queued behind it, for seconds.
   const bool status_read=pending_request_.kind==HttpRequestKind::WEB_STATUS||
                          pending_request_.kind==HttpRequestKind::WIFI_STATUS;
-  const bool no_slack=!slackExempt(pending_request_)&&!service_->motionSlack(esp_timer_get_time(),5000);
-  if(no_slack&&!status_read) {
+  const bool no_slack=!slackExempt(pending_request_)&&!(joystickRefresh(pending_request_)&&service_->motionJoystickActive())&&
+                      !service_->motionSlack(esp_timer_get_time(),5000);
+  if(no_slack) {
     xSemaphoreGive(request_ready_); return;
   }
   // STOP precedence: a Motion command never runs while a STOP waits in its
@@ -550,15 +561,10 @@ void HttpTransport::update(uint32_t now_ms) {
   // SUPERSEDED_BY_STOP by its own epoch.
   deferred_ = pending_request_.kind == HttpRequestKind::MOTION_COMMAND && stop_pending_.load();
   const uint64_t service_start=esp_timer_get_time();
-  if(no_slack){
-    // Field-wise: a value-initialised temporary would put ~5 KB on loopTask.
-    // The status handlers read only ok/message before answering 503.
-    pending_response_.ok=false;pending_response_.text[0]='\0';pending_response_.text_len=0;
-    pending_response_.sequence=pending_request_.sequence;
-    pending_response_.message=kMotionBudgetUnavailable;
-  }else if (!deferred_) serviceRequest(now_ms);   // may defer on fence contention
-  if(motion_read){const uint32_t us=static_cast<uint32_t>(esp_timer_get_time()-service_start);
-    read_service_last_us_.store(us);if(us>read_service_max_us_.load())read_service_max_us_.store(us);}
+  if (!deferred_) serviceRequest(now_ms);   // may defer on fence contention
+  if(motion_read||status_read){const uint32_t us=static_cast<uint32_t>(esp_timer_get_time()-service_start);
+    auto& last=motion_read?read_service_last_us_:status_service_last_us_;auto& max=motion_read?read_service_max_us_:status_service_max_us_;
+    last.store(us);if(us>max.load())max.store(us);}
   if (deferred_) { xSemaphoreGive(request_ready_); return; }
   ready_sequence_.store(pending_response_.sequence);
   if (mailbox_.claimDelivery())
@@ -578,11 +584,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Driver admission was checked by HTTPD before dispatch and is checked again
   // before sending the observation. Controller revalidates RAM facts under the
   // existing zero-wait fence; session ownership remains on Controller only.
+  AdminLease lease(gate);
   const bool readonly=readOnlyAdmitted(req,!motion_read);
   if(req.kind>=HttpRequestKind::OTA_CHALLENGE&&req.kind<=HttpRequestKind::OTA_ABORT&&static_cast<RoleReason>(service_->wifiStatus().role_reason)==RoleReason::MAINTENANCE_STA_READONLY){resp.message="OTA_DENIED_MAINTENANCE_LAN";return;}
   const bool sta_motion=(req.kind>=HttpRequestKind::MOTION_STATUS||req.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(req,!motion_read);
   const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
-  AdminLease lease(gate);
   if (admin_request && (!gate.allowed(req.admin_generation) ||
                         (!motion_read&&!WifiManager::verifyAdminRadio()))) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
@@ -590,7 +596,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Admissible facts but the fence is momentarily held (md_http_life verifies
   // the radio every 50 ms): contention is not an authorization fact. update()
   // retries on the next pass, where everything above is evaluated again.
-  if (admin_request && !lease) { deferred_ = true; return; }
+  if ((admin_request || sta_motion) && !lease) { deferred_ = true; return; }
   if(!req.ap_socket&&!req.tls&&req.local_ipv4&&!readonly){resp.message="LAN_READ_ONLY_REQUIRED";return;}
   if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
@@ -703,7 +709,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
       resp.message="AUTH_FAILED";break;
     }
     // Received before a STOP that was applied meanwhile: never executed late.
-    if(req.stop_epoch!=stop_epoch_.load()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
+    if(req.stop_epoch!=service_->motionStopEpoch()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
     if(!mailbox_.awaitingResponse())break; // reader may have expired during admission
@@ -1359,7 +1365,7 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
     cookieValue(cookie,"md_session",r.cookie);
     httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
     r.kind=HttpRequestKind::MOTION_COMMAND;
-    r.stop_epoch=self->stop_epoch_.load();
+    r.stop_epoch=self->service_->motionStopEpoch();
     if(r.motion_command.intent==motion::Intent::STOP){
       // STOP lane: never waits for the ordinary mailbox (a status or command
       // request may hold it for up to its budget). The Controller validates
@@ -1429,7 +1435,7 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
   }
   if(admitted&&req.local_authorized&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
-    stop_epoch_.fetch_add(1);             // every command received before this STOP is superseded
+    // MotionService advances the common fence for STOP from every channel.
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
     stop_applied_.store(true);stop_ack_ok_.store(service_->motionAck(ack,stop_ack_,sizeof(stop_ack_)));applied=true;
   }

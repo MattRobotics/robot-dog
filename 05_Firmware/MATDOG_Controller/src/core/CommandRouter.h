@@ -286,6 +286,9 @@ class CommandRouter {
   uint32_t wifi_verify_pending_seq_ = 0;
 
   static constexpr size_t kLineBufSize = 320;
+  // @HOSTLINK HELLO protocol: the USB line framing and the three HostLink
+  // commands; the Motion envelope itself is versioned by the contract.
+  static constexpr unsigned kHostLinkProtocol = 1;
   // LF ends a line; CR is ignored for compatibility. The first framing error
   // discards the whole line, across update() calls, until the next LF.
   enum class LineError : uint8_t { NONE, OVERFLOW, NUL };

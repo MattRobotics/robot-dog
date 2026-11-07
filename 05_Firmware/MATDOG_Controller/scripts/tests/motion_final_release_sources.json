@@ -1,11 +1,36 @@
 {
-  "schema": "MATDOG_ORIGINAL_EXTENSION_REVIEW_V1",
-  "approved_original_source_changes": [
-    {
-      "path": "05_Firmware/MATDOG_Controller/src/motion/Gait.h",
-      "original_sha256": "e308c64acff060b8be78796c5db21078a4de5f2b3b9b38f26d186ed0e6173914",
-      "current_sha256": "a91e936afec276b1e4c10c3fe60fd8caa5a89b33227dffc0912ab0950d0aebf8",
-      "reason": "Bounded complete STL reference smoothing derivatives; G4 scheduler unchanged"
-    }
+  "baseline_commit": "4634de8007bd086ce07f8874119f47569f76ea1c",
+  "updated_copied_sources": {
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "f45fb50b35ff10d4c5d27d35ed3025f6ea58ec0dc832f9f1fd351cd62c020437",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "944e04e45af834f5abfea5975d258ea6691542e55566b49b4423f936c1caa948",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "9554d0600dc4cc90d0e78edcc5d79538d964a4b480fe93634ba6cd16fd6d5ac3",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "2c80fcbba9a8fcb8b44cd4888505453c819c7f7a0eb7be45f1568c0e4949bd5b",
+    "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "30be4aadd9d06fa6781fef97143fc13af4b2324014825964f32e42034fcc41ea",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "90b86005366a3230ec9c14f0a890a06abee7e4e62e05cf5ad42ed1e4e9407097",
+    "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "bbe099cea1d7b6c52b07ee3f1449c297860f4f072917a34225b43e2ebc83f720",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "80d8d04a7086f10389d7a21884fd1365f154b86ad6df6778fa300e786f2a3626",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "c2c685c1168468bfb43e45b6044e0dffc87fc10e0c657234d4d402f913677fd6"
+  },
+  "removed_copied_sources": [
+    "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.h",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/BodyStabilizer.h",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/Locomotion.h",
+    "05_Firmware/MATDOG_Controller/src/motion/MotionState.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/MotionState.h",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseReferenceData.h",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/PoseSupport.h",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTransition.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTransition.h",
+    "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/StartupAcquisition.h",
+    "05_Firmware/MATDOG_Controller/src/motion/TimedStand.cpp",
+    "05_Firmware/MATDOG_Controller/src/motion/TimedStand.h"
   ]
 }

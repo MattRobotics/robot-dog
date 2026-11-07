@@ -141,10 +141,14 @@ int fixtures(const char* path) {
   {
     Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
     check(!rig.m.stand(.05,rig.p.now)&&rig.reachStand(),"PRONE terminal fixture starts in HOLD");
+    service.update();
+    check(rig.m.state()==simple::State::STANDING&&rig.m.energized(),"fixture STANDING HOLD, torque ON");
+    put("status_standing",statusJson(service,rig));  // dev.17: page reload in HOLD
     auto c=semantic(motion::Intent::LIE_DOWN,rig);check(service.command(c,c.issued_at_ms).outcome==motion::CommandOutcome::ACCEPTED,"PRONE accepted from HOLD");
-    for(unsigned i=0;i<4000&&strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED");++i)rig.tick();
-    service.update();check(!strcmp(rig.m.phase(),"PRONE_CONTACT_UNVERIFIED"),"PRONE trajectory ends torque ON, no contact claim");
-    put("status_prone_unverified",statusJson(service,rig));
+    for(unsigned i=0;i<4100&&rig.m.state()!=simple::State::READY;++i){rig.tick();service.update();}
+    for(unsigned i=0;i<15;++i){rig.tick();service.update();}  // the OFF readback pauses FAST reads: one population later
+    check(rig.m.proneRest()&&rig.m.state()==simple::State::READY&&rig.m.offVerified()&&!strcmp(rig.m.reason(),"PRONE_REST"),"PRONE ends at rest: torque OFF verified 13/13, no contact claim");
+    put("status_prone_rest",statusJson(service,rig));
   }
   {
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr);
@@ -171,15 +175,145 @@ int fixtures(const char* path) {
     put("ack_walk_stop", ackJson(service, service.command(zero, zero.issued_at_ms)));
     auto stop = semantic(motion::Intent::STOP, rig);
     const auto s = service.command(stop, stop.issued_at_ms);
-    check(s.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(s.reason, "SAFE_OFF_REQUESTED"), "fixture STOP acknowledged");
+    check(s.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(s.reason, "STOP_REQUESTED"), "fixture STOP acknowledged");
     put("ack_stop", ackJson(service, s));
     rig.tick(false); service.update();
-    check(rig.m.stopping() && !rig.m.offVerified(), "fixture SAFE_OFF in progress");
+    check(rig.m.stopping() && !rig.m.offVerified(), "fixture STOP in progress");
     put("status_stopping", statusJson(service, rig));
-    for (unsigned i = 0; i < 15; ++i) rig.tick(false);
+    for (unsigned i = 0; i < 250 && !rig.m.stopVerified(); ++i) rig.tick();
     service.update();
-    check(rig.m.offVerified(), "fixture SAFE_OFF verified (scripted port)");
+    check(rig.m.stopVerified() && rig.m.energized() && !rig.m.stopSupportVerified(), std::string("fixture STOP observed, torque ON, support unknown: ")+rig.m.reason());
+    put("status_stopped_on", statusJson(service, rig));
+    service.safeOff();
+    for (unsigned i = 0; i < 20; ++i) rig.tick(false);
+    service.update();
+    check(rig.m.offVerified(), "fixture explicit SAFE_OFF verified (scripted port)");
     put("status_stopped", statusJson(service, rig), true);
+  }
+  {
+    // dev.17: with STOP latched, a WALK STANDARD preset reaches SimpleMotion
+    // (the STAND-after-STOP admission); WALK STOP, joystick, PRONE and any
+    // non-preset velocity stay refused with STOP_LATCHED.
+    Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    const auto walk = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[1] / simple::kWalkPeriodS);
+    check(service.command(walk, walk.issued_at_ms).outcome == motion::CommandOutcome::ACCEPTED, "STOP->WALK fixture: WALK45 accepted");
+    for (unsigned i = 0; i < 3000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
+    for (unsigned i = 0; i < 200; ++i) rig.tick();
+    auto stop = semantic(motion::Intent::STOP, rig); service.command(stop, stop.issued_at_ms);
+    for (unsigned i = 0; i < 300 && !rig.m.stopVerified(); ++i) rig.tick();
+    service.update();
+    check(rig.m.stopVerified() && rig.m.energized(), "STOP->WALK fixture: STOP verified, torque ON");
+    auto refused = [&](motion::MotionCommand c, const char* what) {
+      const auto a = service.command(c, c.issued_at_ms);
+      check(a.outcome == motion::CommandOutcome::REJECTED && !std::strcmp(a.reason, "STOP_LATCHED"), std::string(what) + " refused while STOP is latched: " + a.reason); };
+    refused(semantic(motion::Intent::BASE_VELOCITY, rig), "WALK STOP");
+    auto joy = semantic(motion::Intent::BASE_VELOCITY, rig, .003); std::strcpy(joy.gait, "JOYSTICK"); refused(joy, "joystick");
+    refused(semantic(motion::Intent::LIE_DOWN, rig), "PRONE");
+    refused(semantic(motion::Intent::BASE_VELOCITY, rig, .004), "non-preset velocity");
+    const auto again = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[2] / simple::kWalkPeriodS);
+    const auto a = service.command(again, again.issued_at_ms);
+    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "COMMAND_ACCEPTED"), std::string("WALK60 after STOP accepted: ") + a.reason);
+    for (unsigned i = 0; i < 4000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
+    check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - simple::kStrideM[2] / simple::kWalkPeriodS) < 1e-12, "STOP->WALK fixture: WALK60 running");
+  }
+  {
+    // dev.17 pre-flash: dashboard joystick order, through the real JSON parser,
+    // the HTTP gate with session/CSRF, MotionService and SimpleMotion. Bodies
+    // are shaped like the page's: id "simple-<page session>-<sequence>".
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK order: HOLD at the WALK height");
+    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;  // full forward on the pad
+    auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
+    auto joy = [&](const char* page, unsigned seq, uint32_t issued, double v) {
+      char b[400];
+      std::snprintf(b, sizeof(b), "{\"version\":1,\"id\":\"simple-%s-%u\",\"sequence\":%u,\"issued_at_ms\":%u,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":%.17g,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",
+                    page, seq, seq, issued, v);
+      return std::string(b); };
+    auto send = [&](const std::string& b) { return serve(request(b, session), session, service, rig, now()).code; };
+    auto idle = [&](unsigned n) { bool moved = false; for (unsigned k = 0; k < n; ++k) { rig.tick(); moved |= rig.m.state() != simple::State::STANDING; } return moved; };
+    auto hold = [&]() { for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::STANDING; ++k) rig.tick(); return rig.m.state() == simple::State::STANDING; };
+    // 1. The move seq 10 is delayed behind the release seq 11 (robot holding):
+    //    applied after it, it would start a walk with no finger on the pad.
+    const std::string move10 = joy("kq3a1", 10, now(), vx); rig.tick(); rig.tick();
+    const std::string neutral11 = joy("kq3a1", 11, now(), 0);
+    check(send(neutral11) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: release seq 11 accepted at HOLD");
+    rig.tick();
+    check(send(move10) == "REJECTED JOYSTICK_SUPERSEDED" && !idle(100), "JOYSTICK order: the late move seq 10 is refused after the release seq 11, the robot keeps holding");
+    // 2. Move seq 12 -> release seq 13 -> the move seq 12 delivered again later.
+    const std::string move12 = joy("kq3a1", 12, now(), vx);
+    check(send(move12) == "ACCEPTED COMMAND_ACCEPTED" && rig.m.joystickActive(), "JOYSTICK order: new move seq 12 after the release accepted");
+    rig.tick(); rig.tick();
+    const std::string neutral13 = joy("kq3a1", 13, now(), 0);
+    check(send(neutral13) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: release seq 13 accepted");
+    check(send(move12) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: the move seq 12 delivered again after the release is refused");
+    // Duplicates and retransmissions: the last command again is its own ack,
+    // never executed twice; an older one is refused.
+    check(send(neutral13) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: retransmitted release seq 13 answered from the replay slot");
+    check(send(joy("kq3a1", 9, now(), vx)) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: an older move seq 9 is refused");
+    check(hold() && !idle(100), "JOYSTICK order: no walk starts after the release");
+    // 3. A new explicit move after the release starts the walk; refreshes keep it.
+    unsigned seq = 14; bool walking = false;
+    for (unsigned k = 0; k < 3000 && !walking; ++k) {
+      if (k % 12 == 0) check(send(joy("kq3a1", seq++, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: refresh accepted while rising");
+      rig.tick(); walking = rig.m.state() == simple::State::WALKING; }
+    check(walking && std::abs(rig.m.walkVelocityX() - vx) < 1e-12, "JOYSTICK order: the next press walks (no joystick lock)");
+    for (unsigned k = 0; k < 60; ++k) { if (k % 12 == 0) send(joy("kq3a1", seq++, now(), vx)); rig.tick(); }
+    // 4. Reload: a new page session restarts at sequence 1 and is accepted; a
+    //    late request of the previous page, issued before it, is refused.
+    const std::string lateOldPage = joy("kq3a1", seq++, now(), vx);
+    rig.tick(); rig.tick(); rig.tick();
+    check(send(joy("kr7b2", 1, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED" && rig.m.state() == simple::State::WALKING, "JOYSTICK order: reloaded page, sequence 1, accepted");
+    check(send(lateOldPage) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: a late request of the previous page is refused after the new page");
+    check(send(joy("kr7b2", 1, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: identical retransmission of the new page answered from the replay slot");
+    check(send(joy("kr7b2", 2, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: the new page goes on");
+    // 5. TTL: an expired refresh is refused by the contract and leaves the order unchanged.
+    check(send(joy("kr7b2", 3, now() - 1000, vx)) == "REJECTED EXPIRED", "JOYSTICK order: TTL still enforced");
+    check(send(joy("kr7b2", 4, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: next fresh refresh accepted after an expired one");
+    // 6. Not a joystick update, no order check: a delayed WALK STOP of the
+    //    previous page, with a sequence below the joystick ones, still stops.
+    check(send(std::string("{\"version\":1,\"id\":\"simple-kq3a1-7\",\"sequence\":7,\"issued_at_ms\":") + std::to_string(now()) +
+               ",\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":0,\"vy\":0,\"yaw_rate\":0}}") == "ACCEPTED COMMAND_ACCEPTED" &&
+          !std::strcmp(rig.m.reason(), "WALK_STOPPING"), "JOYSTICK order: WALK STOP is never subject to the joystick order");
+    // 7. STOP keeps precedence with an old sequence and a long expired timestamp.
+    check(send(std::string("{\"version\":1,\"id\":\"simple-kq3a1-1\",\"sequence\":1,\"issued_at_ms\":") + std::to_string(now() - 60000) +
+               ",\"ttl_ms\":1,\"owner\":\"dashboard\",\"type\":\"MOTION.STOP\",\"params\":{}}") == "ACCEPTED STOP_REQUESTED", "JOYSTICK order: STOP with an old sequence and timestamp accepted");
+    rig.tick();  // the loop services the STOP request
+    const auto latched = send(joy("kr7b2", 5, now(), vx));
+    check(latched == "REJECTED STOP_IN_PROGRESS" || latched == "REJECTED STOP_LATCHED", "JOYSTICK order: joystick refused while STOP is active: " + latched);
+    for (unsigned k = 0; k < 300 && !rig.m.stopVerified(); ++k) rig.tick();
+    check(rig.m.stopVerified() && rig.m.energized(), "JOYSTICK order: STOP verified, torque ON");
+  }
+  {
+    // Deadman without the release, and the id format, on a fresh Controller.
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK deadman: HOLD at the WALK height");
+    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;
+    auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
+    auto joy = [&](const std::string& id, unsigned seq, uint32_t issued, double v) {
+      char b[400];
+      std::snprintf(b, sizeof(b), "{\"version\":1,\"id\":\"%s\",\"sequence\":%u,\"issued_at_ms\":%u,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":%.17g,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",
+                    id.c_str(), seq, issued, v);
+      return std::string(b); };
+    auto send = [&](const std::string& b) { return serve(request(b, session), session, service, rig, now()).code; };
+    check(send(joy("joystick", 5, now(), vx)) == "REJECTED JOYSTICK_SEQUENCE_REQUIRED", "JOYSTICK order: id without the page sequence refused");
+    check(send(joy("simple-kz9-7", 8, now(), vx)) == "REJECTED JOYSTICK_SEQUENCE_REQUIRED", "JOYSTICK order: id sequence different from the envelope refused");
+    std::vector<std::string> sent; bool walking = false; uint64_t lastAcceptedUs = 0;
+    for (unsigned k = 0; k < 3000 && (!walking || sent.size() < 4); ++k) {
+      if (k % 12 == 0) { const unsigned seq = static_cast<unsigned>(sent.size()) + 1;
+        sent.push_back(joy("simple-kz9-" + std::to_string(seq), seq, now(), vx));
+        check(send(sent.back()) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK deadman: refresh accepted"); lastAcceptedUs = rig.p.now; }
+      rig.tick(); walking = rig.m.state() == simple::State::WALKING; }
+    check(walking && sent.size() >= 4, "JOYSTICK deadman: walking from refreshes");
+    // The page goes silent (release lost). 600 ms later an older refresh arrives
+    // inside its TTL: refused, so it cannot extend the 1 s deadman.
+    while (rig.p.now < lastAcceptedUs + 600000) rig.tick();
+    const auto older = send(sent[sent.size() - 2]);
+    check(older == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK deadman: an older refresh inside its TTL is refused: " + older + " sent=" + std::to_string(sent.size()));
+    for (unsigned k = 0; k < 100 && std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT"); ++k) rig.tick();
+    const double after = (rig.p.now - lastAcceptedUs) / 1e6;
+    check(!std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT") && after >= 1.0 && after <= 1.06,
+          "JOYSTICK deadman: WALK STOP 1 s after the last accepted refresh, not extended (" + std::to_string(after) + " s)");
+    check(rig.reachStand(), "JOYSTICK deadman: the gait law ends in STAND");
   }
   out << "}\n";
   std::printf("SIMPLE_DASHBOARD_FIXTURES = %s (%u checks; real MotionService bodies)\n", failures ? "FAIL" : "PASS", checks);
@@ -205,8 +339,10 @@ void anchors(const std::string& src) {
     "if(!self->dispatch(r,&resp,",
     "strcmp(resp.message,\"ACK_UNAVAILABLE\")?\"403 Forbidden\":\"500 Internal Server Error\""}, "handleMotion POST order mirrored by handlerGate; STOP returns before the mailbox dispatch; ACK_UNAVAILABLE is 500, never AUTH_FAILED");
   const auto lane = between(http, "bool HttpTransport::serviceStopLane(", "esp_err_t HttpTransport::handleCalibrationRestore");
-  ordered(lane, {"stop_applied_.store(false);", "portal_.authorize(", "stop_epoch_.fetch_add(1);", "service_->motionCommand(req.motion_command,now_ms);", "stop_applied_.store(true);stop_ack_ok_.store("},
-          "STOP lane: session+CSRF, epoch supersedes earlier commands, then MotionService");
+  ordered(lane, {"stop_applied_.store(false);", "portal_.authorize(", "service_->motionCommand(req.motion_command,now_ms);", "stop_applied_.store(true);stop_ack_ok_.store("},
+          "STOP lane: session+CSRF, then MotionService (owner of the common STOP epoch)");
+  ordered(slurp(src + "/core/MotionService.cpp"), {"if(c.intent==motion::Intent::STOP){", "stopEpoch_.fetch_add(1,std::memory_order_release);", "motion_->stop();"},
+          "common STOP fence owned by MotionService for HTTP and USB");
   const auto mailbox = between(http, "case HttpRequestKind::MOTION_COMMAND: {", "case HttpRequestKind::CALIBRATION_RESTORE:");
   ordered(mailbox, {"portal_.authorize(", "resp.message=\"AUTH_FAILED\"", "SUPERSEDED_BY_STOP", "if(!mailbox_.awaitingResponse())break;", "service_->motionCommand(req.motion_command,millis());"},
           "mailbox command: session+CSRF, STOP epoch, then MotionService");
@@ -246,7 +382,7 @@ void anchors(const std::string& src) {
 int envelopes(const char* path, const char* src) {
   anchors(src);
   std::ifstream in(path);
-  std::string line, standBody, stopBody;
+  std::string line, standBody, stopBody, walkBody;
   unsigned seen = 0, previousSequence = 0;
   while (std::getline(in, line)) {
     const auto tab = line.find('\t'); if (tab == std::string::npos) continue;
@@ -280,6 +416,7 @@ int envelopes(const char* path, const char* src) {
       const unsigned i = name == "walk30" ? 0 : name == "walk45" ? 1 : 2;
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[i] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000,
             name + ": BASE_VELOCITY equals STANDARD preset " + std::to_string(i));
+      if (name == "walk45") walkBody = body;
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED", name + ": HTTP 200 ACCEPTED (" + r.code + ")");
       for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) rig.tick();
@@ -294,6 +431,30 @@ int envelopes(const char* path, const char* src) {
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
       check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
+    } else if (name == "joystick_forward" || name == "joystick_backward" || name == "joystick_lateral" || name == "joystick_turn") {
+      const double T = simple::kWalkPeriodS, nx = c.vx * T / simple::kJoystickStrideM, ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      const bool shape = name == "joystick_forward" ? c.vx == simple::kJoystickStrideM / T && c.vy == 0 && c.yaw_rate == 0 :
+                         name == "joystick_backward" ? c.vx < 0 && c.vy == 0 && c.yaw_rate == 0 :
+                         name == "joystick_lateral" ? c.vx == 0 && c.vy > 0 && c.yaw_rate == 0 : c.vx == 0 && c.vy == 0 && c.yaw_rate > 0;
+      check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && shape && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
+            name + ": BASE_VELOCITY gait JOYSTICK inside the Controller ellipsoid, mailbox");
+      const auto r = serve(request(body, session), session, service, rig, now);
+      check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && rig.m.joystickActive(), name + ": HTTP 200 ACCEPTED, joystick intent held (" + r.code + ")");
+      // The page refreshes every 240 ms; the same semantic command stands in for it here.
+      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(c.vx, c.vy, c.yaw_rate, rig.p.now); rig.tick(); }
+      check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - c.vx) < 1e-12 && std::abs(rig.m.walkVelocityY() - c.vy) < 1e-12 &&
+            std::abs(rig.m.walkYawRate() - c.yaw_rate) < 1e-12, name + ": scripted joystick walk at the commanded velocity (software only)");
+      for (unsigned k = 0; k < 100 && std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT"); ++k) rig.tick();
+      check(!std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT") && rig.reachStand(), name + ": silent page -> Controller WALK STOP within 1 s, STAND (software only)");
+      Rig late; core::MotionService lateService; lateService.begin(&late.m, nullptr, nullptr); lateService.setReady(true, "READY");
+      check(serve(request(body, session), session, lateService, late, c.issued_at_ms + 1000).code == "REJECTED EXPIRED", name + ": 1 s TTL enforced");
+    } else if (name == "joystick_release") {
+      check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == 0 && c.vy == 0 && c.yaw_rate == 0 && !std::strcmp(c.gait, "JOYSTICK") && !gate.stopLane, name + ": zero BASE_VELOCITY");
+      check(!rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now), name + ": test joystick walk started");
+      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now); rig.tick(); }
+      const auto r = serve(request(body, session), session, service, rig, now);
+      check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
+      check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
     } else if (name.rfind("stop", 0) == 0) {
       check(c.intent == motion::Intent::STOP && gate.stopLane, name + ": MOTION.STOP takes the STOP lane");
       stopBody = body;
@@ -301,15 +462,71 @@ int envelopes(const char* path, const char* src) {
       service.setReady(false, "IMU_UNAVAILABLE");  // STOP never depends on readiness
       const auto off = rig.p.offCalls;
       const auto r = serve(request(body, session), session, service, rig, c.issued_at_ms + 60000);  // stale clock, expired TTL
-      check(r.status == 200 && r.code == "ACCEPTED SAFE_OFF_REQUESTED", name + ": HTTP 200 SAFE_OFF_REQUESTED with stale TTL and no readiness (" + r.code + ")");
+      check(r.status == 200 && r.code == "ACCEPTED STOP_REQUESTED", name + ": HTTP 200 STOP_REQUESTED with stale TTL and no readiness (" + r.code + ")");
       rig.tick(false);
-      check(rig.m.stopping() && rig.p.offCalls == off + 1 && !rig.m.offVerified(), name + ": torque OFF sent; ACK is not verification");
-      for (unsigned k = 0; k < 15; ++k) rig.tick(false);
-      check(rig.m.offVerified() && rig.m.state() == simple::State::STOPPED, name + ": 13/13 verified by the scripted port only");
+      check(rig.m.stopInProgress() && rig.p.offCalls == off && rig.m.energized(), name + ": torque retained; ACK is not verification");
+      const auto enables=rig.p.enables;
+      for (unsigned k = 0; k < 250 && !rig.m.stopVerified(); ++k) rig.tick();
+      check(rig.m.stopVerified() && rig.m.state() == simple::State::STOPPED && rig.m.energized() &&
+            !rig.m.stopSupportVerified() && rig.p.enables==enables && rig.p.offCalls==off,
+            name + ": feedback-verified motion arrest, existing torque ON, support unknown");
     } else check(false, "unknown envelope case " + name);
   }
-  check(seen == 9, "nine dashboard envelopes captured (" + std::to_string(seen) + ")");
+  check(seen == 14, "fourteen dashboard envelopes captured (" + std::to_string(seen) + ")");
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
+  // Reuse the shipped STOP/STAND envelopes for the new WALK recovery path.
+  for(unsigned stride:{1u,2u}){
+    Session session;Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    check(!rig.m.walk(stride,rig.p.now),"HTTP recovery: WALK intent");
+    for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::WALKING;++n)rig.tick();
+    for(unsigned n=0;n<(stride==1?380u:500u);++n)rig.tick();
+    const auto enables=rig.p.enables,off=rig.p.offCalls;
+    auto freshBody=[&](const std::string& body,unsigned sequence){
+      motion::MotionCommand parsed;const char* why=nullptr;
+      check(core::parseMotionJson(body.data(),body.size(),&parsed,&why),"recovery envelope parses");
+      auto result=replace(body,"\"sequence\":"+std::to_string(parsed.sequence),"\"sequence\":"+std::to_string(sequence));
+      return replace(result,"\"issued_at_ms\":"+std::to_string(parsed.issued_at_ms),"\"issued_at_ms\":"+std::to_string(rig.p.now/1000));
+    };
+    const auto stop=serve(request(freshBody(stopBody,100),session),session,service,rig,rig.p.now/1000);
+    check(stop.status==200&&stop.code=="ACCEPTED STOP_REQUESTED","HTTP WALK STOP accepted");
+    for(unsigned n=0;n<300&&!rig.m.stopVerified();++n){rig.tick();service.update();}
+    check(rig.m.stopVerified()&&rig.m.energized(),"HTTP WALK STOP verified, torque ON");
+    const auto status=statusJson(service,rig);
+    check(status.find("\"stand_resume_allowed\":true")!=std::string::npos,"HTTP recovery admission in status");
+    const auto stand=serve(request(freshBody(standBody,101),session),session,service,rig,rig.p.now/1000);
+    check(stand.status==200&&stand.code=="ACCEPTED COMMAND_ACCEPTED","HTTP explicit recovery STAND accepted");
+    for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::STANDING;++n){rig.tick();service.update();}
+    core::MotionStatusSnapshot terminal;service.update();service.captureStatus(terminal,rig.p.now/1000);
+    check(rig.m.state()==simple::State::STANDING&&!std::strcmp(terminal.activeReason,"STAND_REACHED")&&
+      !std::strcmp(terminal.activeOutcome,"COMPLETED"),"HTTP recovery actually reaches STAND_REACHED");
+    check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP recovery has no enable/OFF");
+  }
+  // dev.17: the shipped WALK45 envelope after a verified STOP in WALK and in
+  // HOLD: the STAND-after-STOP admission, the resume route, then WALK STANDARD.
+  check(!walkBody.empty(), "WALK45 envelope present");
+  for(unsigned origin=0;origin<2;++origin){
+    Session session;Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    if(origin==0){check(!rig.m.walk(2,rig.p.now),"HTTP STOP->WALK: WALK60 intent");
+      for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::WALKING;++n)rig.tick();for(unsigned n=0;n<300;++n)rig.tick();}
+    else check(!rig.m.stand(.15,rig.p.now)&&rig.reachStand(),"HTTP STOP->WALK: STAND 150 HOLD");
+    const auto enables=rig.p.enables,off=rig.p.offCalls;
+    auto freshBody=[&](const std::string& body,unsigned sequence){
+      motion::MotionCommand parsed;const char* why=nullptr;
+      check(core::parseMotionJson(body.data(),body.size(),&parsed,&why),"STOP->WALK envelope parses");
+      auto result=replace(body,"\"sequence\":"+std::to_string(parsed.sequence),"\"sequence\":"+std::to_string(sequence));
+      return replace(result,"\"issued_at_ms\":"+std::to_string(parsed.issued_at_ms),"\"issued_at_ms\":"+std::to_string(rig.p.now/1000));
+    };
+    const auto stop=serve(request(freshBody(stopBody,200),session),session,service,rig,rig.p.now/1000);
+    check(stop.status==200&&stop.code=="ACCEPTED STOP_REQUESTED","HTTP STOP->WALK: STOP accepted");
+    for(unsigned n=0;n<300&&!rig.m.stopVerified();++n){rig.tick();service.update();}
+    check(rig.m.stopVerified()&&rig.m.energized()&&statusJson(service,rig).find("\"stand_resume_allowed\":true")!=std::string::npos,"HTTP STOP->WALK: STOP verified, resume admitted");
+    const auto walk=serve(request(freshBody(walkBody,201),session),session,service,rig,rig.p.now/1000);
+    check(walk.status==200&&walk.code=="ACCEPTED COMMAND_ACCEPTED",std::string("HTTP STOP->WALK: WALK45 accepted (")+walk.code+")");
+    for(unsigned n=0;n<4000&&rig.m.state()!=simple::State::WALKING;++n){rig.tick();service.update();}
+    check(rig.m.state()==simple::State::WALKING&&std::abs(rig.m.walkVelocityX()-simple::kStrideM[1]/simple::kWalkPeriodS)<1e-12&&
+          rig.m.requestedHeightM()==simple::kWalkHeightM,"HTTP STOP->WALK: WALK STANDARD 45 at the WALK height (software only)");
+    check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP STOP->WALK: no enable/OFF, no intermediate STAND command");
+  }
   // Rejections keep working on the generated envelopes: none reaches the service.
   {
     Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
@@ -339,7 +556,7 @@ int envelopes(const char* path, const char* src) {
     for (uint64_t t = used.now; t <= used.now + 1200000; t += 350) alive = alive && used.portal.authorize(t, used.peer, used.portal.cookie(), used.portal.csrf());
     used.now += 1200000;
     const auto longStop = serve(request(stopBody, used), used, service, rig, 0);
-    check(alive && longStop.status == 200 && longStop.code == "ACCEPTED SAFE_OFF_REQUESTED", "STOP after 20 min of continuous use -> " + longStop.code);
+    check(alive && longStop.status == 200 && longStop.code == "ACCEPTED STOP_REQUESTED", "STOP after 20 min of continuous use -> " + longStop.code);
     Session expired; expired.now += 300000;
     const auto late = serve(request(stopBody, expired), expired, service, rig, 0);
     check(late.status == 403 && late.code == "AUTH_FAILED", "STOP with an expired session -> 403 AUTH_FAILED");
@@ -356,7 +573,7 @@ int envelopes(const char* path, const char* src) {
     auto local = semantic(motion::Intent::STOP, rig); local.owner = motion::ClientOwner::LOCAL; service.setReady(false, "IMU_UNAVAILABLE");
     const auto a = service.command(local, local.issued_at_ms + 60000);
     rig.tick(false);
-    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "SAFE_OFF_REQUESTED") && rig.m.stopping(), "LOCAL (USB) STOP preempts a JETSON WALK, no readiness or TTL needed");
+    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "STOP_REQUESTED") && rig.m.stopping(), "LOCAL (USB) STOP preempts a JETSON WALK, no readiness or TTL needed");
   }
   // rc.3 (f838f677) payloads, transcribed from its MotionDashboard.h lines
   // 41 and 51-55: the deterministic causes of the observed 400/400/403.

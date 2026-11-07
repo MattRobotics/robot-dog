@@ -1,4 +1,5 @@
 #include "TiltedContactIk.h"
+#include "LegKinematicsInternal.h"
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -97,14 +98,17 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
   if (!inLimits(leg, o.seed)) return out;  // a seed outside the limits is rejected, never clamped
   LegJointAngles q = o.seed;
   Vector3 r{}; ContactResult c{};
-  ++out.fkEvaluations;
+  out.solves = 1; ++out.fkEvaluations;
   if (!residual(leg, q, n, target, r, c)) { out.status = TiltedIkResult::Status::NO_CONVERGENCE; return out; }
+  // Squared residuals: the same order and acceptance, no sqrt per comparison.
+  const double tol2 = o.toleranceM * o.toleranceM;
+  double r2 = dot(r, r);
   for (unsigned it = 0; it < o.maxIterations; ++it) {
     out.iterations = it;
     // Stop at the acceptance tolerance. One servo tick at the foot is ~2e-4 m;
     // a further polish step costs a full soft-double FK + Jacobian on the
     // ESP32-S3 and moves the joints by <1e-7 rad (no RAW change).
-    if (norm(r) <= o.toleranceM) break;
+    if (r2 <= tol2) break;
     ++out.newtonSteps;
     double J[3][3];
     if (!contactJacobian(leg, q, n, c, J)) { out.status = TiltedIkResult::Status::JOINT_LIMIT; return out; }
@@ -120,29 +124,26 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
       if (!inLimits(leg, qn)) continue;
       ++out.fkEvaluations;
       if (!residual(leg, qn, n, target, rn, cn)) continue;
-      if (norm(rn) < norm(r) || norm(rn) <= o.toleranceM) { q = qn; r = rn; c = cn; accepted = true; }
+      const double rn2 = dot(rn, rn);
+      if (rn2 < r2 || rn2 <= tol2) { q = qn; r = rn; r2 = rn2; c = cn; accepted = true; }
     }
     if (!accepted) {
-      if (norm(r) <= o.toleranceM) break;  // already inside the acceptance tolerance, no better step exists
+      if (r2 <= tol2) break;  // already inside the acceptance tolerance, no better step exists
       out.status = inLimits(leg, q) ? TiltedIkResult::Status::NO_CONVERGENCE : TiltedIkResult::Status::JOINT_LIMIT; return out;
     }
   }
-  if (!(norm(r) <= o.toleranceM)) { out.status = TiltedIkResult::Status::NO_CONVERGENCE; return out; }
+  if (!(r2 <= tol2)) { out.status = TiltedIkResult::Status::NO_CONVERGENCE; return out; }
   // Conditioning of the converged Jacobian (infinity-norm), reported for the caller's policy.
   double J[3][3], inv[3][3], jn = 0, in = 0;
   if (!contactJacobian(leg, q, n, c, J)) { out.status = TiltedIkResult::Status::JOINT_LIMIT; return out; }
-  for (unsigned col = 0; col < 3; ++col) {
-    double e[3] = {0, 0, 0}, x[3]; e[col] = 1;
-    if (!solve3(J, e, x)) { out.status = TiltedIkResult::Status::SINGULAR; return out; }
-    for (unsigned k = 0; k < 3; ++k) inv[k][col] = x[k];
-  }
+  if (!detail::invert3(J, inv)) { out.status = TiltedIkResult::Status::SINGULAR; return out; }
   for (unsigned k = 0; k < 3; ++k) {
     double a = 0, b = 0;
     for (unsigned col = 0; col < 3; ++col) { a += std::abs(J[k][col]); b += std::abs(inv[k][col]); }
     jn = std::fmax(jn, a); in = std::fmax(in, b);
   }
   out.condition = jn * in;
-  out.joints = q; out.contact = c; out.residualM = norm(r);
+  out.joints = q; out.contact = c; out.residualM = std::sqrt(r2);
   if (o.requireNominalStrip && c.support != SupportMode::NOMINAL_STRIP) { out.status = TiltedIkResult::Status::CONTACT_MODE; return out; }
   out.status = TiltedIkResult::Status::OK;
   return out;
@@ -158,5 +159,21 @@ WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3
   if (out.status != TiltedIkResult::Status::OK) return out;
   if (!pointToWorld(pose, out.base.contact.referenceM, out.achievedWorldM)) out.status = TiltedIkResult::Status::INVALID_INPUT;
   return out;
+}
+WorldTiltedIkResult worldEdgeContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, TiltedIkOptions o) {
+  o.requireNominalStrip = false;
+  // Foot axis in the support frame: R * Rx(hip) * y (UPPER/LOWER keep it).
+  auto tilt = [&](double hip) { return std::asin(std::fmin(1.0, std::abs(pose.rotation[2][1]*std::cos(hip) + pose.rotation[2][2]*std::sin(hip)))); };
+  double lift = edgeContactLiftM(tilt(o.seed.hip));
+  auto r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
+  if (r.status == TiltedIkResult::Status::OK && std::abs(edgeContactLiftM(r.base.contact.axisTiltRad) - lift) > 2e-5) {
+    lift = edgeContactLiftM(r.base.contact.axisTiltRad); o.seed = r.base.joints;
+    // Counts only, inside TiltedIkResult: a result copy, or a field added to
+    // WorldTiltedIkResult, costs ~300 B of Xtensa stack here.
+    const unsigned solves = r.base.solves, newton = r.base.newtonSteps, fk = r.base.fkEvaluations;
+    r = worldContactInverseKinematicsTilted(leg, {worldTarget.x, worldTarget.y, worldTarget.z + lift}, pose, o);
+    r.base.solves += solves; r.base.newtonSteps += newton; r.base.fkEvaluations += fk;
+  }
+  return r;
 }
 } }

@@ -1041,7 +1041,7 @@ void Controller::printBootBanner() {
 bool Controller::stopPreempt(void* self) {
   auto* c=static_cast<Controller*>(self);
   if(c->http_transport_.stopPending())c->http_transport_.serviceStopLane(millis());
-  return c->simple_motion_.stopping();
+  return c->simple_motion_.busPreemptRequested();
 }
 
 void Controller::update(uint32_t now_ms) {
