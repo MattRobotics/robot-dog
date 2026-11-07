@@ -5,6 +5,7 @@
 #include <esp_timer.h>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 namespace matdog { namespace core {
 namespace {
@@ -36,6 +37,28 @@ void MotionService::update(){
  }
  if(!active_)finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
  activeAck_.executor_state=simple::name(motion_->state());
+}
+// Dashboard joystick order (dev.17). HTTP can deliver the page's joystick
+// commands out of order (one connection per request, TCP retransmission), so
+// a refresh sent before the release could be applied after it and restart the
+// walk for up to its 1 s TTL. The page numbers every command of one load:
+// id "<page session>-<sequence>". Within one page session a JOYSTICK command
+// (move or neutral) is admitted only above the newest sequence admitted:
+// duplicates, superseded and late updates are refused and never extend the
+// deadman. A command of another page session is admitted only if not issued
+// before the newest one (issued_at_ms, the Controller time the TTL already
+// checks): a reloaded page starts again at its own sequence 1, a late request
+// of an earlier page is refused. STOP never reaches this check.
+const char* MotionService::admitJoystickOrder(const motion::MotionCommand& c){
+ const char* dash=strrchr(c.id,'-');char* end=nullptr;
+ const unsigned long n=dash&&dash>c.id?strtoul(dash+1,&end,10):0;
+ if(!n||end==dash+1||*end||n!=c.sequence)return "JOYSTICK_SEQUENCE_REQUIRED";
+ const size_t key=static_cast<size_t>(dash-c.id);
+ auto& o=joystickOrder_;
+ const bool samePage=o.valid&&strlen(o.session)==key&&!strncmp(o.session,c.id,key);
+ if(samePage?c.sequence<=o.sequence:o.valid&&static_cast<int32_t>(c.issued_at_ms-o.issuedMs)<0)return "JOYSTICK_SUPERSEDED";
+ memcpy(o.session,c.id,key);o.session[key]=0;o.sequence=c.sequence;o.issuedMs=c.issued_at_ms;o.valid=true;
+ return nullptr;
 }
 motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t now){
  motion::MotionAck a;a.sequence=c.sequence;a.owner=c.owner;
@@ -73,6 +96,9 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  auto& replay=replay_[owner];
  // IDs include the browser instance; a page reload may restart sequence at 1.
  if(replay.sequence&&!strcmp(c.id,replay.id)){if(c.sequence==replay.sequence)return replay.ack;a.reason="COMMAND_ID_REUSED";return last_=a;}
+ const bool joystick=c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+ if(joystick&&c.owner==motion::ClientOwner::DASHBOARD)
+   if(const char* r=admitJoystickOrder(c)){a.reason=r;return last_=a;}
  auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
@@ -85,7 +111,6 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    motion_->walkStop();return result(nullptr);}
  // Continuous base velocity: only an explicit JOYSTICK command, so an exact
  // preset velocity from it never becomes an untimed WALK STANDARD.
- const bool joystick=c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.gait[0]&&!joystick)return result("GAIT_NOT_IN_SIMPLE_V1");
  if(c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::BASE_VELOCITY&&c.intent!=motion::Intent::LIE_DOWN)return result("COMMAND_NOT_IN_SIMPLE_V1");
  if(!ready_)return result(reason_);

@@ -167,6 +167,8 @@ async function boot(initialStatus = fx.status_ready) {
     assert.strictEqual(b.version, 1); assert.strictEqual(b.owner, 'dashboard'); assert.strictEqual(b.type, type);
     assert.deepStrictEqual(b.params, params); assert.strictEqual(b.ttl_ms, ttl);
     assert(/^[A-Za-z0-9_.-]{1,48}$/.test(b.id)); assert.strictEqual(b.sequence, ++sequence);
+    // dev.17: the Controller orders joystick commands by page session + sequence: "simple-<session>-<sequence>".
+    assert(/^simple-[0-9a-z]+-\d+$/.test(b.id) && b.id.endsWith('-' + b.sequence), name + ': id carries the page session and its sequence');
     assert.strictEqual(b.issued_at_ms, Math.floor(JSON.parse(device.status).now_ms + p.clock() - received), name + ': Controller uptime estimate');
     if (name) envelopes.push(name + '\t' + call.body);
     return b;
