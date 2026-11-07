@@ -955,7 +955,7 @@ double SimpleMotion::slewStep(uint64_t now,uint64_t maxDtUs){
 void SimpleMotion::rememberCorrection(const JointTargetFrame& accepted,const JointTargetFrame& nominal,uint64_t now){
   reuseOffset_.valid=accepted.valid&&nominal.valid;
   for(unsigned i=0;i<12;++i)jointSlot(reuseOffset_,i)=jointSlot(accepted,i)-jointSlot(nominal,i);
-  reusePhase_=phase_;reuseUs_=now;reuseGait_[0]=gait_.advanceXM;reuseGait_[1]=gait_.advanceYM;reuseGait_[2]=gait_.yawRad;
+  reusePhase_=phase_;reuseUs_=now;
 }
 void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
   const bool walk=phase_==Phase::WALK;
@@ -1143,23 +1143,29 @@ LocomotionFrame SimpleMotion::nominalRelease(const GaitParameters& g,double term
   if(consecutive){
     // Exact Cartesian sample of this grid point (track advanced in order),
     // then the exact solution one period ahead, seeded by the last exact one.
-    const CartesianSample mid=gaitTrackCartesian(track_,g,c,0,0,terminal);
-    if(mid.valid){
-      LocomotionFrame out=solveGait(g,gaitTrackCartesian(track_,g,c+stepC,0,0,terminal),&walkExact_,false);
-      if(out.target.valid){
-        walkAhead_=out;walkAheadUs_=gridUs+kPeriodUs;walkAheadTerminal_=terminal;walkAheadGait_=g;walkAheadValid_=true;
+    // The result is the named return object (elided into the caller's frame):
+    // this release's exact Cartesian sample goes straight into it, the
+    // look-ahead solve straight into walkAhead_; only statement temporaries
+    // remain on this frame.
+    LocomotionFrame out;out.cartesian=gaitTrackCartesian(track_,g,c,0,0,terminal);
+    if(out.cartesian.valid){
+      walkAhead_=solveGait(g,gaitTrackCartesian(track_,g,c+stepC,0,0,terminal),&walkExact_,false);
+      if(walkAhead_.target.valid){
+        walkAheadUs_=gridUs+kPeriodUs;walkAheadTerminal_=terminal;walkAheadGait_=g;walkAheadValid_=true;
         // Joint-space midpoint of two exact solutions one period apart on
         // each side; branches and conditioning are those of the look-ahead.
-        out.cartesian=mid;
+        out.status=walkAhead_.status;out.failedLeg=walkAhead_.failedLeg;out.minJointMarginRad=walkAhead_.minJointMarginRad;out.maxResidualM=walkAhead_.maxResidualM;
+        for(unsigned l=0;l<4;++l){out.branches[l]=walkAhead_.branches[l];out.condition[l]=walkAhead_.condition[l];}
+        out.target.valid=true;
         for(unsigned i=0;i<12;++i)jointSlot(out.target,i)=.5*(jointSlot(walkExact_.target,i)+jointSlot(walkAhead_.target,i));
 #ifdef MATDOG_T2_SHADOW
-        {const auto exact=solveGait(g,mid,&walkExact_,false);
+        {const auto exact=solveGait(g,out.cartesian,&walkExact_,false);
          if(exact.target.valid)for(unsigned i=0;i<12;++i)lookaheadStats_.maxShadowRad=std::fmax(lookaheadStats_.maxShadowRad,std::abs(jointSlot(exact.target,i)-jointSlot(out.target,i)));}
 #endif
         nominalSolved_=true;++lookaheadStats_.interp;return out;
       }
       // The look-ahead did not solve: this release is exact at its own grid point.
-      return resyncExact(g,mid,gridUs,terminal);
+      return resyncExact(g,out.cartesian,gridUs,terminal);
     }
   }
   // Re-synchronisation: first release, missed release, structural law change.

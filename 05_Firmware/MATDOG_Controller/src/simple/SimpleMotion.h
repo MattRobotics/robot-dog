@@ -341,7 +341,7 @@ class SimpleMotion {
   // nominal target. Alternate WALK/HOLD releases reuse it on the new nominal
   // target; compensationSafe still runs on every release.
   motion::JointTargetFrame reuseOffset_{};Phase reusePhase_=Phase::IDLE;uint64_t reuseUs_=0;
-  double reuseGait_[3]{};bool reuseLight_=false,reuseSettled_=false;
+  bool reuseLight_=false,reuseSettled_=false;
   void rememberCorrection(const motion::JointTargetFrame& accepted,const motion::JointTargetFrame& nominal,uint64_t now);
 public:
   struct ReuseStats { uint32_t light=0,full=0,rejected=0; double maxShadowRad=0; };
