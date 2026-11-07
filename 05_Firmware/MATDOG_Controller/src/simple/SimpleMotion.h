@@ -268,6 +268,7 @@ class SimpleMotion {
   motion::JointTargetFrame measured() const;
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
+  bool nominalRelease(motion::LocomotionFrame&,const motion::GaitParameters&,double terminal,bool clockDone);
   void compensate(motion::LocomotionFrame&,uint64_t);
   double slewStep(uint64_t now,uint64_t maxDtUs=kImuSlewMaxDtUs);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
@@ -358,6 +359,25 @@ private:
   double joystickGoal_[3]{},steeredCycles_=0;  // displacement per cycle: x, y (m), yaw (rad)
   uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
+  // T2 (motion-perf-next): the walking law is solved exactly on alternate
+  // releases, one period ahead, at the release grid point; the release between
+  // sends the joint-space midpoint of the two exact solutions and carries the
+  // exact Cartesian sample of its own grid point for the IMU compensation.
+  // Every release still runs pointSafe, the WALK box, RAW, loaded and STOP
+  // proofs on what it sends. A structural change of the law (terminal, STOP
+  // recovery, end of the clock), a missed release or a failed look-ahead
+  // re-synchronises with an exact solve; steerWalk retargets stay continuous
+  // by construction and are tolerated.
+  motion::LocomotionFrame walkExact_{},walkAhead_{};
+  uint64_t walkExactUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1,walkAheadTerminal_=-1;
+  motion::GaitParameters walkExactGait_{},walkAheadGait_{};
+  bool walkAheadValid_=false,nominalSolved_=true;  // nominalSolved_: this release paid a nominal IK solve
+  void resetLookahead(){walkAheadValid_=false;walkExactUs_=0;nominalSolved_=true;}
+public:
+  struct LookaheadStats { uint32_t exact=0,interp=0,resync=0; double maxShadowRad=0; };
+  const LookaheadStats& lookaheadStats() const { return lookaheadStats_; }
+private:
+  LookaheadStats lookaheadStats_{};
   motion::LocomotionFrame holdNominal_{};
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1;

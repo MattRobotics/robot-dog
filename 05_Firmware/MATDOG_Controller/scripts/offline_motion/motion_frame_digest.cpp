@@ -29,9 +29,9 @@ void report(const char* name,Rig& r,size_t from){
   const auto& s=r.m.reuseStats();
   std::printf("%-18s frames=%5zu digest=%016llx state=%s/%s reason=%s T1 light/full/rejected=%u/%u/%u",name,r.p.sent.size()-from,(unsigned long long)d.h,
     simple::name(r.m.state()),r.m.phase(),r.m.reason(),s.light,s.full,s.rejected);
-#ifdef MATDOG_LOOKAHEAD_STATS
+#ifdef MATDOG_T2_STATS
   const auto& l=r.m.lookaheadStats();
-  std::printf(" T2 exact/interp/invalidated=%u/%u/%u maxInterpErr=%.3e rad (%.3f tick)",l.exact,l.interp,l.invalidated,l.maxShadowRad,l.maxShadowRad/simple::kTickRad);
+  std::printf(" T2 exact/interp/resync=%u/%u/%u maxInterpErr=%.3e rad (%.3f tick)",l.exact,l.interp,l.resync,l.maxShadowRad,l.maxShadowRad/simple::kTickRad);
 #endif
   std::printf("\n");
 }

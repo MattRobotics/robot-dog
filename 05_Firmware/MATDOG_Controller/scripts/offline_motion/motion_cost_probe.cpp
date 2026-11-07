@@ -27,10 +27,14 @@ struct Stat {
     r.m.updateTelemetry(r.p.now);}
   static double mean(const std::vector<double>& v){double s=0;for(double x:v)s+=x;return s/v.size();}
   static double max(const std::vector<double>& v){return *std::max_element(v.begin(),v.end());}
+  // Per-release libm total: the release maximum, not the mean, meets the 20 ms deadline.
+  std::vector<double> totals() const {std::vector<double> t(us.size());for(size_t i=0;i<us.size();++i)t[i]=trig[i]+inv[i]+sq[i]+hyp[i]+rem[i]+flr[i];return t;}
+  static double percentile(std::vector<double> v,double q){std::sort(v.begin(),v.end());return v[std::min(v.size()-1,size_t(q*v.size()))];}
   void print(const char* name){
     std::printf("%-16s n=%4zu trig mean/max=%6.1f/%4.0f  inv-trig=%5.1f/%3.0f  sqrt=%6.1f/%4.0f  hypot=%5.1f rem=%5.1f floor=%5.1f | libm mean=%6.1f | host_us mean=%5.1f max=%6.1f | work max solves=%u ik=%u newton=%u fk=%u\n",
       name,us.size(),mean(trig),max(trig),mean(inv),max(inv),mean(sq),max(sq),mean(hyp),mean(rem),mean(flr),mean(trig)+mean(inv)+mean(sq)+mean(hyp)+mean(rem)+mean(flr),mean(us),max(us),
-      work[simple::timing::SOLVES],work[simple::timing::IK],work[simple::timing::NEWTON],work[simple::timing::FK]);}};
+      work[simple::timing::SOLVES],work[simple::timing::IK],work[simple::timing::NEWTON],work[simple::timing::FK]);
+    const auto t=totals();std::printf("%-16s libm per release p50=%.0f p90=%.0f p99=%.0f max=%.0f\n",name,percentile(t,.5),percentile(t,.9),percentile(t,.99),max(t));}};
 void tilt(Rig& r,double roll,double pitch){  // constant board tilt seen by the IMU
   const double cr=std::cos(roll/2),sr=std::sin(roll/2),cp=std::cos(pitch/2),sp=std::sin(pitch/2);
   r.in.quaternion[0]=cr*cp;r.in.quaternion[1]=sr*cp;r.in.quaternion[2]=cr*sp;r.in.quaternion[3]=-sr*sp;}
