@@ -252,7 +252,7 @@ async function boot() {
     const demo = JSON.parse(fx.status_ready); demo.ready = false;
     demo.reason = 'OFFLINE_UI_FIXTURE'; demo.readiness_reason = 'OFFLINE_DISPLAY_ONLY';
     await refresh(JSON.stringify(demo));
-    assert(q('#simple-reason').hidden && q('#simple-reason').textContent === '', 'loaded Twin demo badge is not duplicated');
+    assert(!q('#simple-reason').hidden && q('#simple-reason').textContent === '', 'loaded Twin demo badge is not duplicated (the fixed slot stays, empty)');
     demo.fault = true;
     await refresh(JSON.stringify(demo));
     assert.strictEqual(q('#simple-state').textContent, 'FAULT');
@@ -356,7 +356,8 @@ async function boot() {
   await refresh(fx.status_ready);
   {
     const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
-    const pointer = (el, type, x, y) => el.dispatchEvent(new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    // Pointer ids as a browser gives them: one per finger (pad 1, rotation 2).
+    const pointer = (el, type, x, y, id = el === pad ? 1 : 2) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
     const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
@@ -404,6 +405,69 @@ async function boot() {
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'true', 'joystick disabled while STOP is active');
     assert(values().includes('Correzione IMU (richiesta → applicata, mrad)') && values().includes('Provenienza giunti'), 'IMU correction and joint provenance in diagnostics');
     await refresh(fx.status_walking);
+  }
+  // 4c. dev.17 input robustness: the pad centre is anchored at pointerdown, so a
+  // reflow cannot change the request; a refusal banner never ends a hold and
+  // never enters the page flow; the intent ends on a release anywhere, on
+  // pointercancel, focus loss and a hidden page; a network failure leaves no
+  // stuck sender; the Twin's resize waits for the release.
+  await refresh(fx.status_ready);
+  {
+    const pad = q('#joy-pad'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5], doc = p.dom.window.document;
+    const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
+    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
+    let rect = { left: 0, top: 0, width: 180, height: 180 };
+    pad.getBoundingClientRect = () => ({ ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height });
+    const frameEl = q('#simple-twin-frame'), twinHeight = h => p.dom.window.dispatchEvent(new p.dom.window.MessageEvent('message', { origin: 'http://192.168.4.1', source: frameEl.contentWindow, data: { type: 'MATDOG_TWIN_HEIGHT', height: h } }));
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 7), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick = p.intervals.filter(i => i.ms === 240).at(-1);
+    // The page reflows 60 px while the finger stays still: same request.
+    rect = { left: 0, top: 60, width: 180, height: 180 };
+    pointer(pad, 'pointermove', 90, 32, 7);
+    await send('', () => tick.fn(), { status: 503, body: jsonError('CONTROLLER_LOOP_LATE', 101) }, 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    assert(!q('#message').hidden && /CONTROLLER_LOOP_LATE/.test(q('#message').textContent), 'refusal banner shown while the pad is held');
+    assert.strictEqual(q('#message').parentElement, q('header'), 'the banner is an overlay in the header, outside the page flow');
+    assert.strictEqual(q('#simple-last').title, q('#simple-last').textContent, 'full result in the fixed slot title');
+    assert(/CONTROLLER_LOOP_LATE/.test(q('#simple-log li').textContent) && q('#simple-log li').dataset.kind === 'warn', 'refusal kept in the diagnostics log');
+    await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    // Another finger lifted elsewhere does not end this hold.
+    pointer(doc.body, 'pointerup', 10, 10, 8); await settle();
+    await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const heightBefore = frameEl.style.height;
+    twinHeight(700);
+    assert.strictEqual(frameEl.style.height, heightBefore, 'Twin resize deferred while the joystick is held');
+    // The finger lifted outside the pad, its capture missing: released all the same.
+    await send('', () => pointer(doc.body, 'pointerup', 300, 400, 7), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    assert.strictEqual(frameEl.style.height, '702px', 'Twin resize applied on release');
+    rect = { left: 0, top: 0, width: 180, height: 180 };
+    // pointercancel (a system gesture) releases.
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 9), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    await send('', () => pointer(pad, 'pointercancel', 90, 32, 9), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    // Focus loss releases.
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 10), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    await send('', () => p.dom.window.dispatchEvent(new p.dom.window.Event('blur')), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    // A hidden page releases.
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 11), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    Object.defineProperty(doc, 'hidden', { configurable: true, value: true });
+    await send('', () => doc.dispatchEvent(new p.dom.window.Event('visibilitychange')), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    Object.defineProperty(doc, 'hidden', { configurable: true, value: false });
+    doc.dispatchEvent(new p.dom.window.Event('visibilitychange')); await settle();  // visible again: the portal refresh restarts
+    // A rotation button left without capture releases.
+    await send('', () => pointer(q('#joy-left'), 'pointerdown', 0, 0, 12), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, 0, 1)), 1000);
+    await send('', () => pointer(q('#joy-left'), 'pointerleave', 0, 0, 12), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    // Connection interrupted on a refresh: no stuck sender, the next tick sends
+    // again (the Controller's own 1 s deadline covers the gap), release is neutral.
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 13), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick2 = p.intervals.filter(i => i.ms === 240).at(-1);
+    await send('', () => tick2.fn(), 'network', 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    assert(/errore di rete/.test(last()), last());
+    await send('', () => tick2.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    await send('', () => pointer(pad, 'pointerup', 90, 32, 13), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    const idle = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
+    assert.strictEqual(commands().length, idle, 'no refresh after any release');
+    delete pad.getBoundingClientRect;
+    q('#message').click();
   }
   // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);

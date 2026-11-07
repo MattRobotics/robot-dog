@@ -12,9 +12,14 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-motion .command-panel{min-width:0}
 #simple-twin{min-width:0;text-align:center}
 #simple-twin h3{margin:0;flex-wrap:wrap;text-align:left}
-#simple-twin-state{font-size:13px;color:var(--muted);margin:6px 0;text-align:left}
+#simple-twin-state{font-size:13px;color:var(--muted);margin:6px 0;text-align:left;height:1.5em;line-height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #simple-motion button{min-height:48px}#simple-stop{min-height:48px;background:#a52835;border-color:#ff7888;font-weight:800;min-width:130px}
-#simple-state{font-size:22px;color:var(--muted)}#simple-state[data-tone=bad]{color:var(--bad)}
+/* Fixed slots (dev.17): the texts above the joystick change with every poll and
+   command, their height never does (ellipsis or two lines; full text in title and
+   in the diagnostics log), so nothing moves the pad or a button under a finger. */
+#simple-state{display:block;font-size:22px;color:var(--muted);height:1.4em;line-height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#simple-reason,#simple-last{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;height:2.8em;line-height:1.4em;margin:6px 0}
+#simple-log{margin:8px 0;padding-left:20px;font-size:13px}#simple-log li[data-kind=bad]{color:var(--bad)}#simple-log li[data-kind=warn]{color:var(--warn)}#simple-state[data-tone=bad]{color:var(--bad)}
 #simple-state[data-tone=ok]{color:var(--ok)}#simple-state[data-tone=warn]{color:var(--warn)}
 #simple-motion .note{max-width:850px}#simple-detail{max-height:320px;overflow:auto}
 #simple-last{font-weight:600}#simple-last[data-kind=bad]{color:var(--bad)}#simple-last[data-kind=warn]{color:var(--warn)}#simple-last[data-kind=pending]{color:var(--muted)}
@@ -30,7 +35,7 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-joystick svg{display:block;width:166px;height:166px;max-width:70%;flex-shrink:0}
 #simple-joystick .joystick-yaw{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px}
 #simple-joystick .joystick-yaw button{display:grid;place-items:center;width:42px;min-height:42px;height:42px;padding:0;border:1px solid #405360;border-radius:50%;background:#182630;color:#b8d3df;font-size:29px;line-height:1}
-#simple-joystick #joy-pad{touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}#simple-joystick[data-active=true] #joy-pad{cursor:grabbing}
+#simple-joystick #joy-pad,#simple-joystick .joystick-yaw button{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}#simple-joystick #joy-pad{cursor:grab}#simple-joystick[data-active=true] #joy-pad{cursor:grabbing}
 #simple-joystick[aria-disabled=true] #joy-pad{opacity:.55;cursor:not-allowed}#simple-joystick .joystick-yaw button:disabled{opacity:.45}#joy-state{color:var(--text)}
 @media(max-width:940px){#simple-motion .cockpit{grid-template-columns:minmax(0,1fr)}#simple-motion .controls{grid-template-columns:repeat(4,minmax(0,1fr))}#simple-motion .controls label{grid-column:span 2}}
 @media(max-width:600px){#simple-motion .controls{grid-template-columns:repeat(2,minmax(0,1fr))}#simple-motion .controls label{grid-column:1/-1}#simple-twin-frame{height:clamp(280px,44vh,400px)}#simple-joints{display:block;overflow-x:auto;font-size:13px}#simple-stop{min-width:90px}}
@@ -59,7 +64,7 @@ card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-sta
 <p id="joy-state" role="status">Richiesto: neutro.</p></section>
 </div></div>
 <p class="note">STOP richiede l’arresto al Controller: può mantenere la coppia ON. SAFE_OFF verifica coppia OFF sui 13 servo. WALK STOP mantiene STAND.</p>
-<details id="simple-diagnostics"><summary>Stato e diagnostica Motion</summary><dl id="simple-values"></dl>
+<details id="simple-diagnostics"><summary>Stato e diagnostica Motion</summary><h4>Ultimi esiti dei comandi (dal più recente)</h4><ol id="simple-log"></ol><dl id="simple-values"></dl>
 <p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello preparato a torque OFF e mantenuto durante Motion; a cache fredda attende SAFE_OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla propria quota nominale indicata dal Controller e poi usa il ciclo STANDARD di 6,5 s. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente circa 7–9 s, più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
 <p class="note">PRONE è disponibile da STAND/HOLD: esegue la discesa e, raggiunta la posa finale, rilascia la coppia con il SAFE_OFF ordinario (PRONE_REST, verifica OFF sui 13 servo). L'appoggio passivo non è misurato. STAND riparte dalla posa reale assestata: acquisizione, verifica della regione certificata, riabilitazione. La quota stimata deriva da encoder e IMU con ipotesi di piano di appoggio: non misura la distanza dal pavimento. La posa misurata è la regione geometrica certificata in cui si trovano gli encoder; non prova l'appoggio a terra.</p>
 <table id="simple-joints"><thead><tr><th>Giunto</th><th>ID</th><th>Angolo</th><th>RAW letto (FAST)</th><th>Temp.</th><th>Coppia</th><th>Età CONTROL (coppia/goal)</th><th>Età FAST (posizione)</th></tr></thead><tbody></tbody></table>
@@ -77,9 +82,13 @@ function prepareTwin(){
  if(twinBusy(status)){if(twinStarted&&!twinReady)twinRetryWhenIdle=true;return}
  if(!twinStarted||twinRetryWhenIdle){twinStarted=true;twinRetryWhenIdle=false;by('simple-twin-frame').src='/twin/?feed=parent'}
 }
+// The Twin's own height is applied at once, except while the joystick is held
+// (dev.17): then it waits for the release, so the page never moves under it.
+let twinHeight=0;
+function twinResize(){if(!twinHeight||joyActive)return;const frame=by('simple-twin-frame');frame.style.height=Math.ceil(twinHeight)+frame.offsetHeight-frame.clientHeight+'px';twinHeight=0}
 window.addEventListener('message',e=>{
  if(e.origin!==location.origin||e.source!==by('simple-twin-frame').contentWindow)return;
- if(e.data?.type==='MATDOG_TWIN_HEIGHT'&&Number.isFinite(e.data.height)&&e.data.height>0&&e.data.height<10000){const frame=by('simple-twin-frame');frame.style.height=Math.ceil(e.data.height)+frame.offsetHeight-frame.clientHeight+'px'}
+ if(e.data?.type==='MATDOG_TWIN_HEIGHT'&&Number.isFinite(e.data.height)&&e.data.height>0&&e.data.height<10000){twinHeight=e.data.height;twinResize()}
  if(e.data?.type==='MATDOG_TWIN_READY'){twinReady=true;twinRetryWhenIdle=false;render()}
 });
 const stop=document.createElement('button');stop.id='simple-stop';stop.textContent='STOP';document.querySelector('header .who').append(stop);
@@ -92,6 +101,11 @@ by('simple-trace').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.str
 const reasons={PRONE_DESCENT_NOT_VALIDATED:"Discesa PRONE in corso; al termine la coppia viene rilasciata (PRONE_REST).",PRONE_REST:"PRONE a riposo: coppia OFF (verificata sui 13 servo al termine). Appoggio passivo non misurato. STAND riacquisisce la posa reale e riabilita la coppia.",STAND_PATH_NOT_CLEAR:"Posa reale fuori dalla regione di ingresso certificata: rialzata rifiutata.",NOT_WALKING:"Nessun passo in corso da fermare.",PRONE_REQUIRES_STAND_HOLD:"PRONE richiede uno STAND fermo con coppia ON.",PRONE_PATH_NOT_CLEAR:"Posa fuori dal passaggio PRONE ammesso.",PRONE_MEASURED_OUTSIDE_BOX:"Feedback fuori dalla box del tratto PRONE: arresto per fault.",PRONE_NOT_COMPLETED_STOPPING:"PRONE non completato entro il tempo: arresto controllato con coppia ON, nessun rilascio a quota intermedia.",PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD:"PRONE interrotto: posa sotto carico fuori dal tratto ma dentro una regione certificata; corpo sostenuto, coppia ON, protezioni attive. Usare STAND (se ammesso) oppure SAFE_OFF con il robot sostenuto.",PRONE_NOT_COMPLETED_SUPPORT_HELD:"PRONE non completato: corpo sostenuto, coppia ON e protezioni attive. Usare STAND (se la posa è certificata) oppure SAFE_OFF con il robot sostenuto.",PRONE_LANDING_NOT_QUALIFIED:'PRONE non disponibile: trasferimento del peso e appoggio ventrale non qualificati. HOLD resta attivo; STOP resta indipendente.',READY:'Pronto al comando.',STAND_REACHED:'Posa STAND raggiunta e mantenuta.',HEIGHT_CHANGE:'Cambio di quota in corso.',HEIGHT_PATH_NOT_CLEAR:'Cambio di quota non ammesso dalla posa reale attuale: nessun movimento.',ACQUIRING_REAL_POSE:'Acquisizione della posa iniziale reale.',WALK_STANDARD:'WALK STANDARD in corso.',WALK_STOPPING:'Conclusione coordinata del passo.',STOP_REQUESTED:'STOP richiesto: attendere il risultato del Controller.',STOP_REQUESTED_FAULT_LATCHED:'STOP richiesto con fault già presente: attendere la verifica coppia OFF sui 13 servo.',SAFE_OFF_VERIFIED_FAULT_LATCHED:'SAFE_OFF verificato sui 13 servo; il fault originale resta attivo.',SAFE_OFF_IN_PROGRESS_FAULT_LATCHED:'Verifica coppia OFF in corso; il fault originale resta attivo.',STAND_FROM_STOPPED_WALK:'Recupero STAND dal WALK arrestato in corso; coppia mantenuta e supporto non verificato.',STOP_HOLD_TRACKING_UNSAFE:'Posa STOP fuori dai limiti di mantenimento: coppia OFF.',STOP_RECOVERY_PATH_NOT_CLEAR:'Recupero STAND rifiutato: percorso del gait fuori dai limiti ammessi.',STOP_IN_PROGRESS:'Arresto controllato in corso, coppia mantenuta.',STOPPED_SUPPORT_UNVERIFIED:'Arresto verificato, coppia ON.',SAFE_OFF_VERIFIED:'SAFE_OFF verificato: coppia OFF sui 13 servo.',SAFE_OFF_STAND_REFUSED:'STAND rifiutato dopo SAFE_OFF: nessuna riabilitazione implicita.',STOP_RECOVERY_SWING_UNVERIFIED:'Recupero STAND rifiutato: swing non qualificato.',STOP_RECOVERY_WALK_UNVERIFIED:'Recupero STAND da WALK non qualificato.',STOP_RECOVERY_POSTURE_UNQUALIFIED:'Recupero STAND da posa intermedia non qualificato.',STOP_RECOVERY_FEEDBACK_UNAVAILABLE:'Feedback non disponibile per il recupero STAND.',STOP_RECOVERY_TORQUE_UNVERIFIED:'Coppia non verificata per il recupero STAND.',STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE:'Raccordo della correzione IMU non qualificato: fallback SAFE_OFF.',IMU_STALE:'Campione IMU scaduto: torque OFF.',HEIGHT_OUTSIDE_MATDOG_WORKSPACE:'Quota fuori dal workspace MATDOG o dai limiti reali.',SERVO_PREFLIGHT_REQUIRED:'Verifica iniziale dei profili servo in corso.',CALIBRATION_RESTORE_REQUIRED:'Calibrazione NVS non ancora ripristinata.',BMS_OR_POWER_UNAVAILABLE:'Alimentazione o BMS non disponibile.',SAFE_OFF_IN_PROGRESS:'Disabilitazione torque e verifica sui 13 servo in corso.',SERVO_COMMUNICATION_LOST:'Comunicazione servo persa: torque OFF.',SERVO_CONTROL_READ_LOST:'Lettura dei comandi servo persa: torque OFF.',SERVO_TORQUE_OR_GOAL_LOST:'Un servo non mantiene il comando richiesto: torque OFF.',SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT:'Allarme servo o limite elettrico: torque OFF.',MEASURED_MECHANICAL_LIMIT:'Un giunto ha raggiunto il limite meccanico ammesso.',NATIVE_TARGET_NOT_REACHED:'Un servo non ha raggiunto la posa entro il tempo disponibile.',INITIAL_POSE_OUTSIDE_SAFE_ENTRY:'Posa iniziale fuori dalla regione di ingresso geometricamente verificata.',REFERENCE_CHANGED_BEFORE_ENABLE:'La posa iniziale è cambiata prima dell’abilitazione.',STAND_CLEARANCE_UNAVAILABLE:'Il prossimo tratto STAND non ha spazio geometrico sufficiente.',STAND_PLAN_UNAVAILABLE:'Riferimento STAND non pianificabile entro i limiti: torque OFF.',WALK_SETTLING:'Assestamento finale del passo.',STAND_FROM_STOPPED_PRONE:'Ripresa STAND dalla posa mantenuta dallo STOP (PRONE o salita), coppia mantenuta.',WALK_JOYSTICK:'Joystick: passo continuo in corso.',JOYSTICK_TIMEOUT:'Joystick: nessun comando entro 1 s, il Controller conclude il passo (WALK STOP).',JOYSTICK_REVERSING:'Joystick: cambio di verso, il passo si conclude prima di ripartire.',JOYSTICK_VELOCITY_RANGE:'Velocità oltre il limite del Controller.',WALK_STANDARD_ACTIVE:'WALK STANDARD in corso: WALK STOP prima del joystick.',WALK_STOPPING:'Conclusione del passo in corso.',GAIT_NOT_IN_SIMPLE_V1:'Andatura non disponibile.',IMU_UNAVAILABLE:'IMU non disponibile o campione non valido.',GEN1_LIMITS_OR_FINGERPRINT:'Calibrazione gen1 o limiti non corrispondenti.',SYNC_WRITE_FAILED:'Trasmissione coordinata ai servo non completata.',TORQUE_ENABLE_UNCERTAIN:'Abilitazione servo non confermata: torque OFF.',MOTION_DEADLINE_LOST:'Aggiornamento Motion interrotto: torque OFF.',SERVO_FEEDBACK_STALE:'Feedback dei 12 servo non aggiornati.',FAULT_STOP_REQUIRED:'Fault persistente: STOP non riabilita il robot.',
 COMMAND_ACCEPTED:'Accettato dal Controller: l’esecuzione è confermata solo dallo stato Motion.',SAFE_OFF_REQUESTED:'Torque OFF richiesto: la verifica 13/13 è solo nella riga SAFE_OFF.',INVALID_JSON_SCHEMA:'Comando non conforme al contratto Motion.',DASHBOARD_OWNER_REQUIRED:'Owner del comando diverso da dashboard.',AUTH_FAILED:'Sessione o token CSRF non validi: accedere di nuovo.',SUPERSEDED_BY_STOP:'Annullato da uno STOP successivo.',STOP_LANE_LATE:'STOP non confermato entro 600 ms: usare anche @STOP via USB.',CONTROLLER_LOOP_LATE:'Il Controller non ha servito la richiesta in tempo.',MAILBOX_BUSY:'Controller occupato da un’altra richiesta.',EXPIRED:'Comando scaduto prima dell’esecuzione.',FUTURE_TIMESTAMP:'Timestamp del comando oltre l’uptime del Controller.',MOTION_BUSY:'Motion già in movimento.',MAINTENANCE_BUSY:'Operazione di manutenzione in corso.',SYSTEM_CONFIGURATION_BUSY:'Configurazione di rete o OTA in corso.',CALIBRATION_OR_LIMITS_NOT_READY:'Calibrazione o limiti non ancora pronti.',ACTUATOR_OWNER_BUSY:'Attuatori in uso da un’altra funzione.',IMU_ACQUISITION_TASK_REQUIRED:'Acquisizione IMU non attiva.'};
 const poses={PRONE_ENTRY:'PRONE (ripiegata)',STAND_HEIGHT:'STAND (regione quote)',WALK:'WALK (regione passo)',STAND_LIFT:'STAND bassa o sollevamento',STAND_DEPLOY:'transizione STAND (apertura)',OUTSIDE_CERTIFIED:'fuori dalle regioni certificate',UNKNOWN:'non disponibile (feedback non fresco)'};
+// #simple-last is a fixed two-line slot (dev.17): the full text stays in its
+// title and every distinct HTTP result or terminal outcome in the diagnostics log.
+function lastShow(kind,text,logged=kind!=='pending'){const e=by('simple-last');e.dataset.kind=kind;e.textContent=e.title=text;
+ const log=by('simple-log');if(!logged||log.firstChild?.textContent===text)return;
+ const li=document.createElement('li');li.dataset.kind=kind;li.textContent=text;log.prepend(li);while(log.children.length>20)log.lastChild.remove()}
 function render(){if(!status)return;const s=status,age=Math.max(0,performance.now()-received)+transitAge;
 const snapshotAge=age+(Number.isFinite(s.snapshot_age_ms)?s.snapshot_age_ms:0);
 // Source freshness: the 250 ms servo-feedback limit applies to j.age_ms as the
@@ -100,13 +114,12 @@ const snapshotAge=age+(Number.isFinite(s.snapshot_age_ms)?s.snapshot_age_ms:0);
 // the 250 ms limit with a 350 ms poll made data look stale ~90% of the time.
 const linked=snapshotAge<1500,fresh=linked&&s.stale===false&&(s.joints||[]).length===12&&s.joints.every(j=>j.valid&&Number.isFinite(j.age_ms)&&j.age_ms<=250);
 const twinNotice=twinReady?(fresh?'':'Dati Motion scaduti: posa non attuale.'):twinBusy(s)?'Modello non disponibile · caricamento rinviato fino a torque OFF':'Preparazione modello 3D…';
-by('simple-twin-state').textContent=twinNotice;by('simple-twin-state').hidden=!twinNotice;
+by('simple-twin-state').textContent=by('simple-twin-state').title=twinNotice;
 const ac=s.active_command||{},c=latestCommand;
 const commandReason=ac.reason+(reasons[ac.reason]?' ('+reasons[ac.reason]+')':'');
 if(linked&&c&&ac.id===c.id&&ac.sequence===c.sequence){
  c.observed=ac;c.observed_ms=performance.now();
- const e=by('simple-last');e.dataset.kind=ac.outcome==='ABORTED'?'warn':'acked';
- e.textContent='Ultimo comando · '+c.label+' · '+ac.outcome+' · '+commandReason+(ac.outcome==='COMPLETED'?' · completamento confermato dal Controller':ac.outcome==='ABORTED'?' · esecuzione interrotta':' · esecuzione osservata: '+s.phase);
+ lastShow(ac.outcome==='ABORTED'?'warn':'acked','Ultimo comando · '+c.label+' · '+ac.outcome+' · '+commandReason+(ac.outcome==='COMPLETED'?' · completamento confermato dal Controller':ac.outcome==='ABORTED'?' · esecuzione interrotta':' · esecuzione osservata: '+s.phase),ac.outcome==='COMPLETED'||ac.outcome==='ABORTED');
 }
 const aged=ms=>Number.isFinite(ms)?Math.ceil(ms+age):null;
 window.mdMotionHealth={fresh,age:Math.ceil(snapshotAge)};
@@ -116,7 +129,7 @@ const stopInfo=s.stop||{},offVerified=s.safe_off_verified===true&&s.safe_off_mas
 const stoppedOn=stopInfo.active===true&&stopInfo.motion_verified===true&&stopInfo.in_progress===false&&s.state==='STOPPED'&&s.torque_active===true;
 const offTerminal=offVerified&&s.state==='STOPPED';
 const shown=controllerFault?('FAULT'+(!fresh?' · DATI SCADUTI':'')):!linked?'COLLEGAMENTO PERSO':!fresh?'FEEDBACK NON FRESCO':offTerminal?'SAFE_OFF VERIFICATO · COPPIA OFF':stopInfo.in_progress===true?'STOP IN CORSO':stoppedOn?'STOP COMPLETATO · COPPIA ON':s.state==='READY'&&!s.ready?'NON PRONTO':s.state;
-by('simple-state').textContent=shown;
+by('simple-state').textContent=by('simple-state').title=shown;
 // Admission and fault facts own the colour, independently of the displayed wording.
 by('simple-state').dataset.tone=controllerFault?'bad':!fresh?'muted':!s.ready?'warn':stopInfo.active?'warn':offTerminal?'ok':['READY','STANDING'].includes(s.state)?'ok':['MOVING','WALKING'].includes(s.state)?'warn':'muted';
 const bar=by('motion');if(bar&&bar.firstChild)bar.firstChild.nodeValue=shown;if(by('motionWhy'))by('motionWhy').textContent=s.reason;by('simple-state').dataset.state=s.state;
@@ -131,7 +144,7 @@ if(stopInfo.active===true){
  const resumeReason=stopInfo.stand_resume_reason;
  reasonMessages.push(stopInfo.stand_resume_allowed===true?'Recupero STAND ammesso dal Controller: da WALK completa il gait e può comportare un piccolo avanzamento. Contatto fisico non verificato.':'STAND non ammesso dal Controller: '+(resumeReason?(reasons[resumeReason]?reasons[resumeReason]+' ['+resumeReason+']':resumeReason):'motivo non disponibile'));
 }
-by('simple-reason').textContent=reasonMessages.join(' · ');by('simple-reason').hidden=!reasonMessages.length;
+by('simple-reason').textContent=by('simple-reason').title=reasonMessages.join(' · ');
 const available=fresh&&s.ready&&!controllerFault&&!!csrf&&!sending&&!['MOVING','WALKING','FAULT'].includes(s.state);
 by('simple-stand').disabled=!available||(stopInfo.active?stopInfo.stand_resume_allowed!==true:!['READY','STANDING'].includes(s.state));by('simple-walk').disabled=!available||stopInfo.active===true||!['READY','STANDING'].includes(s.state);by('simple-prone').disabled=!available||stopInfo.active===true||s.state!=='STANDING';
 by('simple-walk-stop').disabled=!csrf||stopInfo.active===true||!['MOVING','WALKING'].includes(s.state);
@@ -165,7 +178,7 @@ by('simple-detail').textContent=JSON.stringify({period_us:s.period_us,missed_rel
 // answer or an ACK is never proof of motion, and a poll never hides it.
 async function command(type,params={},priority=false,label=type,retried=false){
 let record=null;
-const result=(kind,text)=>{if(record&&latestCommand!==record)return;const e=by('simple-last');e.dataset.kind=kind;e.textContent='Ultimo comando · '+label+' · '+new Date().toLocaleTimeString('it-IT')+' · '+text;
+const result=(kind,text)=>{if(record&&latestCommand!==record)return;lastShow(kind,'Ultimo comando · '+label+' · '+new Date().toLocaleTimeString('it-IT')+' · '+text);
  // The banner shows only the latest command: an earlier refusal stays in the Motion diagnostics, not here.
  if(kind==='bad'||kind==='warn'){commandNotice='Comando '+label+': '+text;show(commandNotice,kind)}
  else if(commandNotice){if(message.textContent===commandNotice)show('');commandNotice=''}};
@@ -240,30 +253,38 @@ else if(status.admin_session===false&&now-lapseAt>5000){lapseAt=now;cookieAt=now
 // inside the Controller's 1 s deadline and sends neutral (WALK STOP) on release.
 // JOY_LIMIT = kJoystickStrideM, kJoystickLateralM, kJoystickYawRad / kWalkPeriodS.
 const JOY_LIMIT=[.045/6.5,.020/6.5,.20/6.5],JOY_DEAD=.12,JOY_MS=240,pad=by('joy-pad');
-let joy=[0,0],joyYaw=0,joyPad=false,joyActive=false,joyAllowed=false,joyTimer=0,joyPointer=null,joySent=false;
+let joy=[0,0],joyYaw=0,joyPad=false,joyActive=false,joyAllowed=false,joyTimer=0,joyPointer=null,joySent=false,joyOrigin=null;
 function joyVelocity(){const r=Math.hypot(joy[0],joy[1]),k=r<JOY_DEAD?0:Math.min(1,(r-JOY_DEAD)/(1-JOY_DEAD))/r;
  let n=[joy[0]*k,joy[1]*k,joyYaw];const m=Math.hypot(n[0],n[1],n[2]);if(m>1)n=n.map(v=>v/m);return n.map((v,i)=>v*JOY_LIMIT[i])}
 const joyText=v=>{const t=[];if(v[0])t.push((v[0]>0?'avanti ':'indietro ')+(Math.abs(v[0])*1000).toFixed(1)+' mm/s');
  if(v[1])t.push((v[1]>0?'sinistra ':'destra ')+(Math.abs(v[1])*1000).toFixed(1)+' mm/s');
  if(v[2])t.push((v[2]>0?'antiorario ':'orario ')+(Math.abs(v[2])*180/Math.PI).toFixed(2)+'°/s');return t.length?t.join(', '):'neutro'};
 function joyDraw(){by('joy-knob').setAttribute('cx',String(90-58*joy[1]));by('joy-knob').setAttribute('cy',String(90-58*joy[0]));by('simple-joystick').dataset.active=String(joyActive)}
-function joyMove(e){const r=pad.getBoundingClientRect(),w=r.width||180,h=r.height||180;  // knob travel: 58 of the 180 viewBox units
- let f=((r.top+h/2)-e.clientY)*180/(58*h),l=((r.left+w/2)-e.clientX)*180/(58*w);const m=Math.hypot(f,l);if(m>1){f/=m;l/=m}joy=[f,l];joyDraw()}
+// The pad centre is taken once, at pointerdown (dev.17): a reflow while the pad
+// is held can move the pad on screen, never the requested velocity.
+function joyAnchor(){const r=pad.getBoundingClientRect(),w=r.width||180,h=r.height||180;joyOrigin={x:r.left+w/2,y:r.top+h/2,w,h}}
+function joyMove(e){const o=joyOrigin;if(!o)return;  // knob travel: 58 of the 180 viewBox units
+ let f=(o.y-e.clientY)*180/(58*o.h),l=(o.x-e.clientX)*180/(58*o.w);const m=Math.hypot(f,l);if(m>1){f/=m;l/=m}joy=[f,l];joyDraw()}
 function joyTick(){if(!joyActive)return;const v=joyVelocity();
  // Back to neutral: WALK STOP once, like a release. The STOP lane is untouched.
  if(!v[0]&&!v[1]&&!v[2]){if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK neutro')}return}
  if(sending)return;joySent=true;command('BASE_VELOCITY',{vx:v[0],vy:v[1],yaw_rate:v[2],gait:'JOYSTICK'},false,'JOYSTICK '+joyText(v))}
 function joyStart(){if(joyActive)return;joyActive=true;joyTick();joyTimer=setInterval(joyTick,JOY_MS)}
-function joyRelease(){if(!joyActive)return;joyActive=false;joyPad=false;joyPointer=null;joyYaw=0;clearInterval(joyTimer);joy=[0,0];joyDraw();
- if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK rilascio')}}
+function joyRelease(){if(!joyActive)return;joyActive=false;joyPad=false;joyPointer=null;joyOrigin=null;joyYaw=0;clearInterval(joyTimer);joy=[0,0];joyDraw();
+ if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK rilascio')}twinResize()}
 // Release ends only when neither the pad nor a rotation button is held.
 const joyEnd=()=>{if(!joyPad&&!joyYaw)joyRelease();else joyTick()};
-pad.addEventListener('pointerdown',e=>{if(!joyAllowed||joyPad)return;e.preventDefault();joyPointer=e.pointerId;pad.setPointerCapture?.(e.pointerId);
- joyPad=true;joyMove(e);if(joyActive)joyTick();else joyStart()});
+pad.addEventListener('pointerdown',e=>{if(!joyAllowed||joyPad)return;e.preventDefault();joyPointer=e.pointerId;try{pad.setPointerCapture?.(e.pointerId)}catch(x){}
+ joyPad=true;joyAnchor();joyMove(e);if(joyActive)joyTick();else joyStart()});
 pad.addEventListener('pointermove',e=>{if(joyPad&&e.pointerId===joyPointer)joyMove(e)});
-for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,e=>{if(joyPad&&e.pointerId===joyPointer){joyPad=false;joyPointer=null;joy=[0,0];joyDraw();joyEnd()}});
+// Pad release: on the pad (captured pointer) and, should the capture be missing,
+// anywhere in the window, so a finger lifted off the pad always ends the intent.
+const padUp=e=>{if(joyPad&&e.pointerId===joyPointer){joyPad=false;joyPointer=null;joyOrigin=null;joy=[0,0];joyDraw();joyEnd()}};
+for(const t of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(t,padUp);
+for(const t of ['pointerup','pointercancel'])window.addEventListener(t,padUp,true);
+for(const el of [pad,by('joy-left'),by('joy-right')])el.addEventListener('contextmenu',e=>e.preventDefault());  // long press is a hold
 for(const [id,sign] of [['joy-left',1],['joy-right',-1]]){const b=by(id);
- b.addEventListener('pointerdown',e=>{if(!joyAllowed)return;e.preventDefault();b.setPointerCapture?.(e.pointerId);joyYaw=sign;if(joyActive)joyTick();else joyStart()});
+ b.addEventListener('pointerdown',e=>{if(!joyAllowed)return;e.preventDefault();try{b.setPointerCapture?.(e.pointerId)}catch(x){}joyYaw=sign;if(joyActive)joyTick();else joyStart()});
  for(const t of ['pointerup','pointercancel','pointerleave','lostpointercapture'])b.addEventListener(t,()=>{if(joyYaw===sign){joyYaw=0;joyEnd()}})}
 window.addEventListener('blur',joyRelease);document.addEventListener('visibilitychange',()=>{if(document.hidden)joyRelease()});
 // Canonical Controller contract (MotionContract.cpp): POSTURE.STAND,
