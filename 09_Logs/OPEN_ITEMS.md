@@ -4,7 +4,7 @@
 
 ## Candidata dev.17 — IMPLEMENTATA, NON VALIDATA HARDWARE (07/11 sera)
 
-`1.0.1-dev.17`, commit `7503bfc`, APP `f49b531a5826d5e2a22a70ee17d5d8976a1075d1e604cb44c5b2803566213c5e`, non flashata. [Dossier](Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [flash APP-only e collaudo minimo](Validation_Reports/Dev17_Candidate_2026-11-07/FLASH_AND_TEST.md).
+`1.0.1-dev.17`, commit `17db0ef` (consolidata pre-flash; la build `7503bfc`, APP `f49b531a…`, è superata), APP `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, non flashata. [Dossier](Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [flash APP-only e collaudo minimo](Validation_Reports/Dev17_Candidate_2026-11-07/FLASH_AND_TEST.md).
 
 | Voce della tabella sotto | Stato dev.17 |
 |---|---|
@@ -14,7 +14,8 @@
 | P1 STOP→WALK | Implementato con l'ammissione e le rotte di ripresa di STAND; WALK STOP, joystick e PRONE restano `STOP_LATCHED` |
 | P1 Timing | Non toccato; `-O2` selettivo valutato offline (APP +0,9 %, codice Motion +18 %, nessuna misura ESP32-S3) e **non incluso**; variabilità HOLD UNKNOWN |
 | P2 Cockpit / ViewCube | Implementati (Twin in alto a tutta larghezza, quota 50–150 passo 5, 🐢30/45/🐇60, ViewCube CAD) |
-| Nuovo, HYPOTHESIS | Il Controller non ordina i comandi per `sequence`: un refresh joystick riordinato dopo il neutro sarebbe accettato entro 1 s (non osservato nelle tracce dev.16) |
+| Ordine dei comandi joystick | Difetto **dimostrato** offline su `7503bfc` (movimento consegnato dopo il rilascio accettato, robot ripartito fino al deadman) e **corretto** prima del flash: comandi joystick ammessi solo in ordine di sessione pagina e `sequence` |
+| STOP durante il caricamento Twin | Misurato in Chrome: un solo STOP per input, ritardo input→invio fino a ~0,5 s (CPU 6×) se l'input cade nella compilazione del Twin; da misurare sul telefono (`input_ms` nella traccia) |
 
 ## Richieste dalla validazione dev.16 (07/11 pomeriggio; stato aggiornato sopra)
 
