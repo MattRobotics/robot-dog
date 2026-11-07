@@ -1,12 +1,8 @@
 # MATDOG Controller — Changelog
 
-> **How to read (added 2026-10-08).** "Unreleased" means not part of an accepted release. The PR-1,
-> PR-2 and PR-3 entries are integrated **in source** on `main`; none is a release approval. dev.3 is
-> a candidate: Hardware Validation 2026-10-07 has execution COMPLETE and acceptance BLOCKED. A build
-> of `main` is not shown to be byte-identical to the installed firmware. **DO NOT FLASH MAIN.**
-> Entries are newest-integration first, then in the order they were written. The dated sequence and
-> the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
-> [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
+> **Current as of 2026-11-07:** first hardware-qualified Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) is published; the installed APP is exactly `1.0.1-dev.17`, build `17db0efe2324` and SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. `main` is canonical source, **not** by itself a verified flashable binary. Use the published APP asset and manifest.
+> **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
+> Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
 ## v1.0.1 — First Stable GitHub Release: firmware 1.0.1-dev.17 promoted unchanged — 2026-11-07
 
