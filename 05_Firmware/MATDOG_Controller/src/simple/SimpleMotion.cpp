@@ -1116,7 +1116,9 @@ void SimpleMotion::generateWalk(uint64_t now){
   // A STOP in WALK_SETTLE can restart at the terminal clock itself. Finish
   // the existing held-RAW bridge before handing off, even with no gait left.
   const bool done=clockDone&&(!walkRecover_||now-recoverUs_>=1000000);
-  auto f=solveGait(g,gaitTrackCartesian(track_,g,cycles_,clockDone?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
+  // Positions only: the IK below runs without derivatives (A1), so the clock
+  // rate would only produce unused velocity/acceleration jets.
+  auto f=solveGait(g,gaitTrackCartesian(track_,g,cycles_,0,0,terminal),&walkPrevious_,false);
   if(!f.target.valid||!contains(walkBox(),f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(offPending_)return;

@@ -11,75 +11,96 @@ D operator-(D x,D y){return {x.p-y.p,x.v-y.v,x.a-y.a};}
 D operator*(D x,D y){return {x.p*y.p,x.v*y.p+x.p*y.v,x.a*y.p+2*x.v*y.v+x.p*y.a};}
 D sn(D x){return {std::sin(x.p),std::cos(x.p)*x.v,std::cos(x.p)*x.a-std::sin(x.p)*x.v*x.v};}
 D cs(D x){return {std::cos(x.p),-std::sin(x.p)*x.v,-std::sin(x.p)*x.a-std::cos(x.p)*x.v*x.v};}
-D smooth(D u){return u*u*u*(D(10)+u*(D(-15)+D(6)*u));}
-struct Planar {D x,y,yaw;};
-Planar nominal(const GaitParameters& p,D s) {
-  D angle=D(p.yawRad)*s, si,co;
+// Position-only evaluation of the same law (motion-perf-next A1). A Motion
+// release samples with zero rate and acceleration and solves the IK without
+// derivatives, so every jet it would carry is identically zero: the p part is
+// computed alone, term for term in the same order as the jet operators (bit
+// for bit the same positions), at one trig call per sn/cs instead of two and
+// one multiplication instead of three. The jet path is unchanged for callers
+// that need joint velocities (envelope sweeps).
+inline double pv(double x){return x;}
+inline double pv(const D& x){return x.p;}
+inline double sn(double x){return std::sin(x);}
+inline double cs(double x){return std::cos(x);}
+// cos/sin jets from already evaluated c=cos(x.p), s=sin(x.p): the same bits
+// as cs(x)/sn(x), without re-evaluating the trig functions.
+inline double csFrom(double,double c,double){return c;}
+inline double snFrom(double,double,double s){return s;}
+inline D csFrom(const D& x,double c,double s){return {c,-s*x.v,-s*x.a-c*x.v*x.v};}
+inline D snFrom(const D& x,double c,double s){return {s,c*x.v,c*x.a-s*x.v*x.v};}
+template<class T> T smooth(T u){return u*u*u*(T(10)+u*(T(-15)+T(6)*u));}
+template<class T> struct PlanarT {T x,y,yaw;};
+using Planar=PlanarT<D>;
+template<class T> PlanarT<T> nominal(const GaitParameters& p,T s) {
+  T angle=T(p.yawRad)*s, si,co;
   // Stable analytic SE(2) exponential at zero angular displacement.
-  if(std::abs(angle.p)<1e-4) {
-    D a2=angle*angle;
-    si=s*(D(1)-a2*D(1.0/6)+a2*a2*D(1.0/120));
-    co=s*angle*(D(.5)-a2*D(1.0/24)+a2*a2*D(1.0/720));
-  } else {si=sn(angle)*D(1/p.yawRad);co=(D(1)-cs(angle))*D(1/p.yawRad);}
-  return {D(p.advanceXM)*si-D(p.advanceYM)*co,D(p.advanceXM)*co+D(p.advanceYM)*si,angle};
+  if(std::abs(pv(angle))<1e-4) {
+    T a2=angle*angle;
+    si=s*(T(1)-a2*T(1.0/6)+a2*a2*T(1.0/120));
+    co=s*angle*(T(.5)-a2*T(1.0/24)+a2*a2*T(1.0/720));
+  } else {si=sn(angle)*T(1/p.yawRad);co=(T(1)-cs(angle))*T(1/p.yawRad);}
+  return {T(p.advanceXM)*si-T(p.advanceYM)*co,T(p.advanceXM)*co+T(p.advanceYM)*si,angle};
 }
-D swayRegular(const GaitParameters& p,D s) {
-  double quarter=std::floor(s.p*4), start=quarter*.25, gap=p.duty-.75;
+template<class T> T swayRegular(const GaitParameters& p,T s) {
+  double quarter=std::floor(pv(s)*4), start=quarter*.25, gap=p.duty-.75;
   double sign=std::fmod(quarter,2)==0?1:-1;
-  if(s.p<gap)return D(p.swayXM)*smooth(s*D(1/gap));  // leave the centred stand
-  D u=(s-D(start))*D(1/gap);
-  return D(sign*p.swayXM)*(u.p<1?D(-1)+D(2)*smooth(u):D(1));
+  if(pv(s)<gap)return T(p.swayXM)*smooth(s*T(1/gap));  // leave the centred stand
+  T u=(s-T(start))*T(1/gap);
+  return T(sign*p.swayXM)*(pv(u)<1?T(-1)+T(2)*smooth(u):T(1));
 }
 // Forward while a hind leg swings, backward while a front leg swings; changes
 // only with four contacts. After the terminal touchdown the held offset
 // recentres with four contacts.
-D sway(const GaitParameters& p,D s,double terminal) {
-  if(p.type!=GaitType::WALK||p.swayXM==0)return {};
-  if(terminal>=0&&s.p>=terminal)return D(swayRegular(p,D(terminal)).p)*(D(1)-smooth((s-D(terminal))*D(1/(p.duty-.75))));
+template<class T> T sway(const GaitParameters& p,T s,double terminal) {
+  if(p.type!=GaitType::WALK||p.swayXM==0)return T();
+  if(terminal>=0&&pv(s)>=terminal)return T(pv(swayRegular(p,T(terminal))))*(T(1)-smooth((s-T(terminal))*T(1/(p.duty-.75))));
   return swayRegular(p,s);
 }
-D lateralRegular(const GaitParameters& p,D s) {
-  const double w=p.duty-.75;const D a(p.swayYM),inv(1/w);
+template<class T> T lateralRegular(const GaitParameters& p,T s) {
+  const double w=p.duty-.75;const T a(p.swayYM),inv(1/w);
   if(p.reverse){  // LH, RF, RH, LF: the forward switches one quarter later
-    if(s.p<w)return D(-1)*a*smooth(s*inv);  // leave the centred stand
-    if(s.p<.25)return D(-1)*a;
-    s=s-D(.25);
-  }else if(s.p<w)return a*smooth(s*inv);  // leave the centred stand
-  const D f=s-D(std::floor(s.p));
-  if(f.p<w)return a*(D(2)*smooth(f*inv)-D(1));
-  if(f.p<.5)return a;
-  if(f.p<.5+w)return a*(D(1)-D(2)*smooth((f-D(.5))*inv));
-  return D(-1)*a;
+    if(pv(s)<w)return T(-1)*a*smooth(s*inv);  // leave the centred stand
+    if(pv(s)<.25)return T(-1)*a;
+    s=s-T(.25);
+  }else if(pv(s)<w)return a*smooth(s*inv);  // leave the centred stand
+  const T f=s-T(std::floor(pv(s)));
+  if(pv(f)<w)return a*(T(2)*smooth(f*inv)-T(1));
+  if(pv(f)<.5)return a;
+  if(pv(f)<.5+w)return a*(T(1)-T(2)*smooth((f-T(.5))*inv));
+  return T(-1)*a;
 }
 // +Y while the right legs swing, -Y while the left legs swing; changes only
 // with four contacts, recentres after the terminal touchdown.
-D lateral(const GaitParameters& p,D s,double terminal) {
-  if(p.type!=GaitType::WALK||p.swayYM==0)return {};
-  if(terminal>=0&&s.p>=terminal)return D(lateralRegular(p,D(terminal)).p)*(D(1)-smooth((s-D(terminal))*D(1/(p.duty-.75))));
+template<class T> T lateral(const GaitParameters& p,T s,double terminal) {
+  if(p.type!=GaitType::WALK||p.swayYM==0)return T();
+  if(terminal>=0&&pv(s)>=terminal)return T(pv(lateralRegular(p,T(terminal))))*(T(1)-smooth((s-T(terminal))*T(1/(p.duty-.75))));
   return lateralRegular(p,s);
 }
-void body(CartesianSample& out,Planar b,D height,D shift,D side=D()) {
-  D x=b.x+cs(b.yaw)*shift-sn(b.yaw)*side,y=b.y+sn(b.yaw)*shift+cs(b.yaw)*side;
-  out.body.translationM={x.p,y.p,height.p};
-  out.bodyVelocity={x.v,y.v,height.v};out.bodyAcceleration={x.a,y.a,height.a};
-  double c=std::cos(b.yaw.p),s=std::sin(b.yaw.p);
+inline void bodyRates(CartesianSample& out,double,double,double,double){out.bodyVelocity={0,0,0};out.bodyAcceleration={0,0,0};out.yawVelocity=out.yawAcceleration=0;}
+inline void bodyRates(CartesianSample& out,const D& x,const D& y,const D& height,const D& yaw){
+  out.bodyVelocity={x.v,y.v,height.v};out.bodyAcceleration={x.a,y.a,height.a};out.yawVelocity=yaw.v;out.yawAcceleration=yaw.a;}
+template<class T> void body(CartesianSample& out,PlanarT<T> b,T height,T shift,T side=T()) {
+  const double c=std::cos(pv(b.yaw)),s=std::sin(pv(b.yaw));
+  const T cy=csFrom(b.yaw,c,s),sy=snFrom(b.yaw,c,s);
+  T x=b.x+cy*shift-sy*side,y=b.y+sy*shift+cy*side;
+  out.body.translationM={pv(x),pv(y),pv(height)};
+  bodyRates(out,x,y,height,b.yaw);
   out.body.rotation[0][0]=c;out.body.rotation[0][1]=-s;
   out.body.rotation[1][0]=s;out.body.rotation[1][1]=c;
-  out.yawVelocity=b.yaw.v;out.yawAcceleration=b.yaw.a;
 }
-D ramp(D u){return u*u*u*u*(D(2.5)+u*(D(-3)+u));}  // integral of smooth(u)
+template<class T> T ramp(T u){return u*u*u*u*(T(2.5)+u*(T(-3)+u));}  // integral of smooth(u)
 // Geometric stride law: body progress, in cycles of advance. Identity without
 // ramps. The start raises the progress rate 0->1 over startCycles; after the
 // decel cycle S=terminal-stopCycles the rate falls 1->0 at the terminal
 // touchdown. Both are C2 in cycles, so a constant clock starts and stops the
 // body with zero velocity and acceleration.
-D progress(const GaitParameters& p,D s,double terminal,bool decel) {
+template<class T> T progress(const GaitParameters& p,T s,double terminal,bool decel) {
   const double a=p.startCycles;
-  D r=a>0?(s.p<a?D(a)*ramp(s*D(1/a)):s-D(.5*a)):s;
-  if(decel&&terminal>=0&&p.stopCycles>0&&s.p>terminal-p.stopCycles){
+  T r=a>0?(pv(s)<a?T(a)*ramp(s*T(1/a)):s-T(.5*a)):s;
+  if(decel&&terminal>=0&&p.stopCycles>0&&pv(s)>terminal-p.stopCycles){
     const double S=terminal-p.stopCycles,L=p.stopCycles,base=a>0?S-.5*a:S;
-    if(s.p>=terminal)return D(base+.5*L);
-    const D v=(s-D(S))*D(1/L);r=D(base)+D(L)*(v-ramp(v));
+    if(pv(s)>=terminal)return T(base+.5*L);
+    const T v=(s-T(S))*T(1/L);r=T(base)+T(L)*(v-ramp(v));
   }
   return r;
 }
@@ -90,29 +111,30 @@ Vector3 anchor(const GaitParameters& p,unsigned leg,double td,double terminal) {
   // A foot that touches down by the decel cycle keeps the regular law: a STOP
   // request never moves a planted foot or an in-flight swing target.
   const bool decel=terminal>=0&&td>terminal-p.stopCycles;
-  const auto b=nominal(p,progress(p,D(s),terminal,decel));double c=std::cos(b.yaw.p),si=std::sin(b.yaw.p);
-  return {b.x.p+c*f.x-si*f.y,b.y.p+si*f.x+c*f.y,0};
+  const auto b=nominal(p,progress(p,s,terminal,decel));double c=std::cos(b.yaw),si=std::sin(b.yaw);
+  return {b.x+c*f.x-si*f.y,b.y+si*f.x+c*f.y,0};
 }
 double offset(const GaitParameters& p,unsigned leg){
   static const double reverse[4]={0,.5,.25,.75};
   return p.reverse&&p.type==GaitType::WALK&&leg<4?reverse[leg]:gaitOffset(p.type,static_cast<LegId>(leg));
 }
 // A planar law expressed in the world through a constant SE(2) frame.
-Planar place(const double f[3],Planar a){
-  const D c(std::cos(f[2])),s(std::sin(f[2]));
-  return {D(f[0])+c*a.x-s*a.y,D(f[1])+s*a.x+c*a.y,D(f[2])+a.yaw};
+template<class T> PlanarT<T> place(const double f[3],PlanarT<T> a){
+  const T c(std::cos(f[2])),s(std::sin(f[2]));
+  return {T(f[0])+c*a.x-s*a.y,T(f[1])+s*a.x+c*a.y,T(f[2])+a.yaw};
 }
 Vector3 place(const double f[3],Vector3 v){
   const double c=std::cos(f[2]),s=std::sin(f[2]);
   return {f[0]+c*v.x-s*v.y,f[1]+s*v.x+c*v.y,v.z};
 }
-CartesianSample sample(const GaitParameters& p,double cycles,double rate,double accel,double terminal,GaitTrack* track){
-  CartesianSample out;
-  if(!validGaitParameters(p)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(rate)||!std::isfinite(accel)||
-     !std::isfinite(terminal)||(terminal!=-1&&(terminal<1||terminal*4!=std::floor(terminal*4)||cycles>terminal+gaitSettleCycles(p))))return out;
-  if(terminal!=-1&&p.stopCycles>0&&terminal-p.stopCycles<p.startCycles)return out;
-  const double identity[3]={0,0,0};const double* frame=track?track->frame:identity;
-  D s(cycles,rate,accel);body(out,place(frame,nominal(p,progress(p,s,terminal,true))),D(p.heightM),sway(p,s,terminal),lateral(p,s,terminal));out.cycles=cycles;
+inline void setP(double& u,double value){u=value;}
+inline void setP(D& u,double value){u.p=value;}
+inline void footRates(CartesianSample&,unsigned,double,double,double){}
+inline void footRates(CartesianSample& out,unsigned i,const D& x,const D& y,const D& z){out.velocity[i]={x.v,y.v,z.v};out.acceleration[i]={x.a,y.a,z.a};}
+// One sample of the law with the clock jet s (T=double: positions only).
+template<class T> void sampleLaw(CartesianSample& out,const GaitParameters& p,T s,double terminal,const double* frame,GaitTrack* track){
+  const double cycles=pv(s);
+  body(out,place(frame,nominal(p,progress(p,s,terminal,true))),T(p.heightM),sway(p,s,terminal),lateral(p,s,terminal));out.cycles=cycles;
   for(unsigned i=0;i<4;++i){auto phase=legPhase(p,static_cast<LegId>(i),cycles);
     // After the terminal touchdown all four feet stay down (recentring window).
     if(terminal>=0&&cycles>=terminal&&!phase.stance){phase.stance=phase.boundary=true;phase.swingProgress=0;}
@@ -133,9 +155,9 @@ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double 
         for(unsigned j=0;j<3;++j)ramp=ramp||(track->goalRate[j]>0&&track->goal[j]!=now[j]);
         if(ramp&&terminal<0){
           // Integrate the planned twist from now to that step's mid-stance.
-          const double mid=td+1+p.duty*.5;double r0=progress(p,D(cycles),terminal,true).p;
-          const Planar w=place(frame,nominal(p,D(r0)));double x=w.x.p,y=w.y.p,yaw=w.yaw.p;
-          for(unsigned k=1;k<=16;++k){const double c=cycles+(mid-cycles)*k/16,r1=progress(p,D(c),terminal,true).p,t=c-cycles-(mid-cycles)/32,dr=r1-r0;r0=r1;
+          const double mid=td+1+p.duty*.5;double r0=progress(p,cycles,terminal,true);
+          const auto w=place(frame,nominal(p,r0));double x=w.x,y=w.y,yaw=w.yaw;
+          for(unsigned k=1;k<=16;++k){const double c=cycles+(mid-cycles)*k/16,r1=progress(p,c,terminal,true),t=c-cycles-(mid-cycles)/32,dr=r1-r0;r0=r1;
             double xi[3];for(unsigned j=0;j<3;++j){const double g=track->goal[j]-now[j];xi[j]=now[j]+std::copysign(std::fmin(std::abs(g),track->goalRate[j]*t),g);}
             const double a=xi[2]*dr,si=std::abs(xi[2])>1e-9?std::sin(a)/xi[2]:dr,co=std::abs(xi[2])>1e-9?(1-std::cos(a))/xi[2]:0;
             const double bx=xi[0]*si-xi[1]*co,by=xi[0]*co+xi[1]*si;
@@ -147,9 +169,18 @@ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double 
       a=track->anchor[i];b=track->target[i];
     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
     out.feet[i]=a;
-    if(!phase.stance){D u=(s-D(td+p.duty))*D(1/(1-p.duty));if(phase.boundary)u.p=0;D f=smooth(u);
-      D x=D(a.x)+D(b.x-a.x)*f,y=D(a.y)+D(b.y-a.y)*f,z=D(64*p.liftM)*u*u*u*(D(1)-u)*(D(1)-u)*(D(1)-u);
-      out.feet[i]={x.p,y.p,z.p};out.velocity[i]={x.v,y.v,z.v};out.acceleration[i]={x.a,y.a,z.a};}}
+    if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=smooth(u);
+      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
+      out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
+}
+CartesianSample sample(const GaitParameters& p,double cycles,double rate,double accel,double terminal,GaitTrack* track){
+  CartesianSample out;
+  if(!validGaitParameters(p)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(rate)||!std::isfinite(accel)||
+     !std::isfinite(terminal)||(terminal!=-1&&(terminal<1||terminal*4!=std::floor(terminal*4)||cycles>terminal+gaitSettleCycles(p))))return out;
+  if(terminal!=-1&&p.stopCycles>0&&terminal-p.stopCycles<p.startCycles)return out;
+  const double identity[3]={0,0,0};const double* frame=track?track->frame:identity;
+  if(rate==0&&accel==0)sampleLaw<double>(out,p,cycles,terminal,frame,track);
+  else sampleLaw<D>(out,p,D(cycles,rate,accel),terminal,frame,track);
   out.valid=true;return out;
 }
 bool finite(Vector3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
@@ -225,10 +256,10 @@ bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParamete
      from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||from.swayXM!=to.swayXM||
      from.swayYM!=to.swayYM||from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad)return false;
   // Same world pose of the nominal body at this progress under both laws.
-  const D r(progress(from,D(cycles),terminal,true).p);
-  const Planar world=place(track.frame,nominal(from,r)),next=nominal(to,r);
-  const double yaw=world.yaw.p-next.yaw.p,c=std::cos(yaw),s=std::sin(yaw);
-  const double f[3]={world.x.p-(c*next.x.p-s*next.y.p),world.y.p-(s*next.x.p+c*next.y.p),yaw};
+  const double r=progress(from,cycles,terminal,true);
+  const auto world=place(track.frame,nominal(from,r)),next=nominal(to,r);
+  const double yaw=world.yaw-next.yaw,c=std::cos(yaw),s=std::sin(yaw);
+  const double f[3]={world.x-(c*next.x-s*next.y),world.y-(s*next.x+c*next.y),yaw};
   for(double v:f)if(!std::isfinite(v))return false;
   for(unsigned i=0;i<3;++i)track.frame[i]=f[i];
   return true;
