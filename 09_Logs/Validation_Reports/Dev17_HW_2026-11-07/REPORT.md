@@ -49,6 +49,12 @@ Regole di lettura: le finestre `(34)/(35)/(36)` si sovrappongono parzialmente e 
 
 Dopo l'esportazione l'operatore ha spento il robot con KEY OFF del BMS e lo ha riposto sulla fixture.
 
+Screenshot della dashboard durante la sessione (copie byte-identiche dei PNG nello ZIP, vedi [manifest](EVIDENCE_MANIFEST.md#d-screenshot-pubblicati-in-chiaro)):
+
+| READY, Twin e ViewCube (file delle 18:47) | STAND100 raggiunto, Twin in vista FRONTE (file delle 18:52) |
+|---|---|
+| ![Motion Cockpit in READY](screenshots/matdog-motion-cockpit-ready-idle-twin-viewcube-2026-11-07.png) | ![Motion Cockpit dopo STAND 100 mm](screenshots/matdog-motion-cockpit-stand100-reached-twin-front-2026-11-07.png) |
+
 ## 4. Perimetro VERIFIED HARDWARE (questo robot, dev.17)
 
 - IDLE, dashboard Motion Cockpit operativa, STOP sempre visibile.
