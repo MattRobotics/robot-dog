@@ -74,8 +74,14 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   recovery, fixed dashboard slots and joystick anchor, Twin after a reload
 //   with torque ON, WALK STANDARD directly after a verified STOP, Motion
 //   Cockpit and Twin view cube; pre-flash: dashboard joystick commands
-//   admitted in page-session order only.
-constexpr const char* kFirmwareVersion = "1.0.1-dev.17"; // Offline candidate; hardware qualification pending
+//   admitted in page-session order only. Released unchanged as Stable v1.0.1.
+// 1.0.2-dev.1: v1.0.1 + Motion release budget (A1 position-only gait
+//   sampling, A2 exact analytic IK savings, T2 look-ahead nominal gait on
+//   alternate WALK releases, T1b retarget-tolerant IMU correction reuse);
+//   gait law, geometry, boxes, calibration, STOP and drive profile unchanged.
+//   Identity proposed by the motion-perf-next branch, to be agreed before any
+//   flash; the installed firmware stays 1.0.1-dev.17 (APP 14e055a0...).
+constexpr const char* kFirmwareVersion = "1.0.2-dev.1"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
