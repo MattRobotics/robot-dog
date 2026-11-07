@@ -167,6 +167,8 @@ async function boot(initialStatus = fx.status_ready) {
     assert.strictEqual(b.version, 1); assert.strictEqual(b.owner, 'dashboard'); assert.strictEqual(b.type, type);
     assert.deepStrictEqual(b.params, params); assert.strictEqual(b.ttl_ms, ttl);
     assert(/^[A-Za-z0-9_.-]{1,48}$/.test(b.id)); assert.strictEqual(b.sequence, ++sequence);
+    // dev.17: the Controller orders joystick commands by page session + sequence: "simple-<session>-<sequence>".
+    assert(/^simple-[0-9a-z]+-\d+$/.test(b.id) && b.id.endsWith('-' + b.sequence), name + ': id carries the page session and its sequence');
     assert.strictEqual(b.issued_at_ms, Math.floor(JSON.parse(device.status).now_ms + p.clock() - received), name + ': Controller uptime estimate');
     if (name) envelopes.push(name + '\t' + call.body);
     return b;
@@ -497,6 +499,10 @@ async function boot(initialStatus = fx.status_ready) {
   }
   // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
+  { const r = p.dom.window.matdogMotionTrace.commands.at(-1);  // dev.17: STOP input -> request measurable on the phone
+    // jsdom stamps events with the real epoch clock, a browser with performance.now()'s origin:
+    // the clock agreement is checked in Chrome (test_stop_twin_load_browser.cjs), presence here.
+    assert(r.type === 'MOTION.STOP' && Number.isFinite(r.input_ms), 'STOP trace record carries the input event time: ' + JSON.stringify(r)); }
   assert(/STOP · .* · HTTP 200 · ACCEPTED · STOP_REQUESTED/.test(last()) && /arresto da verificare/.test(last()), last());
   await refresh(fx.status_stopping);
   assert(!values().includes('13/13 verificato') && /\d+\/13 verificati/.test(values()), values());

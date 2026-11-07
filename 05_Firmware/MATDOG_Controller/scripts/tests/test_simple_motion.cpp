@@ -648,7 +648,8 @@ static void proneRest(){
     const auto done=ack(r,service);
     assert(r.m.state()==simple::State::READY&&!std::strcmp(r.m.reason(),"PRONE_REST")&&done.find("\"outcome\":\"COMPLETED\",\"reason\":\"PRONE_REST\",\"id\":\"prone-1\"")!=std::string::npos);
     // Rest: no position write, no enable, torque OFF, reads continue; a neutral joystick does not take over the command.
-    {char j[200];const int n=std::snprintf(j,sizeof j,"{\"version\":1,\"id\":\"joy-0\",\"sequence\":2,\"issued_at_ms\":%lu,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",(unsigned long)(r.p.now/1000));
+    // (dev.17: a dashboard joystick id ends with its sequence, as the page sends it.)
+    {char j[200];const int n=std::snprintf(j,sizeof j,"{\"version\":1,\"id\":\"joy-2\",\"sequence\":2,\"issued_at_ms\":%lu,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",(unsigned long)(r.p.now/1000));
      motion::MotionCommand c;const char* why=nullptr;assert(core::parseMotionJson(j,size_t(n),&c,&why));test_clock_us=r.p.now;assert(!std::strcmp(service.command(c,r.p.now/1000).reason,"NOT_WALKING"));
      assert(ack(r,service)==done);}
     r.p.missing=true;for(unsigned k=0;k<100;++k)r.tick();r.p.missing=false;

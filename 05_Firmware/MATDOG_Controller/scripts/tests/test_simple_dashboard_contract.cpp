@@ -216,6 +216,105 @@ int fixtures(const char* path) {
     for (unsigned i = 0; i < 4000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
     check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - simple::kStrideM[2] / simple::kWalkPeriodS) < 1e-12, "STOP->WALK fixture: WALK60 running");
   }
+  {
+    // dev.17 pre-flash: dashboard joystick order, through the real JSON parser,
+    // the HTTP gate with session/CSRF, MotionService and SimpleMotion. Bodies
+    // are shaped like the page's: id "simple-<page session>-<sequence>".
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK order: HOLD at the WALK height");
+    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;  // full forward on the pad
+    auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
+    auto joy = [&](const char* page, unsigned seq, uint32_t issued, double v) {
+      char b[400];
+      std::snprintf(b, sizeof(b), "{\"version\":1,\"id\":\"simple-%s-%u\",\"sequence\":%u,\"issued_at_ms\":%u,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":%.17g,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",
+                    page, seq, seq, issued, v);
+      return std::string(b); };
+    auto send = [&](const std::string& b) { return serve(request(b, session), session, service, rig, now()).code; };
+    auto idle = [&](unsigned n) { bool moved = false; for (unsigned k = 0; k < n; ++k) { rig.tick(); moved |= rig.m.state() != simple::State::STANDING; } return moved; };
+    auto hold = [&]() { for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::STANDING; ++k) rig.tick(); return rig.m.state() == simple::State::STANDING; };
+    // 1. The move seq 10 is delayed behind the release seq 11 (robot holding):
+    //    applied after it, it would start a walk with no finger on the pad.
+    const std::string move10 = joy("kq3a1", 10, now(), vx); rig.tick(); rig.tick();
+    const std::string neutral11 = joy("kq3a1", 11, now(), 0);
+    check(send(neutral11) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: release seq 11 accepted at HOLD");
+    rig.tick();
+    check(send(move10) == "REJECTED JOYSTICK_SUPERSEDED" && !idle(100), "JOYSTICK order: the late move seq 10 is refused after the release seq 11, the robot keeps holding");
+    // 2. Move seq 12 -> release seq 13 -> the move seq 12 delivered again later.
+    const std::string move12 = joy("kq3a1", 12, now(), vx);
+    check(send(move12) == "ACCEPTED COMMAND_ACCEPTED" && rig.m.joystickActive(), "JOYSTICK order: new move seq 12 after the release accepted");
+    rig.tick(); rig.tick();
+    const std::string neutral13 = joy("kq3a1", 13, now(), 0);
+    check(send(neutral13) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: release seq 13 accepted");
+    check(send(move12) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: the move seq 12 delivered again after the release is refused");
+    // Duplicates and retransmissions: the last command again is its own ack,
+    // never executed twice; an older one is refused.
+    check(send(neutral13) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: retransmitted release seq 13 answered from the replay slot");
+    check(send(joy("kq3a1", 9, now(), vx)) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: an older move seq 9 is refused");
+    check(hold() && !idle(100), "JOYSTICK order: no walk starts after the release");
+    // 3. A new explicit move after the release starts the walk; refreshes keep it.
+    unsigned seq = 14; bool walking = false;
+    for (unsigned k = 0; k < 3000 && !walking; ++k) {
+      if (k % 12 == 0) check(send(joy("kq3a1", seq++, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: refresh accepted while rising");
+      rig.tick(); walking = rig.m.state() == simple::State::WALKING; }
+    check(walking && std::abs(rig.m.walkVelocityX() - vx) < 1e-12, "JOYSTICK order: the next press walks (no joystick lock)");
+    for (unsigned k = 0; k < 60; ++k) { if (k % 12 == 0) send(joy("kq3a1", seq++, now(), vx)); rig.tick(); }
+    // 4. Reload: a new page session restarts at sequence 1 and is accepted; a
+    //    late request of the previous page, issued before it, is refused.
+    const std::string lateOldPage = joy("kq3a1", seq++, now(), vx);
+    rig.tick(); rig.tick(); rig.tick();
+    check(send(joy("kr7b2", 1, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED" && rig.m.state() == simple::State::WALKING, "JOYSTICK order: reloaded page, sequence 1, accepted");
+    check(send(lateOldPage) == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK order: a late request of the previous page is refused after the new page");
+    check(send(joy("kr7b2", 1, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: identical retransmission of the new page answered from the replay slot");
+    check(send(joy("kr7b2", 2, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: the new page goes on");
+    // 5. TTL: an expired refresh is refused by the contract and leaves the order unchanged.
+    check(send(joy("kr7b2", 3, now() - 1000, vx)) == "REJECTED EXPIRED", "JOYSTICK order: TTL still enforced");
+    check(send(joy("kr7b2", 4, now(), vx)) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK order: next fresh refresh accepted after an expired one");
+    // 6. Not a joystick update, no order check: a delayed WALK STOP of the
+    //    previous page, with a sequence below the joystick ones, still stops.
+    check(send(std::string("{\"version\":1,\"id\":\"simple-kq3a1-7\",\"sequence\":7,\"issued_at_ms\":") + std::to_string(now()) +
+               ",\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":0,\"vy\":0,\"yaw_rate\":0}}") == "ACCEPTED COMMAND_ACCEPTED" &&
+          !std::strcmp(rig.m.reason(), "WALK_STOPPING"), "JOYSTICK order: WALK STOP is never subject to the joystick order");
+    // 7. STOP keeps precedence with an old sequence and a long expired timestamp.
+    check(send(std::string("{\"version\":1,\"id\":\"simple-kq3a1-1\",\"sequence\":1,\"issued_at_ms\":") + std::to_string(now() - 60000) +
+               ",\"ttl_ms\":1,\"owner\":\"dashboard\",\"type\":\"MOTION.STOP\",\"params\":{}}") == "ACCEPTED STOP_REQUESTED", "JOYSTICK order: STOP with an old sequence and timestamp accepted");
+    rig.tick();  // the loop services the STOP request
+    const auto latched = send(joy("kr7b2", 5, now(), vx));
+    check(latched == "REJECTED STOP_IN_PROGRESS" || latched == "REJECTED STOP_LATCHED", "JOYSTICK order: joystick refused while STOP is active: " + latched);
+    for (unsigned k = 0; k < 300 && !rig.m.stopVerified(); ++k) rig.tick();
+    check(rig.m.stopVerified() && rig.m.energized(), "JOYSTICK order: STOP verified, torque ON");
+  }
+  {
+    // Deadman without the release, and the id format, on a fresh Controller.
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK deadman: HOLD at the WALK height");
+    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;
+    auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
+    auto joy = [&](const std::string& id, unsigned seq, uint32_t issued, double v) {
+      char b[400];
+      std::snprintf(b, sizeof(b), "{\"version\":1,\"id\":\"%s\",\"sequence\":%u,\"issued_at_ms\":%u,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"BASE_VELOCITY\",\"params\":{\"vx\":%.17g,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}}",
+                    id.c_str(), seq, issued, v);
+      return std::string(b); };
+    auto send = [&](const std::string& b) { return serve(request(b, session), session, service, rig, now()).code; };
+    check(send(joy("joystick", 5, now(), vx)) == "REJECTED JOYSTICK_SEQUENCE_REQUIRED", "JOYSTICK order: id without the page sequence refused");
+    check(send(joy("simple-kz9-7", 8, now(), vx)) == "REJECTED JOYSTICK_SEQUENCE_REQUIRED", "JOYSTICK order: id sequence different from the envelope refused");
+    std::vector<std::string> sent; bool walking = false; uint64_t lastAcceptedUs = 0;
+    for (unsigned k = 0; k < 3000 && (!walking || sent.size() < 4); ++k) {
+      if (k % 12 == 0) { const unsigned seq = static_cast<unsigned>(sent.size()) + 1;
+        sent.push_back(joy("simple-kz9-" + std::to_string(seq), seq, now(), vx));
+        check(send(sent.back()) == "ACCEPTED COMMAND_ACCEPTED", "JOYSTICK deadman: refresh accepted"); lastAcceptedUs = rig.p.now; }
+      rig.tick(); walking = rig.m.state() == simple::State::WALKING; }
+    check(walking && sent.size() >= 4, "JOYSTICK deadman: walking from refreshes");
+    // The page goes silent (release lost). 600 ms later an older refresh arrives
+    // inside its TTL: refused, so it cannot extend the 1 s deadman.
+    while (rig.p.now < lastAcceptedUs + 600000) rig.tick();
+    const auto older = send(sent[sent.size() - 2]);
+    check(older == "REJECTED JOYSTICK_SUPERSEDED", "JOYSTICK deadman: an older refresh inside its TTL is refused: " + older + " sent=" + std::to_string(sent.size()));
+    for (unsigned k = 0; k < 100 && std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT"); ++k) rig.tick();
+    const double after = (rig.p.now - lastAcceptedUs) / 1e6;
+    check(!std::strcmp(rig.m.reason(), "JOYSTICK_TIMEOUT") && after >= 1.0 && after <= 1.06,
+          "JOYSTICK deadman: WALK STOP 1 s after the last accepted refresh, not extended (" + std::to_string(after) + " s)");
+    check(rig.reachStand(), "JOYSTICK deadman: the gait law ends in STAND");
+  }
   out << "}\n";
   std::printf("SIMPLE_DASHBOARD_FIXTURES = %s (%u checks; real MotionService bodies)\n", failures ? "FAIL" : "PASS", checks);
   return failures ? 1 : 0;

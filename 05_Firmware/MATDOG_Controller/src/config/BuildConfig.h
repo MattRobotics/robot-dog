@@ -73,7 +73,8 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 // dev.17: dev.16 + status pages without Motion slack, read lanes past TCP
 //   recovery, fixed dashboard slots and joystick anchor, Twin after a reload
 //   with torque ON, WALK STANDARD directly after a verified STOP, Motion
-//   Cockpit and Twin view cube.
+//   Cockpit and Twin view cube; pre-flash: dashboard joystick commands
+//   admitted in page-session order only.
 constexpr const char* kFirmwareVersion = "1.0.1-dev.17"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;

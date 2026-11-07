@@ -69,5 +69,9 @@ class MotionService {
   motion::MotionAck last_{},activeAck_{};
   uint32_t acceptedMs_=0,finishedMs_=0;
   struct Replay {uint32_t sequence=0;char id[49]{};motion::MotionAck ack{};} replay_[3]{};
+  // Dashboard joystick order (dev.17), RAM only: page session (id prefix) of
+  // the newest JOYSTICK command admitted, its sequence and issued_at_ms.
+  struct JoystickOrder {char session[49]{};uint32_t sequence=0,issuedMs=0;bool valid=false;} joystickOrder_{};
+  const char* admitJoystickOrder(const motion::MotionCommand&);
 };
 } }
