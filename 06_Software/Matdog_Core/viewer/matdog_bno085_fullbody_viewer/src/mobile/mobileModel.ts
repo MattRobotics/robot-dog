@@ -1,32 +1,54 @@
 /** Pure presentation model for the phone twin (unit-tested; no DOM). */
 import { JOINT_NAMES, type MotionFrame } from '../motion/telemetry';
-import type { ActualModelState } from '../motion/twinController';
+import type { ActualModelState, DisplayGrounding } from '../motion/twinController';
 
 export interface TwinChip { id: string; text: string; tone: 'ok' | 'warn' | 'bad' | 'info' | '' }
 export interface TwinFacts { chips: TwinChip[]; banner: string; rows: [string, string][]; jointLines: string[] }
 
 export function describeTwin(frame: MotionFrame | null, ageMs: number | null, stale: boolean, actualState: ActualModelState | null,
-  error: string, failures: number): TwinFacts {
+  error: string, failures: number, ground?: DisplayGrounding): TwinFacts {
   const chips: TwinChip[] = [];
   if (!frame) {
-    chips.push({ id: 'chip-link', text: error ? `LINK ${error.split(' ')[0]}` : 'LINK in attesa', tone: error ? 'bad' : '' });
+    chips.push({ id: 'twin-status', text: error ? 'ERRORE' : 'IN ATTESA', tone: error ? 'bad' : '' });
     return { chips, banner: error ? `Nessuna telemetria: ${error}` : 'In attesa della prima telemetria…', rows: [], jointLines: [] };
   }
   const c = frame.channels;
-  chips.push({ id: 'chip-link', text: stale ? `LINK STALE ${ageMs === null ? '' : Math.round(ageMs) + ' ms'}` : `LINK ${Math.round(ageMs ?? 0)} ms`, tone: stale ? 'bad' : failures ? 'warn' : 'ok' });
-  chips.push({ id: 'chip-imu', text: c.imuValid ? `IMU ${c.imuAgeMs ?? '?'} ms` : c.imuValid === false ? 'IMU NON VALIDA' : 'IMU N/D', tone: c.imuValid ? 'ok' : 'bad' });
   const mapped = c.mappedCount ?? 0;
-  chips.push({ id: 'chip-joints', text: actualState === 'MEASURED' ? 'GIUNTI MISURATI 12/12' : actualState === 'PARTIAL' ? `GIUNTI PARZIALI ${mapped}/12` : 'GIUNTI UNMEASURED', tone: actualState === 'MEASURED' ? 'ok' : 'warn' });
-  chips.push({ id: 'chip-raw', text: c.rawCount === null ? 'RAW N/D' : `RAW ${c.rawCount}/12`, tone: c.rawCount === 12 ? 'info' : 'warn' });
-  const banner = stale ? 'Telemetria STALE: il modello non rappresenta lo stato attuale.'
-    : actualState === 'MEASURED' ? 'Postura misurata (12 angoli da encoder mappati) · orientamento BNO085.'
-      : actualState === 'PARTIAL' ? 'Postura PARZIALE: i link grigi sono a URDF neutro, non misurati.'
-        : 'UNMEASURED: modello URDF neutro, NON è la postura reale. Calibrazione non ripristinata in RAM.';
+  const demo = /OFFLINE|SYNTHETIC|FAKE|DEMO/i.test(frame.source) || /OFFLINE|SYNTHETIC|FAKE|DEMO/i.test(frame.owner) ||
+    /^OFFLINE_|^SYNTHETIC_NOT_HARDWARE/.test(frame.reason);
+  const expired = stale || ageMs === null || !Number.isFinite(ageMs) || ageMs > 1500;
+  const imuFresh = frame.quaternion !== null && c.imuValid === true && c.imuAgeMs !== null && c.imuAgeMs <= 200;
+  const measured = actualState === 'MEASURED' && !frame.jointsStale && imuFresh;
+  const hardware = frame.source === 'CONTROLLER' || frame.source.startsWith('HARDWARE_');
+  const failed = !!error || failures > 0;
+  chips.push({ id: 'twin-status',
+    text: expired ? (demo ? 'OFFLINE · SCADUTO' : 'DATI SCADUTI') : failed ? (demo ? 'OFFLINE · ERRORE' : 'ERRORE')
+      : demo ? 'OFFLINE' : measured && hardware ? 'LIVE' : 'DATI N/D',
+    tone: expired || failed ? 'bad' : !demo && measured && hardware ? 'ok' : 'warn' });
+  const banner = expired ? 'Telemetria scaduta: il modello non rappresenta lo stato attuale.'
+    : failed ? `Telemetria non disponibile: ${error || 'errore di ricezione'}`
+      : frame.fault !== 'NONE' ? `Fault Controller: ${frame.reason || frame.fault}`
+        : actualState !== 'MEASURED' ? `${actualState ?? 'UNMEASURED'}: i link grigi non rappresentano una postura misurata.`
+          : !imuFresh ? 'Orientamento IMU non disponibile o non aggiornato.' : '';
   const rows: [string, string][] = [
+    ['Fonte telemetria', frame.source || 'non dichiarata'],
+    ['Età telemetria', ageMs === null ? 'N/D' : `${Math.round(ageMs)} ms${expired ? ' · STALE' : ''}`],
+    ['IMU', c.imuValid ? `valida · ${c.imuAgeMs ?? '?'} ms` : c.imuValid === false ? 'NON VALIDA' : 'N/D'],
+    ['Giunti', `${actualState ?? 'UNMEASURED'} · ${mapped}/12`],
+    ['RAW', c.rawCount === null ? 'N/D' : `${c.rawCount}/12`],
+    ['Quaternion BNO085 (w,x,y,z)', frame.quaternion ? [frame.quaternion.w, frame.quaternion.x, frame.quaternion.y, frame.quaternion.z].map((v) => v.toFixed(6)).join(', ') : 'N/D'],
     ['Motivo Controller', frame.reason || '—'], ['Executor', `${frame.executorState} / ${frame.standState}`],
     ['RESTORE', frame.restore ? `${frame.restore.decision} · ${frame.restore.reason}` : 'N/D (firmware senza stato RESTORE)'],
     ['Errore rete', error || 'nessuno'],
   ];
+  const source = stale ? 'unavailable' : ground?.source;
+  rows.push(['Riferimento pavimento', source === 'controller-estimate' ? 'Piano orizzontale · stima encoder + IMU'
+    : source === 'visual-envelope' ? 'Appoggio grafico dai piedi del modello · contatti non misurati'
+      : source === 'reported' ? 'Piano dichiarato dalla telemetria' : 'Non disponibile · posizione grafica non attuale']);
+  if (!stale && ground?.baseHeightM !== null && ground?.baseHeightM !== undefined && source !== 'unavailable') {
+    rows.push([source === 'visual-envelope' ? 'Quota base_link grafica' : 'Quota base_link stimata', `${(ground.baseHeightM * 1000).toFixed(1)} mm · non è una misura assoluta`]);
+    if (ground.adjustmentM > .00005) rows.push(['Correzione grafica anti-penetrazione', `+${(ground.adjustmentM * 1000).toFixed(1)} mm`]);
+  }
   const jointLines = JOINT_NAMES.map((name, i) => {
     const q = frame.actualByJoint?.[name] ?? frame.actual?.[name] ?? null;
     const raw = frame.rawTicks ? String(frame.rawTicks[i]).padStart(4) : '   —';

@@ -123,14 +123,21 @@ const row = (page, list, label) => {
   const page = await boot();
   const dot = () => page.q('#linkDot').className, txt = () => page.q('#linkText').textContent;
   const cards = () => [...page.d.querySelectorAll('.card')].map(c => c.textContent).join('|');
-  ok(dot() === 'dot ok', 'initial poll ok');
+  ok(dot() === 'dot' && page.q('#linkDot').hidden, 'normal diagnostic success has no green connection indicator');
+  ok(txt() === 'Diagnostica aggiornata' && !txt().includes('fonte browser'), 'normal success is short and neutral');
+  const timing = page.q('#diagnostic-timing'), time = () => page.q('#diagnostic-time').textContent;
+  ok(timing && !timing.open && timing.contains(page.q('#diagnostic-time')), 'diagnostic timing is in a closed detail');
+  timing.open = true;
+  ok(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(time()) && time().includes('Europe/Rome') && time().includes('fonte browser'), 'expanding details exposes the browser timestamp and its source');
+  ok(time().includes('età') && time().includes('ogni 4 s'), 'diagnostic age and cadence are retained in details');
+  timing.open = false;
   const before = cards();
   // 503 MOTION_BUDGET_UNAVAILABLE: telemetry paused, not a lost link.
   page.device.budget = true;
   for (let i = 0; i < 3; ++i) {
     const next = await page.poll();
     ok(next === 4000, 'budget refusal keeps the normal poll period (no lost-link backoff)');
-    ok(dot() === 'dot warn', 'budget refusal shown as warning, not as lost link');
+    ok(dot() === 'dot warn' && !page.q('#linkDot').hidden, 'budget refusal remains a visible warning, not a lost link');
     ok(txt().includes('MOTION_BUDGET_UNAVAILABLE') && txt().includes('non aggiornati'), 'explicit budget reason and stale data');
     ok(page.d.body.classList.contains('stale'), 'shown values marked stale');
     ok(page.q('#staleNote').textContent.includes('movimento'), 'stale note explains the Motion pause');
@@ -139,14 +146,14 @@ const row = (page, list, label) => {
   // Real network loss is still recognised.
   page.device.budget = false; page.device.down = true;
   await page.poll(); await page.poll();
-  ok(dot() === 'dot bad' && txt().startsWith('Nessuna risposta'), 'network loss still reported as lost link');
+  ok(dot() === 'dot bad' && !page.q('#linkDot').hidden && txt().startsWith('Nessuna risposta'), 'network loss still reported visibly as lost link');
   ok(page.q('#staleNote').textContent.includes('non risponde'), 'stale note for a real loss');
   // Recovery.
   page.device.down = false; await page.poll();
-  ok(dot() === 'dot ok' && !page.d.body.classList.contains('stale'), 'recovery clears warning and stale');
+  ok(dot() === 'dot' && page.q('#linkDot').hidden && txt() === 'Diagnostica aggiornata' && !page.d.body.classList.contains('stale'), 'recovery restores neutral diagnostic success and clears stale');
   // Any other 503 remains a failed attempt.
   page.device.late = true; await page.poll();
-  ok(dot() === 'dot warn' && txt().startsWith('Ultimo tentativo senza risposta'), 'other 503 counted as a failed attempt');
+  ok(dot() === 'dot warn' && !page.q('#linkDot').hidden && txt().startsWith('Ultimo tentativo senza risposta'), 'other 503 remains a visible failed attempt');
   ok(page.errors.length === 0, 'no page script errors: ' + page.errors.join(';'));
   page.close();
   console.log('PORTAL_MOTION_BUDGET_DOM PASS checks=' + checks + ' (shipped PortalPage.h script, jsdom fixtures, no device)');

@@ -67,7 +67,7 @@ async function boot() {
   const doc = dom.window.document, q = s => doc.querySelector(s);
   const poll = async (advance = 350) => { clock += advance; intervals.filter(i => i.ms === 350).forEach(i => i.fn()); await settle(); };
   const fire = async ms => { const t = timers.find(t => t.active && t.ms === ms); assert(t, 'active timer ' + ms); t.active = false; clock += ms; t.fn(); await settle(); };
-  return { dom, device, q, calls, errors, poll, fire, timers, clock: () => clock };
+  return { dom, device, q, calls, errors, poll, fire, timers, intervals, clock: () => clock };
 }
 
 (async () => {
@@ -81,6 +81,7 @@ async function boot() {
   await p.poll();
   assert.deepStrictEqual(p.errors, [], 'shipped scripts run without DOM errors');
   assert.strictEqual(q('#simple-state').textContent, 'READY');
+  assert.strictEqual(q('#simple-state').dataset.tone, 'ok', 'Controller READY with admission true is green');
   assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND/WALK enabled by Controller readiness with a session');
   assert(values().includes('Motion ammessa dal Controller' + 'sì'));
   // Motion is the first, open page; STOP stays in the header on every page.
@@ -88,6 +89,22 @@ async function boot() {
   assert(!q('#motion-page').hidden && q('#dashboard').hidden && q('#motion-page').contains(q('#simple-motion')));
   q('[data-page="dashboard"]').click(); assert(q('#motion-page').hidden && !q('#dashboard').hidden && q('header #simple-stop'));
   p.dom.window.document.querySelector('nav button').click(); assert(!q('#motion-page').hidden);
+  const twinPanel = q('#simple-twin');
+  assert(twinPanel && !twinPanel.hidden && !twinPanel.closest('details'), 'Twin visible without opening a disclosure');
+  assert(twinPanel.compareDocumentPosition(q('#simple-controls')) & p.dom.window.Node.DOCUMENT_POSITION_FOLLOWING, 'Twin precedes Motion controls in the cockpit');
+  assert.strictEqual(q('#simple-twin h3 a'), null, 'no redundant Comandi link');
+  assert.strictEqual(q('#simple-controls').className, 'command-panel');
+  const joystick = q('#simple-joystick');
+  assert(joystick && q('#joy-pad') && joystick.textContent.includes('NON VALIDATO SU HARDWARE') && joystick.textContent.includes('Rotazione'), 'joystick panel shipped, marked not hardware-validated');
+  assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
+  const diagnostics = q('#simple-diagnostics');
+  assert(diagnostics && !diagnostics.open && diagnostics.contains(q('#simple-values')) && diagnostics.contains(q('#simple-joints')) && diagnostics.contains(q('#simple-detail')), 'technical details remain in one closed diagnostic panel');
+  assert(!q('#simple-state').closest('details') && !q('#simple-reason').closest('details') && !q('#simple-last').closest('details') && !q('#simple-stop').closest('details'), 'state, command result and STOP remain visible outside diagnostics');
+  assert(q('#simple-stand').nextElementSibling === q('#simple-prone') && q('#simple-walk').nextElementSibling === q('#simple-walk-stop'), 'paired Motion controls preserved');
+  assert.strictEqual(p.dom.window.getComputedStyle(q('header')).position, 'sticky', 'header STOP remains reachable while scrolling');
+  assert.strictEqual(q('#simple-prone').textContent, 'PRONE');
+  assert(!/sperimentale/i.test(q('#simple-motion').textContent + q('#simple-prone').title), 'PRONE copy reflects dev.7 validation');
+  assert(/coppia viene rilasciata/.test(q('#simple-prone').title) && /Appoggio non verificato/.test(q('#simple-prone').title), 'PRONE remains explicit about support and torque');
   const ready = JSON.parse(fx.status_ready);
   // Twelve joints in degrees from the real status rad values; measured pose and session rows.
   const jrows = [...q('#simple-joints').tBodies[0].rows];
@@ -100,6 +117,7 @@ async function boot() {
   assert(values().includes('Posa misurata (encoder)PRONE (ripiegata)') && ready.pose_region === 'PRONE_ENTRY', values());
   assert(values().includes('Sessione amministratorevalida'));
   assert(values().includes('Quota nominale richiesta (comando)') && values().includes('Quota nominale stimata (encoder + IMU)'));
+  assert(values().includes('Quota base_link stimata (encoder + IMU)') && !values().includes('Ventre sul terreno'), 'height presentation identifies an estimate');
   assert(/nessuno inviato/.test(last()));
   let received = p.clock(), sequence = 0;
 
@@ -126,6 +144,24 @@ async function boot() {
   }
   const refresh = async status => { device.status = status; await p.poll(); received = p.clock(); };
   const ok = body => ({ status: 200, body });
+
+  // Deduplicate repeated readiness, while real refusals remain explicit.
+  {
+    const t = JSON.parse(fx.status_ready); t.ready = false;
+    t.reason = t.readiness_reason = 'SERVO_FEEDBACK_STALE';
+    await refresh(JSON.stringify(t));
+    assert.strictEqual(q('#simple-reason').textContent, 'Feedback dei 12 servo non aggiornati.');
+    t.reason = 'IMU_STALE';
+    await refresh(JSON.stringify(t));
+    assert.strictEqual(q('#simple-reason').textContent, 'Campione IMU scaduto: torque OFF. · Feedback dei 12 servo non aggiornati.', 'distinct real reasons are preserved');
+    for (const [reason, readiness] of [['OFFLINE_UI_FIXTURE', 'OFFLINE_UI_FIXTURE'], ['OFFLINE_UI_FIXTURE', 'OFFLINE_DISPLAY_ONLY']]) {
+      t.reason = reason; t.readiness_reason = readiness;
+      await refresh(JSON.stringify(t));
+      assert.strictEqual(q('#simple-reason').textContent, 'Modalità offline', 'one readable offline indication before the Twin is ready');
+      assert(!q('#simple-reason').hidden);
+    }
+    await refresh(fx.status_ready);
+  }
 
   // Torque from the control read only: 1 ON, 0 OFF; -1, any other value, a
   // control read older than 3 s or an invalid feedback are UNKNOWN.
@@ -161,16 +197,26 @@ async function boot() {
     const partial = JSON.parse(fx.status_ready); partial.telemetry.actual_rad = null; partial.telemetry.actual_rad_by_joint = Array(12).fill(0.1); partial.telemetry.actual_rad_by_joint[4] = null;
     const pf = parseMotionFrame(partial);
     assert(pf && pf.actual === null && pf.jointsStale && pf.actualByJoint[JOINT_NAMES[4]] === null, 'a joint never read stays unknown in the Twin');
-    // Lazy: the 3D model is requested only when the operator opens it. Open,
-    // it renders this page's own status (postMessage, same origin): one status
-    // read per poll either way (test_twin_feed_parent.mjs: the Twin never polls).
+    // The visible Twin is preloaded only at SAFE_OFF and renders this page's
+    // own status (postMessage, same origin): one status read per poll
+    // (test_twin_feed_parent.mjs: the Twin never polls).
     const frameEl = q('#simple-twin-frame');
     assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'Twin preloaded at SAFE_OFF');
     const posted = [], reads = () => p.calls.filter(c => c.url === '/api/motion/status').length;
-    Object.defineProperty(frameEl, 'contentWindow', { configurable: true, get: () => ({ postMessage: (data, origin) => posted.push({ data, origin }) }) });
+    const frameWindow = { postMessage: (data, origin) => posted.push({ data, origin }) };
+    Object.defineProperty(frameEl, 'contentWindow', { configurable: true, get: () => frameWindow });
+    Object.defineProperty(frameEl, 'offsetHeight', { configurable: true, value: 502 });
+    Object.defineProperty(frameEl, 'clientHeight', { configurable: true, value: 500 });
+    const heightMessage = (height, origin = 'http://192.168.4.1', source = frameWindow) => p.dom.window.dispatchEvent(new p.dom.window.MessageEvent('message', { origin, source, data: { type: 'MATDOG_TWIN_HEIGHT', height } }));
+    const initialHeight = frameEl.style.height, beforeHeight = p.calls.length;
+    heightMessage(900, 'http://192.168.4.2'); heightMessage(900, 'http://192.168.4.1', {});
+    for (const bad of [0, -1, NaN, Infinity, 10000, '900']) heightMessage(bad);
+    assert.strictEqual(frameEl.style.height, initialHeight, 'only same-origin exact iframe finite bounded heights accepted');
+    heightMessage(555.2); assert.strictEqual(frameEl.style.height, '558px', 'natural collapsed content height includes iframe borders');
+    heightMessage(960); assert.strictEqual(frameEl.style.height, '962px', 'expanded diagnostics grow below the render surface without clipping the border-box');
+    assert.strictEqual(p.calls.length, beforeHeight, 'iframe sizing issues no request');
     await refresh(fx.status_ready);
-    assert.strictEqual(posted.length, 1, 'closed preloaded Twin receives same telemetry');posted.length=0;
-    q('#simple-twin').open = true; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
+    assert.strictEqual(posted.length, 1, 'visible preloaded Twin receives same telemetry');posted.length=0;
     assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'Twin served by the same host, fed by this page');
     let before = reads();
     await refresh(fx.status_walking);
@@ -179,18 +225,16 @@ async function boot() {
     const polled = JSON.parse(fx.status_walking), { channels, ...rest } = posted[0].data;
     assert.deepStrictEqual(rest, polled, 'the Twin gets exactly the polled status');
     assert.deepStrictEqual(JSON.parse(JSON.stringify(channels)), { imu: { valid: polled.imu_valid, age_ms: polled.imu_age_ms }, raw: { count: 12 } }, 'IMU age and RAW count bound to the viewer channels');
-    q('#simple-twin').open = false; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
-    assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'closed Twin preserves its model');
+    assert.strictEqual(frameEl.getAttribute('src'), '/twin/?feed=parent', 'Twin preserves its model between states');
     before = reads();
     await refresh(fx.status_ready);
-    assert(reads() === before + 1 && posted.length === 2, 'closed again: one read and existing feed');
-    // First open during WALK may get a 503 for the module itself: retry the
+    assert(reads() === before + 1 && posted.length === 2, 'idle again: one read and existing feed');
+    // A first load interrupted by WALK may get a 503 for the module: retry the
     // iframe once after SAFE_OFF, without a timer/download loop during WALK.
     await refresh(fx.status_walking);
     const srcDescriptor = Object.getOwnPropertyDescriptor(p.dom.window.HTMLIFrameElement.prototype, 'src');
     let navigations = 0;
     Object.defineProperty(frameEl, 'src', { configurable: true, get(){ return srcDescriptor.get.call(this); }, set(v){ navigations++; srcDescriptor.set.call(this,v); } });
-    q('#simple-twin').open=true; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
     const opened=navigations;
     await refresh(fx.status_walking); await refresh(fx.status_walking);
     assert.strictEqual(navigations,opened,'no repeated downloads while WALK is active');
@@ -198,14 +242,76 @@ async function boot() {
     assert.strictEqual(navigations,opened+1,'automatic iframe retry when motion is idle');
     await refresh(fx.status_ready);
     assert.strictEqual(navigations,opened+1,'no repeated reload after idle recovery');
-    q('#simple-twin').open=false; q('#simple-twin').dispatchEvent(new p.dom.window.Event('toggle')); await settle();
+    // The loaded Twin owns the sole demo badge; the command panel still
+    // surfaces every real fault/refusal, even in an offline fixture.
+    p.dom.window.dispatchEvent(new p.dom.window.MessageEvent('message', { origin: 'http://192.168.4.1', source: frameWindow, data: { type: 'MATDOG_TWIN_READY' } }));
+    const demo = JSON.parse(fx.status_ready); demo.ready = false;
+    demo.reason = 'OFFLINE_UI_FIXTURE'; demo.readiness_reason = 'OFFLINE_DISPLAY_ONLY';
+    await refresh(JSON.stringify(demo));
+    assert(q('#simple-reason').hidden && q('#simple-reason').textContent === '', 'loaded Twin demo badge is not duplicated');
+    demo.fault = true;
+    await refresh(JSON.stringify(demo));
+    assert.strictEqual(q('#simple-state').textContent, 'FAULT');
+    assert.strictEqual(q('#simple-state').dataset.tone, 'bad', 'fault flag takes priority over raw READY state');
+    assert(!q('#simple-reason').hidden && q('#simple-reason').textContent === 'Guasto segnalato dal Controller.', 'fault flag is never hidden by a demo reason');
+    demo.reason = 'IMU_STALE';
+    await refresh(JSON.stringify(demo));
+    assert(!q('#simple-reason').hidden && q('#simple-reason').textContent === 'Campione IMU scaduto: torque OFF.', 'a real fault stays visible beside the Twin demo badge');
+    await refresh(fx.status_ready);
     delete frameEl.src;
     delete frameEl.contentWindow;
     // READY with admission false (stale servo feedback) is not shown as ready.
     const notAdmitted = JSON.parse(fx.status_ready); notAdmitted.ready = false; notAdmitted.readiness_reason = 'SERVO_FEEDBACK_STALE';
     await refresh(JSON.stringify(notAdmitted));
     assert.strictEqual(q('#simple-state').textContent, 'NON PRONTO');
+    assert.strictEqual(q('#simple-state').dataset.tone, 'warn', 'admission false is never rendered green, even with state READY');
     assert(values().includes('Motion ammessa dal Controllerno · Feedback dei 12 servo non aggiornati.') && q('#simple-stand').disabled && !q('#simple-stop').disabled, values());
+    notAdmitted.state = 'FAULT'; notAdmitted.fault = false;
+    await refresh(JSON.stringify(notAdmitted));
+    assert.strictEqual(q('#simple-state').dataset.tone, 'bad', 'Controller FAULT state is red independently of fault flag');
+    notAdmitted.stale = true;
+    await refresh(JSON.stringify(notAdmitted));
+    assert.strictEqual(q('#simple-state').textContent, 'FAULT · DATI SCADUTI', 'stale data does not conceal an observed fault');
+    assert.strictEqual(q('#simple-state').dataset.tone, 'bad');
+    await refresh(fx.status_ready);
+  }
+  // Controller STOP facts, independent of labels and of an admission ACK.
+  {
+    const s = JSON.parse(fx.status_ready);
+    s.state='MOVING';s.phase='STOP';s.reason='STOP_IN_PROGRESS';s.torque_active=true;s.safe_off_verified=false;s.safe_off_mask=0;
+    s.stop={active:true,in_progress:true,motion_verified:false,support_verified:false,stand_resume_allowed:false,stand_resume_reason:'STOP_IN_PROGRESS'};
+    await refresh(JSON.stringify(s));
+    assert.strictEqual(q('#simple-state').textContent,'STOP IN CORSO');
+    assert(q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-walk-stop').disabled&&!q('#simple-stop').disabled);
+    assert(values().includes('Compensazione IMUcongelata durante STOP')&&q('#simple-reason').textContent.includes('Supporto non verificato'));
+    s.state='STOPPED';s.reason='STOPPED_SUPPORT_UNVERIFIED';s.stop.in_progress=false;s.stop.motion_verified=true;
+    s.stop.stand_resume_reason='STOP_RECOVERY_POSTURE_UNQUALIFIED';
+    await refresh(JSON.stringify(s));
+    assert.strictEqual(q('#simple-state').textContent,'STOP COMPLETATO · COPPIA ON');assert(q('#simple-stand').disabled);
+    assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_POSTURE_UNQUALIFIED'), 'actual Controller recovery refusal is visible');
+    s.stop.stand_resume_reason='STOP_RECOVERY_PATH_NOT_CLEAR';await refresh(JSON.stringify(s));
+    assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR') && q('#simple-reason').textContent.includes('Supporto non verificato') && q('#simple-stand').disabled, 'geometric recovery refusal does not qualify support or bypass Controller admission');
+    s.stop.stand_resume_reason='FUTURE_CONTROLLER_REFUSAL';await refresh(JSON.stringify(s));
+    assert(q('#simple-reason').textContent.includes('FUTURE_CONTROLLER_REFUSAL') && q('#simple-stand').disabled, 'unknown refusal stays visible and never grants admission');
+    s.stop.stand_resume_allowed=true;s.stop.stand_resume_reason='STAND_RECOVERY_AVAILABLE';await refresh(JSON.stringify(s));assert(!q('#simple-stand').disabled&&q('#simple-walk').disabled);
+    assert(q('#simple-reason').textContent.includes('Recupero STAND ammesso dal Controller:') && q('#simple-reason').textContent.includes('piccolo avanzamento'), 'admission comes from Controller boolean');
+    const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='WALK_STANDARD';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
+    await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Recupero STAND dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
+    s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
+    await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
+    s.fault=true;s.state='FAULT';s.reason='SERVO_COMMUNICATION_LOST';s.stale=false;await refresh(JSON.stringify(s));
+    assert(q('#simple-state').textContent.startsWith('FAULT') && q('#simple-state').dataset.tone==='bad' && q('#simple-reason').textContent.includes('Comunicazione servo persa'), 'fresh feedback after a fault keeps FAULT red and preserves the original reason');
+    const faultStopAck=JSON.parse(fx.ack_stop);faultStopAck.reason='STOP_REQUESTED_FAULT_LATCHED';
+    await send('',()=>q('#simple-stop').click(),ok(JSON.stringify(faultStopAck)),'MOTION.STOP',{},5000);
+    assert(last().includes('STOP_REQUESTED_FAULT_LATCHED') && last().includes('fault già presente'), 'STOP ACK explains that the prior fault remains latched');
+    const faultStop=p.dom.window.matdogMotionTrace.commands.at(-1);
+    s.active_command={id:faultStop.id,sequence:faultStop.sequence,outcome:'ACCEPTED',reason:'SAFE_OFF_IN_PROGRESS_FAULT_LATCHED'};
+    await refresh(JSON.stringify(s));assert(last().includes('Verifica coppia OFF in corso') && q('#simple-state').dataset.tone==='bad', 'SAFE_OFF progress never masks the original FAULT');
+    s.active_command={id:faultStop.id,sequence:faultStop.sequence,outcome:'COMPLETED',reason:'SAFE_OFF_VERIFIED_FAULT_LATCHED'};
+    await refresh(JSON.stringify(s));
+    assert(last().includes('COMPLETED') && last().includes('SAFE_OFF_VERIFIED_FAULT_LATCHED') && last().includes('il fault originale resta attivo'), 'successful SAFE_OFF completion is distinct from clearing a prior fault');
+    assert(q('#simple-state').textContent==='FAULT' && q('#simple-state').dataset.tone==='bad' && q('#simple-reason').textContent.includes('Comunicazione servo persa') && q('#simple-stand').disabled, 'successful STOP in prior FAULT preserves red fault, original cause and movement refusal');
+    assert.strictEqual(p.dom.window.document.querySelectorAll('#simple-stop').length,1);
     await refresh(fx.status_ready);
   }
   // 1-2. STAND 50 / 150 mm.
@@ -240,21 +346,86 @@ async function boot() {
   assert.strictEqual(q('#simple-state').textContent, 'WALKING');
   assert(!q('#simple-walk-stop').disabled);
   await send('walk_stop', () => q('#simple-walk-stop').click(), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0 }, 1000);
-  // 5. STOP button; 9. SAFE_OFF_REQUESTED is not presented as verified.
+  // 4b. JOYSTICK (dev.15): vx (pad up), vy (pad left), yaw_rate (held buttons),
+  // ttl 1 s, refreshed at 240 ms, scaled into the Controller ellipsoid, neutral
+  // on release, dead zone silent; disabled over WALK STANDARD and STOP.
+  await refresh(fx.status_ready);
+  {
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pointer = (el, type, x, y) => el.dispatchEvent(new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
+    assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
+    assert(!q('#joy-left').disabled && !q('#joy-right').disabled, 'rotation buttons enabled with the joystick');
+    const before = commands().length;
+    pointer(pad, 'pointerdown', 90, 90); pointer(pad, 'pointerup', 90, 90); await settle();
+    assert.strictEqual(commands().length, before, 'dead-zone press and release issue no request');
+    await send('joystick_forward', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    assert(/JOYSTICK avanti 6\.9 mm\/s/.test(last()), last());
+    const tick = p.intervals.filter(i => i.ms === 240).at(-1);
+    assert(tick, 'refresh period inside the Controller 1 s deadline');
+    await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    pointer(pad, 'pointermove', 90, 119);  // half way back: proportional beyond the dead zone
+    await send('joystick_backward', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(-.5, 0, 0)), 1000);
+    pointer(pad, 'pointermove', 61, 90);   // half way left
+    await send('joystick_lateral', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, .5, 0)), 1000);
+    // Pad full forward-right with the clockwise button held: scaled into the ellipsoid.
+    pointer(pad, 'pointermove', 148, 32);
+    await send('', () => pointer(q('#joy-right'), 'pointerdown', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1 / Math.SQRT2, -1 / Math.SQRT2, -1)), 1000);
+    // Button released, pad still held: the pad intent alone is sent at once, no neutral.
+    await send('', () => pointer(q('#joy-right'), 'pointerup', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1 / Math.SQRT2, -1 / Math.SQRT2, 0)), 1000);
+    await send('joystick_release', () => pointer(pad, 'pointerup', 148, 32), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
+    assert.strictEqual(q('#joy-knob').getAttribute('cy'), '90', 'knob back to neutral');
+    // Rotation alone from a held button, then neutral on its release.
+    await send('joystick_turn', () => pointer(q('#joy-left'), 'pointerdown', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, 0, 1)), 1000);
+    assert(/antiorario 1\.76°\/s/.test(last()), last());
+    await send('', () => pointer(q('#joy-left'), 'pointerup', 0, 0), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
+    const released = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
+    assert.strictEqual(commands().length, released, 'no refresh after release');
+    await refresh(fx.status_walking);
+    assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'true', 'no joystick over WALK STANDARD');
+    assert(q('#joy-left').disabled && q('#joy-right').disabled, 'rotation disabled with the joystick');
+    pointer(pad, 'pointerdown', 90, 32); pointer(pad, 'pointerup', 90, 32); await settle();
+    assert.strictEqual(commands().length, released, 'disabled joystick issues no request');
+    const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: L[0], vy_m_s: 0, yaw_rate_rad_s: 0, joystick: true }; steered.reason = 'WALK_JOYSTICK';
+    await refresh(JSON.stringify(steered));
+    assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'Controller joystick walk keeps the joystick operable');
+    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 6\.9 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    await send('', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    // Admission lost while pressed (STOP in progress): one neutral command, then disabled.
+    device.replies.push(ok(fx.ack_walk_stop)); const pressed = commands().length;
+    await refresh(fx.status_stopping); ++sequence;
+    assert.strictEqual(commands().length, pressed + 1, 'one neutral command when admission is lost');
+    assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' });
+    assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'true', 'joystick disabled while STOP is active');
+    assert(values().includes('Correzione IMU (richiesta → applicata, mrad)') && values().includes('Provenienza giunti'), 'IMU correction and joint provenance in diagnostics');
+    await refresh(fx.status_walking);
+  }
+  // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
-  assert(/STOP · .* · HTTP 200 · ACCEPTED · SAFE_OFF_REQUESTED/.test(last()) && /SAFE_OFF non ancora verificato/.test(last()), last());
+  assert(/STOP · .* · HTTP 200 · ACCEPTED · STOP_REQUESTED/.test(last()) && /arresto da verificare/.test(last()), last());
   await refresh(fx.status_stopping);
   assert(!values().includes('13/13 verificato') && /\d+\/13 verificati/.test(values()), values());
+  await refresh(fx.status_stopped_on);
+  assert.strictEqual(q('#simple-state').textContent,'STOP COMPLETATO · COPPIA ON');
+  assert(!q('#simple-stand').disabled&&JSON.parse(fx.status_stopped_on).stop.stand_resume_allowed,
+    'explicit STAND follows Controller admission after a verified synchronous HEIGHT/WALK stop');
+  assert(values().includes('Compensazione IMUcongelata durante STOP'));
+  const refusedStop=JSON.parse(fx.status_stopped_on);
+  refusedStop.stop.stand_resume_allowed=false;refusedStop.stop.stand_resume_reason='STOP_RECOVERY_PATH_NOT_CLEAR';
+  await refresh(JSON.stringify(refusedStop));
+  assert(q('#simple-stand').disabled&&q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR'),
+    'UI preserves the Controller refusal and exposes its reason');
   await refresh(fx.status_stopped);
   assert(values().includes('SAFE_OFF13/13 verificato'), values());
-  assert(/SAFE_OFF_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
+  assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
   // 6. Escape sends the same STOP intent, also while another command is in flight.
   await refresh(fx.status_ready);
   q('#simple-height').value = '150';
   await send('', () => q('#simple-stand').click(), 'hang', 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/in attesa della risposta/.test(last()) && kind() === 'pending');
   await send('stop_escape', () => p.dom.window.dispatchEvent(new p.dom.window.KeyboardEvent('keydown', { key: 'Escape' })), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
-  assert(/STOP \(Esc\) · .* · SAFE_OFF_REQUESTED/.test(last()), last());
+  assert(/STOP \(Esc\) · .* · STOP_REQUESTED/.test(last()), last());
   // A held Escape autorepeats keydown: no further STOP; a new press still sends one.
   const beforeRepeat = commands().length;
   for (let i = 0; i < 5; i++) p.dom.window.dispatchEvent(new p.dom.window.KeyboardEvent('keydown', { key: 'Escape', repeat: true }));
@@ -263,7 +434,7 @@ async function boot() {
   await send('', () => p.dom.window.dispatchEvent(new p.dom.window.KeyboardEvent('keydown', { key: 'Escape' })), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
   // Browser abort at 1.2 s: the Controller budget is 3 s, so the outcome is unknown.
   await p.fire(5000);
-  assert(/STOP \(Esc\).*SAFE_OFF_REQUESTED/.test(last()), 'a late older timeout cannot overwrite STOP: '+last());
+  assert(/STOP \(Esc\).*STOP_REQUESTED/.test(last()), 'a late older timeout cannot overwrite STOP: '+last());
 
   // 8. Refusals show HTTP code, backend error and reason; 9. REJECTED is not success.
   // Explicit pre-execution refusals vs unknown outcomes (HttpTransport semantics):
@@ -291,7 +462,7 @@ async function boot() {
     const shown = last(); await refresh(fx.status_ready); assert.strictEqual(last(), shown, 'outcome kept after a poll');
   }
   await send('', () => q('#simple-stop').click(), { status: 503, body: jsonError('STOP_LANE_LATE', 600) }, 'MOTION.STOP', {}, 5000);
-  assert(/STOP · .* · HTTP 503 · errore STOP_LANE_LATE \(.*\) · ESITO SCONOSCIUTO: .*se SAFE_OFF non è confermato usare @STOP via USB o il KEY OFF\./.test(last()) && kind() === 'bad', last());
+  assert(/STOP · .* · HTTP 503 · errore STOP_LANE_LATE \(.*\) · ESITO SCONOSCIUTO: .*per torque OFF globale usare @SERVO SAFE_OFF 51 via USB o il KEY OFF\./.test(last()) && kind() === 'bad', last());
   await refresh(fx.status_ready);
   await send('', () => q('#simple-stand').click(), ok(fx.ack_rejected), 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/HTTP 200 · REJECTED dal Controller, non eseguito · IMU_UNAVAILABLE/.test(last()) && kind() === 'warn', last());
@@ -361,7 +532,7 @@ async function boot() {
   assert(!!p.dom.window.eval('csrf') && q('#login').hidden, 'session still valid after 400 s of use');
   received = p.clock();
   await send('', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
-  assert(/SAFE_OFF_REQUESTED/.test(last()), 'STOP available after 400 s');
+  assert(/STOP_REQUESTED/.test(last()), 'STOP available after 400 s');
   // A refused STOP (expired session) is renewed and resent once.
   await refresh(fx.status_ready);
   renewals = sessionCalls();
@@ -370,7 +541,7 @@ async function boot() {
   const stops = commands().slice(-2).map(c => JSON.parse(c.body));
   assert(stops.length === 2 && stops.every(b => b.type === 'MOTION.STOP') && stops[1].sequence === stops[0].sequence + 1);
   sequence += 2;
-  assert(sessionCalls() === renewals + 1 && /STOP · .* · HTTP 200 · ACCEPTED · SAFE_OFF_REQUESTED/.test(last()), last());
+  assert(sessionCalls() === renewals + 1 && /STOP · .* · HTTP 200 · ACCEPTED · STOP_REQUESTED/.test(last()), last());
   // Renewed but still refused: shown as a refusal, never a third attempt.
   device.replies.push({ status: 403, body: jsonError('AUTH_FAILED') }, { status: 403, body: jsonError('AUTH_FAILED') });
   q('#simple-stop').click(); await settle(); await settle(); sequence += 2;
@@ -405,12 +576,12 @@ async function boot() {
   assert(!q('#simple-prone').disabled, 'PRONE offered from STANDING');
   await send('prone', () => q('#simple-prone').click(), ok(fx.ack_prone), 'POSTURE.LIE_DOWN', {}, 5000);
   assert(/REJECTED.*PRONE_REQUIRES_STAND_HOLD/.test(last())); // Controller refusal still rendered
-  await refresh(fx.status_prone_unverified);
-  assert(/Appoggio non verificato/.test(q('#simple-reason').textContent));
-  // Held PRONE terminal (state PRONE, torque ON): STAND/WALK offered without STOP; nothing to WALK STOP.
-  assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND after PRONE without STOP');
+  await refresh(fx.status_prone_rest);
+  assert(/PRONE a riposo: coppia OFF/.test(q('#simple-reason').textContent) && /Appoggio passivo non misurato/.test(q('#simple-reason').textContent));
+  // PRONE rest (READY, torque OFF verified): STAND/WALK offered (they re-acquire the pose); nothing to WALK STOP.
+  assert(!q('#simple-stand').disabled && !q('#simple-walk').disabled, 'STAND after PRONE rest');
   assert(q('#simple-prone').disabled && q('#simple-walk-stop').disabled);
-  assert(/goal fissi; appoggio non verificato/.test(q('#simple-values').textContent));
+  assert(/Compensazione IMUnon attiva/.test(q('#simple-values').textContent));
   assert(!q('#simple-stop').disabled);
   // A new HTTP response with old controller feedback is not fresh.
   const stale=JSON.parse(fx.status_ready);stale.stale=true;
@@ -464,7 +635,7 @@ async function boot() {
     r.device.release();await settle();
     const sent=r.calls.filter(c=>c.url==='/api/motion/command').map(c=>JSON.parse(c.body).type);
     assert.deepStrictEqual(sent,['POSTURE.STAND','MOTION.STOP'],'no stale authenticated retry after STOP');
-    assert(/SAFE_OFF_REQUESTED/.test(r.q('#simple-last').textContent));
+    assert(/STOP_REQUESTED/.test(r.q('#simple-last').textContent));
     assert.deepStrictEqual(r.errors,[]);r.dom.window.close();
   }
   fs.writeFileSync(envelopesPath, envelopes.join('\n') + '\n');

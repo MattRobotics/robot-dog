@@ -48,7 +48,7 @@ bool parseMotionJson(const char* input,size_t len,motion::MotionCommand* out,con
  }
  p.ws();if(!closed||p.p!=p.end||seen!=255)return false;
  uint32_t allowed=0,required=0;
- switch(c.intent){case motion::Intent::STAND:allowed=required=1;break;case motion::Intent::LIE_DOWN:allowed=1;break;case motion::Intent::GAIT_SELECT:allowed=required=1u<<10;break;case motion::Intent::BASE_VELOCITY:allowed=required=14;break;case motion::Intent::BODY_POSE:allowed=1008;break;case motion::Intent::ACTION_EXECUTE:allowed=(1u<<11)|1;required=1u<<11;break;case motion::Intent::STOP:allowed=1u<<12;break;case motion::Intent::STATUS:case motion::Intent::CAPABILITIES:break;default:return false;}
+ switch(c.intent){case motion::Intent::STAND:allowed=required=1;break;case motion::Intent::LIE_DOWN:allowed=1;break;case motion::Intent::GAIT_SELECT:allowed=required=1u<<10;break;case motion::Intent::BASE_VELOCITY:allowed=14|(1u<<10);required=14;break;case motion::Intent::BODY_POSE:allowed=1008;break;case motion::Intent::ACTION_EXECUTE:allowed=(1u<<11)|1;required=1u<<11;break;case motion::Intent::STOP:allowed=1u<<12;break;case motion::Intent::STATUS:case motion::Intent::CAPABILITIES:break;default:return false;}
  if((ps&~allowed)||(ps&required)!=required)return false;
  *out=c;if(reason)*reason="OK";return true;
 }

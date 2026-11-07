@@ -10,7 +10,8 @@ enum Part : unsigned { READ, NOMINAL, COMPENSATE, CONVERT, FRAME, REST, PARTS };
 enum External : unsigned { USB_CAPTURE, USB_FORMAT, USB_SERIAL, ROUTER, HTTP,
                           IMU_BMS, CONTROLLER_SERVICES, TELEMETRY, EXTERNALS };
 // Deterministic numeric work of one release: compensate solve() calls, tilted
-// leg IK calls, Newton steps and contact FK evaluations inside that IK.
+// leg IK solves (two for a fillet re-solve), Newton steps and contact FK
+// evaluations inside all of them.
 enum Work : unsigned { SOLVES, IK, NEWTON, FK, WORKS };
 struct Record {
   bool valid=false;

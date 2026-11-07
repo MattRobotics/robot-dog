@@ -33,7 +33,7 @@ inline unsigned hardware_calls = 0;
 }
 inline uint32_t millis() { return router_test::now_ms; }
 inline uint32_t micros() { return router_test::now_ms * 1000u; }
-class HardwareSerial { public: explicit HardwareSerial(int) {} int available() { return 0; } int read() { return -1; } size_t write(const uint8_t*, size_t n) { return n; } };
+class HardwareSerial { public: explicit HardwareSerial(int) {} void flush(bool = true) { ++router_test::hardware_calls; } int available() { return 0; } int read() { return -1; } size_t write(const uint8_t*, size_t n) { return n; } };
 class HostSerial {
  public:
   std::string output;

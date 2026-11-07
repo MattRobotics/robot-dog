@@ -32,9 +32,12 @@ int main() {
   check(!fresh.auth(0),"initialization denies session");
   check(fresh.login(issued),"new login");
   check(fresh.auth(issued),"fresh session");
-  check(fresh.auth(issued+299999),"TTL minus one");
-  check(!fresh.auth(issued+300000),"TTL boundary");
-  check(!fresh.auth(issued+300001),"expired session");
+  const uint64_t last_use=issued+299999;
+  check(fresh.auth(last_use),"last authorized use renews at TTL minus one");
+  check(fresh.session.current(last_use+299999,Fixture::peer,fresh.cookie),"cookie-only read within renewed TTL");
+  check(!fresh.session.authorize(last_use+299999,Fixture::peer,fresh.cookie,"wrong"),"wrong CSRF cannot renew");
+  check(!fresh.auth(last_use+300000),"idle TTL boundary after last authenticated use");
+  check(!fresh.auth(last_use+300001),"expired session");
   check(!fresh.auth(issued+cycle),"no resurrection after full cycle");
   check(!fresh.auth(issued+2*cycle+1),"no resurrection after two cycles");
   check(!fresh.auth(issued),"expired session remains invalid even on clock regression");
@@ -44,8 +47,8 @@ int main() {
   Fixture crossing;
   check(crossing.login(cycle-1000),"login before 32-bit wrap");
   check(crossing.auth(cycle+1000),"valid session crosses 32-bit wrap");
-  check(crossing.auth(cycle-1000+299999),"cross-wrap TTL minus one");
-  check(!crossing.auth(cycle-1000+300000),"cross-wrap TTL exact");
+  check(crossing.session.current(cycle+1000+299999,Fixture::peer,crossing.cookie),"cross-wrap idle TTL minus one");
+  check(!crossing.auth(cycle+1000+300000),"cross-wrap idle TTL exact");
   Fixture long_uptime;
   check(long_uptime.login(3*cycle+issued),"login after three uptime cycles");
   check(long_uptime.auth(3*cycle+issued+1),"valid login after three cycles");

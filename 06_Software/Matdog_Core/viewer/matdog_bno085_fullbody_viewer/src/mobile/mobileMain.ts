@@ -5,6 +5,7 @@
  * WebGL runs on the phone; the ESP32 only serves bytes.
  */
 import { createViewerScene } from '../viewer/scene';
+import { sh2ToRollPitchYaw } from '../frame/orientation';
 import { parseUrdf } from '../urdf/parseUrdf';
 import { buildRobot } from '../urdf/buildRobot';
 import { styleForLink } from '../viewer/linkStyle';
@@ -19,20 +20,48 @@ const el = <T extends HTMLElement = HTMLElement>(id: string): T => document.getE
 const stream = new MotionTelemetryStream();
 let twin: MotionTwinController | null = null, lastError = '', modelError = '', failures = 0;
 const parentFeed = new URLSearchParams(location.search).get('feed') === 'parent' && window.parent !== window;
+let viewer: ReturnType<typeof createViewerScene> | null = null, initialViewSet = false;
+
+function resetView(): void {
+  // Front view of the robot's +X: a graphical yaw reference on the robot anchor
+  // (ACTUAL and TARGET turn together) cancels the yaw measured at the click and
+  // the camera takes the canonical +X view. The BNO085 quaternion, roll and pitch
+  // are untouched; later yaw shows relative to this reset. No command or POST.
+  const q = twin?.actual.rootObject.quaternion;
+  if (viewer) viewer.robotAnchor.rotation.z = q ? -sh2ToRollPitchYaw(q).yaw : 0;
+  viewer?.resetCamera(0);
+}
+function prepareInitialView(): void {
+  if (!initialViewSet && twin && stream.frame?.quaternion) { resetView(); initialViewSet = true; }
+}
+
+let reportedHeight = 0;
+function reportHeight(): void {
+  if (!parentFeed) return;
+  const height = Math.ceil(el('app').getBoundingClientRect().height);
+  if (height > 0 && height !== reportedHeight) {
+    reportedHeight = height;
+    window.parent.postMessage({ type: 'MATDOG_TWIN_HEIGHT', height }, location.origin);
+  }
+}
 
 function chip(id: string, text: string, tone: string): void { const c = el(id); c.textContent = text; c.className = `chip ${tone}`; }
 function render(): void {
   const now = performance.now(), frame = stream.frame;
-  const facts: TwinFacts = describeTwin(frame, stream.ageMs(now), stream.isStale(now), twin?.actualState ?? null, modelError || lastError, failures);
+  const facts: TwinFacts = describeTwin(frame, stream.ageMs(now), stream.isStale(now), twin?.actualState ?? null, modelError || lastError, failures, twin?.grounding);
   for (const c of facts.chips) chip(c.id, c.text, c.tone);
   el('banner').textContent = facts.banner;
+  el('banner').hidden = facts.banner === '';
   const dl = el('facts'); dl.replaceChildren();
   for (const [k, v] of facts.rows) { const dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = k; dd.textContent = v; dl.append(dt, dd); }
   el('joints').textContent = facts.jointLines.join('\n');
   if (twin && stream.isStale(now)) twin.setStale(true);
+  reportHeight();
 }
 function accept(body: unknown): void {
-  if (stream.accept(body, performance.now()) && stream.frame) twin?.apply(stream.frame, performance.now());
+  if (!stream.accept(body, performance.now())) { lastError = 'TELEMETRY_REJECTED'; return; }
+  if (stream.frame) twin?.apply(stream.frame, performance.now());
+  prepareInitialView();
   lastError = ''; failures = 0;
 }
 async function poll(): Promise<void> {
@@ -63,6 +92,7 @@ async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<
     const actual = await buildRobot({ model, urdfUrl: URDF_URL, loadMeshGeometry, styleForLink });
     const target = await buildRobot({ model, urdfUrl: URDF_URL, loadMeshGeometry, styleForLink });
     twin = new MotionTwinController(actual, target);
+    twin.groundFromFeet = true;
     twin.interpolationMs = 0; // display the received ACTUAL pose, no extra 500 ms lag
     viewer.setBeforeRender((nowMs) => twin?.animate(nowMs));
     viewer.robotAnchor.add(target.rootObject); viewer.robotAnchor.add(actual.rootObject);
@@ -70,6 +100,7 @@ async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<
     viewer.start();
     modelError='';
     if(stream.frame){twin.apply(stream.frame,performance.now());twin.setStale(stream.isStale(performance.now()));}
+    prepareInitialView();
     if(parentFeed)window.parent.postMessage({type:'MATDOG_TWIN_READY'},location.origin);
     if (actual.collisionMeshCount !== 17) lastError = `ASSETS_MISSING ${actual.collisionMeshCount}/17`;
   } catch (error) {
@@ -79,7 +110,11 @@ async function loadModel(viewer: ReturnType<typeof createViewerScene>): Promise<
   render();
 }
 async function boot(): Promise<void> {
-  const viewer = createViewerScene(el('viewport'));
+  viewer = createViewerScene(el('viewport'));
+  el('dashboard-link').hidden = parentFeed;
+  el<HTMLButtonElement>('reset-view').onclick = resetView;
+  if (parentFeed && typeof ResizeObserver === 'function') new ResizeObserver(reportHeight).observe(el('app'));
+  el('panel').addEventListener('toggle', reportHeight);
   void loadModel(viewer);
   // Embedded in the Controller dashboard (?feed=parent): reuse the status the
   // dashboard already polls (same-origin postMessage), so one page = one poll.

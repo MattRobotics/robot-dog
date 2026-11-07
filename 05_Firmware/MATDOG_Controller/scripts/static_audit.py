@@ -271,6 +271,34 @@ def check_torque_enable(files):
                      f"(CR3 uncertain-write safety)")
 
 
+def function_body(code, signature):
+    start = code.find(signature)
+    if start < 0:
+        return None
+    brace = code.find("{", start)
+    if brace < 0:
+        return None
+    depth = 0
+    # Quoted braces in JSON and character literals are not C++ scopes.
+    for token in re.finditer(r'''"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[{}]''', code[brace:]):
+        if token[0] == "{":
+            depth += 1
+        elif token[0] == "}":
+            depth -= 1
+            if depth == 0:
+                return code[brace + 1:brace + token.start()]
+    return None
+
+def require_path(code, signature, *steps):
+    """Check guard and effect in order inside their owning C++ block."""
+    body = re.sub(r"\s+", "", function_body(code, signature) or "")
+    for step in steps:
+        _, found, body = body.partition(re.sub(r"\s+", "", step))
+        if not found:
+            fail(f"{signature}: expected {step!r} on this path")
+            return
+
+
 def check_loop_task_stack(files):
     """2026-10-16: the Controller loop task needs 16 KB (measured worst call
     chains 8.5-10 KB; the 8 KB default overflowed into the heap and boot-looped
@@ -286,9 +314,8 @@ def check_sync_frame_boundary(files):
     distinct ids (never the all-ID broadcast instruction):
       buildGoalFrame  - SRAM 41..47 (ACC, GoalPosition 0..4095, GoalTime=0, GoalSpeed)
       buildTorqueOff  - SRAM 40 TorqueEnable := 0 (de-escalation only)
-    They are built only inside ServoBus.cpp; the goal frame is reachable only
-    through ServoBusActuatorBackend::writeGoalPositionFrame (SafeActuator
-    commitFrame + ActuatorRuntime::executeFrame); torque ON, EEPROM, offsets
+    They are built only inside ServoBus.cpp. SIMPLE owns operational frames;
+    the retained maintenance backend has no production executeFrame caller; torque ON, EEPROM, offsets
     and RegWrite/Action stay forbidden; the stock library sync READ is unused."""
     packet = next((c for p, c in files if p.name == "ServoPacket.h"), None)
     if packet is None:
@@ -306,10 +333,19 @@ def check_sync_frame_boundary(files):
         for token in ("buildGoalFrame", "buildTorqueOff"):
             if token in code and path.name != "ServoBus.cpp":
                 fail(f"{path}: {token} may be used only inside ServoBus.cpp")
-        if "syncWriteGoalPositions(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "ServoBusActuatorBackend.h"):
-            fail(f"{path}: syncWriteGoalPositions may be called only by ServoBusActuatorBackend")
-        if "syncTorqueOff(" in code and path.name not in ("ServoBus.h", "ServoBus.cpp", "Controller.cpp"):
-            fail(f"{path}: syncTorqueOff is the Controller SAFE_OFF burst only")
+        if path.name == "SimpleMotionIntegration.cpp":
+            for primitive, owner in (("syncWriteGoalPositions", "bool Controller::SimpleServoPort::frame("),
+                                     ("syncTorqueOff", "bool Controller::SimpleServoPort::off(")):
+                calls = rf"\b{primitive}\s*\("
+                if len(re.findall(calls, code)) != 1 or not re.search(calls, function_body(code, owner) or ""):
+                    fail(f"{path}: {primitive} must have exactly one SIMPLE call in {owner}")
+        else:
+            if re.search(r"\bsyncWriteGoalPositions\s*\(", code) and path.name not in ("ServoBus.h", "ServoBus.cpp", "ServoBusActuatorBackend.h"):
+                fail(f"{path}: unauthorized goal frame writer")
+            if re.search(r"\bsyncTorqueOff\s*\(", code) and path.name not in ("ServoBus.h", "ServoBus.cpp"):
+                fail(f"{path}: unauthorized multi-servo torque OFF writer")
+        if re.search(r"(?:->|\.)\s*executeFrame\s*\(", code):
+            fail(f"{path}: production frame execution must use the SIMPLE owner")
         for token in ("syncReadPacketRx", "syncReadPacketTx", "SyncRead(", "RegWriteAction"):
             if token in code:
                 fail(f"{path}: {token} (unverified library RX / latent RegWrite target) is not used")
@@ -946,10 +982,8 @@ def check_servo_diagnostics_require_maintenance_mode(files):
         # @SERVO SAFE_OFF is the one servo write that can only decrease risk
         # (torque off) and must stay reachable in every mode - it must never
         # gain this guard.
-        safe_off_branch = re.search(
-            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\)\s*\{(.*?)\}\s*else if',
-            code, re.DOTALL)
-        if safe_off_branch and "OperatingMode::MAINTENANCE" in safe_off_branch.group(1):
+        safe_off_branch = function_body(code, 'if(upper.startsWith("@SERVO SAFE_OFF"))')
+        if safe_off_branch and "OperatingMode::MAINTENANCE" in safe_off_branch:
             fail(f"{path}: @SERVO SAFE_OFF must remain reachable regardless of operating "
                  f"mode (handoff: 'SAFE_OFF resta l'unico torque write consentito') - found "
                  f"a MAINTENANCE-mode gate on it")
@@ -3157,23 +3191,6 @@ def check_startup_servo_selftest_wiring(files):
     remains incremental: ServoBus::update() owns at most one Ping per tick.
     """
 
-    def function_body(code, signature):
-        start = code.find(signature)
-        if start < 0:
-            return None
-        brace = code.find("{", start)
-        if brace < 0:
-            return None
-        depth = 0
-        for i in range(brace, len(code)):
-            if code[i] == "{":
-                depth += 1
-            elif code[i] == "}":
-                depth -= 1
-                if depth == 0:
-                    return code[brace + 1:i]
-        return None
-
     for path, code in files:
         if path.name != "Controller.cpp":
             continue
@@ -3183,14 +3200,15 @@ def check_startup_servo_selftest_wiring(files):
             fail(f"{path}: Controller::begin() not found")
             continue
 
-        if begin_body.count("servo_census_.start()") != 1:
-            fail(f"{path}: startup must arm exactly one servo_census_.start()")
-
-        if "if (build::kServoPowerAvailable)" not in begin_body:
-            fail(f"{path}: startup census is not ROBOT_POWERED-gated")
-
-        if "startup_servo_census_pending_ = servo_census_.start();" not in begin_body:
-            fail(f"{path}: startup census result is not explicitly tracked")
+        require_path(begin_body, "if (build::kServoPowerAvailable)", "startup_servo_census_pending_=true;",
+                     "system_state_.setServoHealth(ModuleHealth::NOT_INITIALIZED);")
+        integration = next((c for p, c in files if p.name == "SimpleMotionIntegration.cpp"), "")
+        if "servo_census_.start()" in begin_body or integration.count("servo_census_.start()") != 1:
+            fail("startup census must have one Controller initiation site")
+        require_path(integration, "void Controller::updateSimpleMotion(",
+                     "if(build::kServoPowerAvailable&&simple_motion_.offVerified()&&servo_census_.state()==servo::ServoCensus::State::IDLE)servo_census_.start();",
+                     "servo_census_.result().verdict==servo::CensusVerdict::PASS){",
+                     "servo_preflight_.start();")
 
         for forbidden in (
             "startScan(",
@@ -3302,10 +3320,8 @@ def check_calibration_boundaries(files, sketch_dir):
     router = by_name.get("CommandRouter.cpp")
     if router is not None:
         path, code = router
-        branch = re.search(
-            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
-            code, re.DOTALL)
-        if branch and ("calibration" in branch.group(1) or "Calibration" in branch.group(1)):
+        branch = function_body(code, 'if(upper.startsWith("@SERVO SAFE_OFF"))')
+        if branch and ("calibration" in branch or "Calibration" in branch):
             fail(f"{path}: the @SERVO SAFE_OFF branch references calibration - a safety "
                  f"de-escalation must never be routed through a calibration session")
 
@@ -3420,13 +3436,11 @@ def check_actuator_authority(files, sketch_dir):
     router = by_name.get("CommandRouter.cpp")
     if router is not None:
         path, code = router
-        branch = re.search(
-            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
-            code, re.DOTALL)
+        branch = function_body(code, 'if(upper.startsWith("@SERVO SAFE_OFF"))')
         if not branch:
             fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
         else:
-            body = branch.group(1)
+            body = branch
             for token in ("authority", "Authority", "operating_mode"):
                 if token in body:
                     fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a safety "
@@ -3588,14 +3602,17 @@ def check_safe_actuator_boundaries(files, sketch_dir):
     router = by_name.get("CommandRouter.cpp")
     if router is not None:
         path, code = router
-        branch = re.search(
-            r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
-            code, re.DOTALL)
+        branch = function_body(code, 'if(upper.startsWith("@SERVO SAFE_OFF"))')
         if not branch:
             fail(f"{path}: could not locate the @SERVO SAFE_OFF branch to audit it")
         else:
+            require_path(code, 'if(upper.startsWith("@SERVO SAFE_OFF"))',
+                         "if(modules_.service&&modules_.service->motionSafeOff()){",
+                         "return;}", "printServoSafeOff(id);return;")
+            if code.index('if(upper.startsWith("@SERVO SAFE_OFF"))') > code.find('if(modules_.service&&modules_.service->motionEngaged())'):
+                fail("SAFE_OFF must precede ordinary Motion exclusion")
             for token in layer_tokens:
-                if token in branch.group(1):
+                if token in branch:
                     fail(f"{path}: the @SERVO SAFE_OFF branch references {token!r} - a "
                          f"safety de-escalation must never be routed through the write "
                          f"policy, which can reject")
@@ -4315,13 +4332,12 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
 
     # SAFE_OFF is the deliberate exception: a de-escalation must stay
     # reachable even during a read-only capture and must not consult it.
-    safe = re.search(r'upper\.startsWith\("@SERVO SAFE_OFF"\)\s*\)\s*\{(.*?)\}\s*else',
-                     rcode, re.DOTALL)
+    safe = function_body(rcode, 'if(upper.startsWith("@SERVO SAFE_OFF"))')
     if not safe:
         fail(f"{rpath}: @SERVO SAFE_OFF branch not found for CR2-B audit")
     else:
         for forbidden in ("q0_capture", "Q0Capture", "CALIBRATION_Q0"):
-            if forbidden in safe.group(1):
+            if forbidden in safe:
                 fail(f"{rpath}: SAFE_OFF consults CR2-B via {forbidden!r} - de-escalation "
                      f"must remain independent")
 
@@ -5123,7 +5139,7 @@ def check_http_transport_boundaries(files, sketch_dir):
         stop_body=re.search(r"void HttpTransport::stop\(\)\s*\{(.*?)\}",code,re.DOTALL)
         if not stop_body or any(t in stop_body.group(1) for t in ("httpd_stop(","httpd_ssl_stop(","vSemaphoreDelete(")):
             fail(f"{path}: stop must only enqueue listener intent, never stall Controller or delete live handles")
-        if "HttpTransport::lifecycle()" not in code or "mailbox_.claimDelivery()" not in code or not contains_v3(code,"ready_sequence_.load()==id"):
+        if "HttpTransport::lifecycle()" not in code or "mailbox_.claimDelivery()" not in code:
             fail(f"{path}: dedicated lifecycle or atomic correlated mailbox missing")
 
     # --- (5) the OTA shared secret: one use site, never committed ----------
@@ -6414,7 +6430,7 @@ def check_portal_page_text(page, where="src/network/PortalPage.h"):
             fail(f"{where}: portal section {name!r} missing")
     for endpoint in ("'/status'","'/wifi/status'","'/wifi/session'","'/wifi/logout'","'/wifi/login'"):
         if endpoint not in script:fail(f"{where}: endpoint {endpoint} not used")
-    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",re.sub(r"/api/motion/(?:login|session|logout)", "", script),re.I):
+    if re.search(r"/(servo|motion|torque|actuator|calibration)[/'\"]",re.sub(r"'/api/motion/(?:login|session|logout)'", "", re.sub(r"^\s*//[^\n]*", "", script, flags=re.M)),re.I):
         fail(f"{where}: the portal must not address an actuator or calibration endpoint")
 
 
@@ -6424,9 +6440,9 @@ def check_network_v3_boundaries(files, sketch_dir):
       "NetworkConfigNvs.cpp": ('kNetworkPartition[]="nvs"','kNetworkNamespace[]="md_net_v1"','NVS_READONLY','nvs_get_blob','nvs_commit','memcmp(record,readback,size)==0'),
       "NetworkConfig.cpp": ('phase_=ConfigPhase::ROLLBACK','storage_->pending(c)','storage_->activate(candidate_)','!alt','critical','crc(b,n-4)'),
       "WifiManager.cpp": ('xTaskCreatePinnedToCore','xQueueCreate(1,sizeof(Request))','config_busy_.exchange(true)','modemSleep(sleep)','if(worker_status_.scan_running && context_.load()){esp_wifi_scan_stop()','drv.sta.bssid_set=false','test_fresh_&&link_up'),
-      "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','ready_sequence_.load()==id','httpd_ssl_start','manual_stop_'),
+      "HttpTransport.cpp": ('req.local_authorized','portal_.authorize','!req.tls || req.ap_socket','!service_->remoteUpdateAllowed()','session_.timedOut(now_ms)','mailbox_.claimDelivery()','if(ready_sequence_.load()==id)return delivered();}while','if(!mailbox_.abandon()){if(ready_sequence_.load()==id)return delivered();','httpd_ssl_start','manual_stop_'),
       "AdminAccess.cpp": ('xSemaphoreTake(static_cast<SemaphoreHandle_t>(mutex_),0)',),
-      "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','g==generation_.load()'),
+      "AdminAccess.h": ('class AdminLease','admitted_.store(false)','listeners_closed.store(false)','if(g!=generation_.load())return deny("GATE_GENERATION_CHANGED");'),
       # rc.4 boots in RUN with the AP role: motion activity and the operator's
       # router role (not the default mode) make network mutations critical.
       "ControllerService.h": ('motionActive()||powerState()!=PowerState::RUN||modules_.operating_mode->routerRole()','bool networkCritical() const','configBusy()','sessionLive()'),
@@ -6466,8 +6482,6 @@ def check_network_v3_boundaries(files, sketch_dir):
                              (compact_manager,"admin_.allowed(r.generation)",2),
                              (compact_transport,"httpd_stop(server_)==ESP_OK",2),
                              (compact_transport,"httpd_ssl_stop(tls_server_)==ESP_OK",2),
-                             # 2: + handleCalibrationRestore (Issue #48, AP-only, reviewed 2026-10-14)
-                             (compact_transport,"self->admitAdmin(r)",2),
                              # 3: + serviceStopLane (Issue #52, 2026-10-15): the priority STOP lane runs the
                              # SAME admission as an AP Motion command (lease + generation + radio), pinned below.
                              (compact_transport,"gate.allowed(req.admin_generation)",3)):
@@ -6520,18 +6534,40 @@ def check_network_v3_boundaries(files, sketch_dir):
                   # rc.4: the idle expiry is renewed only after cookie, peer AND CSRF proof.
                   "if(!current(now,peer,cookie)||!tokenEqual(csrf,csrf_))returnfalse;issued_=now;returntrue;"):
         if token not in security:fail("Remembered-device invariant missing: "+token)
-    # portal_.authorize 4: Motion command + Issue #48 CALIBRATION_RESTORE (same CSRF/session proof)
-    # + the operator heartbeat (2026-10-15): only a poll proving session AND CSRF (the Dashboard,
-    # which holds STOP) keeps the deadman alive; the read-only Twin and anonymous polls never do.
-    # 2026-10-17: the same proof is computed once and also reported to the
-    # Dashboard ("heartbeat":true|false) so a lapsed session is visible.
-    if "constboolbeat=req.ap_socket&&!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);if(beat)service_->operatorHeartbeat(now_ms);" not in compact_transport:
-        fail("Operator heartbeat must require the AP admin session and its CSRF token")
-    # 5th portal_.authorize: the Issue #52 STOP lane (same session + CSRF proof as a Motion
-    # command, after the admin lease/generation/radio admission, AP socket only).
-    if "constbooladmitted=lease&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio();" not in compact_transport or \
-       "if(admitted&&req.local_authorized&&req.ap_socket&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){" not in compact_transport:
-        fail("STOP lane must require the admin lease/generation/radio AND the AP session + CSRF proof")
+    # Wi-Fi administration and calibration restore are AP-only. Motion also
+    # admits exclusive RUN_STA over TLS. The read-only LAN never authorizes a write.
+    require_path(transport, "bool HttpTransport::admitAdmin(",
+                 "if(!gate.allowed(request.admin_generation,failure))return false;",
+                 "return WifiManager::verifyAdminRadio(failure);")
+    require_path(transport, "bool HttpTransport::motionStaAdmitted(bool",
+                 'if(!tls)return deny("STA_TLS_REQUIRED");',
+                 'if(!local_ipv4||local_ipv4!=w.ipv4)return deny("STA_SOCKET_IP_MISMATCH");',
+                 'if(generation!=gate.generation())return deny("GATE_GENERATION_CHANGED");',
+                 'if(gate.closing.load())return deny("GATE_CLOSING");',
+                 'if(gate.radio_fault.load())return deny("GATE_RADIO_FAULT");',
+                 'if(gate.phase.load()!=NetworkPhase::CLIENT_STA)return deny("GATE_NOT_CLIENT_STA");',
+                 'if(!w.run_mode||!w.connected||static_cast<RoleReason>(w.role_reason)!=RoleReason::RUN_STA)return deny("STA_RUN_LINK_REQUIRED");',
+                 'if(verify_radio&&(esp_wifi_get_mode(&mode)!=ESP_OK||mode!=WIFI_MODE_STA))return deny("STA_NOT_EXCLUSIVE");',
+                 'if(verify_radio&&esp_wifi_sta_get_ap_info(&ap)!=ESP_OK)return deny("STA_DRIVER_DISCONNECTED");')
+    require_path(transport, "esp_err_t HttpTransport::handleCalibrationRestore(",
+                 "if(!socketFacts(req,r)||!r.ap_socket||!self->admitAdmin(r))return sendJsonError")
+    require_path(transport, "esp_err_t HttpTransport::handleWifi(",
+                 "motion_auth?self->admitMotion(r,&admission_failure):self->admitAdmin(r,&admission_failure);",
+                 "if(!admitted){", "return sendJsonError")
+    require_path(transport, "void HttpTransport::serviceRequest(",
+                 "AdminLease lease(gate);",
+                 "motionStaAdmitted(req,!motion_read);",
+                 "if((admin_request||sta_motion)&&!lease){deferred_=true;return;}",
+                 "case HttpRequestKind::MOTION_STATUS:",
+                 "resp.motion_session=!readonly&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf);",
+                 "case HttpRequestKind::MOTION_COMMAND:",
+                 'if(!req.local_authorized||!portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){resp.message="AUTH_FAILED";break;}',
+                 "service_->motionCommand(req.motion_command,millis())")
+    require_path(transport, "bool HttpTransport::serviceStopLane(",
+                 "AdminLease lease(gate);if(!lease)return false;", "stop_pending_.store(false);",
+                 "const bool sta_motion=!req.ap_socket&&motionStaAdmitted(req.tls,req.local_ipv4,req.admin_generation);",
+                 "const bool admitted=lease&&(sta_motion||(req.ap_socket&&gate.allowed(req.admin_generation)&&WifiManager::verifyAdminRadio()));",
+                 "if(admitted&&req.local_authorized&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){const auto ack=service_->motionCommand(req.motion_command,now_ms);")
     for token,count in (("portalDeviceIssue(",1),("portal_.authorize(",5),("portal_.resume(",1),
                         ("portal_.login(",1),("HttpOnly;SameSite=Strict;Path=/",4),
                         ("Path=/wifi/session;Max-Age=",2)):
@@ -6618,11 +6654,8 @@ def check_network_v3_boundaries(files, sketch_dir):
     if "wifi_.setRunMode(operating_mode_.routerRole());" not in controller:
         fail("The Controller must forward exactly the operator's router role; automatic RUN keeps the AP")
     autorun=[p2.name for p2,c2 in firmware for _ in re.finditer(r"(?:->|\.)enterRunAutomatic\s*\(",c2)]
-    if autorun!=["Controller.cpp"]:
-        fail(f"Automatic RUN entry belongs to operational readiness only; call sites: {autorun}")
-    raw_controller=by_name.get("Controller.cpp",(None,""))[1]
-    if "enterRunAutomatic" in raw_controller and "case core::ReadinessAction::ENTER_RUN:" not in raw_controller:
-        fail("enterRunAutomatic must be driven by OperationalReadiness ENTER_RUN")
+    if autorun!=["SimpleMotionIntegration.cpp"]:
+        fail(f"Automatic RUN entry belongs to SIMPLE admission only; call sites: {autorun}")
     page_path=sketch_dir/"src"/"network"/"PortalPage.h"
     check_portal_page_text(page_path.read_text() if page_path.is_file() else "",str(page_path))
 
@@ -6648,13 +6681,8 @@ def check_stand_release_scope(files):
     # by a compile-time validation fence; qualification is reported, not gated.
     if any('kStandOnlyCandidate' in c for p,c in files if "scripts" not in p.parts):
         fail('ADR-006: compile-time STAND-only fence reintroduced')
-    if 'if(operational){unsigned joint=12;' not in by_name.get('Commissioning.cpp',''):
-        fail('ADR-006: operational WALK binding must depend on live limits only')
     if '\\"hardware_qualified\\":{' not in by_name.get('MotionService.cpp',''):
         fail('ADR-006: capabilities must report hardware qualification separately')
-    arm=by_name.get('Controller.cpp','').split('const char* Controller::armOperationalSession(')[-1].split('bool Controller::RestoreHook')[0]
-    if 'Serial.printf' in arm or 'writeAdmissionTrace(Serial,trace,trace_bytes)' not in arm:
-        fail('Admission diagnostics must use bounded nonallocating writes')
     # The legacy comment stripper removes // even inside URL literals. Inspect
     # only the real quoted CSP lines here; do not weaken other audit rules.
     policy_path=next((p for p,c in files if p.name=='TwinHostPolicy.h'),None)
@@ -6665,14 +6693,54 @@ def check_stand_release_scope(files):
     if expected not in policy or '*' in policy or 'http' in policy:fail('Twin CSP allowlist drift')
 
 
-def check_operational_session_boundaries(files):
+def check_simple_motion_boundaries(files):
     by_name={p.name:(p,c) for p,c in files if "scripts" not in p.parts}
-    session=by_name.get("MotionSession.cpp",(None,""))[1]
-    # Core Motion V6: request() refuses torque ON itself and admits limits only through the shared planPrime().
-    for token in ('if(!image)', 'gate(e,input,fb,now)', 'policy_->plan(', 'runtime_->execute(',
-                  'if(fb.torque_on[i])', 'planPrime(fb.actual_rad', 'executor_->arm(', 'policy_->epoch()!=epoch_',
-                  'e.scope==TrialScope::FIXTURE_MICRO', 'AUTONOMOUS_SUPPORT_LOAD_REQUIRED', 'WALK_DYNAMICS_REQUIRED'):
-        if token not in session:fail("MotionSession operational invariant missing: "+token)
+    integration=by_name.get("SimpleMotionIntegration.cpp",(None,""))[1]
+    motion=by_name.get("SimpleMotion.cpp",(None,""))[1]
+    service=by_name.get("MotionService.cpp",(None,""))[1]
+    require_path(integration, "const char* Controller::prepareSimpleMotion(",
+                 'if(!simple_limits_ready_)return "CALIBRATION_OR_LIMITS_NOT_READY";',
+                 'if(wifi_.configBusy()||authority_.inhibited())return "SYSTEM_CONFIGURATION_BUSY";',
+                 'if(authority_.current()==ActuatorAuthority::NONE){operating_mode_.enterRunAutomatic();',
+                 'if(authority_.request(ActuatorAuthority::MOTION,OperatingMode::RUN,&motion_authority_lease_)!=AuthorityResult::GRANTED)return "ACTUATOR_OWNER_BUSY";')
+    require_path(integration, "void Controller::updateSimpleMotion(",
+                 "simple_inputs_.authorityOk=authority_.current()==ActuatorAuthority::MOTION&&!authority_.inhibited();",
+                 "simple_inputs_.ready=build::kServoPowerAvailable&&profile&&mapping&&simple_limits_ready_&&!maintenance&&!authority_.inhibited()&&!wifi_.configBusy();",
+                 "simple_motion_.inputs(simple_inputs_);", "if(build::kServoPowerAvailable)simple_motion_.update(now);")
+    require_path(service, "MotionService::command(", "if(!ready_)return result(reason_);",
+                 "if(!motion_->stopActive()&&prepare_&&(why=prepare_(context_)))return result(why);",
+                 "return result(motion_->stand(", "return result(motion_->walk(")
+    require_path(integration, "bool Controller::SimpleServoPort::frame(",
+                 "if(owner->simple_motion_.stopping()&&!owner->simple_motion_.stopFrameAuthorized(raw,drive)){frame_preempted=true;return false;}",
+                 "if(!owner->servo_bus_.setOperationalDrive(drive.speed,drive.acc))return false;",
+                 "owner->servo_bus_.syncWriteGoalPositions(ids,raw,&tx)", "return sent&&tx.complete;")
+    require_path(by_name.get("ControllerService.h",(None,""))[1], "bool motionSafeOff()",
+                 "if(!motion_)return false;", "motion_->safeOff();")
+    require_path(by_name.get("MotionService.h",(None,""))[1], "void safeOff()",
+                 "stopEpoch_.fetch_add(1,std::memory_order_release);", "if(motion_)motion_->safeOff();")
+    require_path(by_name.get("SimpleMotion.h",(None,""))[1], "void safeOff()",
+                 "safeOffRequest_.store(true,std::memory_order_release);")
+    require_path(integration, "bool Controller::SimpleServoPort::off(",
+                 "for(unsigned i=0;i<12;++i)ids[i]=slotId(i);ids[12]=51;",
+                 "return owner->servo_bus_.syncTorqueOff(ids+first,13-first)==8+2*(13-first);")
+    require_path(integration, "bool Controller::SimpleServoPort::verifyOff(",
+                 "return owner&&i<13&&owner->servo_bus_.verifyTorqueOff(i<12?slotId(i):51,2)==servo::SafeOffResult::VERIFIED_OFF;")
+    require_path(motion, "bool SimpleMotion::serviceStop(",
+                 "if(safeOffRequest_.exchange(false,std::memory_order_acq_rel)){",
+                 "enterOff(false,", "serviceOff();return true;}", "if(!stop_.exchange(false,",
+                 "if(faultLatched_||offPending_){serviceOff();return true;}", "beginStop(")
+    require_path(motion, "void SimpleMotion::serviceOff(",
+                 "if(!offSent_){offSent_=port_->off();return;}",
+                 "if(port_->verifyOff(offNext_))offMask_|=1u<<offNext_;",
+                 "offNext_=(offNext_+1)%13;", "if(offMask_==0x1fff){energized_=false;offPending_=false;")
+    require_path(motion, "void SimpleMotion::update(", "if(serviceStop())return;",
+                 "if(engaged()&&!input_.powerOk){fault(", "if(energized_&&gap>100000){fault(",
+                 "if(engaged()&&(!input_.ready||!input_.powerOk||!input_.authorityOk)){fault(",
+                 "if(energized_&&!fresh(esp_timer_get_time())){fault(", "if(stopActive_){generateStop(now);return;}")
+    require_path(motion, "bool SimpleMotion::send(", "if(stopActive_&&!stopFrame_)return false;",
+                 "if(!holdReference&&!pointSafe(q)){fault(", "if(!port_->resolve(", "if(!frameTimed(")
+    require_path(motion, "const char* SimpleMotion::stand(", 'if(faultLatched_)return "FAULT_STOP_REQUIRED";',
+                 'if(operatorStopped_&&!energized_)return "SAFE_OFF_STAND_REFUSED";')
     config=by_name.get("BuildConfig.h",(None,""))[1]
     if not re.search(r'constexpr bool kOperationalMotionAuthorized\s*=\s*false\s*;',config):
         fail("Operational image must retain MOTION_AUTHORIZED=0")
@@ -6689,7 +6757,7 @@ def main():
 
     check_forbidden_literals(files)
     check_stand_release_scope(files)
-    check_operational_session_boundaries(files)
+    check_simple_motion_boundaries(files)
     check_torque_enable(files)
     check_servo_motion_write_surface(files)
     check_sync_frame_boundary(files)

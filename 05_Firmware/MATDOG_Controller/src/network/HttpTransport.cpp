@@ -406,6 +406,13 @@ static bool slackExempt(const HttpTransportRequest& r) {
   return r.kind==HttpRequestKind::MOTION_STATUS||(r.kind==HttpRequestKind::MOTION_COMMAND&&
          c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0);
 } // slackExempt
+// A JOYSTICK refresh of the walk it already holds only latches a velocity
+// target and its deadline, like WALK STOP. A starting one needs slack.
+// Controller thread only: reads the Motion owner's state.
+static bool joystickRefresh(const HttpTransportRequest& r) {
+  const auto& c=r.motion_command;
+  return r.kind==HttpRequestKind::MOTION_COMMAND&&c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
+} // joystickRefresh
 bool HttpTransport::dispatch(const HttpTransportRequest &request,
                              HttpTransportResponse *response, char* large_text, size_t large_cap,
                              uint32_t budget_ms, const char** failure) {
@@ -541,7 +548,8 @@ void HttpTransport::update(uint32_t now_ms) {
   // single HTTPD task, and every request queued behind it, for seconds.
   const bool status_read=pending_request_.kind==HttpRequestKind::WEB_STATUS||
                          pending_request_.kind==HttpRequestKind::WIFI_STATUS;
-  const bool no_slack=!slackExempt(pending_request_)&&!service_->motionSlack(esp_timer_get_time(),5000);
+  const bool no_slack=!slackExempt(pending_request_)&&!(joystickRefresh(pending_request_)&&service_->motionJoystickActive())&&
+                      !service_->motionSlack(esp_timer_get_time(),5000);
   if(no_slack&&!status_read) {
     xSemaphoreGive(request_ready_); return;
   }
@@ -578,11 +586,11 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Driver admission was checked by HTTPD before dispatch and is checked again
   // before sending the observation. Controller revalidates RAM facts under the
   // existing zero-wait fence; session ownership remains on Controller only.
+  AdminLease lease(gate);
   const bool readonly=readOnlyAdmitted(req,!motion_read);
   if(req.kind>=HttpRequestKind::OTA_CHALLENGE&&req.kind<=HttpRequestKind::OTA_ABORT&&static_cast<RoleReason>(service_->wifiStatus().role_reason)==RoleReason::MAINTENANCE_STA_READONLY){resp.message="OTA_DENIED_MAINTENANCE_LAN";return;}
   const bool sta_motion=(req.kind>=HttpRequestKind::MOTION_STATUS||req.kind==HttpRequestKind::WIFI_STATUS)&&motionStaAdmitted(req,!motion_read);
   const bool admin_request = req.kind >= HttpRequestKind::WIFI_STATUS&&!sta_motion&&!readonly;
-  AdminLease lease(gate);
   if (admin_request && (!gate.allowed(req.admin_generation) ||
                         (!motion_read&&!WifiManager::verifyAdminRadio()))) {
     resp.message = "ADMIN_AP_REQUIRED"; return;
@@ -590,7 +598,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
   // Admissible facts but the fence is momentarily held (md_http_life verifies
   // the radio every 50 ms): contention is not an authorization fact. update()
   // retries on the next pass, where everything above is evaluated again.
-  if (admin_request && !lease) { deferred_ = true; return; }
+  if ((admin_request || sta_motion) && !lease) { deferred_ = true; return; }
   if(!req.ap_socket&&!req.tls&&req.local_ipv4&&!readonly){resp.message="LAN_READ_ONLY_REQUIRED";return;}
   if ((admin_request||sta_motion)&&(portal_generation_!=req.admin_generation||portal_sta_!=sta_motion)) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
@@ -703,7 +711,7 @@ void HttpTransport::serviceRequest(uint32_t now_ms) {
       resp.message="AUTH_FAILED";break;
     }
     // Received before a STOP that was applied meanwhile: never executed late.
-    if(req.stop_epoch!=stop_epoch_.load()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
+    if(req.stop_epoch!=service_->motionStopEpoch()&&req.motion_command.intent!=motion::Intent::STOP){resp.message="SUPERSEDED_BY_STOP";break;}
     // A semantic ack is returned also for Controller refusals. No bus pointer,
     // actuator register, lease request or operational permit exists in Web.
     if(!mailbox_.awaitingResponse())break; // reader may have expired during admission
@@ -1359,7 +1367,7 @@ esp_err_t HttpTransport::handleMotion(httpd_req_t* req) {
     cookieValue(cookie,"md_session",r.cookie);
     httpd_req_get_hdr_value_str(req,"X-Csrf-Token",r.csrf,sizeof(r.csrf));
     r.kind=HttpRequestKind::MOTION_COMMAND;
-    r.stop_epoch=self->stop_epoch_.load();
+    r.stop_epoch=self->service_->motionStopEpoch();
     if(r.motion_command.intent==motion::Intent::STOP){
       // STOP lane: never waits for the ordinary mailbox (a status or command
       // request may hold it for up to its budget). The Controller validates
@@ -1429,7 +1437,7 @@ bool HttpTransport::serviceStopLane(uint32_t now_ms) {
     portal_.reset();portal_generation_=req.admin_generation;portal_sta_=sta_motion;
   }
   if(admitted&&req.local_authorized&&portal_.authorize(static_cast<uint64_t>(esp_timer_get_time())/1000,req.peer,req.cookie,req.csrf)){
-    stop_epoch_.fetch_add(1);             // every command received before this STOP is superseded
+    // MotionService advances the common fence for STOP from every channel.
     const auto ack=service_->motionCommand(req.motion_command,now_ms);
     stop_applied_.store(true);stop_ack_ok_.store(service_->motionAck(ack,stop_ack_,sizeof(stop_ack_)));applied=true;
   }
