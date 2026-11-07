@@ -2,7 +2,21 @@
 
 **Installata e validata sul robot nel perimetro provato:** `1.0.1-dev.16`, build `e0ddbb1791d0`, APP SHA256 `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d`. NVS gen-1/census 13/13 preservati; STAND, WALK STANDARD45/60, PRONE con SAFE_OFF e STOP da movimenti sono riusciti nei casi registrati. Ultimo stato `READY/PRONE_REST`, `safe_off_mask=8191`, 0 fault; robot spento via KEY OFF (discharge MOS BMS alimenta/disalimenta anche ESP32-S3 in configurazione attuale). **NON dichiarata release stabile**. Dossier [HW 07/11](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) · [manifest](Validation_Reports/Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [metriche](Validation_Reports/Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv). La PR #64 resta DRAFT; main non integrato, APP/manifest binari su ASUS.
 
-## Prossime patch mirate — non implementate
+## Candidata dev.17 — IMPLEMENTATA, NON VALIDATA HARDWARE (07/11 sera)
+
+`1.0.1-dev.17`, commit `7503bfc`, APP `f49b531a5826d5e2a22a70ee17d5d8976a1075d1e604cb44c5b2803566213c5e`, non flashata. [Dossier](Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [flash APP-only e collaudo minimo](Validation_Reports/Dev17_Candidate_2026-11-07/FLASH_AND_TEST.md).
+
+| Voce della tabella sotto | Stato dev.17 |
+|---|---|
+| P0 Dashboard / `/status` 503 / letture | Cause dimostrate (ammissione slack per le pagine di stato; abort browser a 800 ms < RTO lwIP); corrette. **Causa delle perdite TCP solo con coppia ON: UNKNOWN** (serve cattura pacchetti HOLD vs IDLE) |
+| P0 Reflow joystick | Corretto (overlay, slot fissi, centro pad ancorato al `pointerdown`, rilascio ovunque); Chrome: 0 px contro 89–202 px di dev.16 |
+| P0 Twin cold refresh | Corretto (Twin a robot fermo anche con coppia ON, 304 dalla cache; mai in moto o con joystick premuto; un retry a torque OFF) |
+| P1 STOP→WALK | Implementato con l'ammissione e le rotte di ripresa di STAND; WALK STOP, joystick e PRONE restano `STOP_LATCHED` |
+| P1 Timing | Non toccato; `-O2` selettivo valutato offline (APP +0,9 %, codice Motion +18 %, nessuna misura ESP32-S3) e **non incluso**; variabilità HOLD UNKNOWN |
+| P2 Cockpit / ViewCube | Implementati (Twin in alto a tutta larghezza, quota 50–150 passo 5, 🐢30/45/🐇60, ViewCube CAD) |
+| Nuovo, HYPOTHESIS | Il Controller non ordina i comandi per `sequence`: un refresh joystick riordinato dopo il neutro sarebbe accettato entro 1 s (non osservato nelle tracce dev.16) |
+
+## Richieste dalla validazione dev.16 (07/11 pomeriggio; stato aggiornato sopra)
 
 | Priorità | Difetto residuo / richiesta operativa |
 |---|---|
