@@ -143,7 +143,10 @@ void checkHeldStop(Rig& r){
   assert(r.m.state()==simple::State::STOPPED&&r.m.energized());
   assert(!r.m.offVerified()&&!r.m.stopSupportVerified());assert(r.p.offCalls==off&&r.p.enables==enables);
   const auto frames=r.p.frames;r.ticks(30);assert(r.p.frames==frames);
-  assert(r.m.prone(r.p.now));assert(r.m.walk(1,r.p.now));
+  assert(r.m.prone(r.p.now));
+  // dev.17: WALK is an explicit resume, admitted exactly as STAND after STOP
+  // (test_simple_motion stopThenWalk); refused, it gives the same reason.
+  if(const char* why=r.m.standResumeRefusal(r.p.now)){const char* w=r.m.walk(1,r.p.now);assert(w&&!strcmp(w,why));}
   r.m.walkStop();r.ticks(30);assert(r.p.frames==frames&&r.p.enables==enables);
   assert(r.m.stopVerified()&&!r.m.stopSupportVerified());
 }

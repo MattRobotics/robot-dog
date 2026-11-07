@@ -348,7 +348,7 @@ private:
   Drive commandedDrive_=kStandDrive;
   double requestedHeight_=.15,actualHeight_=0;
   bool heightValid_=false,walkRequested_=false;
-  unsigned stride_=1;
+  unsigned stride_=1,requestedStride_=1;  // requested: applied by startWalk (dev.17)
   InitialRoute initialRoute_=InitialRoute::ENTRY;
   // The walking law and its track. joystick_ is the live intent (deadline);
   // steered_ marks a walk started by it, through STOP and its recovery.

@@ -58,7 +58,14 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    }
    return last_=a;
  }
- if(motion_->stopActive()&&c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){
+ // An exact WALK STANDARD preset (forward stride, no gait name): -1 otherwise.
+ int preset=-1;
+ if(c.intent==motion::Intent::BASE_VELOCITY&&!c.gait[0]&&c.vy==0&&c.yaw_rate==0)
+   for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)preset=static_cast<int>(i);
+ // While STOP is latched only STAND and (dev.17) a WALK STANDARD preset reach
+ // SimpleMotion, which admits both through the same STOP-resume checks.
+ // WALK STOP, the joystick and PRONE stay refused.
+ if(motion_->stopActive()&&c.intent!=motion::Intent::STAND&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&preset<0){
    a.reason=motion_->stopInProgress()?"STOP_IN_PROGRESS":"STOP_LATCHED";return last_=a;
  }
  const unsigned owner=static_cast<unsigned>(c.owner);
@@ -87,7 +94,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
  if(joystick)return result(motion_->drive(c.vx,c.vy,c.yaw_rate,us));
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
- for(unsigned i=0;i<3;++i)if(std::abs(c.vx-simple::kStrideM[i]/simple::kWalkPeriodS)<1e-10)return result(motion_->walk(i,us));
+ if(preset>=0)return result(motion_->walk(static_cast<unsigned>(preset),us));
  return result("STANDARD_STRIDE_REQUIRED");
 }
 bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) const {

@@ -297,10 +297,11 @@ async function boot(initialStatus = fx.status_ready) {
     assert(q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR') && q('#simple-reason').textContent.includes('Supporto non verificato') && q('#simple-stand').disabled, 'geometric recovery refusal does not qualify support or bypass Controller admission');
     s.stop.stand_resume_reason='FUTURE_CONTROLLER_REFUSAL';await refresh(JSON.stringify(s));
     assert(q('#simple-reason').textContent.includes('FUTURE_CONTROLLER_REFUSAL') && q('#simple-stand').disabled, 'unknown refusal stays visible and never grants admission');
-    s.stop.stand_resume_allowed=true;s.stop.stand_resume_reason='STAND_RECOVERY_AVAILABLE';await refresh(JSON.stringify(s));assert(!q('#simple-stand').disabled&&q('#simple-walk').disabled);
-    assert(q('#simple-reason').textContent.includes('Recupero STAND ammesso dal Controller:') && q('#simple-reason').textContent.includes('piccolo avanzamento'), 'admission comes from Controller boolean');
+    s.stop.stand_resume_allowed=true;s.stop.stand_resume_reason='STAND_RECOVERY_AVAILABLE';await refresh(JSON.stringify(s));
+    assert(!q('#simple-stand').disabled&&!q('#simple-walk').disabled&&q('#simple-prone').disabled&&q('#simple-walk-stop').disabled, 'dev.17: STAND and WALK follow the same Controller admission after STOP; PRONE and WALK STOP stay off');
+    assert(q('#simple-reason').textContent.includes('Ripresa ammessa dal Controller (STAND o WALK):') && q('#simple-reason').textContent.includes('piccolo avanzamento'), 'admission comes from Controller boolean');
     const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='WALK_STANDARD';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
-    await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Recupero STAND dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
+    await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Ripresa dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
     await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
     s.fault=true;s.state='FAULT';s.reason='SERVO_COMMUNICATION_LOST';s.stale=false;await refresh(JSON.stringify(s));
@@ -476,17 +477,23 @@ async function boot(initialStatus = fx.status_ready) {
   assert(!values().includes('13/13 verificato') && /\d+\/13 verificati/.test(values()), values());
   await refresh(fx.status_stopped_on);
   assert.strictEqual(q('#simple-state').textContent,'STOP COMPLETATO · COPPIA ON');
-  assert(!q('#simple-stand').disabled&&JSON.parse(fx.status_stopped_on).stop.stand_resume_allowed,
-    'explicit STAND follows Controller admission after a verified synchronous HEIGHT/WALK stop');
+  assert(!q('#simple-stand').disabled&&!q('#simple-walk').disabled&&JSON.parse(fx.status_stopped_on).stop.stand_resume_allowed,
+    'explicit STAND or WALK follows Controller admission after a verified synchronous HEIGHT/WALK stop');
   assert(values().includes('Compensazione IMUcongelata durante STOP'));
   const refusedStop=JSON.parse(fx.status_stopped_on);
   refusedStop.stop.stand_resume_allowed=false;refusedStop.stop.stand_resume_reason='STOP_RECOVERY_PATH_NOT_CLEAR';
   await refresh(JSON.stringify(refusedStop));
-  assert(q('#simple-stand').disabled&&q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR'),
+  assert(q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-reason').textContent.includes('STOP_RECOVERY_PATH_NOT_CLEAR'),
     'UI preserves the Controller refusal and exposes its reason');
   await refresh(fx.status_stopped);
   assert(values().includes('SAFE_OFF13/13 verificato'), values());
   assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
+  // dev.17: WALK after STOP is the ordinary WALK STANDARD preset; the Controller admits it.
+  await refresh(fx.status_stopped_on);
+  { const i = Number(q('#simple-stride').value);
+    await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
+    assert(new RegExp('WALK STANDARD ' + [30, 45, 60][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
+  await refresh(fx.status_stopped);
   // 6. Escape sends the same STOP intent, also while another command is in flight.
   await refresh(fx.status_ready);
   q('#simple-height').value = '150';

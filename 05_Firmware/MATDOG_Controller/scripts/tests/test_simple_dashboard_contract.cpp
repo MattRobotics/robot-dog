@@ -190,6 +190,32 @@ int fixtures(const char* path) {
     check(rig.m.offVerified(), "fixture explicit SAFE_OFF verified (scripted port)");
     put("status_stopped", statusJson(service, rig), true);
   }
+  {
+    // dev.17: with STOP latched, a WALK STANDARD preset reaches SimpleMotion
+    // (the STAND-after-STOP admission); WALK STOP, joystick, PRONE and any
+    // non-preset velocity stay refused with STOP_LATCHED.
+    Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    const auto walk = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[1] / simple::kWalkPeriodS);
+    check(service.command(walk, walk.issued_at_ms).outcome == motion::CommandOutcome::ACCEPTED, "STOP->WALK fixture: WALK45 accepted");
+    for (unsigned i = 0; i < 3000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
+    for (unsigned i = 0; i < 200; ++i) rig.tick();
+    auto stop = semantic(motion::Intent::STOP, rig); service.command(stop, stop.issued_at_ms);
+    for (unsigned i = 0; i < 300 && !rig.m.stopVerified(); ++i) rig.tick();
+    service.update();
+    check(rig.m.stopVerified() && rig.m.energized(), "STOP->WALK fixture: STOP verified, torque ON");
+    auto refused = [&](motion::MotionCommand c, const char* what) {
+      const auto a = service.command(c, c.issued_at_ms);
+      check(a.outcome == motion::CommandOutcome::REJECTED && !std::strcmp(a.reason, "STOP_LATCHED"), std::string(what) + " refused while STOP is latched: " + a.reason); };
+    refused(semantic(motion::Intent::BASE_VELOCITY, rig), "WALK STOP");
+    auto joy = semantic(motion::Intent::BASE_VELOCITY, rig, .003); std::strcpy(joy.gait, "JOYSTICK"); refused(joy, "joystick");
+    refused(semantic(motion::Intent::LIE_DOWN, rig), "PRONE");
+    refused(semantic(motion::Intent::BASE_VELOCITY, rig, .004), "non-preset velocity");
+    const auto again = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[2] / simple::kWalkPeriodS);
+    const auto a = service.command(again, again.issued_at_ms);
+    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "COMMAND_ACCEPTED"), std::string("WALK60 after STOP accepted: ") + a.reason);
+    for (unsigned i = 0; i < 4000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
+    check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - simple::kStrideM[2] / simple::kWalkPeriodS) < 1e-12, "STOP->WALK fixture: WALK60 running");
+  }
   out << "}\n";
   std::printf("SIMPLE_DASHBOARD_FIXTURES = %s (%u checks; real MotionService bodies)\n", failures ? "FAIL" : "PASS", checks);
   return failures ? 1 : 0;
@@ -257,7 +283,7 @@ void anchors(const std::string& src) {
 int envelopes(const char* path, const char* src) {
   anchors(src);
   std::ifstream in(path);
-  std::string line, standBody, stopBody;
+  std::string line, standBody, stopBody, walkBody;
   unsigned seen = 0, previousSequence = 0;
   while (std::getline(in, line)) {
     const auto tab = line.find('\t'); if (tab == std::string::npos) continue;
@@ -291,6 +317,7 @@ int envelopes(const char* path, const char* src) {
       const unsigned i = name == "walk30" ? 0 : name == "walk45" ? 1 : 2;
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[i] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000,
             name + ": BASE_VELOCITY equals STANDARD preset " + std::to_string(i));
+      if (name == "walk45") walkBody = body;
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED", name + ": HTTP 200 ACCEPTED (" + r.code + ")");
       for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) rig.tick();
@@ -374,6 +401,32 @@ int envelopes(const char* path, const char* src) {
     check(rig.m.state()==simple::State::STANDING&&!std::strcmp(terminal.activeReason,"STAND_REACHED")&&
       !std::strcmp(terminal.activeOutcome,"COMPLETED"),"HTTP recovery actually reaches STAND_REACHED");
     check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP recovery has no enable/OFF");
+  }
+  // dev.17: the shipped WALK45 envelope after a verified STOP in WALK and in
+  // HOLD: the STAND-after-STOP admission, the resume route, then WALK STANDARD.
+  check(!walkBody.empty(), "WALK45 envelope present");
+  for(unsigned origin=0;origin<2;++origin){
+    Session session;Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    if(origin==0){check(!rig.m.walk(2,rig.p.now),"HTTP STOP->WALK: WALK60 intent");
+      for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::WALKING;++n)rig.tick();for(unsigned n=0;n<300;++n)rig.tick();}
+    else check(!rig.m.stand(.15,rig.p.now)&&rig.reachStand(),"HTTP STOP->WALK: STAND 150 HOLD");
+    const auto enables=rig.p.enables,off=rig.p.offCalls;
+    auto freshBody=[&](const std::string& body,unsigned sequence){
+      motion::MotionCommand parsed;const char* why=nullptr;
+      check(core::parseMotionJson(body.data(),body.size(),&parsed,&why),"STOP->WALK envelope parses");
+      auto result=replace(body,"\"sequence\":"+std::to_string(parsed.sequence),"\"sequence\":"+std::to_string(sequence));
+      return replace(result,"\"issued_at_ms\":"+std::to_string(parsed.issued_at_ms),"\"issued_at_ms\":"+std::to_string(rig.p.now/1000));
+    };
+    const auto stop=serve(request(freshBody(stopBody,200),session),session,service,rig,rig.p.now/1000);
+    check(stop.status==200&&stop.code=="ACCEPTED STOP_REQUESTED","HTTP STOP->WALK: STOP accepted");
+    for(unsigned n=0;n<300&&!rig.m.stopVerified();++n){rig.tick();service.update();}
+    check(rig.m.stopVerified()&&rig.m.energized()&&statusJson(service,rig).find("\"stand_resume_allowed\":true")!=std::string::npos,"HTTP STOP->WALK: STOP verified, resume admitted");
+    const auto walk=serve(request(freshBody(walkBody,201),session),session,service,rig,rig.p.now/1000);
+    check(walk.status==200&&walk.code=="ACCEPTED COMMAND_ACCEPTED",std::string("HTTP STOP->WALK: WALK45 accepted (")+walk.code+")");
+    for(unsigned n=0;n<4000&&rig.m.state()!=simple::State::WALKING;++n){rig.tick();service.update();}
+    check(rig.m.state()==simple::State::WALKING&&std::abs(rig.m.walkVelocityX()-simple::kStrideM[1]/simple::kWalkPeriodS)<1e-12&&
+          rig.m.requestedHeightM()==simple::kWalkHeightM,"HTTP STOP->WALK: WALK STANDARD 45 at the WALK height (software only)");
+    check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP STOP->WALK: no enable/OFF, no intermediate STAND command");
   }
   // Rejections keep working on the generated envelopes: none reaches the service.
   {

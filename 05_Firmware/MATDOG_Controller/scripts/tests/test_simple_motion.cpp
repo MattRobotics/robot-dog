@@ -710,7 +710,66 @@ static void temperatureChecks(){
   std::printf("THERMAL diagnostics: %s (status %zu bytes)\n",expect,std::strlen(status));
 }
 
+// dev.17: WALK after a verified STOP. The same STOP-resume admission as STAND
+// (standResumeRefusal), the same resume route of the STOP origin to the WALK
+// height, then WALK STANDARD with the requested stride: no ACQUIRE/ENABLE, no
+// SAFE_OFF, no intermediate STAND command, no restart without a new WALK.
+static void stopThenWalk(){
+  auto walking=[](Rig& r,unsigned n){for(unsigned i=0;i<n&&r.m.state()!=simple::State::WALKING;++i){r.tick();
+      if(r.m.state()==simple::State::FAULT){std::printf("fault=%s phase=%s\n",r.m.reason(),r.m.phase());return false;}}
+    return r.m.state()==simple::State::WALKING;};
+  auto stopped=[](Rig& r){r.m.stop();for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();return r.m.stopVerified()&&r.m.energized();};
+  // STOP during WALK45, then WALK60: the stopped gait completes with its own
+  // stride (45) and envelope, HOLD at the WALK height, then WALK60.
+  unsigned resumed=0;
+  for(unsigned when:{60u,200u,330u}){
+    Rig r;assert(!r.m.walk(1,r.p.now));assert(walking(r,3000));for(unsigned n=0;n<when;++n)r.tick();
+    const auto enables=r.p.enables,off=r.p.offCalls;assert(stopped(r));
+    for(unsigned n=0;n<100;++n)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&r.m.stopVerified());  // nothing restarts without a command
+    const char* why=r.m.standResumeRefusal(r.p.now);const char* w=r.m.walk(2,r.p.now);
+    assert(!why==!w&&(!w||!std::strcmp(w,why)));  // exactly the STAND-after-STOP admission
+    if(w){std::printf("WALK after STOP in WALK at %u refused like STAND: %s\n",when,w);continue;}
+    assert(!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK")&&!r.m.stopActive());
+    bool ownStride=true;unsigned recovering=0;
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);
+      if(r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.phase(),"WALK_STANDARD")){++recovering;ownStride=ownStride&&std::abs(r.m.walkVelocityX()-simple::kStrideM[1]/simple::kWalkPeriodS)<1e-12;}}
+    assert(recovering>0&&ownStride&&r.m.state()==simple::State::WALKING&&!std::strcmp(r.m.reason(),"WALK_STANDARD"));
+    assert(r.m.requestedHeightM()==simple::kWalkHeightM&&std::abs(r.m.walkVelocityX()-simple::kStrideM[2]/simple::kWalkPeriodS)<1e-12);
+    assert(r.p.enables==enables&&r.p.offCalls==off);
+    for(unsigned n=0;n<400;++n){r.tick();assert(r.m.state()==simple::State::WALKING);}
+    ++resumed;
+  }
+  assert(resumed>=2);
+  // STOP in HOLD (STAND 150), then WALK45: HEIGHT to the WALK height, then WALK.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());for(unsigned n=0;n<50;++n)r.tick();
+    const auto enables=r.p.enables,off=r.p.offCalls;assert(stopped(r));
+    assert(!r.m.walk(1,r.p.now));assert(r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.phase(),"HEIGHT"));
+    assert(walking(r,3000)&&r.m.requestedHeightM()==simple::kWalkHeightM&&r.p.enables==enables&&r.p.offCalls==off);
+    assert(std::abs(r.m.walkVelocityX()-simple::kStrideM[1]/simple::kWalkPeriodS)<1e-12);}
+  // STOP while rising (HEIGHT 150 -> 60), then WALK30: same admission as STAND.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.stand(.06,r.p.now));for(unsigned n=0;n<20;++n)r.tick();
+    assert(!std::strcmp(r.m.phase(),"HEIGHT"));const auto enables=r.p.enables;assert(stopped(r));
+    const char* why=r.m.standResumeRefusal(r.p.now);const char* w=r.m.walk(0,r.p.now);assert(!why==!w);
+    if(w)std::printf("WALK after STOP in HEIGHT refused like STAND: %s\n",w);
+    else assert(walking(r,4000)&&r.p.enables==enables&&std::abs(r.m.walkVelocityX()-simple::kStrideM[0]/simple::kWalkPeriodS)<1e-12);}
+  // Refusals keep their meaning: STOP in progress, bad stride, SAFE_OFF, fault.
+  {Rig r;assert(!r.m.walk(1,r.p.now));assert(walking(r,3000));for(unsigned n=0;n<100;++n)r.tick();
+    r.m.stop();r.tick();assert(r.m.stopActive()&&!r.m.stopVerified());
+    assert(!std::strcmp(r.m.walk(1,r.p.now),"STOP_IN_PROGRESS"));
+    for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());
+    assert(!std::strcmp(r.m.walk(3,r.p.now),"STANDARD_STRIDE_REQUIRED")&&r.m.stopVerified());
+    r.m.safeOff();assert(!std::strcmp(r.m.walk(1,r.p.now),"SAFE_OFF_IN_PROGRESS"));
+    for(unsigned n=0;n<40&&!r.m.offVerified();++n)r.tick(false);assert(r.m.offVerified());
+    const char* w=r.m.walk(1,r.p.now);assert(w&&r.m.offVerified());std::printf("WALK after STOP then SAFE_OFF refused: %s\n",w);}
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.p.missing=true;
+    for(unsigned i=0;i<20&&r.m.state()!=simple::State::FAULT;++i)r.tick(false);assert(r.m.state()==simple::State::FAULT);
+    r.p.missing=false;for(unsigned i=0;i<40;++i)r.tick(false);
+    const char* w=r.m.walk(1,r.p.now);assert(w);std::printf("WALK after a fault refused: %s\n",w);}
+  std::puts("STOP->WALK: STOP in WALK/HOLD/HEIGHT then WALK STANDARD through the STAND-after-STOP admission and resume routes, stride applied at HOLD, refusals unchanged PASS (offline)");
+}
 int main(){proneRest();temperatureChecks();standHoldTilt();
+  stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
   joystickWalk();
