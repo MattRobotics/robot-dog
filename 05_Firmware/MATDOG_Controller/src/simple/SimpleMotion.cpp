@@ -530,12 +530,20 @@ const char* SimpleMotion::prone(uint64_t now){
   return nullptr;
 }
 const char* SimpleMotion::walk(unsigned stride,uint64_t now){
-  if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
+  // dev.17: after a verified STOP, WALK is admitted exactly as STAND after STOP
+  // (standResumeRefusal: torque, feedback, IMU, certified path from the STOP
+  // origin) and takes stand()'s resume route to the WALK height, then walks.
+  // A STOP in progress, SAFE_OFF and a latched fault still refuse it.
+  if(stopping()&&!(stopActive_&&stopVerified_))return stopActive_?"STOP_IN_PROGRESS":"SAFE_OFF_IN_PROGRESS";
   if(stride>=3)return "STANDARD_STRIDE_REQUIRED";
   if(state_==State::WALKING)return "ALREADY_WALKING";
-  // One user command can acquire, energize, stand at 150 mm and then walk.
+  // One user command can acquire, energize, stand at the WALK height and then walk.
   const char* r=stand(kWalkHeightM,now);if(r)return r;
-  stride_=stride;gait_=walkGait(stride);joystick_=false;walkRequested_=true;return nullptr;
+  requestedStride_=stride;joystick_=false;walkRequested_=true;
+  // A resumed WALK STOP finishes with its own gait and tilt envelope; the
+  // requested stride starts at HOLD (startWalk).
+  if(phase_!=Phase::WALK){stride_=stride;gait_=walkGait(stride);}
+  return nullptr;
 }
 const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now){
   if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
@@ -855,6 +863,7 @@ void SimpleMotion::generateStand(uint64_t now){
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
+  if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_);}
   plannedHeight_=kWalkHeightM;track_={};steered_=joystick_;steeredCycles_=0;
   // The latest target, from the start ramp; never against the leg order.
   if(steered_){gait_.advanceXM=(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[0];gait_.advanceYM=joystickGoal_[1];gait_.yawRad=joystickGoal_[2];}

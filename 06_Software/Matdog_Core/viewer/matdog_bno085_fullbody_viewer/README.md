@@ -347,6 +347,13 @@ SH2_ROTATION_VECTOR quaternion  →  MATDOG base_link  →  Three.js root object
 4. The **only** conversion performed is the storage order:
    `SH2 (w, x, y, z)` → `THREE.Quaternion (x, y, z, w)`
    (`src/frame/orientation.ts → sh2ToThree`).
+5. **View cube** (`src/viewer/viewCube.ts`, dev.17): a CAD cube with an XYZ
+   triad in the top-right corner of the same renderer. Camera only: a click or
+   tap on a face turns the camera to that axis about the same target and
+   distance (FRONTE = +X, RETRO, SINISTRA = +Y, DESTRA, ALTO with the front at
+   the bottom, BASSO with the front at the top, as in CAD); a drag is still the
+   OrbitControls rotation; "Reset vista" is unchanged. It never touches the
+   model, the IMU quaternion, the URDF or any request.
 
 Consequences, matching the frozen hardware definitions:
 

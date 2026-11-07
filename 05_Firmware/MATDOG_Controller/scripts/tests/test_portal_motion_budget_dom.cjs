@@ -107,7 +107,7 @@ async function boot(options = {}) {
   const d = dom.window.document;
   // The page's only other timer is the 6 s abort guard of a request.
   // poll() runs the scheduled refresh and returns the delay of the next one.
-  const poll = async () => { const t = timers.filter(x => x.ms !== 800).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 800).pop() || {}).ms; };
+  const poll = async () => { const t = timers.filter(x => x.ms !== 3500).pop(); timers.length = 0; assert(t, 'a poll is scheduled'); t.fn(); await settle(); return (timers.filter(x => x.ms !== 3500).pop() || {}).ms; };
   const tick = () => intervals.forEach(i => i.fn());
   return {dom, d, device, errors, timers, intervals, poll, tick, q: s => d.querySelector(s),
     close: () => dom.window.close()};

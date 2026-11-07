@@ -18,7 +18,7 @@ struct HttpTransportRequest { HttpRequestKind kind=HttpRequestKind::NONE; motion
 '''+body+r'''
 int main(){int bad=0;
  for(int k=0;k<=20;++k){HttpTransportRequest r;r.kind=static_cast<HttpRequestKind>(k);r.motion_command.intent=motion::Intent::STAND;
-  const bool want=k==8||k==12||k==14||k==17||k==18; // WIFI_LOGIN WIFI_SESSION MOTION_STATUS MOTION_LOGIN MOTION_SESSION
+  const bool want=k==1||k==7||k==8||k==12||k==14||k==17||k==18; // WEB_STATUS WIFI_STATUS (dev.17) WIFI_LOGIN WIFI_SESSION MOTION_STATUS MOTION_LOGIN MOTION_SESSION
   if(slackExempt(r)!=want){std::printf("kind %d exempt=%d want=%d\n",k,slackExempt(r),want);++bad;}}
  HttpTransportRequest w;w.kind=HttpRequestKind::MOTION_COMMAND;w.motion_command.intent=motion::Intent::BASE_VELOCITY;
  if(!slackExempt(w)){std::puts("WALK STOP not exempt");++bad;}
