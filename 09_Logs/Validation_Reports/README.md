@@ -12,7 +12,7 @@
 Historical scoped closure (11/10/2026): [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 
 Each entry is evidence for its recorded date and scope only. A PASS here does not carry over to a
-later firmware, a later mechanical state or a later power architecture, and none of the historical diagnostics authorizes motion on its own. The `MOTION_AUTHORIZED=0` diagnostic restriction belonged to earlier test builds, **not** to the qualified operational v1.0.1. Recorded PASS/FAIL results are not edited by this index.
+later firmware, a later mechanical state or a later power architecture, and none of the historical diagnostics authorizes motion on its own. The build flag `MOTION_AUTHORIZED=0` is also present in the v1.0.1 manifest (with `BOOT_MOTION_AUTHORIZED=0` and `MOTION_AUTHORITY=RUNTIME_GOVERNED`): no binary authorizes motion at build time or at boot; the Controller admits each motion command at runtime. Recorded PASS/FAIL results are not edited by this index.
 Current state: [root README](../../README.md). Chronology: [`HISTORY_INDEX.md`](../HISTORY_INDEX.md).
 
 Legend — **Era**: *Station* = Station-mediated, 12-servo phase (historical); *Rebuild* = after the

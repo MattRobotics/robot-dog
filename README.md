@@ -2,7 +2,11 @@
 
 MATDOG è un quadrupede costruito da zero. Il Controller ESP32-S3 è l'unica autorità su Motion, servomotori, cinematica, limiti e STOP; la dashboard invia comandi ad alto livello e mostra telemetria e Digital Twin. **STAND, WALK STANDARD, PRONE e STOP sono operativi sulla prima release stabile qualificata per questo robot.**
 
-## Stato corrente — MATDOG v1.0.1, prima Stable (07/11/2026)
+## MATDOG v1.0.1 — First Stable Hardware Release
+
+| Firmware installato | Build | APP SHA256 |
+|---|---|---|
+| `1.0.1-dev.17` | `17db0efe2324` | `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83` |
 
 **Release [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) — VERIFIED HARDWARE, CURRENT ROBOT, QUALIFIED FUNCTIONAL SCOPE (07/11/2026).** Sul robot è installata e collaudata l'APP `MATDOG Controller 1.0.1-dev.17`, build `17db0efe2324`, compilata dal commit `17db0efe23242ae8932b5549546a9758d9aa4645`: 1.707.808 B, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, `app0` @ `0x010000`. Il tag `v1.0.1` promuove **questi stessi byte** senza ricompilazione: la stringa interna del firmware resta `1.0.1-dev.17`. Da questa release `main` è la sorgente canonica. Il tag pubblico `v1.0.1` resta immutabile; eventuali correzioni documentali successive su `main` non alterano il firmware rilasciato.
 
@@ -14,11 +18,17 @@ MATDOG è un quadrupede costruito da zero. Il Controller ESP32-S3 è l'unica aut
 
 **Rollback:** dev.16 `e0ddbb1791d0` (APP `73952eec…`), VERIFIED HARDWARE il 07/11, conservata sull'ASUS con script qualificato. Il solo sorgente `main` non sostituisce l'APP binaria pubblicata e verificata.
 
-**Screenshot di validazione:** due PNG della dashboard reale sono conservati byte-identici nell'[archivio ZIP hardware dev.17](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/raw/MATDOG_DEV17_HARDWARE_VALIDATION_2026-11-07.zip); non sono ancora pubblicati come anteprime singole nel README.
+## MATDOG Motion Cockpit
+
+Dashboard reale del Controller dev.17 durante il collaudo del 07/11/2026 (screenshot originali dell'operatore, byte-identici a quelli nell'[archivio hardware](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/raw/MATDOG_DEV17_HARDWARE_VALIDATION_2026-11-07.zip); [dossier](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md)).
+
+| READY: Digital Twin, ViewCube e comandi | STAND100 raggiunto: vista frontale del Twin |
+|---|---|
+| [![MATDOG Motion Cockpit in READY con Digital Twin, ViewCube, quota STAND, WALK STANDARD 30/45/60 e joystick](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/screenshots/matdog-motion-cockpit-ready-idle-twin-viewcube-2026-11-07.png)](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/screenshots/matdog-motion-cockpit-ready-idle-twin-viewcube-2026-11-07.png) | [![MATDOG Motion Cockpit in STANDING dopo STAND 100 mm completato, Twin in vista FRONTE e pulsante STOP](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/screenshots/matdog-motion-cockpit-stand100-reached-twin-front-2026-11-07.png)](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/screenshots/matdog-motion-cockpit-stand100-reached-twin-front-2026-11-07.png) |
 
 ## Contesto storico (non rappresenta il firmware corrente)
 
-Il [report dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) documenta il firmware precedente, ora conservato per rollback. Il [report dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) documenta i precedenti problemi di PRONE e HTTP, **già superati nel perimetro hardware verificato dalla dev.17**. I relativi log e le RCA rimangono nei dossier originali; le vecchie etichette DRAFT/non-flashata hanno valore soltanto alla loro data.
+Il [report dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) documenta il firmware precedente, ora conservato per rollback. Il [report dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) documenta i problemi di quella build: la discesa PRONE interrotta a quota intermedia (corretta dalla dev.16) e i 503 su `/status` (corretti dalla dev.17), non presenti nelle prove hardware successive. I limiti ancora aperti sono quelli elencati sopra. I relativi log e le RCA rimangono nei dossier originali; le vecchie etichette DRAFT/non-flashata hanno valore soltanto alla loro data.
 
 ## Hardware e architettura
 

@@ -68,3 +68,14 @@ Il backup completo del 10/09/2026 (SHA `5cbba0b9…fd32`) e l'APP dev.16 restano
 ## C. Regola di lettura
 
 Le tracce sono buffer finiti (ultimi 240 campioni, ultimi 48 comandi) e in parte sovrapposti: non sommare finestre diverse, non contare due volte lo stesso `TIMEOUT_3500MS`, non attribuire un ACK a comandi usciti dal buffer. `VERIFIED HARDWARE` vale solo per ciò che è stato osservato o registrato in questa sessione, su questo robot.
+
+## D. Screenshot pubblicati in chiaro (aggiunta 07/11/2026, dopo la release)
+
+Estratti con `unzip -p` dallo ZIP dell'operatore, **senza modificarne i byte** e con nome descrittivo; gli originali restano nello ZIP e il suo `SHA256SUMS.txt` è invariato.
+
+| File pubblicato | Originale nello ZIP | Byte | SHA256 |
+|---|---|---:|---|
+| [`screenshots/matdog-motion-cockpit-ready-idle-twin-viewcube-2026-11-07.png`](screenshots/matdog-motion-cockpit-ready-idle-twin-viewcube-2026-11-07.png) | `screenshots/image(20261107-184722).png` | 70.288 | `007e2daa9cf77c28b9555ed0d4e320a6fcdd94174cebf65153e7a33141f2c27b` |
+| [`screenshots/matdog-motion-cockpit-stand100-reached-twin-front-2026-11-07.png`](screenshots/matdog-motion-cockpit-stand100-reached-twin-front-2026-11-07.png) | `screenshots/image(20261107-185216).png` | 58.031 | `c69234c051fc56336eefa3044feaba9bd72fd211d0a17159d00980b2b7e1cef2` |
+
+Contenuto: solo la dashboard Motion Cockpit (stato, Twin, ViewCube, comandi, STOP e l'etichetta «Amministratore connesso»); nessun indirizzo, nome utente, URL, SSID o dato personale; nessun metadato PNG oltre a `IHDR`/`sBIT`/`IDAT`/`IEND`.

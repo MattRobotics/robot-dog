@@ -22,7 +22,9 @@
 | UX Twin | overlay leggermente trasparente dei comandi dentro il Twin; zampe posteriori sospese sul pavimento grafico in PRONE | #62 |
 | LED | verde stabile osservato in dev.17, nessuna qualificazione del sottosistema | #62 |
 | RESTORE e manutenzione | RESTORE manuale da dashboard, rifiuti per giunto, multigenerazione non qualificati | #48 |
-| Non ricollaudati in dev.17 | rotazioni IMU pitch/roll, quote STAND diverse da 100/125, WALK FAST, funzioni avanzate | — |
+| Non ricollaudati in dev.17 | rotazioni IMU pitch/roll (dev.15: roll applicato ~1,9° contro ~4,8° richiesti, limite `WORKSPACE`), quote STAND diverse da 100/125, WALK FAST, funzioni avanzate | #52 |
+| Termica servo | picchi termici isolati ID21/ID31 (dev.15/dev.16) da discriminare tra dato spurio e fault reale, senza ridurre le protezioni | #52 |
+| HostLink / Jetson | controllo Motion via USB (HostLink) non qualificato su hardware; Jetson non ancora integrata | — |
 
 ## Archivi storici — per provenienza, non per attività corrente
 
@@ -33,5 +35,7 @@ Le sezioni originali della dev.15 e dev.16 sono preservate nei loro dossier, anz
 - [dev.17 candidata offline](Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md) · [dev.17 realmente validata e promossa a Stable](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md).
 
 Per i dettagli dello stato del repository, del tag e dell'APP installata usa [README corrente](../README.md) e [Release v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1). Il tag è immutabile: i successivi commit di sola documentazione su `main` non alterano il binario originale pubblicato.
+
+Archivio cronologico: [dev.14 05/11](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) · [dev.7 31/10](Validation_Reports/Motion_dev7_HW_2026-10-31/REPORT.md) · [snapshot documentale dev.14](Historical/Dev14_Documentation_Closeout_2026-11-05/README.md) · versione completa precedente di questo file, con gli snapshot dev.15/dev.16, al commit della release: [`OPEN_ITEMS.md` @ `35f5ca4`](https://github.com/MattRobotics/robot-dog/blob/35f5ca43e0118cdfc501c14456efb615abb9a8be/09_Logs/OPEN_ITEMS.md).
 
 Prossimi interventi tecnici: issue [#52](https://github.com/MattRobotics/robot-dog/issues/52), [#62](https://github.com/MattRobotics/robot-dog/issues/62) e [#48](https://github.com/MattRobotics/robot-dog/issues/48), tutte da trattare come **lavoro del ciclo successivo**.
