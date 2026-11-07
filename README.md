@@ -1,10 +1,10 @@
 # MATDOG — quadrupede robotico di Matt Robotics
 
-MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 trasforma i comandi della dashboard in traiettorie e comandi coordinati ai servo; raccoglie feedback e gestisce STOP e protezioni. Il Digital Twin mostra la posa misurata. L'obiettivo successivo è il comando direzionale continuo, senza affidare al browser il controllo degli attuatori.
+MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 trasforma i comandi della dashboard in traiettorie e comandi coordinati ai servo; raccoglie feedback e gestisce STOP e protezioni. Il Digital Twin mostra la posa misurata. Il joystick direzionale continuo è ora operativo nella dev.15; i prossimi obiettivi sono PRONE affidabile, timing real-time, gait più rapido e integrazione futura della Jetson, mantenendo l'autorità degli attuatori sull'ESP32-S3.
 
 **Al 06/11/2026 il robot ha installata la dev.15, build `7997ad4d4497`**, flash APP-only verificato sulla partizione attiva e **validazione hardware PARZIALE**. STAND 50–150 mm, WALK STANDARD, joystick 3DOF proporzionale, Digital Twin (incluso Reset vista frontale +X) e risposta IMU sono stati osservati sul robot reale. **PRONE è intermittente**: due completamenti fino a `PRONE_REST` con torque OFF 13/13, ma due abort documentati ~53 mm con SAFE_OFF e un ulteriore fallimento riferito dall'operatore. Il timing Motion supera ripetutamente 20 ms, e la locomozione è lenta. **Non è una release stable.**
 
-[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [RCA timing 20 ms](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
+[Report hardware dev.15](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze e SHA256](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [Piano prestazioni 2×–5×](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/PERFORMANCE_PLAN.md) · [RCA timing 20 ms](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Report storico dev.14](09_Logs/Validation_Reports/Dev14_HW_2026-11-05/REPORT.md)
 
 ## Hardware e architettura
 
@@ -28,7 +28,7 @@ MATDOG è un robot a quattro zampe progettato da zero. Il Controller ESP32-S3 tr
 | PRONE terminale | **INTERMITTENTE / NON QUALIFICATO**: due `PRONE_REST` con torque OFF13/13; due timeout verificati a ~52 mm con caduta al rilascio; terzo caso riferito senza JSON. Necessarie RCA fase e gestione sicura del supporto. |
 | Stabilizzazione IMU | Pitch/roll attivi e più reattivi secondo operatore; ampiezza roll limitata da `WORKSPACE`. Correzione applicata ≠ livellamento assoluto del corpo. |
 | STOP | Accessibile e verificato: STOP in STAND/WALK può lasciare coppia ON se supporto non verificato; dopo fault PRONE conferma SAFE_OFF 13/13 ma il fault resta latched. |
-| Digital Twin | Segue la posa, Reset vista frontale **+X verificato hardware**; restano eventuali verifiche UI/pavimento e badge LIVE della issue #62. |
+| Digital Twin | Visualizzato all'inizio della scheda Motion, segue la posa reale; Reset vista **+X verificato hardware**. L'operatore riferisce appoggio grafico corretto durante STAND; restano da qualificare completo PRONE/WALK swing, rendering mobile e stati stale/offline della issue #62. |
 | NVS / BMS | gen-1 `VALID_ACKNOWLEDGED`, census 13/13, READY; BMS fresco in dev.15. Restore manuale da dashboard non qualificato. |
 | LED / termica | Sfarfallamento policromatico intermittente aperto; picchi termici isolati da indagare, non prova di surriscaldamento continuo. |
 | HostLink / Jetson | Bridge/USB non qualificati Motion hardware; Jetson prevista, **non installata**. |
