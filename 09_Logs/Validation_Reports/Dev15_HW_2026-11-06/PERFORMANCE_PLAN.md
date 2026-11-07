@@ -4,7 +4,7 @@
 
 ## Baseline misurata / NON misurata
 
-- Il firmware **realmente installato** è dev.15 `7997ad4d4497`; sorgente `7997ad4` ancora locale e assente da GitHub main.
+- Il firmware **realmente installato** è dev.15 `7997ad4d4497`; il sorgente esatto `7997ad4` è pubblicato sul branch della PR #64 (merge `e5b0644`), ma **non ancora su GitHub main**. APP esatta e manifest restano locali sull'ASUS.
 - Periodo di release Motion impostato 20 ms (50 Hz); lavoro massimo osservato **49,586 ms** (più di 2,4 volte il budget) e **51,159 ms max gap** in uno snapshot cumulativo della sessione joystick. Centinaia di missed release per finestra di ~84 s; `COMPENSATE` massimo **32,408 ms o 33,109 ms** in altre finestre. Serve prima una attribuzione nello **stesso release** su build esatta (READ, NOMINAL, COMPENSATE, CONVERT, FRAME, REST, numero solve/IK).
 - Log VIDEO: oscillazione del marker laterale ~6,5 s; **non** prova periodo esatto del gait né velocità a terra. Esiste un ritardo di assestamento `WALK_SETTLE→STAND` ~7,3–8,7 s dopo rilascio joystick/WALK STOP, distinto dalla latenza di invio e accettazione del comando.
 - Limiti **comandati** dev.15 riferiti nella sessione: `vx` ~6,9 mm/s, `vy` ~3,1 mm/s, `yaw` ~1,76°/s. Nessuna velocità effettiva al suolo in mm/s misurata. **Non** inferire velocità e coppia massime ST3215 da questi tre valori.
