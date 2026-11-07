@@ -2,18 +2,17 @@
 
 > **Storico (07/11/2026, prima della dev.17):** [dev.16 VALIDATED HARDWARE nel perimetro provato, NOT STABLE](Dev16_HW_2026-11-07/REPORT.md) · [metriche per finestra](Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv) · [manifest originali](Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md). Robot allora installato con dev.16 `e0ddbb1791d0` (ora rollback); PR #64 allora draft; restano HTTP/UX, STOP→WALK e timing del gait. Le righe più sotto sono fotografie storiche, non lo stato attuale.
 
-> **Nuovo (07/11/2026):** [Candidata dev.16 — IMPLEMENTED NOT VALIDATED HARDWARE, non flashata](Dev16_Candidate_2026-11-07/REPORT.md) · [procedura flash e collaudo](Dev16_Candidate_2026-11-07/FLASH_AND_TEST.md).
-> **Nuovo (06/11/2026):** [MATDOG dev.15 — hardware partial validation](Dev15_HW_2026-11-06/REPORT.md) · [Manifest evidenze locali SHA256](Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Analisi video joystick](Dev15_HW_2026-11-06/VIDEO_AUDIT.md). Firmware installato dev.15; sorgente esatto nella PR #64 (non in main). PRONE intermittente, deadline 20 ms non mantenute; non stable. **07/11:** [RCA timing](Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md) · [brief per confronto tecnico](Dev15_HW_2026-11-06/TIMING_DISCUSSION_BRIEF.md).
+> **Storico pre-flash:** [candidata dev.16](Dev16_Candidate_2026-11-07/REPORT.md) e [procedura originale](Dev16_Candidate_2026-11-07/FLASH_AND_TEST.md). In seguito è stata installata, collaudata e conservata come rollback della dev.17.
+> **Storico dev.15:** [validazione parziale del 06/11](Dev15_HW_2026-11-06/REPORT.md), [manifest](Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md), [analisi video](Dev15_HW_2026-11-06/VIDEO_AUDIT.md) e [RCA timing](Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md); difetti PRONE di quella build non rappresentano la stable corrente.
 
 # Validation reports — index
 
-Latest hardware checkpoint 05/11/2026: [dev.14 — PARTIAL HW VALIDATION](Dev14_HW_2026-11-05/REPORT.md). Dev.7 pre-release storica → dev.12 installata 04/11 (STOP terminale da correggere) → dev.14 installata 05/11 → dev.15 in sviluppo separato, non qualificato HW qui. Codice esatto sul [tag checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105); nessun merge firmware o promozione stable.
+**Latest hardware checkpoint: 07/11/2026 — [dev.17, prima Stable v1.0.1](Dev17_HW_2026-11-07/REPORT.md)**. Per la sequenza precedente: [dev.16](Dev16_HW_2026-11-07/REPORT.md) → [dev.15](Dev15_HW_2026-11-06/REPORT.md) → [dev.14](Dev14_HW_2026-11-05/REPORT.md). Il [tag storico dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) è soltanto un checkpoint passato.
 
 Historical scoped closure (11/10/2026): [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 
 Each entry is evidence for its recorded date and scope only. A PASS here does not carry over to a
-later firmware, a later mechanical state or a later power architecture, and no entry authorizes
-motion (`MOTION_AUTHORIZED=0`). Recorded PASS/FAIL results are not edited by this index.
+later firmware, a later mechanical state or a later power architecture, and none of the historical diagnostics authorizes motion on its own. The `MOTION_AUTHORIZED=0` diagnostic restriction belonged to earlier test builds, **not** to the qualified operational v1.0.1. Recorded PASS/FAIL results are not edited by this index.
 Current state: [root README](../../README.md). Chronology: [`HISTORY_INDEX.md`](../HISTORY_INDEX.md).
 
 Legend — **Era**: *Station* = Station-mediated, 12-servo phase (historical); *Rebuild* = after the
