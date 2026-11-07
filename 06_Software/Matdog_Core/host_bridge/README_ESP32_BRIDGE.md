@@ -77,7 +77,7 @@ operator present; robot on its stand or in SAFE_OFF; physical STOP available.
 2. Check the stable identity: `ls -l /dev/serial/by-id/` shows exactly one
    `usb-Espressif_USB_JTAG_serial_debug_unit_<MAC>-if00`; no other process holds it.
 3. Start by hand: `sudo systemctl start matdog-esp32-bridge`;
-   `journalctl -u matdog-esp32-bridge` shows `link READY: 1.0.1-dev.15 <git>`.
+   `journalctl -u matdog-esp32-bridge` shows `link READY: 1.0.1-dev.16 <git>`.
 4. Read-only: `{"op":"link"}`, `{"op":"status","fresh":true}` through the socket;
    Controller `@MOTION STATUS` unchanged with and without the bridge.
 5. With the robot in SAFE_OFF: `{"op":"stop"}` → ACCEPTED; unplug/replug USB →

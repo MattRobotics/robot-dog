@@ -269,7 +269,7 @@ class SimpleMotion {
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
   void compensate(motion::LocomotionFrame&,uint64_t);
-  double slewStep(uint64_t now);
+  double slewStep(uint64_t now,uint64_t maxDtUs=kImuSlewMaxDtUs);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
   bool compensationSafe(const motion::JointTargetFrame&,const collision::Box&,bool stopProof=true) const;
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
@@ -332,6 +332,17 @@ class SimpleMotion {
   double nativePitch_=0,nativeX_=0,nativeZ_=0,plannedHeight_=0;
   uint64_t segmentStartUs_=0,segmentDurationUs_=0,settleUs_=0,segmentDeadlineUs_=0;
   uint64_t imuStartUs_=0,compensatedUs_=0;
+  // T1 (dev.16): the last ACCEPTED IMU correction as a joint offset from its
+  // nominal target. Alternate WALK/HOLD releases reuse it on the new nominal
+  // target; compensationSafe still runs on every release.
+  motion::JointTargetFrame reuseOffset_{};Phase reusePhase_=Phase::IDLE;uint64_t reuseUs_=0;
+  double reuseGait_[3]{};bool reuseLight_=false,reuseSettled_=false;
+  void rememberCorrection(const motion::JointTargetFrame& accepted,const motion::JointTargetFrame& nominal,uint64_t now);
+public:
+  struct ReuseStats { uint32_t light=0,full=0,rejected=0; double maxShadowRad=0; };
+  const ReuseStats& reuseStats() const { return reuseStats_; }
+private:
+  ReuseStats reuseStats_{};
   bool pendingGoalValid_=false;
   uint16_t commandedRaw_[12]{};
   Drive commandedDrive_=kStandDrive;

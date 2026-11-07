@@ -95,7 +95,7 @@ async function boot() {
   assert.strictEqual(q('#simple-twin h3 a'), null, 'no redundant Comandi link');
   assert.strictEqual(q('#simple-controls').className, 'command-panel');
   const joystick = q('#simple-joystick');
-  assert(joystick && q('#joy-pad') && joystick.textContent.includes('NON VALIDATO SU HARDWARE') && joystick.textContent.includes('Rotazione'), 'joystick panel shipped, marked not hardware-validated');
+  assert(joystick && q('#joy-pad') && joystick.textContent.includes('VERIFICATO SU HARDWARE (dev.15)') && joystick.textContent.includes('Rotazione'), 'joystick panel shipped, marked not hardware-validated');
   assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
   const diagnostics = q('#simple-diagnostics');
   assert(diagnostics && !diagnostics.open && diagnostics.contains(q('#simple-values')) && diagnostics.contains(q('#simple-joints')) && diagnostics.contains(q('#simple-detail')), 'technical details remain in one closed diagnostic panel');

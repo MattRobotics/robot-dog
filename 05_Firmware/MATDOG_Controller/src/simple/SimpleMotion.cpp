@@ -939,18 +939,51 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
 // One slew step per Motion release, scaled by the physical time since the last
 // one: a group boundary regenerates the reference in the same release and must
 // not advance the correction twice; a late release does not slow it down.
-double SimpleMotion::slewStep(uint64_t now){
-  const uint64_t dt=now==compensatedUs_?0:compensatedUs_&&now>compensatedUs_?std::min<uint64_t>(now-compensatedUs_,kImuSlewMaxDtUs):kPeriodUs;
+double SimpleMotion::slewStep(uint64_t now,uint64_t maxDtUs){
+  const uint64_t dt=now==compensatedUs_?0:compensatedUs_&&now>compensatedUs_?std::min<uint64_t>(now-compensatedUs_,maxDtUs):kPeriodUs;
   compensatedUs_=now;return kImuSlewRadS*double(dt)/1e6;
 }
+void SimpleMotion::rememberCorrection(const JointTargetFrame& accepted,const JointTargetFrame& nominal,uint64_t now){
+  reuseOffset_.valid=accepted.valid&&nominal.valid;
+  for(unsigned i=0;i<12;++i)jointSlot(reuseOffset_,i)=jointSlot(accepted,i)-jointSlot(nominal,i);
+  reusePhase_=phase_;reuseUs_=now;reuseGait_[0]=gait_.advanceXM;reuseGait_[1]=gait_.advanceYM;reuseGait_[2]=gait_.yawRad;
+}
 void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
+  const bool walk=phase_==Phase::WALK;
+  const collision::Box& safeBox=(walk||phase_==Phase::WALK_HOLD)?walkBox():collision::kHeight;
+  // T1 light release (dev.7 WALK budget, restored for WALK and HOLD): while
+  // the accepted correction is settled (the last full solve did not step it),
+  // every other release keeps it as a joint offset on the new nominal target.
+  // Same limits, boxes, RAW, loaded and STOP proof; any slew, phase, gait,
+  // IMU, unwind or recovery change forces the full solve.
+  const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&!walkRecover_&&reusePhase_==phase_&&
+    (phase_==Phase::WALK||phase_==Phase::HOLD)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
+    !(up.x==0&&up.y==0&&up.z==0)&&reuseGait_[0]==gait_.advanceXM&&reuseGait_[1]==gait_.advanceYM&&reuseGait_[2]==gait_.yawRad;
+  if(reusable){
+    auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(reuseOffset_,i);
+    if(compensationSafe(q,safeBox,true)){
+#ifdef MATDOG_T1_SHADOW
+      {auto body=headed(f.cartesian.body,rollCorrection_,pitchCorrection_);const auto t=f.cartesian.body.translationM;
+       body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
+       const auto exact=(rollCorrection_==0&&pitchCorrection_==0&&walk)?f.target:
+         compensationTarget(f,body,goal_.valid?goal_:f.target,true,walk?gait_.edgeTiltRad:0);
+       if(exact.valid&&!(phase_==Phase::HOLD&&imuLimited_))for(unsigned i=0;i<12;++i)
+         reuseStats_.maxShadowRad=std::fmax(reuseStats_.maxShadowRad,std::abs(jointSlot(exact,i)-jointSlot(q,i)));}
+#endif
+      f.target=q;reuseLight_=true;++reuseStats_.light;return;}
+    ++reuseStats_.rejected;
+  }
+  // A full solve after a light release steps at most one period: never more
+  // than dev.15's per-release step from the same accepted correction.
+  const bool afterLight=reuseLight_;reuseLight_=false;++reuseStats_.full;
+  const double oldRoll=rollCorrection_,oldPitch=pitchCorrection_;
+  const JointTargetFrame nominal=f.target;
   // Angles are the accepted body orientation in the existing support frame,
   // not an integral of IMU error. Fit its orientation from labelled stance
   // anchors and fresh encoder FK; the measured gravity direction supplies
   // the world vertical. Contacts remain modelled, never asserted as sensed.
   const auto previous=headed(f.cartesian.body,rollCorrection_,pitchCorrection_);
   double wantedRoll=0,wantedPitch=0;bool stance[4];for(unsigned l=0;l<4;++l)stance[l]=f.cartesian.phases[l].stance;
-  const bool walk=phase_==Phase::WALK;
   if(walk){
     // In a four-contact window omit the newest touchdown from the fit until
     // the next liftoff. The other three planted anchors retain their labels;
@@ -964,15 +997,15 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
   if(walk&&limitWalkTilt(wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
   imuWanted_[0]=wantedRoll;imuWanted_[1]=wantedPitch;
-  const double slew=slewStep(now);
+  const double slew=slewStep(now,afterLight?kPeriodUs:kImuSlewMaxDtUs);
   auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
   double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
   if(walk){const double dr=wantedRoll-rollCorrection_,dp=wantedPitch-pitchCorrection_;
     const double distance=std::fmax(std::abs(dr),std::abs(dp)),fraction=distance>.001?std::fmin(1.,slew/distance):0;
     roll=rollCorrection_+fraction*dr;pitch=pitchCorrection_+fraction*dp;}
   if(!imuLimited_&&std::fmax(std::abs(wantedRoll-roll),std::abs(wantedPitch-pitch))>.001)imuReason_="SLEW";
-  if(!walk&&roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;return;}
-  if(walk&&roll==0&&pitch==0){correctionScale_=1;return;} // nominal gait already solved
+  if(!walk&&roll==rollCorrection_&&pitch==pitchCorrection_&&goal_.valid){f.target=goal_;rememberCorrection(goal_,nominal,now);reuseSettled_=true;return;}
+  if(walk&&roll==0&&pitch==0){correctionScale_=1;rememberCorrection(nominal,nominal,now);reuseSettled_=oldRoll==0&&oldPitch==0;return;} // nominal gait already solved
   auto body=headed(f.cartesian.body,roll,pitch);const auto t=f.cartesian.body.translationM;
   // Keep the nominal vertical clearance, with the body over the same gait
   // XY in gravity's direction. Anchors stay in their support-plane frame.
@@ -980,14 +1013,14 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // Large edge-biased roll solutions do not preserve this model's nominal
   // support strip. Keep its existing contact domain, not a new IMU-angle cap.
   const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:0);
-  if(compensationSafe(q,(walk||phase_==Phase::WALK_HOLD)?walkBox():collision::kHeight,!walkRecover_)){
-    f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;
+  if(compensationSafe(q,safeBox,!walkRecover_)){
+    f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{
     // Retain the accepted pose at the real workspace boundary. The desired
     // geometric orientation is re-estimated next release, so reversal leaves
     // saturation immediately; there is no accumulated integral to unwind.
     if(walk){fault("WALK_IK_OR_WORKSPACE");return;}
-    if(goal_.valid)f.target=goal_;imuLimited_=true;imuReason_="WORKSPACE";
+    if(goal_.valid){f.target=goal_;rememberCorrection(goal_,nominal,now);}imuLimited_=true;imuReason_="WORKSPACE";reuseSettled_=true;
   }
 }
 void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){

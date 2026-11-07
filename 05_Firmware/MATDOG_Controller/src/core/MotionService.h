@@ -6,29 +6,35 @@ constexpr size_t kMotionStatusJsonBytes=5248; // bounded status + unchanged 640 
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
 struct MotionStatusSnapshot {
+  // Fields grouped by alignment (dev.16) so the T0 timing fields fit the bound.
   uint64_t capturedUs=0,imuStampUs=0,maxGapUs=0,offVerifiedUs=0;
+  double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,walkVelocityY=0,walkYawRate=0,quaternion[4]{};
+  simple::Feedback feedback[12]{},referenceFaultFeedback{};
+  simple::TempCheck tempCheck[2]{};
+  const char* firstMissPhase="";const char* commandMaxWorkPhase="";
+  const char *phase="IDLE",*poseRegion="UNKNOWN",*reason="BOOTING",*readinessReason="BOOTING",*powerReason="POWER_NOT_READY";
+  const char *activeReason="",*activeOutcome="";
+  const char* standResumeReason="STOP_NOT_ACTIVE";
+  const char* imuReason="";
   uint32_t capturedMs=0,releases=0,missed=0,bmsAgeMs=0,maxReleaseWorkUs=0;
   uint32_t commandMissed=0,firstMissLatenessUs=0,commandMaxWorkUs=0,commandMaxCompensateUs=0,commandMaxSolves=0;
-  const char* firstMissPhase="";const char* commandMaxWorkPhase="";
-  simple::State state=simple::State::STOPPED;
-  const char *phase="IDLE",*poseRegion="UNKNOWN",*reason="BOOTING",*readinessReason="BOOTING",*powerReason="POWER_NOT_READY";
-  char activeId[49]{};
   uint32_t activeSequence=0,acceptedMs=0,finishedMs=0;
+  uint32_t tempSpikes=0,tempChecks=0;
+  uint32_t overrunsTotal=0,commandOverruns=0;  // releases whose work exceeded 20 ms
+  unsigned referenceFaultSlot=12;
+  simple::State state=simple::State::STOPPED;
+  float imuWanted[2]{},imuApplied[2]{};
   uint16_t commandedRaw[12]{};
-  const char *activeReason="",*activeOutcome="";
-  bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
-  bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
-  const char* standResumeReason="STOP_NOT_ACTIVE";
-  uint16_t offMask=0,referenceFaultRaw=0;
-  double requestedHeightM=0,heightM=0,walkCycles=0,walkVelocityX=0,walkVelocityY=0,walkYawRate=0,quaternion[4]{};
-  bool joystick=false;
-  uint32_t tempSpikes=0,tempChecks=0;uint16_t hotPendingMask=0;simple::TempCheck tempCheck[2]{};
-  const char* imuReason="";float imuWanted[2]{},imuApplied[2]{};
+  uint16_t offMask=0,referenceFaultRaw=0,hotPendingMask=0;
   // MotionTiming records (same release): parts us, previous release parts us,
   // work counters. Copies of data already held; USB @MOTION TIMING has the rest.
-  bool timingValid[2]{};uint16_t timing[2][16]{};  // saturated at 65535
-  unsigned referenceFaultSlot=12;
-  simple::Feedback feedback[12]{},referenceFaultFeedback{};
+  uint16_t timing[2][16]{};  // saturated at 65535
+  uint16_t timingMeta[2][3]{};  // [lateness, since previous release end, external loop work] us, saturated
+  bool timingValid[2]{};
+  bool ready=false,fresh=false,offVerified=false,energized=false,heightValid=false,stabilizationLimited=false,imuValid=false;
+  bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
+  bool joystick=false;
+  char activeId[49]{};
 };
 static_assert(sizeof(MotionStatusSnapshot)<=1536,"bounded per-request Motion observation");
 // Transport adapter only. SimpleMotion is the one operational state owner.

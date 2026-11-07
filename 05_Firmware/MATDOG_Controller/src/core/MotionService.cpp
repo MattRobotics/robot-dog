@@ -136,10 +136,15 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.maxReleaseWorkUs=motion_->maxReleaseWorkUs();
  {const auto& t=simple::timing::state;s.commandMissed=t.missed;
   if(t.firstMiss.valid){s.firstMissPhase=t.firstMiss.phase;s.firstMissLatenessUs=static_cast<uint32_t>(t.firstMiss.latenessUs);}
-  for(unsigned i=0;i<2;++i){const auto& r=i?t.maximum:t.firstMiss;s.timingValid[i]=r.valid;
+  // Index 0 is serialized as "max_work", 1 as "first_miss" (dev.15 had them swapped).
+  for(unsigned i=0;i<2;++i){const auto& r=i?t.firstMiss:t.maximum;s.timingValid[i]=r.valid;
     auto sat=[](uint32_t v){return static_cast<uint16_t>(v>65535?65535:v);};
     for(unsigned k=0;k<simple::timing::PARTS;++k){s.timing[i][k]=sat(r.us[k]);s.timing[i][6+k]=sat(r.previousUs[k]);}
-    for(unsigned k=0;k<simple::timing::WORKS;++k)s.timing[i][12+k]=sat(r.work[k]);}
+    for(unsigned k=0;k<simple::timing::WORKS;++k)s.timing[i][12+k]=sat(r.work[k]);
+    uint64_t ext=0;for(unsigned k=0;k<simple::timing::EXTERNALS;++k)ext+=r.externalUs[k];
+    auto sat64=[](uint64_t v){return static_cast<uint16_t>(v>65535?65535:v);};
+    s.timingMeta[i][0]=sat64(r.latenessUs);s.timingMeta[i][1]=sat64(r.sinceReleaseUs);s.timingMeta[i][2]=sat64(ext);}
+  s.commandOverruns=t.overruns;s.overrunsTotal=simple::timing::overrunsTotal;
   if(t.maximum.valid){s.commandMaxWorkUs=t.maximum.workUs;s.commandMaxWorkPhase=t.maximum.phase;s.commandMaxCompensateUs=t.sectionMax[simple::timing::COMPENSATE];s.commandMaxSolves=t.maximum.work[simple::timing::SOLVES];}}
  s.offVerifiedUs=motion_->offVerifiedUs();
  s.referenceFaultSlot=motion_->referenceFaultSlot();
@@ -173,13 +178,17 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  add(",\"snapshot_age_ms\":%llu",(unsigned long long)elapsedMs);
  add(",\"stop\":{\"active\":%s,\"in_progress\":%s,\"motion_verified\":%s,\"support_verified\":%s,\"stand_resume_allowed\":%s,\"stand_resume_reason\":\"%s\"}",
    boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
- add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu}",
-   (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves);
+ add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu,\"overruns\":%lu}",
+   (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves,(unsigned long)s.commandOverruns);
  // [read,nominal,compensate,convert,frame,rest] us of one release, the same six
  // of the release before, then solves, ik, newton, fk of that release.
  for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss\":":",\"timing\":{\"max_work\":");
    if(!s.timingValid[i]){add("%s","null");continue;}
    for(unsigned k=0;k<16;++k)add("%s%lu",k?",":"[",(unsigned long)s.timing[i][k]);add("%s","]");}
+ // [lateness, since previous release end, external loop work] us of the same two records.
+ for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss_meta\":":",\"max_work_meta\":");
+   if(!s.timingValid[i]){add("%s","null");continue;}
+   add("[%lu,%lu,%lu]",(unsigned long)s.timingMeta[i][0],(unsigned long)s.timingMeta[i][1],(unsigned long)s.timingMeta[i][2]);}
  add("%s","}");
  // Existing thermal confirmation counters: isolated hot samples rejected, joints whose hot window is open.
  // Direct confirmations of bulk >= 70 C, latest first: [servo id, bulk C,
@@ -192,8 +201,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
- add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
-   s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long long)s.offVerifiedUs);
+ add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
+   s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long)s.overrunsTotal,(unsigned long long)s.offVerifiedUs);
  if(s.referenceFaultSlot<12){const auto& f=s.referenceFaultFeedback;
    add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
      s.referenceFaultSlot,f.raw,s.referenceFaultRaw,f.torque,f.goal,(unsigned long long)f.controlStampUs);}
