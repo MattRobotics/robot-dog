@@ -268,7 +268,11 @@ class SimpleMotion {
   motion::JointTargetFrame measured() const;
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
-  bool nominalRelease(motion::LocomotionFrame&,const motion::GaitParameters&,double terminal,bool clockDone);
+  // T2: the nominal frame of this release (target.valid false when a solve
+  // failed). Returned by value so every exact solve is constructed in the
+  // caller's frame: the loop task stack holds one frame, not a copy.
+  motion::LocomotionFrame nominalRelease(const motion::GaitParameters&,double terminal,bool clockDone);
+  motion::LocomotionFrame resyncExact(const motion::GaitParameters&,const motion::CartesianSample&,uint64_t gridUs,double terminal);
   void compensate(motion::LocomotionFrame&,uint64_t);
   double slewStep(uint64_t now,uint64_t maxDtUs=kImuSlewMaxDtUs);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
