@@ -1,0 +1,185 @@
+# ANALYSIS ONLY - host instrumentation used by TIMING_RCA_2026-11-07.md.
+# Never apply to a firmware build. Base: 7997ad4. Apply on a scratch copy, then run
+# scripts/offline_motion/run_motion_cost_probe.sh (it builds rca_probe.cpp).
+--- a/src/simple/RcaProbe.h
++++ b/src/simple/RcaProbe.h
+@@ -0,0 +1,13 @@
++#pragma once
++// RCA-only host instrumentation (scratch copy, never firmware).
++#include <chrono>
++#include <cstdint>
++namespace rca {
++enum F { STOPPLAN, CSAFE, CTARGET, SUPPORTFIT, SOLVEGAIT, POINTSAFE, NF };
++inline const char* names[NF]={"StopPlan::build","compensationSafe","compensationTarget","supportLevelTarget","solveGait","pointSafe"};
++inline double ns[NF]{}; inline uint64_t calls[NF]{}; inline uint64_t stopIter=0, stopJointChecks=0;
++inline int depth[NF]{};
++struct T { F f; std::chrono::steady_clock::time_point a; bool top;
++  T(F x):f(x),a(std::chrono::steady_clock::now()),top(depth[x]++==0){++calls[x];}
++  ~T(){--depth[f]; if(top) ns[f]+=std::chrono::duration<double,std::nano>(std::chrono::steady_clock::now()-a).count();} };
++}
+--- a/src/simple/StopPlan.h
++++ b/src/simple/StopPlan.h
+@@ -2,6 +2,7 @@
+ #include <cmath>
+ #include <algorithm>
+ #include <initializer_list>
++#include "RcaProbe.h"
+ 
+ namespace matdog { namespace simple {
+ // Candidate reference arrest, NOT an actuator/contact model. q is the last
+@@ -14,7 +15,7 @@
+   double q[12]{},v[12]{},a[12]{},end[12]{},duration=0;
+   bool build(const double position[12],const double velocity[12],const double acceleration[12],
+              const double lo[12],const double hi[12],double vmax,double amax) {
+-    duration=0;
++    rca::T rcaT(rca::STOPPLAN);duration=0;
+     if(!(vmax>0&&amax>0)||!std::isfinite(vmax)||!std::isfinite(amax))return false;
+     for(unsigned i=0;i<12;++i){
+       q[i]=position[i];v[i]=velocity[i];a[i]=acceleration[i];
+@@ -24,8 +25,8 @@
+     // Choose the shortest 20 ms multiple satisfying the entire polynomial,
+     // including extrema between frames. No servo tuning or clipping of q,v,a.
+     for(unsigned steps=2;steps<=60;++steps){
+-      const double t=steps*.02;bool valid=true;
+-      for(unsigned i=0;i<12&&valid;++i){
++      const double t=steps*.02;bool valid=true;++rca::stopIter;
++      for(unsigned i=0;i<12&&valid;++i){++rca::stopJointChecks;
+         const double c1=a[i]*t,c2=-3*v[i]-2*c1,c3=2*v[i]+c1;
+         const double p1=q[i]+t*v[i]/4;
+         end[i]=q[i]+t*v[i]/2+t*t*a[i]/12;
+--- a/src/simple/SimpleMotion.cpp
++++ b/src/simple/SimpleMotion.cpp
+@@ -328,6 +328,7 @@
+   return "OUTSIDE_CERTIFIED";
+ }
+ bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
++  rca::T rcaT(rca::POINTSAFE);
+   timing::Section section(timing::CONVERT);
+   if(!q.valid)return false;
+   for(unsigned i=0;i<12;++i){const double v=jointSlot(q,i);if(!std::isfinite(v)||v<input_.minRad[i]||v>input_.maxRad[i])return false;}
+@@ -867,6 +868,7 @@
+   return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
+ }
+ JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
++  rca::T rcaT(rca::CTARGET);
+   timing::count(timing::SOLVES);
+   JointTargetFrame q;q.valid=true;
+   for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=seed.legs[l];opt.toleranceM=1e-6;opt.maxIterations=8;opt.requireNominalStrip=nominalStrip&&edgeTilt==0;
+@@ -881,6 +883,7 @@
+   return q;
+ }
+ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box,bool stopProof) const {
++  rca::T rcaT(rca::CSAFE);
+   if(!pointSafe(q)||!contains(box,q))return false;
+   // The same gen-1 conversion as TX/readback; an in-box floating point IK
+   // solution alone is insufficient at a box edge after RAW quantization.
+--- a/src/motion/TiltCompensation.cpp
++++ b/src/motion/TiltCompensation.cpp
+@@ -1,3 +1,4 @@
++#include "../simple/RcaProbe.h"
+ #include "TiltCompensation.h"
+ #include <cmath>
+ namespace matdog { namespace motion {
+@@ -19,7 +20,7 @@
+ bool supportLevelTarget(const Vector3 anchors[4],const JointTargetFrame& measured,
+                         const bool stance[4],const Vector3& worldUpBase,
+                         const BodyPose& previousBodyInSupport,double& roll,double& pitch){
+-  roll=pitch=0;
++  rca::T rcaT(rca::SUPPORTFIT);roll=pitch=0;
+   if(!anchors||!stance||!measured.valid||!validBodyPose(previousBodyInSupport))return false;
+   Vector3 up=worldUpBase;if(!unit(up))return false;
+   // Select by the labelled gait anchors before doing only three FK evaluations.
+--- a/src/motion/Gait.cpp
++++ b/src/motion/Gait.cpp
+@@ -1,3 +1,4 @@
++#include "../simple/RcaProbe.h"
+ #include "Gait.h"
+ #include "LegKinematicsInternal.h"
+ #include <cmath>
+@@ -241,6 +242,7 @@
+   out.valid=true;return out;
+ }
+ LocomotionFrame solveGait(const GaitParameters& p,const CartesianSample& s,const LocomotionFrame* prev,bool derivatives){
++  rca::T rcaT(rca::SOLVEGAIT);
+   LocomotionFrame out;out.cartesian=s;
+   if(!validGaitParameters(p)){out.status=GaitStatus::INVALID_PARAMETER;return out;}
+   if(!s.valid||(prev&&!prev->target.valid)){out.status=GaitStatus::STATE_ERROR;return out;}
+--- a/scripts/offline_motion/run_motion_cost_probe.sh
++++ b/scripts/offline_motion/run_motion_cost_probe.sh
+@@ -8,5 +8,5 @@
+ for n in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKinematics LegInverseKinematics StandTrajectory TiltCompensation TiltedContactIk; do src+=("$sketch/src/motion/$n.cpp"); done
+ w=();for f in sin cos sincos tan asin acos atan atan2 sqrt; do w+=("-Wl,--wrap=$f"); done
+ "${CC:-gcc}" -O2 -c "$here/opcount.c" -o "$out/opcount.o"
+-"${CXX:-g++}" -std=c++17 -O2 -fno-builtin -w -I "$sketch/scripts/tests/simple_host_stub" "$here/motion_cost_probe.cpp" "${src[@]}" "$out/opcount.o" "${w[@]}" -lm -o "$out/cost"
++"${CXX:-g++}" -std=c++17 -O2 -fno-builtin -w -I "$sketch/scripts/tests/simple_host_stub" "$here/rca_probe.cpp" "${src[@]}" "$out/opcount.o" "${w[@]}" -lm -o "$out/cost"
+ "$out/cost"
+--- a/scripts/offline_motion/rca_probe.cpp
++++ b/scripts/offline_motion/rca_probe.cpp
+@@ -0,0 +1,67 @@
++// Motion release cost, offline (dev.15). Production SimpleMotion on the scripted
++// rig of test_simple_motion.cpp with a constant tilted IMU (compensation active):
++// HOLD100, WALK45, WALK60, a steered combined walk. Counts per Motion release
++// (SimpleMotion::update only; cooperative telemetry excluded): libm
++// transcendental/sqrt calls through link-time wrappers (opcount.c, soft-double
++// cost proxy for the ESP32-S3) and the firmware's own work counters. Host wall
++// time is reported only as a relative figure, NOT ESP32-S3 timing.
++// Build: run_motion_cost_probe.sh.
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wreturn-type"
++#define main simple_motion_main
++#include "../tests/test_simple_motion.cpp"
++#undef main
++#pragma GCC diagnostic pop
++#include <chrono>
++#include "../../src/simple/MotionTiming.h"
++#include "../../src/simple/RcaProbe.h"
++#include <map>
++extern "C" { extern uint64_t op_trig,op_inv,op_sqrt; }
++namespace {
++struct Stat {
++  Stat(){for(int i=0;i<rca::NF;++i){rca::ns[i]=0;rca::calls[i]=0;}rca::stopIter=rca::stopJointChecks=0;}
++  std::vector<double> us,trig,inv,sq,iters;uint32_t work[simple::timing::WORKS]{};
++  void release(Rig& r){r.p.now+=simple::kPeriodUs;r.in.imuStampUs=r.p.now;r.m.inputs(r.in);r.p.publishCommandedPose();test_clock_us=r.p.now;
++    const uint64_t t0=op_trig,i0=op_inv,s0=op_sqrt;const auto a=std::chrono::steady_clock::now();
++    const uint64_t si0=rca::stopIter;
++    r.m.update(r.p.now);
++    iters.push_back(double(rca::stopIter-si0));
++    us.push_back(std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-a).count());
++    trig.push_back(double(op_trig-t0));inv.push_back(double(op_inv-i0));sq.push_back(double(op_sqrt-s0));
++    const auto& w=simple::timing::state.previousWork;for(unsigned i=0;i<simple::timing::WORKS;++i)work[i]=std::max(work[i],w[i]);
++    r.m.updateTelemetry(r.p.now);}
++  static double mean(const std::vector<double>& v){double s=0;for(double x:v)s+=x;return s/v.size();}
++  static double max(const std::vector<double>& v){return *std::max_element(v.begin(),v.end());}
++  void print(const char* name){
++    std::map<int,int> h;for(double x:iters)h[int(x)]++;std::printf("  stopplan iterations/release mean=%.1f max=%.0f hist:",mean(iters),max(iters));for(auto&kv:h)std::printf(" %d:%d",kv.first,kv.second);std::printf("\n");
++    double tot=0;for(int i=0;i<rca::NF;++i)tot+=0;
++    for(int i=0;i<rca::NF;++i)std::printf("  %-20s calls/release=%6.2f host_ns/release=%8.0f\n",rca::names[i],double(rca::calls[i])/us.size(),rca::ns[i]/us.size());
++    std::printf("  stop joint-checks/release=%.1f\n",double(rca::stopJointChecks)/us.size());
++    for(int i=0;i<rca::NF;++i){rca::ns[i]=0;rca::calls[i]=0;}rca::stopIter=rca::stopJointChecks=0;
++    std::printf("%-16s n=%4zu trig mean/max=%6.1f/%4.0f  inv-trig=%5.1f/%3.0f  sqrt=%6.1f/%4.0f | host_us mean=%5.1f max=%6.1f | work max solves=%u ik=%u newton=%u fk=%u\n",
++      name,us.size(),mean(trig),max(trig),mean(inv),max(inv),mean(sq),max(sq),mean(us),max(us),
++      work[simple::timing::SOLVES],work[simple::timing::IK],work[simple::timing::NEWTON],work[simple::timing::FK]);}};
++void tilt(Rig& r,double roll,double pitch){  // constant board tilt seen by the IMU
++  const double cr=std::cos(roll/2),sr=std::sin(roll/2),cp=std::cos(pitch/2),sp=std::sin(pitch/2);
++  r.in.quaternion[0]=cr*cp;r.in.quaternion[1]=sr*cp;r.in.quaternion[2]=cr*sp;r.in.quaternion[3]=-sr*sp;}
++}
++int main(){
++  constexpr double degree=3.14159265358979323846/180;
++  {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());tilt(r,.8*degree,1.2*degree);Stat s;
++    for(unsigned n=0;n<650;++n)s.release(r);s.print("HOLD100 tilted");}
++  for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
++    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);Stat s;
++    for(unsigned n=0;n<975;++n)s.release(r);assert(r.m.state()==simple::State::WALKING);s.print(stride==1?"WALK45 tilted":"WALK60 tilted");}
++  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kWalkPeriodS,v[3]={.5*simple::kJoystickStrideM/T,.5*simple::kJoystickLateralM/T,.5*simple::kJoystickYawRad/T};
++    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
++    tilt(r,.3*degree,.8*degree);Stat s;for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);s.release(r);}
++    assert(r.m.state()==simple::State::WALKING);s.print("JOYSTICK tilted");}
++
++  for(double target:{.05,.10,.15,.24}){Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());Stat s;
++    // board tilt ramping in pitch from 0 to `target` over 6 s, then held 7 s (tilted-table test shape)
++    for(unsigned n=0;n<650;++n){const double p=std::fmin(1.,n/300.)*target;tilt(r,.1*degree,p);s.release(r);}
++    char name[48];std::snprintf(name,sizeof name,"HOLD100 ramp %.2f",target);s.print(name);
++    std::vector<std::pair<double,double>> v;for(size_t i=0;i<s.us.size();++i)v.push_back({s.iters[i],s.us[i]});
++    std::sort(v.begin(),v.end());double lo=0,hi=0;size_t nl=0,nh=0;for(auto&x:v){if(x.first<=2){lo+=x.second;++nl;}else if(x.first>=20){hi+=x.second;++nh;}}
++    std::printf("  host_us mean when stopplan iters<=2: %.1f (n=%zu)   when iters>=20: %.1f (n=%zu)\n",nl?lo/nl:0,nl,nh?hi/nh:0,nh);}
++}
