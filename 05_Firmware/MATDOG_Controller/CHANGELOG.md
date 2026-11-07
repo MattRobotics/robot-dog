@@ -8,6 +8,16 @@
 > the original-to-recreated SHA map are in [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and
 > [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — MATDOG Controller 1.0.1-dev.16 candidate: PRONE without intermediate drop, Motion timing T0/T1 (on dev.15 `7997ad4`) — 2026-11-07
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**. dev.15 (`7997ad4`, APP `b81d3a4f…`) stays the installed reference until an authorized flash. Calibration gen-1, mapping, Geometry V5/URDF REV01-FIX, FK/IK, collision boxes, partitions, STOP/SAFE_OFF and physical limits unchanged.
+
+- **PRONE handover (root cause of the dev.15 aborts).** PRONE_HEIGHT ended at 53 mm, where the nominal rear UPPER lay 2.2 ticks inside kLift; recorded loaded sag (3–14 ticks) left the measured pose 0.3–0.8 ticks outside it, so neither arrival nor loaded settle could hand over and the deadline released the torque at ~52 mm. Handover now at `kProneHandoverM` = 52.0 mm: against the worst recorded sag of every joint (dev.14 HOLD 69+23 cases, dev.15 PRONE 4 cases) ≥ 4.7 ticks inside kHeight and ≥ 3.5 inside kLift (53 mm: −0.8).
+- **No automatic drop.** A PRONE segment past its deadline, or whose loaded pose leaves the segment box but stays pointSafe in kHeight/kLift, enters the ordinary contextual STOP with torque (`PRONE_NOT_COMPLETED_SUPPORT_HELD` / `PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD`); every guard of that STOP still falls back to fault + SAFE_OFF. Exits: existing STAND recovery (certified region) or SAFE_OFF.
+- **T0 diagnostics.** `timing.max_work` / `timing.first_miss` now carry the records their names say (swapped in dev.15); new `command_timing.overruns`, `overrun_releases` (work > 20 ms, also without lost periods) and `max_work_meta` / `first_miss_meta` = [lateness, since previous release end, external loop work] µs; Dashboard row.
+- **T1 timing.** While the accepted IMU correction is settled, alternate WALK/HOLD releases reuse it as a joint offset on the new nominal target; pointSafe, boxes, RAW conversion, loaded and STOP proof run on every release; slew, phase, gait, IMU, unwind or recovery changes force the full solve, which steps at most one period after a light release. Host: mean libm work per release HOLD −47 %, WALK −22 %, JOYSTICK −20 %; reused vs exact target ≤ 1.0 tick; worst WALK board attitude error 2.17 mrad (dev.15 1.97).
+- **UI.** Joystick badge: verified on hardware (dev.15).
+
 ## Unreleased — MATDOG Controller 1.0.1-dev.15 candidate: joystick Motion, PRONE rest and STOP recovery, runtime cost (on dev.14 `4ff2aad`) — 2026-11-06
 
 > Offline candidate, IMPLEMENTED NOT VALIDATED HW. dev.14 (`4ff2aad`, APP `71028f95…`) stays the installed reference. Calibration gen-1, mapping, Geometry V5/URDF, partitions, STOP/SAFE_OFF and physical limits unchanged.

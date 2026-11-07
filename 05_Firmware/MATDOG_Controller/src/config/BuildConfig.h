@@ -66,7 +66,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 // dev.15: dev.14 + JOYSTICK BASE_VELOCITY (vx, vy, yaw_rate) on the SE(2) WALK law, tread
 //   fillet contact and certified kSteer, STAND after STOP in PRONE/route segments,
 //   lighter IK, IMU slew in physical time, Reset vista +X, timing/IMU diagnostics.
-constexpr const char* kFirmwareVersion = "1.0.1-dev.15"; // Offline candidate; hardware qualification pending
+// dev.16: dev.15 + PRONE HEIGHT->LIFT handover at 52 mm and contextual STOP instead of
+//   SAFE_OFF when a PRONE segment cannot complete with support available; timing
+//   diagnostics (overruns, lateness, outside work; max_work/first_miss keys fixed);
+//   IMU correction reused on alternate settled WALK/HOLD releases (T1).
+constexpr const char* kFirmwareVersion = "1.0.1-dev.16"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

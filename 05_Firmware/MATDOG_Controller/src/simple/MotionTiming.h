@@ -13,11 +13,16 @@ enum External : unsigned { USB_CAPTURE, USB_FORMAT, USB_SERIAL, ROUTER, HTTP,
 // leg IK solves (two for a fillet re-solve), Newton steps and contact FK
 // evaluations inside all of them.
 enum Work : unsigned { SOLVES, IK, NEWTON, FK, WORKS };
+// Release work above this budget is an overrun even when no whole period is
+// lost (missed counts only skipped 20 ms slots). Equal to simple::kPeriodUs.
+constexpr uint32_t kBudgetUs=20000;
+inline uint32_t overrunsTotal=0;  // since boot, never re-armed
 struct Record {
   bool valid=false;
   const char* phase="IDLE";
   const char* previousPhase="IDLE";
   uint64_t stampUs=0,latenessUs=0,visitGapUs=0,outsideVisitUs=0;
+  uint64_t sinceReleaseUs=0;  // previous release end -> this release start (loop work outside Motion)
   uint32_t release=0,missed=0,skipped=0,workUs=0;
   uint32_t us[PARTS]{},previousUs[PARTS]{},externalUs[EXTERNALS]{};
   uint32_t fastReads=0,controlReads=0,frames=0;
@@ -34,6 +39,8 @@ struct State {
   uint32_t previous[PARTS]{},external[EXTERNALS]{},externalMax[EXTERNALS]{};
   uint32_t previousWork[WORKS]{};
   uint32_t missed=0;  // release periods lost since the command armed this record
+  uint32_t overruns=0;  // releases of this command whose work exceeded kBudgetUs
+  uint64_t lastReleaseEnd=0;
 };
 inline State state{};
 inline void arm() { state=State{};state.armed=true; }
@@ -76,12 +83,16 @@ struct Release {
     state.working=Record{};auto& r=state.working;r.valid=true;r.phase=phase;
     r.stampUs=stamp;r.release=number;r.latenessUs=lateness;r.missed=missed;r.skipped=skipped;
     r.visitGapUs=state.visitGap;r.outsideVisitUs=state.outside;r.previousPhase=state.previousPhase;
+    r.sinceReleaseUs=state.lastReleaseEnd&&start>state.lastReleaseEnd?start-state.lastReleaseEnd:0;
     for(unsigned i=0;i<PARTS;++i)r.previousUs[i]=state.previous[i];
     for(unsigned i=0;i<EXTERNALS;++i){r.externalUs[i]=state.external[i];state.external[i]=0;}
     for(unsigned i=0;i<WORKS;++i)r.previousWork[i]=state.previousWork[i];
     state.start=start;state.partStart=start;state.part=REST;state.active=true;
   }
   ~Release(){
+    const uint64_t end=esp_timer_get_time();
+    if(end-start>kBudgetUs){++overrunsTotal;if(state.armed)++state.overruns;}
+    if(state.armed)state.lastReleaseEnd=end;
     if(state.active){switchPart(REST);state.active=false;auto& r=state.working;
       // The same endpoint closes the partition: sum(us)==workUs exactly.
       r.workUs=static_cast<uint32_t>(state.partStart-start);
@@ -91,7 +102,7 @@ struct Release {
       if(r.skipped&&!state.firstMiss.valid)state.firstMiss=r;
       if(!state.maximum.valid||r.workUs>state.maximum.workUs)state.maximum=r;
       maximum=std::max(maximum,r.workUs);
-    }else maximum=std::max(maximum,static_cast<uint32_t>(esp_timer_get_time()-start));
+    }else maximum=std::max(maximum,static_cast<uint32_t>(end-start));
   }
 };
 } } }

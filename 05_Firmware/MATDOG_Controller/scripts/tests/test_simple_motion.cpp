@@ -100,8 +100,9 @@ struct Rig {
   bool reachStand(){for(unsigned i=0;i<3000;++i){tick();if(m.state()==simple::State::STANDING)return true;if(m.state()==simple::State::FAULT){std::printf("fault=%s phase=%s frames=%u\n",m.reason(),m.phase(),p.frames);return false;}}return false;}
 };
 static void proneHandoverWait(){
-  // Scripted late tracking, not a model of PRONE or ground support. The existing
-  // 12-tick arrival allowance can include a pose outside the NEXT certified box.
+  // Scripted late tracking, not a model of PRONE or ground support. dev.16: the
+  // handover target (kProneHandoverM) lies far inside the NEXT box, so a pose
+  // outside it is now beyond the 12-tick arrival allowance as well.
   auto atHeight=[](Rig& r){assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());assert(!r.m.prone(r.p.now));
     for(unsigned n=0;n<100&&strcmp(r.m.phase(),"PRONE_HEIGHT");++n)r.tick();assert(!strcmp(r.m.phase(),"PRONE_HEIGHT"));};
   Rig reference;atHeight(reference);motion::JointTargetFrame terminal;
@@ -112,7 +113,7 @@ static void proneHandoverWait(){
   const int raw=2048+static_cast<int>(std::floor(next.lo[slot]/simple::kTickRad));
   const double lag=(raw-2048)*simple::kTickRad,end=motion::jointSlot(terminal,slot);
   assert(lag>=current.lo[slot]&&lag<=current.hi[slot]&&lag<next.lo[slot]);
-  assert(std::abs(lag-end)<=12*simple::kTickRad);
+  assert(lag<end&&(end-lag)/simple::kTickRad<=48);
   std::printf("PRONE handover replay slot=%u q=%.12f end=%.12f error_ticks=%.6f current=[%.12f,%.12f] next=[%.12f,%.12f]\n",
               slot,lag,end,(lag-end)/simple::kTickRad,current.lo[slot],current.hi[slot],next.lo[slot],next.hi[slot]);std::fflush(stdout);
   auto delayed=[&](Rig& r){r.p.now+=simple::kPeriodUs;r.in.imuStampUs=r.p.now;r.m.inputs(r.in);r.p.publishCommandedPose();
@@ -130,12 +131,15 @@ static void proneHandoverWait(){
       for(unsigned f=frames;f<r.p.sent.size();++f)for(unsigned i=0;i<12;++i){const double q=(int(r.p.sent[f][i])-2048)*simple::kTickRad;assert(q>=current.lo[i]&&q<=current.hi[i]);}}
     if(catchesUp){for(unsigned n=0;n<20&&!strcmp(r.m.phase(),"PRONE_HEIGHT");++n)r.tick();
       assert(!strcmp(r.m.phase(),"PRONE_LIFT")&&r.m.state()!=simple::State::FAULT&&r.p.offCalls==off&&r.p.enables==enables);
-    }else{for(unsigned n=0;n<2000&&r.m.state()!=simple::State::FAULT;++n){assert(r.m.deadlineUs()==deadline);delayed(r);}
+    }else{for(unsigned n=0;n<2000&&r.m.state()!=simple::State::FAULT&&!strcmp(r.m.phase(),"PRONE_HEIGHT");++n){assert(r.m.deadlineUs()==deadline);delayed(r);}
       assert(r.p.now>deadline&&r.p.now<=deadline+simple::kPeriodUs);
-      assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"NATIVE_TARGET_NOT_REACHED"));
-      for(unsigned n=0;n<30&&!r.m.offVerified();++n)r.tick(false);assert(r.m.offVerified()&&!r.m.energized());}
+      // dev.16: no torque release at an intermediate height; the ordinary contextual STOP holds.
+      assert(r.m.state()!=simple::State::FAULT&&!strcmp(r.m.phase(),"STOP")&&r.m.energized()&&r.p.offCalls==off&&r.p.enables==enables);
+      for(unsigned n=0;n<400&&r.m.state()!=simple::State::STOPPED&&r.m.state()!=simple::State::FAULT;++n)delayed(r);
+      assert(r.m.state()==simple::State::STOPPED&&!strcmp(r.m.reason(),"PRONE_NOT_COMPLETED_SUPPORT_HELD")&&r.m.energized()&&r.p.offCalls==off);
+      r.m.safeOff();for(unsigned n=0;n<30&&!r.m.offVerified();++n)r.tick(false);assert(r.m.offVerified()&&!r.m.energized());}
   }
-  std::puts("PRONE handover waits inside current box, follows catch-up into next box, and retains the original timeout");
+  std::puts("PRONE handover waits inside current box, follows catch-up into next box; at the original timeout it holds (contextual STOP), no SAFE_OFF");
 }
 // Quasistatic kinematic board model, not dynamics or proof of physical contact.
 // Four nominal references are assumed planted/no-slip on one rigid plane. Servo
