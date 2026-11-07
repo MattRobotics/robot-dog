@@ -1,9 +1,12 @@
 # MATDOG flash layout safety notice — updated 2026-10-10 (LED selective integration)
 
+> **AVVISO ATTUALE — 07/11/2026:** la prima [Stable `v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) è stata pubblicata e verificata sul robot. L'APP originale è `1.0.1-dev.17` / `17db0efe2324`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, `app0` a `0x010000`, layout `MATDOG_16M_2x5M_NVS_V1`. **Non flashare compilati arbitrari da `main` né scrivere partizioni/NVS**; per APP-only/rollback vedere il [manifest qualificato](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Le regole sotto descrivono **la fotografia storica PR-3/LED del 10/10/2026**, non l'identità o il blocco Motion della stable corrente. Il flag `MOTION_AUTHORIZED=0` nel manifest di build NON significa che la Motion operativa da dashboard sia disabilitata a runtime.
+
+
 **Documentation only.** This notice authorizes nothing: no flash, no migration, no calibration, no
 motion. `MOTION_AUTHORIZED=0`.
 
-## Rule
+## Historical PR-3 rule (2026-10-10), superseded by v1.0.1 above
 
 > **Do not build from, or flash, `main` to update the current robot.**
 >
