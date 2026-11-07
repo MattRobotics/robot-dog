@@ -19,9 +19,11 @@ Kit di ingresso estratto in `~/MATDOG/verification-artifacts/MATDOG_MOTION_PERF_
 | T2 nominale a release alterne + interpolazione | FATTA, suite PASS, errore interp < 1 tick | d7ed9da |
 | T1b riuso T1 tollerante ai retarget joystick + test T2 | FATTA | affa60c |
 | Checker inviluppo tilt WALK / cadenza | FATTA (baseline PASS; stop 0.5 FAIL; cadenze >1,25× FAIL) | d890da7 |
-| Fase B gait: cadenza selezionabile se ammissibile, sway documentato | IN CORSO | — |
-| Build ROBOT_POWERED CLEAN + manifest/SHA | DA FARE | — |
-| Draft PR + commento #52 | DA FARE | — |
+| Fase B gait: nessuna cadenza ammissibile senza nuovo profilo servo; stop 0,5 e ramp 1 bocciati; sway documentato | FATTA (REPORT §6) | — |
+| T2 frame di stack (`solveGaitInto`, in place) | FATTA | 2569401, e01e95a, 2d95b99 |
+| Build ROBOT_POWERED CLEAN + manifest/SHA | FATTA: 2d95b99, APP 1.716.064 B, SHA256 492f5ac1… | — |
+| Static audit completo | PASS | 27c409f |
+| Draft PR + commento #52 | IN CORSO | — |
 
 ## Risultati chiave finora
 
@@ -53,8 +55,5 @@ Kit di ingresso estratto in `~/MATDOG/verification-artifacts/MATDOG_MOTION_PERF_
 
 ## Prossimo passo
 
-T2 in `SimpleMotion::generateWalk`: soluzione nominale esatta a release
-alterne (look-ahead di un periodo), interpolazione lineare in spazio giunti
-sulle altre, tutte le prove (pointSafe, box, compensationSafe/StopPlan) a ogni
-release; T1 leggera solo sulle release con nominale esatto; shadow test
-dell'errore di interpolazione.
+Collaudo hardware supervisionato secondo `HW_TEST_PLAN.md` (decisione
+dell'operatore), dopo accordo sul nome `1.0.2-dev.1`.
