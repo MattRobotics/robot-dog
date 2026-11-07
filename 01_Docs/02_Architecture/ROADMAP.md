@@ -1,5 +1,8 @@
 # MATDOG Roadmap
 
+> **STATO OPERATIVO ATTUALE — 07/11/2026:** [MATDOG v1.0.1 prima Stable](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), firmware installato `1.0.1-dev.17` / `17db0efe2324`, VERIFIED HARDWARE nel perimetro STAND/WALK STANDARD/STOP/PRONE e dashboard. [Report hardware](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [issue attive #52/#62/#48](../../09_Logs/OPEN_ITEMS.md). **Le frasi sotto su «Motion NO-GO», `0.2.0-dev.3`, assenza di release e roadmap G0–Gx appartengono allo snapshot 2026-10-01/11, NON alle autorizzazioni correnti.** Nel prossimo ciclo prevalgono verifiche pertinenti a difetti dimostrati, senza nuovi gate amministrativi né modifica unilaterale delle protezioni.
+
+
 **Update 2026-10-11:** [non-motion closeout](../../09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
 closes the limited hardware baseline on b08322d. Temporary STA and AP Dashboard
 operator evidence supersede blanket historical “no association/UI hardware test”
