@@ -769,7 +769,47 @@ static void stopThenWalk(){
     const char* w=r.m.walk(1,r.p.now);assert(w);std::printf("WALK after a fault refused: %s\n",w);}
   std::puts("STOP->WALK: STOP in WALK/HOLD/HEIGHT then WALK STANDARD through the STAND-after-STOP admission and resume routes, stride applied at HOLD, refusals unchanged PASS (offline)");
 }
-int main(){proneRest();temperatureChecks();standHoldTilt();
+// T2 (motion-perf-next): look-ahead nominal gait on alternate WALK releases.
+// Alternation engages in WALK STANDARD and in steered walks, every sent
+// midpoint stays within one RAW tick of the exact solution (MATDOG_T2_SHADOW),
+// the T1 light compensation falls only on releases that solved the nominal,
+// a WALK STOP and a missed release re-synchronise with an exact solve, STOP
+// during either release kind arrests, and a release without a nominal solve
+// never skips the WALK box/pointSafe/STOP proofs (a far target faults).
+static void lookaheadWalk(){
+  constexpr double degree=3.14159265358979323846/180;
+  auto tilt=[](Rig& r,double roll,double pitch){const double cr=std::cos(roll/2),sr=std::sin(roll/2),cp=std::cos(pitch/2),sp=std::sin(pitch/2);
+    r.in.quaternion[0]=cr*cp;r.in.quaternion[1]=sr*cp;r.in.quaternion[2]=cr*sp;r.in.quaternion[3]=-sr*sp;};
+  for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);
+    const auto s0=r.m.lookaheadStats();for(unsigned n=0;n<400;++n)r.tick();const auto s1=r.m.lookaheadStats();
+    // Strict alternation after the first exact release: 200/200 of 400.
+    assert(s1.exact-s0.exact>=199&&s1.interp-s0.interp>=199&&s1.resync-s0.resync<=1);
+    const auto t1=r.m.reuseStats();assert(t1.light>0&&t1.light<t1.full+t1.light);
+    // A missed release (one period skipped) re-synchronises once, then alternates again.
+    r.p.now+=simple::kPeriodUs;const auto s2=r.m.lookaheadStats();for(unsigned n=0;n<40;++n)r.tick();const auto s3=r.m.lookaheadStats();
+    assert(s3.resync-s2.resync==1&&s3.interp-s2.interp>=19);
+    // WALK STOP changes the terminal: one re-sync, then alternation to STAND.
+    r.m.walkStop();const auto s4=r.m.lookaheadStats();assert(r.reachStand());const auto s5=r.m.lookaheadStats();
+    assert(s5.resync-s4.resync>=1&&s5.interp-s4.interp>50&&s5.exact-s4.exact>50);
+#ifdef MATDOG_T2_SHADOW
+    assert(s5.maxShadowRad>0&&s5.maxShadowRad<simple::kTickRad);  // below one RAW tick on every interpolated release
+#endif
+  }
+  // STOP on an interpolated and on an exact release: both arrest with torque.
+  for(unsigned extra:{0u,1u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(1,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();for(unsigned n=0;n<300+extra;++n)r.tick();
+    r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized());}
+  // Steered walk with a rate-limited retarget every 12 releases: alternation continues (retargets are tolerated).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kWalkPeriodS;double v[3]={.5*simple::kJoystickStrideM/T,.2*simple::kJoystickLateralM/T,.1*simple::kJoystickYawRad/T};
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
+    const auto s0=r.m.lookaheadStats();
+    for(unsigned n=0;n<600;++n){if(n%12==0){v[1]=(n%24?.3:-.3)*simple::kJoystickLateralM/T;assert(!r.m.drive(v[0],v[1],v[2],r.p.now));}r.tick();assert(r.m.state()==simple::State::WALKING);}
+    const auto s1=r.m.lookaheadStats();assert(s1.interp-s0.interp>=299&&s1.resync-s0.resync<=1);
+    r.m.walkStop();assert(r.reachStand());}
+  std::puts("T2 look-ahead: alternation, missed-release and WALK STOP re-sync, STOP on both release kinds, retarget tolerance PASS (software only)");
+}
+int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();

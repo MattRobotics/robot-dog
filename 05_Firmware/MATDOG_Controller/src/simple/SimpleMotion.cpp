@@ -968,9 +968,16 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // T2 balance: in WALK the light compensation is taken on the releases that
   // paid the nominal IK solve, so the look-ahead release (no nominal solve)
   // carries the full compensation and no release carries both.
+  // T1b (motion-perf-next): a steerWalk retarget of the displacement per cycle
+  // no longer forces the full solve. The accepted correction is a body
+  // attitude offset expressed on the nominal of the previous release; the
+  // rate-limited retarget moves that nominal by less than one release of the
+  // same law does, and the reused frame still passes compensationSafe here.
+  // Offline, with the random joystick runs of run_motion_frame_digest.sh, the
+  // light fraction rises from 8 % to 40 % with the same shadow error (1.2 tick).
   const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&!walkRecover_&&reusePhase_==phase_&&
     (phase_==Phase::WALK||phase_==Phase::HOLD)&&(phase_!=Phase::WALK||nominalSolved_)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
-    !(up.x==0&&up.y==0&&up.z==0)&&reuseGait_[0]==gait_.advanceXM&&reuseGait_[1]==gait_.advanceYM&&reuseGait_[2]==gait_.yawRad;
+    !(up.x==0&&up.y==0&&up.z==0);
   if(reusable){
     auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(reuseOffset_,i);
     if(compensationSafe(q,safeBox,true)){

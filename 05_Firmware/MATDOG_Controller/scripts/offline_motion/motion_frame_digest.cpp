@@ -27,8 +27,8 @@ void report(const char* name,Rig& r,size_t from){
   Digest d;for(size_t k=from;k<r.p.sent.size();++k){for(unsigned i=0;i<12;++i)d.add(r.p.sent[k][i]);
     if(dump){std::fprintf(dump,"%s %zu",name,k-from);for(unsigned i=0;i<12;++i)std::fprintf(dump," %u",r.p.sent[k][i]);std::fprintf(dump,"\n");}}
   const auto& s=r.m.reuseStats();
-  std::printf("%-18s frames=%5zu digest=%016llx state=%s/%s reason=%s T1 light/full/rejected=%u/%u/%u",name,r.p.sent.size()-from,(unsigned long long)d.h,
-    simple::name(r.m.state()),r.m.phase(),r.m.reason(),s.light,s.full,s.rejected);
+  std::printf("%-18s frames=%5zu digest=%016llx state=%s/%s reason=%s T1 light/full/rejected=%u/%u/%u shadow=%.3ftick",name,r.p.sent.size()-from,(unsigned long long)d.h,
+    simple::name(r.m.state()),r.m.phase(),r.m.reason(),s.light,s.full,s.rejected,s.maxShadowRad/simple::kTickRad);
 #ifdef MATDOG_T2_STATS
   const auto& l=r.m.lookaheadStats();
   std::printf(" T2 exact/interp/resync=%u/%u/%u maxInterpErr=%.3e rad (%.3f tick)",l.exact,l.interp,l.resync,l.maxShadowRad,l.maxShadowRad/simple::kTickRad);
