@@ -1,3 +1,25 @@
+# Stato operativo corrente — 07/11/2026, validazione hardware dev.16
+
+**Installata e validata sul robot nel perimetro provato:** `1.0.1-dev.16`, build `e0ddbb1791d0`, APP SHA256 `73952eec1ddb29976941b7afd16149b15f790a2e8c46cb2067d1f72a8424138d`. NVS gen-1/census 13/13 preservati; STAND, WALK STANDARD45/60, PRONE con SAFE_OFF e STOP da movimenti sono riusciti nei casi registrati. Ultimo stato `READY/PRONE_REST`, `safe_off_mask=8191`, 0 fault; robot spento via KEY OFF (discharge MOS BMS alimenta/disalimenta anche ESP32-S3 in configurazione attuale). **NON dichiarata release stabile**. Dossier [HW 07/11](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) · [manifest](Validation_Reports/Dev16_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [metriche](Validation_Reports/Dev16_HW_2026-11-07/TRACE_WINDOW_METRICS.csv). La PR #64 resta DRAFT; main non integrato, APP/manifest binari su ASUS.
+
+## Prossime patch mirate — non implementate
+
+| Priorità | Difetto residuo / richiesta operativa |
+|---|---|
+| **P0 – Dashboard controllo** | Alert e stati dinamici causano **reflow** verticale del joystick durante pressione; risolvere layout e cattura pointer senza alterare STOP/deadman. `/status` espone 503 sotto admission slack 5 ms, HTTP 200 talvolta incompleto/lento; `/api/motion/status` 20/20 HTTP200 da terminale. Separare cause di trasporto, server e polling. [#62](https://github.com/MattRobotics/robot-dog/issues/62), [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
+| **P0 – Twin cold refresh** | Refresh browser durante torque ON cancella iframe; `prepareTwin` blocca reload fino a torque OFF. Recuperare visualizzazione senza torque OFF e senza carico pesante durante Motion. Reset vista +X già verificato. [#62](https://github.com/MattRobotics/robot-dog/issues/62) |
+| **P1 – STOP→WALK** | Da STOP concluso, WALK richiede STAND; se campo STAND=150, robot sale a 150 e ridiscende alla quota WALK nominale ~120. Controller deve gestire automaticamente ENTRY e transizione da posa certificata a WALK con comando unico, rifiutando pose non ammissibili, preservando STOP. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
+| **P1 – Timing sotto gait/joystick** | Trace(32): +7 missed e +154 overrun nella sua finestra, non da sommare alle altre; HOLD100 regolare, HOLD150 +2 overrun senza missed. T1 funziona ma non risolve 20 ms per tutte le traiettorie; indagare variabilità HOLD senza assegnare causa non provata. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
+| **P2 – Cockpit Motion** | Twin e comandi unico pannello superiore full-width; joystick/rotazioni + STAND/PRONE/WALK/WALK STOP; quota STAND step 5 mm (50–150); stride 30/45/60 mm/ciclo con 🐢→🐇; ViewCube/triade CAD cliccabile e trascinabile; rimuovere descrizione joystick dev.15; STOP sempre visibile. [#62](https://github.com/MattRobotics/robot-dog/issues/62) |
+| **P2 – Prestazioni** | Gait ancora lenta, sway joystick, WALK_SETTLE ~7–9 s; obiettivo fino a 5× solo dopo profilo temporale e margini di stabilità verificati. [#52](https://github.com/MattRobotics/robot-dog/issues/52) |
+| **Monitorare** | Picchi termici isolati ID21/31, LED intermittenti (issue #62), RESTORE manuale/gen gestione (issue #48) non qualificato. Protezioni sempre attive. |
+
+**Non eseguire ora nuovi flash, merge, release o modifiche alla safety.** Il report dev.16 fotografa risultati reali. Gli elementi sotto sono lo snapshot storico della dev.15, preservato per tracciabilità.
+
+---
+
+## Snapshot storico — 06/11/2026 / RCA 07/11 dev.15
+
 # Stato operativo e problemi aperti — 06/11/2026 (agg. 07/11: RCA timing, sorgente dev.15 nella PR #64)
 
 **Installed on robot: `MATDOG Controller 1.0.1-dev.15`, build `7997ad4d4497`**, flash APP-only `ROBOT_POWERED` verificato; sorgente esatto `7997ad4` pubblicato il 07/11 sul branch della [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (merge `e5b0644`, draft), **non su `main`**. **PARTIAL HW VALIDATION — NOT STABLE**. [Report dev.15](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [Manifest raw locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [Audit video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [README corrente](../README.md).
