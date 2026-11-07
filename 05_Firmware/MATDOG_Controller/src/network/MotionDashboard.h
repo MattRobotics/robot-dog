@@ -83,9 +83,10 @@ window.addEventListener('message',e=>{
  if(e.data?.type==='MATDOG_TWIN_READY'){twinReady=true;twinRetryWhenIdle=false;render()}
 });
 const stop=document.createElement('button');stop.id='simple-stop';stop.textContent='STOP';document.querySelector('header .who').append(stop);
-let status=null,received=0,sequence=0,polling=false,sending=false,transitAge=0,cookieAt=Date.now(),lapseAt=0;const session=Date.now().toString(36);
+const READ_ABORT_MS=3500,READ_OVERLAP_MS=700,readStarts=[];let readSequence=0,appliedSequence=0;
+let status=null,received=0,sequence=0,sending=false,transitAge=0,cookieAt=Date.now(),lapseAt=0;const session=Date.now().toString(36);
 let latestCommand=null,commandNotice='';
-const trace=window.matdogMotionTrace={version:1,started_utc:new Date().toISOString(),commands:[],samples:[],poll_errors:[],poll_skipped:0};
+const trace=window.matdogMotionTrace={version:1,started_utc:new Date().toISOString(),commands:[],samples:[],poll_errors:[],poll_skipped:0,late_dropped:0};
 const keep=(list,item,max)=>{list.push(item);if(list.length>max)list.shift()};
 by('simple-trace').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(trace,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='matdog-motion-trace.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
 const reasons={PRONE_DESCENT_NOT_VALIDATED:"Discesa PRONE in corso; al termine la coppia viene rilasciata (PRONE_REST).",PRONE_REST:"PRONE a riposo: coppia OFF (verificata sui 13 servo al termine). Appoggio passivo non misurato. STAND riacquisisce la posa reale e riabilita la coppia.",STAND_PATH_NOT_CLEAR:"Posa reale fuori dalla regione di ingresso certificata: rialzata rifiutata.",NOT_WALKING:"Nessun passo in corso da fermare.",PRONE_REQUIRES_STAND_HOLD:"PRONE richiede uno STAND fermo con coppia ON.",PRONE_PATH_NOT_CLEAR:"Posa fuori dal passaggio PRONE ammesso.",PRONE_MEASURED_OUTSIDE_BOX:"Feedback fuori dalla box del tratto PRONE: arresto per fault.",PRONE_NOT_COMPLETED_STOPPING:"PRONE non completato entro il tempo: arresto controllato con coppia ON, nessun rilascio a quota intermedia.",PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD:"PRONE interrotto: posa sotto carico fuori dal tratto ma dentro una regione certificata; corpo sostenuto, coppia ON, protezioni attive. Usare STAND (se ammesso) oppure SAFE_OFF con il robot sostenuto.",PRONE_NOT_COMPLETED_SUPPORT_HELD:"PRONE non completato: corpo sostenuto, coppia ON e protezioni attive. Usare STAND (se la posa è certificata) oppure SAFE_OFF con il robot sostenuto.",PRONE_LANDING_NOT_QUALIFIED:'PRONE non disponibile: trasferimento del peso e appoggio ventrale non qualificati. HOLD resta attivo; STOP resta indipendente.',READY:'Pronto al comando.',STAND_REACHED:'Posa STAND raggiunta e mantenuta.',HEIGHT_CHANGE:'Cambio di quota in corso.',HEIGHT_PATH_NOT_CLEAR:'Cambio di quota non ammesso dalla posa reale attuale: nessun movimento.',ACQUIRING_REAL_POSE:'Acquisizione della posa iniziale reale.',WALK_STANDARD:'WALK STANDARD in corso.',WALK_STOPPING:'Conclusione coordinata del passo.',STOP_REQUESTED:'STOP richiesto: attendere il risultato del Controller.',STOP_REQUESTED_FAULT_LATCHED:'STOP richiesto con fault già presente: attendere la verifica coppia OFF sui 13 servo.',SAFE_OFF_VERIFIED_FAULT_LATCHED:'SAFE_OFF verificato sui 13 servo; il fault originale resta attivo.',SAFE_OFF_IN_PROGRESS_FAULT_LATCHED:'Verifica coppia OFF in corso; il fault originale resta attivo.',STAND_FROM_STOPPED_WALK:'Recupero STAND dal WALK arrestato in corso; coppia mantenuta e supporto non verificato.',STOP_HOLD_TRACKING_UNSAFE:'Posa STOP fuori dai limiti di mantenimento: coppia OFF.',STOP_RECOVERY_PATH_NOT_CLEAR:'Recupero STAND rifiutato: percorso del gait fuori dai limiti ammessi.',STOP_IN_PROGRESS:'Arresto controllato in corso, coppia mantenuta.',STOPPED_SUPPORT_UNVERIFIED:'Arresto verificato, coppia ON.',SAFE_OFF_VERIFIED:'SAFE_OFF verificato: coppia OFF sui 13 servo.',SAFE_OFF_STAND_REFUSED:'STAND rifiutato dopo SAFE_OFF: nessuna riabilitazione implicita.',STOP_RECOVERY_SWING_UNVERIFIED:'Recupero STAND rifiutato: swing non qualificato.',STOP_RECOVERY_WALK_UNVERIFIED:'Recupero STAND da WALK non qualificato.',STOP_RECOVERY_POSTURE_UNQUALIFIED:'Recupero STAND da posa intermedia non qualificato.',STOP_RECOVERY_FEEDBACK_UNAVAILABLE:'Feedback non disponibile per il recupero STAND.',STOP_RECOVERY_TORQUE_UNVERIFIED:'Coppia non verificata per il recupero STAND.',STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE:'Raccordo della correzione IMU non qualificato: fallback SAFE_OFF.',IMU_STALE:'Campione IMU scaduto: torque OFF.',HEIGHT_OUTSIDE_MATDOG_WORKSPACE:'Quota fuori dal workspace MATDOG o dai limiti reali.',SERVO_PREFLIGHT_REQUIRED:'Verifica iniziale dei profili servo in corso.',CALIBRATION_RESTORE_REQUIRED:'Calibrazione NVS non ancora ripristinata.',BMS_OR_POWER_UNAVAILABLE:'Alimentazione o BMS non disponibile.',SAFE_OFF_IN_PROGRESS:'Disabilitazione torque e verifica sui 13 servo in corso.',SERVO_COMMUNICATION_LOST:'Comunicazione servo persa: torque OFF.',SERVO_CONTROL_READ_LOST:'Lettura dei comandi servo persa: torque OFF.',SERVO_TORQUE_OR_GOAL_LOST:'Un servo non mantiene il comando richiesto: torque OFF.',SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT:'Allarme servo o limite elettrico: torque OFF.',MEASURED_MECHANICAL_LIMIT:'Un giunto ha raggiunto il limite meccanico ammesso.',NATIVE_TARGET_NOT_REACHED:'Un servo non ha raggiunto la posa entro il tempo disponibile.',INITIAL_POSE_OUTSIDE_SAFE_ENTRY:'Posa iniziale fuori dalla regione di ingresso geometricamente verificata.',REFERENCE_CHANGED_BEFORE_ENABLE:'La posa iniziale è cambiata prima dell’abilitazione.',STAND_CLEARANCE_UNAVAILABLE:'Il prossimo tratto STAND non ha spazio geometrico sufficiente.',STAND_PLAN_UNAVAILABLE:'Riferimento STAND non pianificabile entro i limiti: torque OFF.',WALK_SETTLING:'Assestamento finale del passo.',STAND_FROM_STOPPED_PRONE:'Ripresa STAND dalla posa mantenuta dallo STOP (PRONE o salita), coppia mantenuta.',WALK_JOYSTICK:'Joystick: passo continuo in corso.',JOYSTICK_TIMEOUT:'Joystick: nessun comando entro 1 s, il Controller conclude il passo (WALK STOP).',JOYSTICK_REVERSING:'Joystick: cambio di verso, il passo si conclude prima di ripartire.',JOYSTICK_VELOCITY_RANGE:'Velocità oltre il limite del Controller.',WALK_STANDARD_ACTIVE:'WALK STANDARD in corso: WALK STOP prima del joystick.',WALK_STOPPING:'Conclusione del passo in corso.',GAIT_NOT_IN_SIMPLE_V1:'Andatura non disponibile.',IMU_UNAVAILABLE:'IMU non disponibile o campione non valido.',GEN1_LIMITS_OR_FINGERPRINT:'Calibrazione gen1 o limiti non corrispondenti.',SYNC_WRITE_FAILED:'Trasmissione coordinata ai servo non completata.',TORQUE_ENABLE_UNCERTAIN:'Abilitazione servo non confermata: torque OFF.',MOTION_DEADLINE_LOST:'Aggiornamento Motion interrotto: torque OFF.',SERVO_FEEDBACK_STALE:'Feedback dei 12 servo non aggiornati.',FAULT_STOP_REQUIRED:'Fault persistente: STOP non riabilita il robot.',
@@ -203,21 +204,31 @@ const renewed=await resume();if(latestCommand!==record)return;
 if(renewed)return command(type,params,priority,label,true);
 result('bad','HTTP 403 · RIFIUTATO PRIMA DELL’ESECUZIONE · AUTH_FAILED: sessione non rinnovabile, accedere di nuovo'+(type==='MOTION.STOP'?'. Usare @STOP via USB o il KEY OFF.':'.'));needLogin();
 }
-// The status poll shares the page's single read lane (PortalPage mdNet): it
-// waits for at most one 800 ms diagnostic read, and commands/STOP, outside
-// the lane, always keep the second socket. It is telemetry and admin-session
-// upkeep only: no Motion command depends on it.
-async function poll(){if(polling){trace.poll_skipped++;return}polling=true;const queued=performance.now();
-try{await window.mdNet(async()=>{const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),800);
- try{const started=performance.now();const r=await fetch('/api/motion/status',{cache:'no-store',headers:csrf?{'X-Csrf-Token':csrf}:{},signal:abort.signal});if(!r.ok)throw Error(r.status);status=await r.json();received=performance.now();transitAge=Math.max(0,received-started);keep(trace.samples,{received_ms:received,roundtrip_ms:transitAge,status},240);prepareTwin();render();
+// The status poll is telemetry and admin-session upkeep only: no Motion
+// command depends on it, and commands/STOP use their own requests. Listener:
+// 7 sockets (HttpTransport), enough for both read lanes, a command and STOP.
+async function poll(){
+ // Own read lane (dev.17), outside the portal's diagnostic lane: at most two
+ // reads in flight for the WHOLE page (window.mdReads, both lanes), a second
+ // Motion read only when the one in flight is older than READ_OVERLAP_MS (a TCP
+ // segment lost on the Controller costs a retransmission timeout, not an abort
+ // and a new connection). With one command, WALK STOP and STOP that is 5 of the
+ // 6 connections a browser opens to one host: STOP never waits for a free one.
+ // The newest issued read wins; an older late answer is counted and dropped.
+ const t0=performance.now();
+ if((window.mdReads||0)>=2||(readStarts.length&&t0-readStarts[0]<READ_OVERLAP_MS)){trace.poll_skipped++;return}
+ const seq=++readSequence;readStarts.push(t0);window.mdReads=(window.mdReads||0)+1;
+ const abort=new AbortController(),timer=setTimeout(()=>abort.abort(),READ_ABORT_MS);
+ try{const r=await fetch('/api/motion/status',{cache:'no-store',headers:csrf?{'X-Csrf-Token':csrf}:{},signal:abort.signal});if(!r.ok)throw Error(r.status);const body=await r.json();
+  if(seq<appliedSequence)trace.late_dropped++;
+  else{appliedSequence=seq;status=body;received=performance.now();transitAge=Math.max(0,received-t0);keep(trace.samples,{received_ms:received,roundtrip_ms:transitAge,status},240);prepareTwin();render();
   if(twinStarted){
    // The viewer reads its optional freshness channels (IMU age, RAW count) under
    // channels.*; this status carries the same Controller facts as imu_valid,
    // imu_age_ms and joints[].valid. Bound here, nothing new is measured.
-   by('simple-twin-frame').contentWindow?.postMessage({...status,channels:{imu:{valid:status.imu_valid,age_ms:status.imu_age_ms},raw:{count:(status.joints||[]).filter(j=>j.valid).length}}},location.origin)}}
- finally{clearTimeout(timer)}})}
-catch(e){keep(trace.poll_errors,{at_ms:performance.now(),since_queued_ms:performance.now()-queued,error:e.name==='AbortError'?'TIMEOUT_800MS':String(e.message||e.name)},240);render()}
-finally{polling=false}
+   by('simple-twin-frame').contentWindow?.postMessage({...status,channels:{imu:{valid:status.imu_valid,age_ms:status.imu_age_ms},raw:{count:(status.joints||[]).filter(j=>j.valid).length}}},location.origin)}}}
+ catch(e){keep(trace.poll_errors,{at_ms:performance.now(),since_queued_ms:performance.now()-t0,error:e.name==='AbortError'?'TIMEOUT_'+READ_ABORT_MS+'MS':String(e.message||e.name)},240);render()}
+ finally{clearTimeout(timer);readStarts.splice(readStarts.indexOf(t0),1);window.mdReads--}
 // Admin session upkeep: an authenticated poll renews it on the Controller;
 // the cookie is refreshed through /wifi/session; a lapsed one is resumed.
 if(!status||!csrf)return;const now=Date.now();

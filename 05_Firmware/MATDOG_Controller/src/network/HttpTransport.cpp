@@ -397,12 +397,18 @@ bool HttpTransport::admitMotion(HttpTransportRequest& r,const char** failure){
 // deceleration. LOGIN/SESSION verify one bounded digest/HMAC and copy the
 // cookie/CSRF, so the operator can keep or regain the session that STOP
 // needs while Motion leaves no window; the admission, radio, credential and
-// throttling checks are unchanged. Every other request needs 5 ms before the
+// throttling checks are unchanged. The two status pages (dev.17) format only
+// cached RAM facts (no bus, NVS or radio call); refusing them at once whenever
+// a loop pass fell inside the last 5 ms of a period answered ~40 % of /status
+// reads with 503 even in HOLD without any overrun (dev.16 hardware), and
+// making them wait would hold the single mailbox slot. Their service time is
+// exported (status_service_*_us). Every other request needs 5 ms before the
 // next release.
 static bool slackExempt(const HttpTransportRequest& r) {
   const auto& c=r.motion_command;
   if(r.kind==HttpRequestKind::WIFI_LOGIN||r.kind==HttpRequestKind::WIFI_SESSION||
-     r.kind==HttpRequestKind::MOTION_LOGIN||r.kind==HttpRequestKind::MOTION_SESSION)return true;
+     r.kind==HttpRequestKind::MOTION_LOGIN||r.kind==HttpRequestKind::MOTION_SESSION||
+     r.kind==HttpRequestKind::WEB_STATUS||r.kind==HttpRequestKind::WIFI_STATUS)return true;
   return r.kind==HttpRequestKind::MOTION_STATUS||(r.kind==HttpRequestKind::MOTION_COMMAND&&
          c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0);
 } // slackExempt
@@ -491,11 +497,11 @@ void HttpTransport::appendTransportStats(char* text,size_t cap,uint32_t loop_sta
   // Windowed maxima: each report starts a new window.
   const size_t n=strlen(text);if(!n||text[n-1]!='}')return;
   char extra[512];
-  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu,\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu,\"read_service_last_us\":%lu,\"read_service_max_us\":%lu,\"httpd_stack_min_free\":%lu}}",
+  const int k=snprintf(extra,sizeof(extra),",\"transport\":{\"loop_last_ms\":%lu,\"loop_max_ms\":%lu,\"dispatch_last_ms\":%lu,\"dispatch_max_ms\":%lu,\"late\":%lu,\"busy\":%lu,\"heap_free\":%lu,\"heap_min_free\":%lu,\"heap_largest\":%lu,\"loop_stack_min_free\":%lu,\"read_service_last_us\":%lu,\"read_service_max_us\":%lu,\"status_service_last_us\":%lu,\"status_service_max_us\":%lu,\"httpd_stack_min_free\":%lu}}",
     (unsigned long)loop_last_ms_.load(),(unsigned long)loop_max_ms_.exchange(0),(unsigned long)dispatch_last_ms_.load(),
     (unsigned long)dispatch_max_ms_.exchange(0),(unsigned long)dispatch_late_.load(),(unsigned long)dispatch_busy_.load(),
     (unsigned long)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),(unsigned long)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL),
-    (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)loop_stack_free,(unsigned long)read_service_last_us_.load(),(unsigned long)read_service_max_us_.load(),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
+    (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL),(unsigned long)loop_stack_free,(unsigned long)read_service_last_us_.load(),(unsigned long)read_service_max_us_.load(),(unsigned long)status_service_last_us_.load(),(unsigned long)status_service_max_us_.load(),(unsigned long)uxTaskGetStackHighWaterMark(nullptr));
   if(k>0&&n-1+static_cast<size_t>(k)<cap)memcpy(text+n-1,extra,static_cast<size_t>(k)+1);
 }
 void HttpTransport::update(uint32_t now_ms) {
@@ -543,14 +549,11 @@ void HttpTransport::update(uint32_t now_ms) {
     deferred_ = false; xSemaphoreGive(slot_free_); return;
   }
   const bool motion_read=pending_request_.kind==HttpRequestKind::MOTION_STATUS;
-  // The legacy status pages have no qualified Motion budget. Without slack
-  // they are answered at once with an explicit error instead of holding the
-  // single HTTPD task, and every request queued behind it, for seconds.
   const bool status_read=pending_request_.kind==HttpRequestKind::WEB_STATUS||
                          pending_request_.kind==HttpRequestKind::WIFI_STATUS;
   const bool no_slack=!slackExempt(pending_request_)&&!(joystickRefresh(pending_request_)&&service_->motionJoystickActive())&&
                       !service_->motionSlack(esp_timer_get_time(),5000);
-  if(no_slack&&!status_read) {
+  if(no_slack) {
     xSemaphoreGive(request_ready_); return;
   }
   // STOP precedence: a Motion command never runs while a STOP waits in its
@@ -558,15 +561,10 @@ void HttpTransport::update(uint32_t now_ms) {
   // SUPERSEDED_BY_STOP by its own epoch.
   deferred_ = pending_request_.kind == HttpRequestKind::MOTION_COMMAND && stop_pending_.load();
   const uint64_t service_start=esp_timer_get_time();
-  if(no_slack){
-    // Field-wise: a value-initialised temporary would put ~5 KB on loopTask.
-    // The status handlers read only ok/message before answering 503.
-    pending_response_.ok=false;pending_response_.text[0]='\0';pending_response_.text_len=0;
-    pending_response_.sequence=pending_request_.sequence;
-    pending_response_.message=kMotionBudgetUnavailable;
-  }else if (!deferred_) serviceRequest(now_ms);   // may defer on fence contention
-  if(motion_read){const uint32_t us=static_cast<uint32_t>(esp_timer_get_time()-service_start);
-    read_service_last_us_.store(us);if(us>read_service_max_us_.load())read_service_max_us_.store(us);}
+  if (!deferred_) serviceRequest(now_ms);   // may defer on fence contention
+  if(motion_read||status_read){const uint32_t us=static_cast<uint32_t>(esp_timer_get_time()-service_start);
+    auto& last=motion_read?read_service_last_us_:status_service_last_us_;auto& max=motion_read?read_service_max_us_:status_service_max_us_;
+    last.store(us);if(us>max.load())max.store(us);}
   if (deferred_) { xSemaphoreGive(request_ready_); return; }
   ready_sequence_.store(pending_response_.sequence);
   if (mailbox_.claimDelivery())

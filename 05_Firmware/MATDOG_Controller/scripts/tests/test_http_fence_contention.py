@@ -101,6 +101,7 @@ class HttpTransport {
  public:
   FakeService service; FakeService* service_=&service; FakePortal portal_;
   std::atomic<uint32_t> read_service_last_us_{0},read_service_max_us_{0};
+  std::atomic<uint32_t> status_service_last_us_{0},status_service_max_us_{0};
   uint32_t portal_generation_=0; bool portal_sta_=false;
   SemaphoreHandle_t request_ready_=xSemaphoreCreateBinary(), response_ready_=xSemaphoreCreateBinary(), slot_free_=xSemaphoreCreateBinary();
   HttpMailbox mailbox_{};
@@ -292,25 +293,25 @@ int main(){
       check(free,"preempted admission: slot reclaimed");if(free)xSemaphoreGive(t.slot_free_);
     }
   }
-  // 13. No Motion slack: the legacy status reads are answered at once with
-  // MOTION_BUDGET_UNAVAILABLE and free the single slot, so a Motion GET queued
-  // behind them is served promptly. Commands keep waiting for slack; STOP keeps its lane.
+  // 13. No Motion slack (dev.17): the status pages format cached RAM facts only
+  // and are served in the next loop pass like the Motion GET, never refused
+  // MOTION_BUDGET_UNAVAILABLE (dev.16: ~40 % of /status in HOLD). They do not
+  // hold the single slot, so a Motion GET behind them is still served promptly.
+  // Commands keep waiting for slack; STOP keeps its lane.
   for(const auto kind:{HttpRequestKind::WEB_STATUS,HttpRequestKind::WIFI_STATUS}){
     HttpTransport t;t.service.slack.store(false);Loop loop(t);Result st,mo;
     const uint32_t started=millis();
     auto a=reader(t,apRequest(t,kind),3000,&st);a.join();const uint32_t took=millis()-started;
-    check(st.ok&&!st.resp.ok&&!std::strcmp(st.resp.message,"MOTION_BUDGET_UNAVAILABLE"),"status read without slack: explicit refusal");
+    check(st.ok&&std::strcmp(st.resp.message,"MOTION_BUDGET_UNAVAILABLE")&&!std::strcmp(st.resp.message,"UNSUPPORTED_IN_FIXTURE"),"status read without slack: served by serviceRequest, not refused");
     check(took<500,"status read without slack: answered within loop passes, not the 3 s budget");
+    check(t.status_service_max_us_.load()<1000000,"status read service time exported");
     auto b=reader(t,apRequest(t,HttpRequestKind::MOTION_STATUS),1200,&mo);b.join();
-    check(mo.ok&&mo.resp.ok&&t.service.statuses.load()==1,"Motion GET after a refused status read: served, slot free");
+    check(mo.ok&&mo.resp.ok&&t.service.statuses.load()==1,"Motion GET after a status read: served, slot free");
     Result cmd;auto c=reader(t,apRequest(t,HttpRequestKind::MOTION_COMMAND),80,&cmd);c.join();
-    check(!cmd.ok&&!std::strcmp(cmd.failure,"CONTROLLER_LOOP_LATE")&&t.service.commands.load()==0,"command without slack still waits, never refused as a status read");
+    check(!cmd.ok&&!std::strcmp(cmd.failure,"CONTROLLER_LOOP_LATE")&&t.service.commands.load()==0,"command without slack still waits");
     const auto ticket=publishStop(t);loop.waitPasses(10);
     check(t.stop_done_.load()==ticket&&t.service.stops.load()==1,"STOP serviced without Motion slack");
-    t.service.slack.store(true);loop.waitPasses(5);Result ok;
-    auto d=reader(t,apRequest(t,kind),3000,&ok);d.join();
-    check(ok.ok&&!std::strcmp(ok.resp.message,"UNSUPPORTED_IN_FIXTURE"),"with slack the status read reaches serviceRequest");
-    std::printf("NO_SLACK_STATUS kind=%u refused_in_ms=%u motion_get=%d\n",unsigned(kind),took,mo.resp.ok); }
+    std::printf("NO_SLACK_STATUS kind=%u served_in_ms=%u motion_get=%d\n",unsigned(kind),took,mo.resp.ok); }
   // 14. WALK STOP (zero base velocity) does not wait for Motion slack: a WALK
   // release may never leave 5 ms and its TTL is <= 1 s. Other commands still wait;
   // a pending STOP still runs first and supersedes it.

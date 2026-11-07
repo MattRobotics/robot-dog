@@ -77,11 +77,13 @@ const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 let authReady=Promise.resolve();
 let budget=false,csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
-// One read at a time for the WHOLE page (portal + Motion): the AP listener has
-// two sockets with LRU purge, and two independent pollers plus any third
-// request forced purges of in-flight sockets (14 Oct HTTP_TIMEOUT). Motion
-// commands/STOP do not use this lane, so the second socket stays free for them.
-let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};
+// The portal's diagnostic lane: one request at a time (status reads, admin
+// posts). The Motion status poll has its own lane (MotionDashboard.h, dev.17).
+// window.mdReads counts the reads in flight of BOTH lanes: the page never has
+// more than two, so commands and STOP keep the rest of the 6 connections a
+// browser opens to one host. Listener: 7 sockets with LRU purge (HttpTransport),
+// one more than a browser opens, so a new connection never purges an unread STOP.
+let netTail=Promise.resolve();window.mdNet=f=>{const run=netTail.then(f,f);netTail=run.catch(()=>{});return run};window.mdReads=0;
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const message=$('#message');
 function formatDiagnosticTime(value){const d=new Date(value);if(!Number.isFinite(d.getTime()))return 'N/D';try{const p=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZoneName:'longOffset'}).formatToParts(d).map(x=>[x.type,x.value]));const off=p.timeZoneName.replace('GMT','')||'+00:00';return d.toISOString()+' · '+p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute+':'+p.second+off+' Europe/Rome '+(off==='+02:00'?'CEST':'CET')+' · fonte browser, non sincronizza il robot'}catch(e){return d.toISOString()+' · Europe/Rome non disponibile · fonte browser'}}
@@ -215,16 +217,23 @@ function link(){
  // authenticated use; the Motion poll refreshes sessionAt on each one.
  if(csrf&&!store.get('md_remember')&&Date.now()-sessionAt>SESSION_MS){csrf='';authUi();show('Sessione temporanea scaduta. Accedi di nuovo per modificare.','warn')}
 }
-// Diagnostics get 800 ms: the 3 s deadman budget minus a 1 s poll and
-// the Controller's 1200 ms Motion-read budget. STOP has a separate socket.
-async function get(path){return window.mdNet(async()=>{const c=new AbortController(),t=setTimeout(()=>c.abort(),800);try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok){const e=Error(path);e.status=r.status;try{e.code=JSON.parse(await r.text()).error}catch(x){}throw e}return await r.text()}finally{clearTimeout(t)}})}
+// A read is aborted only after READ_ABORT_MS (dev.17). The Controller answers
+// within its own budgets (dev.16 hardware: dispatch <= 125 ms, 0 late), but its
+// lwIP recovers a lost TCP segment only by retransmission timeout (initial RTO
+// 3 s, 250 ms timer): the former 800 ms abort turned each lost segment into an
+// error plus a new connection. No command depends on a read: commands and STOP
+// use their own requests, outside this lane. A read that would be the page's
+// third in flight is deferred (READS_DEFERRED), not sent.
+const READ_ABORT_MS=3500;
+async function get(path){return window.mdNet(async()=>{if(window.mdReads>=2){const e=Error(path);e.code='READS_DEFERRED';throw e}const c=new AbortController(),t=setTimeout(()=>c.abort(),READ_ABORT_MS);window.mdReads++;try{const r=await fetch(path,{cache:'no-store',signal:c.signal});if(!r.ok){const e=Error(path);e.status=r.status;try{e.code=JSON.parse(await r.text()).error}catch(x){}throw e}return await r.text()}finally{clearTimeout(t);window.mdReads--}})}
 async function refresh(){
- if(busy)return;busy=true;clearTimeout(timer);let ok=false;budget=false;
+ if(busy)return;busy=true;clearTimeout(timer);let ok=false,deferred=false;budget=false;
  // Sequential on purpose: one keep-alive connection, never two at once.
- try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){budget=e.status===503&&e.code==='MOTION_BUDGET_UNAVAILABLE'}
- if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else if(!budget)fails++;   // Motion budget: telemetry paused, not a lost link
+ try{const a=await get('/status'),next={};for(const l of a.split('\n')){const i=l.indexOf('=');if(i>0)next[l.slice(0,i)]=l.slice(i+1)}const b=JSON.parse(await get('/wifi/status'));st=next;wf=b;ok=true}catch(e){budget=e.status===503&&e.code==='MOTION_BUDGET_UNAVAILABLE';deferred=e.code==='READS_DEFERRED'}
+ // Motion budget: telemetry paused, not a lost link; deferred: two Motion reads in flight.
+ if(ok){fails=0;lastOk=Date.now();try{renderStatus();renderWifi()}catch(e){show('Errore di visualizzazione: '+e.message,'bad')}}else if(!budget&&!deferred)fails++;
  link();busy=false;
- if(!document.hidden)timer=setTimeout(refresh,ok||budget?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
+ if(!document.hidden)timer=setTimeout(refresh,ok||budget||deferred?POLL_MS:Math.min(15000,POLL_MS*(1+fails)));
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(timer);else refresh()});
 // ---- Administrator session ---------------------------------------------------

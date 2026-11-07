@@ -26,8 +26,9 @@ async function boot() {
   let clock = 1000;
   const timers = [], intervals = [], calls = [], errors = [];
   // inflight: requests issued and not yet answered (each needs its own
-  // HTTP/1.1 connection); holdUrl keeps one read pending until release().
-  const device = { status: fx.status_ready, replies: [], inflight: 0, reads: 0, holdUrl: null, release: null, sessionOk: true };
+  // HTTP/1.1 connection); holdUrl keeps every matching request pending until
+  // release() (all) or releaseFirst() (the oldest); an abort clears holdUrl.
+  const device = { status: fx.status_ready, replies: [], inflight: 0, reads: 0, holdUrl: null, release: null, releaseFirst: null, held: [], sessionOk: true };
   const dom = new JSDOM(html, { url: 'http://192.168.4.1/', runScripts: 'dangerously', pretendToBeVisual: true,
     beforeParse(w) {
       w.localStorage.setItem('md_login', '1');  // the page resumes its session at start
@@ -45,8 +46,11 @@ async function boot() {
       const serve = async (url, init) => {
         const reply = (text, status = 200) => ({ ok: status >= 200 && status < 300, status, text: async () => text, json: async () => JSON.parse(text) });
         if (url === device.holdUrl) await new Promise((resolve, reject) => {
-          device.release = () => { device.holdUrl = null; resolve(); };
-          init.signal.addEventListener('abort', () => { device.holdUrl = null; reject(new w.DOMException('aborted', 'AbortError')); }, { once: true });
+          const entry = { resolve };
+          device.held.push(entry);
+          device.release = () => { device.holdUrl = null; device.held.splice(0).forEach(h => h.resolve()); };
+          device.releaseFirst = () => { const h = device.held.shift(); assert(h, 'a held request'); h.resolve(); };
+          init.signal?.addEventListener('abort', () => { device.holdUrl = null; const i = device.held.indexOf(entry); if (i >= 0) device.held.splice(i, 1); reject(new w.DOMException('aborted', 'AbortError')); }, { once: true });
         });
         if (url === '/wifi/session') return device.sessionOk ? reply(CSRF) : reply('AUTH_FAILED', 403);
         if (url === '/status') return reply('mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n');
@@ -490,37 +494,75 @@ async function boot() {
   await refresh(fx.status_ready);
   await send('',()=>q('#simple-stand').click(),{status:200,body:fx.ack_stand_accepted,keepIdentity:true},'POSTURE.STAND',{target_height_m:.15},5000);
   assert(/ACK_ID_MISMATCH.*ESITO SCONOSCIUTO/.test(last()),last());
-  // B. One read lane for the whole page (PortalPage mdNet; listener: 2 sockets,
-  // LRU purge). Request-level model only: no socket or latency is simulated.
+  // B. Read lanes (dev.17). The portal's diagnostic lane (mdNet) and the Motion
+  // poll's own lane: never more than two reads in flight for the whole page, a
+  // read is aborted only after 3.5 s (lwIP retransmission timeout), a stalled
+  // read is overlapped once after 700 ms, and a late answer never overwrites a
+  // newer one. Request-level model only: no socket or latency is simulated.
   await refresh(fx.status_ready);
   const motionReads = () => p.calls.filter(c => c.url === '/api/motion/status');
+  const trace = p.dom.window.matdogMotionTrace;
   device.holdUrl = '/status';
-  await p.fire(4000);  // the portal refresh (POLL_MS) issues /status in the lane
+  await p.fire(4000);  // the portal refresh (POLL_MS) issues /status in its lane
   const held = p.calls.at(-1);
   assert.strictEqual(held.url, '/status');
-  const readsBefore = motionReads().length;
-  await p.poll(0);  // a Motion poll tick while /status is in flight
-  assert.deepStrictEqual(motionReads().slice(readsBefore).map(c => c.reads), [], 'the Motion read waits in the lane, never beside a portal read');
+  assert(p.timers[held.timersAt - 1].ms === 3500 && p.timers[held.timersAt - 1].active, 'the portal read budget is 3.5 s, armed when the read is sent');
+  let readsBefore = motionReads().length;
+  await p.poll(); received = p.clock();  // a Motion poll tick while /status is in flight
+  assert.deepStrictEqual(motionReads().slice(readsBefore).map(c => c.reads), [2], 'the Motion read does not wait behind a portal read');
   await send('', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
-  assert.strictEqual(commands().at(-1).inflight, 2, 'STOP sent at once, beside at most one read');
-  const releasedAt = p.timers.length;
+  assert.strictEqual(commands().at(-1).inflight, 2, 'STOP sent at once, beside the held read');
   device.release(); await settle();
-  const next = p.calls.slice(p.calls.indexOf(held) + 1).filter(c => c.method === 'GET').map(c => c.url);
-  assert.deepStrictEqual(next.slice(0, 2), ['/api/motion/status', '/wifi/status'], 'the heartbeat read waits for at most one diagnostic read');
+  assert.deepStrictEqual(p.calls.slice(p.calls.indexOf(held) + 1).filter(c => c.method === 'GET' && c.url !== '/api/motion/status').map(c => c.url), ['/wifi/status'], 'portal reads stay sequential in their lane');
   const beat = motionReads().at(-1);
   assert.strictEqual(beat.headers['X-Csrf-Token'], CSRF, 'the poll still carries the deadman proof');
-  assert(beat.timersAt - 1 >= releasedAt && p.timers[beat.timersAt - 1].ms === 800, 'the 800 ms read budget starts when the read is sent');
-  assert.strictEqual(beat.reads, 1, 'one read in flight');
-  // A diagnostic read that times out releases the lane to the Motion poll.
-  device.holdUrl = '/status';
-  await p.fire(4000);
-  assert.strictEqual(p.calls.at(-1).url, '/status');
-  const readsQueued = motionReads().length;
-  await p.poll(0);
-  assert.strictEqual(motionReads().length, readsQueued);
-  await p.fire(800);  // get('/status') abort
-  assert.strictEqual(motionReads().length, readsQueued + 1, 'Motion poll proceeds after an aborted diagnostic read');
+  assert(p.timers[beat.timersAt - 1].ms === 3500, 'the Motion read budget is 3.5 s, armed when the read is sent');
+  // A stalled Motion read (one TCP segment lost on the Controller): the next
+  // ticks inside 700 ms are skipped, then ONE overlapping read keeps telemetry
+  // live; with two in flight every tick is skipped; the late answer is dropped.
   await refresh(fx.status_ready);
+  device.holdUrl = '/api/motion/status';
+  readsBefore = motionReads().length;
+  let skipped = trace.poll_skipped;
+  await p.poll();  // read 1, held
+  await p.poll();  // 350 ms: skipped
+  assert.strictEqual(motionReads().length, readsBefore + 1);
+  assert.strictEqual(trace.poll_skipped, skipped + 1, 'a tick inside READ_OVERLAP_MS is skipped and counted');
+  device.holdUrl = null;
+  device.status = fx.status_walking;
+  await p.poll();  // 700 ms: read 2 overlaps read 1 and is answered
+  assert.strictEqual(motionReads().length, readsBefore + 2);
+  assert.strictEqual(motionReads().at(-1).reads, 2, 'two reads in flight at most');
+  assert.strictEqual(q('#simple-state').textContent, 'WALKING', 'telemetry continues beside the stalled read');
+  const samples = trace.samples.length, dropped = trace.late_dropped;
+  device.status = fx.status_ready;
+  device.releaseFirst(); await settle();  // read 1 answers after read 2
+  assert.strictEqual(trace.late_dropped, dropped + 1, 'late answer counted');
+  assert.strictEqual(trace.samples.length, samples, 'late answer not recorded as a sample');
+  assert.strictEqual(q('#simple-state').textContent, 'WALKING', 'a late answer never overwrites a newer one');
+  // Two reads held: no third read, STOP still has its connection at once.
+  await refresh(fx.status_ready);
+  device.holdUrl = '/api/motion/status';
+  readsBefore = motionReads().length; skipped = trace.poll_skipped;
+  await p.poll(); await p.poll(700); await p.poll(); await p.poll(700);
+  assert.strictEqual(motionReads().length, readsBefore + 2, 'never a third read while two are in flight');
+  assert.strictEqual(trace.poll_skipped, skipped + 2);
+  await send('', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
+  assert.strictEqual(commands().at(-1).inflight, 3, 'STOP sent at once beside the two held reads');
+  // Nor does the portal lane add a third read: its diagnostic refresh is
+  // deferred, not sent, and a deferral is not a lost link.
+  const portalBefore = p.calls.filter(c => c.url === '/status').length;
+  await p.fire(4000);
+  assert.strictEqual(p.calls.filter(c => c.url === '/status').length, portalBefore, 'no third read: the diagnostic refresh is deferred');
+  assert(p.timers.some(t => t.active && t.ms === 4000), 'diagnostic refresh rescheduled at its normal cadence');
+  assert(!/Ultimo tentativo senza risposta|Nessuna risposta/.test(q('#linkText').textContent), q('#linkText').textContent);
+  // Only the 3.5 s budget ends a stalled read: a TIMEOUT, then the lane reopens.
+  const errors = trace.poll_errors.length;
+  await p.fire(3500); await p.fire(3500);
+  assert(trace.poll_errors.slice(errors).some(e => e.error === 'TIMEOUT_3500MS'), 'a read is aborted only at 3.5 s');
+  device.release(); await settle();
+  await refresh(fx.status_ready);
+  assert.strictEqual(q('#simple-state').textContent, 'READY', 'reads resume after the abort');
 
   // Admin session: kept valid while the page is used, never a Motion condition.
   const sessionCalls = () => p.calls.filter(c => c.url === '/wifi/session').length;
@@ -624,7 +666,7 @@ async function boot() {
   assert(/STOP · .* · NON INVIATO: serve l’accesso amministratore\. Usare anche @STOP via USB o il KEY OFF\./.test(last()) && !q('#login').hidden, last());
 
   assert.deepStrictEqual(p.errors, []);
-  assert(p.calls.filter(c => c.method === 'GET').every(c => c.reads === 1), 'never two page reads in flight during the whole session');
+  assert(p.calls.filter(c => c.method === 'GET').every(c => c.reads <= 2), 'never more than two page reads in flight, both lanes counted');
   // A session renewal of an older command cannot resend it after priority STOP.
   {
     const r=await boot();r.device.holdUrl='/wifi/session';
