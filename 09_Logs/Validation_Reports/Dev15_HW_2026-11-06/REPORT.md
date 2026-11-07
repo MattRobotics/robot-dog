@@ -1,6 +1,6 @@
 # MATDOG dev.15 — Sessione hardware del 06/11/2026
 
-**Stato: PARTIAL HARDWARE VALIDATION — non stable.** Questo report è una fotografia della sessione, non una certificazione di affidabilità continuativa. Le prove sono state condotte sull'ESP32-S3 reale tramite dashboard AP MATDOG, con log Motion raccolti dalla pagina e osservazioni dell'operatore. Le fonti primarie sono catalogate in [EVIDENCE_MANIFEST.md](EVIDENCE_MANIFEST.md), incluso il video analizzato in [VIDEO_AUDIT.md](VIDEO_AUDIT.md). I file grezzi sono **LOCAL_ONLY / PENDING PUBLICATION**; l'assenza dei grezzi da GitHub è dichiarata e non occultata.
+**Stato: PARTIAL HARDWARE VALIDATION — non stable.** Questo report è una fotografia della sessione, non una certificazione di affidabilità continuativa. Le prove sono state condotte sull'ESP32-S3 reale tramite dashboard AP MATDOG, con log Motion raccolti dalla pagina e osservazioni dell'operatore. Le fonti primarie sono catalogate in [EVIDENCE_MANIFEST.md](EVIDENCE_MANIFEST.md), incluso il video analizzato in [VIDEO_AUDIT.md](VIDEO_AUDIT.md). **Aggiornamento 07/11:** i 15 JSON Motion originali sono pubblicati sul branch della PR #64 nell'archivio compresso [`raw/`](raw/), con SHA256 verificati. Il filmato originale e i derivati video restano locali, identificati nel manifesto. Alla data del collaudo (06/11) tutti i grezzi erano locali.
 
 ## 1. Provenienza: distinguere dispositivo, sorgente e remoto
 
