@@ -4,9 +4,28 @@
 #define MATDOG_MOTION_DASHBOARD R"MOTION(<style>
 header.top{position:sticky;top:0;z-index:10;padding:8px 0;background:var(--bg)}
 header.top .who{flex-wrap:wrap;max-width:100%}
-#simple-motion .cockpit{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start;margin-bottom:18px}
-#simple-motion .controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:end}
-#simple-motion .controls label{grid-column:1/-1;margin:0}
+#simple-motion .cockpit-title{margin:0 0 2px;font-size:19px;color:var(--accent);letter-spacing:.03em}
+#simple-motion .cockpit-status{margin:0 0 8px}
+/* Cockpit (dev.17, operator request of the dev.16 session): the Twin on top at
+   full width, then one command panel with posture, WALK and joystick side by
+   side (3 columns, 2 below 940 px, 1 on phones). */
+#simple-motion .cockpit{margin-bottom:12px}
+#simple-motion .cockpit-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start}
+#simple-motion .cockpit-controls .cockpit-group,#simple-motion .cockpit-controls #simple-joystick{margin:0}
+#simple-motion .cockpit-group{margin:8px 0;padding:6px 10px 10px;border:1px solid var(--line);border-radius:10px}
+#simple-motion .cockpit-group legend{padding:0 4px;font-size:13px;color:var(--muted)}
+#simple-motion .pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px}
+#simple-motion .height-row{display:flex;justify-content:space-between;align-items:baseline;font-size:14px;color:var(--muted)}
+#simple-motion .height-row label{display:inline;margin:0}#simple-height-value{font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+#simple-motion .stepper{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;gap:8px;align-items:center;margin-top:4px}
+#simple-motion .stepper button{padding:0;font-size:22px}#simple-height{margin:0;padding:0;width:100%;accent-color:var(--accent);border:0;background:none;min-height:40px}
+#simple-motion .segmented{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid #456075;border-radius:8px;overflow:hidden}
+#simple-motion .segmented label{position:relative;margin:0;color:var(--text);font-size:14px}
+#simple-motion .segmented input{position:absolute;opacity:0;width:1px;height:1px}
+#simple-motion .segmented span{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 4px;white-space:nowrap;cursor:pointer;border-left:1px solid #456075}
+#simple-motion .segmented label:first-child span{border-left:0}
+#simple-motion .segmented input:checked+span{background:var(--accent);color:#06222a;font-weight:700}
+#simple-motion .segmented input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-3px}
 #simple-controls{scroll-margin-top:130px}
 /* The command column grows with its contents, including future controls. */
 #simple-motion .command-panel{min-width:0}
@@ -26,33 +45,34 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-joints{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px}#simple-joints th,#simple-joints td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}#simple-joints th:first-child,#simple-joints td:first-child{text-align:left}
 #simple-joints tr.bad td{color:var(--bad)}
 #simple-twin-frame{display:block;width:100%;height:clamp(340px,56vh,560px);border:1px solid var(--line);border-radius:8px;background:#0c131a;margin:8px auto 0}
-#simple-joystick{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:10px;background:#101a23;color:var(--muted)}
-#simple-joystick .joystick-title{display:flex;align-items:center;justify-content:space-between;gap:8px}
-#simple-joystick h3{margin:0;font-size:15px;color:var(--text)}
-#simple-joystick .joystick-badge{padding:2px 7px;border:1px solid #55717e;border-radius:999px;color:#b8d3df;font-size:11px;white-space:nowrap}
-#simple-joystick p{margin:5px 0 8px;font-size:12px}
+#simple-joystick{margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#101a23;color:var(--muted)}
+#simple-joystick h3{margin:0 0 4px;font-size:15px;color:var(--text)}
+#joy-state{margin:6px 0 0;font-size:12px;height:2.8em;line-height:1.4em;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
 #simple-joystick .joystick-pad{display:flex;align-items:center;justify-content:center;gap:12px}
 #simple-joystick svg{display:block;width:166px;height:166px;max-width:70%;flex-shrink:0}
 #simple-joystick .joystick-yaw{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px}
 #simple-joystick .joystick-yaw button{display:grid;place-items:center;width:42px;min-height:42px;height:42px;padding:0;border:1px solid #405360;border-radius:50%;background:#182630;color:#b8d3df;font-size:29px;line-height:1}
 #simple-joystick #joy-pad,#simple-joystick .joystick-yaw button{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}#simple-joystick #joy-pad{cursor:grab}#simple-joystick[data-active=true] #joy-pad{cursor:grabbing}
 #simple-joystick[aria-disabled=true] #joy-pad{opacity:.55;cursor:not-allowed}#simple-joystick .joystick-yaw button:disabled{opacity:.45}#joy-state{color:var(--text)}
-@media(max-width:940px){#simple-motion .cockpit{grid-template-columns:minmax(0,1fr)}#simple-motion .controls{grid-template-columns:repeat(4,minmax(0,1fr))}#simple-motion .controls label{grid-column:span 2}}
-@media(max-width:600px){#simple-motion .controls{grid-template-columns:repeat(2,minmax(0,1fr))}#simple-motion .controls label{grid-column:1/-1}#simple-twin-frame{height:clamp(280px,44vh,400px)}#simple-joints{display:block;overflow-x:auto;font-size:13px}#simple-stop{min-width:90px}}
+@media(max-width:940px){#simple-motion .cockpit-controls{grid-template-columns:repeat(2,minmax(0,1fr))}#simple-motion .cockpit-controls #simple-joystick{grid-column:1/-1}}
+@media(max-width:600px){#simple-motion .cockpit-controls{grid-template-columns:minmax(0,1fr)}#simple-twin-frame{height:clamp(280px,44vh,400px)}#simple-joints{display:block;overflow-x:auto;font-size:13px}#simple-stop{min-width:90px}}
 </style><script>
 (()=>{'use strict';const by=id=>document.getElementById(id);
 const card=document.createElement('div');card.className='card';card.id='simple-motion';
-card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-state="STOPPED" data-tone="muted">COLLEGAMENTO…</span></h2>
+card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
+<p class="cockpit-status"><span id="simple-state" data-state="STOPPED" data-tone="muted">COLLEGAMENTO…</span></p>
 <div class="cockpit"><div id="simple-twin" aria-labelledby="simple-twin-title"><h3 id="simple-twin-title">Digital Twin 3D</h3><iframe id="simple-twin-frame" title="MATDOG Digital Twin"></iframe><p id="simple-twin-state" role="status">Modello 3D non ancora caricato.</p></div><div class="command-panel" id="simple-controls" tabindex="-1" aria-label="Comandi Motion">
-
 <p id="simple-reason" role="status">Lettura dello stato reale dal Controller.</p>
 <p id="simple-last" role="status" data-kind="none">Ultimo comando: nessuno inviato da questa pagina.</p>
-<div class="controls"><label>Quota STAND (mm)<input id="simple-height" type="number" min="50" max="150" step="1" value="150"></label>
-<button id="simple-stand" disabled>STAND</button><button id="simple-prone" disabled title="Discesa PRONE: al termine verificato la coppia viene rilasciata (SAFE_OFF ordinario, PRONE_REST). Appoggio non verificato.">PRONE</button><label>WALK STANDARD<select id="simple-stride"><option value="0">30 mm / ciclo</option><option value="1" selected>45 mm / ciclo</option><option value="2">60 mm / ciclo</option></select></label>
-<button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div>
+<div class="cockpit-controls"><fieldset class="cockpit-group"><legend>Postura</legend>
+<div class="height-row"><label for="simple-height">Quota STAND</label><output id="simple-height-value" for="simple-height">150 mm</output></div>
+<div class="stepper"><button type="button" id="simple-height-down" aria-label="Quota STAND −5 mm">−</button><input id="simple-height" type="range" min="50" max="150" step="5" value="150" aria-describedby="simple-height-value"><button type="button" id="simple-height-up" aria-label="Quota STAND +5 mm">+</button></div>
+<div class="pair"><button id="simple-stand" disabled>STAND</button><button id="simple-prone" disabled title="Discesa PRONE: al termine verificato la coppia viene rilasciata (SAFE_OFF ordinario, PRONE_REST). Appoggio non verificato.">PRONE</button></div></fieldset>
+<fieldset class="cockpit-group"><legend>WALK STANDARD · passo per ciclo</legend>
+<div id="simple-stride" class="segmented" role="radiogroup" aria-label="Passo WALK per ciclo (non velocità)"><label><input type="radio" name="simple-stride" value="0"><span>🐢 30 mm</span></label><label><input type="radio" name="simple-stride" value="1" checked><span>45 mm</span></label><label><input type="radio" name="simple-stride" value="2"><span>🐇 60 mm</span></label></div>
+<div class="pair"><button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div></fieldset>
 <section id="simple-joystick" aria-label="Joystick avanti/indietro, laterale e rotazione" aria-disabled="true" data-active="false">
-<div class="joystick-title"><h3>Joystick</h3><span class="joystick-badge">VERIFICATO SU HARDWARE (dev.15)</span></div>
-<p>Trascinare: avanti/indietro fino a 6,9 mm/s e laterale fino a 3,1 mm/s, proporzionali; tenere premuto ↶/↷ per ruotare fino a 1,8°/s. Combinazioni scalate nel limite del Controller. Al rilascio WALK STOP; senza comandi per 1 s il Controller esegue WALK STOP da solo. Cambio avanti/indietro: il passo si conclude, poi si riparte.</p>
+<h3>Joystick</h3>
 <div class="joystick-pad"><svg id="joy-pad" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg" aria-label="Velocità avanti/indietro e laterale">
 <circle cx="90" cy="90" r="58" fill="#15242f" stroke="#3c5667" stroke-width="2"/>
 <circle cx="90" cy="90" r="7" fill="none" stroke="#294454" stroke-dasharray="3 3"/>
@@ -61,10 +81,12 @@ card.innerHTML=`<h2>MATDOG Controller · Motion <span id="simple-state" data-sta
 <path d="M90 26l-7 10h14zM90 154l-7-10h14z" fill="#acc5d0"/><path d="M26 90l10-7v14zM154 90l-10-7v14z" fill="#acc5d0"/>
 <g fill="#a8bdc9" font-family="system-ui,sans-serif" font-size="9" text-anchor="middle"><text x="90" y="17">Avanti</text><text x="90" y="173">Indietro</text><text x="16" y="112">Sinistra</text><text x="164" y="112">Destra</text></g>
 </svg><div class="joystick-yaw"><button id="joy-left" type="button" disabled title="Tenere premuto: rotazione antioraria">↶</button><small>Rotazione</small><button id="joy-right" type="button" disabled title="Tenere premuto: rotazione oraria">↷</button></div></div>
-<p id="joy-state" role="status">Richiesto: neutro.</p></section>
+<p id="joy-state" role="status">Richiesto: neutro.</p></section></div>
 </div></div>
-<p class="note">STOP richiede l’arresto al Controller: può mantenere la coppia ON. SAFE_OFF verifica coppia OFF sui 13 servo. WALK STOP mantiene STAND.</p>
-<details id="simple-diagnostics"><summary>Stato e diagnostica Motion</summary><h4>Ultimi esiti dei comandi (dal più recente)</h4><ol id="simple-log"></ol><dl id="simple-values"></dl>
+<details id="simple-diagnostics"><summary>Stato, guida e diagnostica Motion</summary><h4>Ultimi esiti dei comandi (dal più recente)</h4><ol id="simple-log"></ol><dl id="simple-values"></dl>
+<h4>Guida comandi</h4><p class="note">STOP richiede l’arresto al Controller: può mantenere la coppia ON. SAFE_OFF verifica coppia OFF sui 13 servo. WALK STOP mantiene STAND.</p>
+<p class="note">Joystick (verificato su hardware in dev.15): trascinare per avanti/indietro fino a 6,9 mm/s e laterale fino a 3,1 mm/s, proporzionali; tenere premuto ↶/↷ per ruotare fino a 1,8°/s. Combinazioni scalate nel limite del Controller. Al rilascio WALK STOP; senza comandi per 1 s il Controller esegue WALK STOP da solo. Cambio avanti/indietro: il passo si conclude, poi si riparte.</p>
+<p class="note">WALK STANDARD: 🐢 30, 45 o 🐇 60 mm è il passo per ciclo da 6,5 s, non una velocità impostabile. Quota STAND: 50–150 mm a passi di 5 mm; il valore è inviato solo con il pulsante STAND e il Controller può rifiutarlo con il motivo. Dopo uno STOP completato con coppia ON, WALK riparte direttamente se il Controller ammette la ripresa (stessa verifica di STAND): completa l’eventuale passo interrotto, porta alla quota WALK e avvia WALK STANDARD.</p>
 <p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello caricato a robot fermo (anche con coppia ON, dai file nella cache del browser) e mantenuto durante Motion; a cache fredda con coppia ON attende torque OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla propria quota nominale indicata dal Controller e poi usa il ciclo STANDARD di 6,5 s. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente circa 7–9 s, più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
 <p class="note">PRONE è disponibile da STAND/HOLD: esegue la discesa e, raggiunta la posa finale, rilascia la coppia con il SAFE_OFF ordinario (PRONE_REST, verifica OFF sui 13 servo). L'appoggio passivo non è misurato. STAND riparte dalla posa reale assestata: acquisizione, verifica della regione certificata, riabilitazione. La quota stimata deriva da encoder e IMU con ipotesi di piano di appoggio: non misura la distanza dal pavimento. La posa misurata è la regione geometrica certificata in cui si trovano gli encoder; non prova l'appoggio a terra.</p>
 <table id="simple-joints"><thead><tr><th>Giunto</th><th>ID</th><th>Angolo</th><th>RAW letto (FAST)</th><th>Temp.</th><th>Coppia</th><th>Età CONTROL (coppia/goal)</th><th>Età FAST (posizione)</th></tr></thead><tbody></tbody></table>
@@ -299,9 +321,15 @@ for(const [id,sign] of [['joy-left',1],['joy-right',-1]]){const b=by(id);
 window.addEventListener('blur',joyRelease);document.addEventListener('visibilitychange',()=>{if(document.hidden)joyRelease()});
 // Canonical Controller contract (MotionContract.cpp): POSTURE.STAND,
 // BASE_VELOCITY, MOTION.STOP, owner 'dashboard'. The parser is case-sensitive.
-by('simple-stand').onclick=()=>{const mm=Number(by('simple-height').value);command('POSTURE.STAND',{target_height_m:mm/1000},false,'STAND '+mm+' mm')};
+// The height selector and the stride only choose a value: nothing is sent
+// until STAND or WALK is pressed, and the Controller may refuse it (dev.17).
+const height=by('simple-height'),showHeight=()=>{by('simple-height-value').textContent=height.value+' mm'};
+const stepHeight=d=>{height.value=String(Math.min(150,Math.max(50,Number(height.value)+d)));showHeight()};
+height.addEventListener('input',showHeight);by('simple-height-down').onclick=()=>stepHeight(-5);by('simple-height-up').onclick=()=>stepHeight(5);
+const stride=()=>Number(document.querySelector('input[name="simple-stride"]:checked')?.value??1);
+by('simple-stand').onclick=()=>{const mm=Number(height.value);command('POSTURE.STAND',{target_height_m:mm/1000},false,'STAND '+mm+' mm')};
 by('simple-prone').onclick=()=>command('POSTURE.LIE_DOWN',{},false,'PRONE');
-by('simple-walk').onclick=()=>{const i=Number(by('simple-stride').value);command('BASE_VELOCITY',{vx:[.030,.045,.060][i]/6.5,vy:0,yaw_rate:0},false,'WALK STANDARD '+[30,45,60][i]+' mm')};
+by('simple-walk').onclick=()=>{const i=stride();command('BASE_VELOCITY',{vx:[.030,.045,.060][i]/6.5,vy:0,yaw_rate:0},false,'WALK STANDARD '+[30,45,60][i]+' mm')};
 by('simple-walk-stop').onclick=()=>command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true,'WALK STOP');
 stop.onclick=()=>command('MOTION.STOP',{},true,'STOP');
 // Each Escape press is a STOP; the key autorepeat of a held key is not.

@@ -23,7 +23,9 @@ for name in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKine
 # Real-browser layout under a held joystick (Chrome via playwright-core).
 if [ -n "${MATDOG_PLAYWRIGHT_NODE_PATH:-}" ]; then
   NODE_PATH="$MATDOG_PLAYWRIGHT_NODE_PATH" "${NODE:-node}" "$here/test_dashboard_layout_browser.cjs" "$out/fixtures.json"
+  NODE_PATH="$MATDOG_PLAYWRIGHT_NODE_PATH" "${NODE:-node}" "$here/test_twin_viewcube_browser.cjs" "$out/fixtures.json"
 else
   echo "DASHBOARD_LAYOUT_BROWSER = NOT RUN (set MATDOG_PLAYWRIGHT_NODE_PATH to a node_modules with playwright-core)"
+  echo "TWIN_VIEWCUBE_BROWSER = NOT RUN (same)"
 fi
 "$out/contract" envelopes "$out/envelopes.tsv" "$sketch/src"

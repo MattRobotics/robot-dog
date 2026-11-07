@@ -99,7 +99,32 @@ async function boot(initialStatus = fx.status_ready) {
   assert.strictEqual(q('#simple-twin h3 a'), null, 'no redundant Comandi link');
   assert.strictEqual(q('#simple-controls').className, 'command-panel');
   const joystick = q('#simple-joystick');
-  assert(joystick && q('#joy-pad') && joystick.textContent.includes('VERIFICATO SU HARDWARE (dev.15)') && joystick.textContent.includes('Rotazione'), 'joystick panel shipped, marked not hardware-validated');
+  // dev.17 cockpit: one top section; the compact joystick has no badge and no
+  // prose; the guide texts live in the closed diagnostics.
+  assert.strictEqual(q('#simple-motion h2').textContent, 'MATDOG — Motion Cockpit');
+  assert(joystick && q('#joy-pad') && joystick.textContent.includes('Rotazione') && !joystick.querySelector('.joystick-badge') &&
+    !/VERIFICATO SU HARDWARE|mm\/s|Trascinare/.test(joystick.textContent.replace(q('#joy-state').textContent, '')), 'compact joystick: no badge, no prose');
+  assert(/Joystick \(verificato su hardware in dev\.15\): trascinare/.test(q('#simple-diagnostics').textContent) &&
+    /🐢 30, 45 o 🐇 60 mm è il passo per ciclo/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
+  {
+    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); stride: 🐢 30 / 45 / 🐇 60 mm per cycle.
+    // Choosing a value sends nothing: only STAND or WALK sends, and the Controller may refuse.
+    const h = q('#simple-height'), before = p.calls.filter(c => c.url === '/api/motion/command').length;
+    assert(h.type === 'range' && h.min === '50' && h.max === '150' && h.step === '5' && h.value === '150' && q('#simple-height-value').textContent === '150 mm');
+    q('#simple-height-down').click(); assert(h.value === '145' && q('#simple-height-value').textContent === '145 mm');
+    for (let k = 0; k < 30; k++) q('#simple-height-down').click();
+    assert(h.value === '50' && q('#simple-height-value').textContent === '50 mm', 'stepper clamps at 50 mm');
+    for (let k = 0; k < 30; k++) q('#simple-height-up').click();
+    assert(h.value === '150', 'stepper clamps at 150 mm');
+    h.value = '75'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true })); h.dispatchEvent(new p.dom.window.Event('change', { bubbles: true }));
+    assert.strictEqual(q('#simple-height-value').textContent, '75 mm');
+    const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-stride"]')];
+    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['0:🐢 30 mm', '1:45 mm', '2:🐇 60 mm']);
+    assert(radios[1].checked && /passo per ciclo/.test(q('#simple-stride').closest('fieldset').textContent) && /non velocità/.test(q('#simple-stride').getAttribute('aria-label')));
+    radios[2].click(); radios[0].click(); radios[1].click(); await settle();
+    assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a value change');
+    h.value = '150'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true }));
+  }
   assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
   const diagnostics = q('#simple-diagnostics');
   assert(diagnostics && !diagnostics.open && diagnostics.contains(q('#simple-values')) && diagnostics.contains(q('#simple-joints')) && diagnostics.contains(q('#simple-detail')), 'technical details remain in one closed diagnostic panel');
@@ -342,7 +367,7 @@ async function boot(initialStatus = fx.status_ready) {
   // 3. WALK STANDARD presets 30/45/60 mm per 6.5 s cycle.
   for (const [i, mm] of [[0, 30], [1, 45], [2, 60]]) {
     await refresh(fx.status_ready);
-    q('#simple-stride').value = String(i);
+    q('input[name="simple-stride"][value="' + i + '"]').click();
     await send('walk' + mm, () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
     assert(new RegExp('WALK STANDARD ' + mm + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last());
   }
@@ -490,7 +515,7 @@ async function boot(initialStatus = fx.status_ready) {
   assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
   // dev.17: WALK after STOP is the ordinary WALK STANDARD preset; the Controller admits it.
   await refresh(fx.status_stopped_on);
-  { const i = Number(q('#simple-stride').value);
+  { const i = Number(q('input[name="simple-stride"]:checked').value);
     await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
     assert(new RegExp('WALK STANDARD ' + [30, 45, 60][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
   await refresh(fx.status_stopped);
@@ -544,8 +569,8 @@ async function boot(initialStatus = fx.status_ready) {
   assert(!/ACCEPTED|movimento da confermare/.test(last()), 'a REJECTED ACK is never shown as accepted motion');
   assert(/REJECTED/.test(q('#message').textContent), 'the refusal is in the banner');
   await refresh(fx.status_ready);
-  q('#simple-height').value = '73';
-  await send('', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .073 }, 5000);
+  q('#simple-height').value = '75';
+  await send('', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .075 }, 5000);
   assert(q('#message').hidden && !/REJECTED/.test(q('#message').textContent), 'a later accepted command clears the earlier refusal: ' + q('#message').textContent);
   assert(p.dom.window.matdogMotionTrace.commands.some(c => c.ack && c.ack.outcome === 'REJECTED'), 'the refusal stays in the diagnostics');
   q('#simple-height').value = '150';
