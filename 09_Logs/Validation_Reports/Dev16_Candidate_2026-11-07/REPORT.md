@@ -1,3 +1,5 @@
+> **Aggiornamento operativo 07/11/2026 (non retroattivo):** il candidato descritto qui è stato **flashato APP-only, verificato al boot e provato fisicamente**. Il rapporto di candidata qui sotto conserva i dati offline dello stato pre-flash. **Stato aggiornato e problemi residui:** [rapporto hardware dev.16](../Dev16_HW_2026-11-07/REPORT.md). Firmware effettivamente installato dev.16; non è stata dichiarata release stabile; PR #64 rimane draft, main non mergiato.
+
 # MATDOG Controller 1.0.1-dev.16 — candidata di stabilizzazione (07/11/2026)
 
 **Stato: IMPLEMENTED NOT VALIDATED HARDWARE.** Candidata compilata e qualificata offline. **Non flashata**: sul robot resta installata la dev.15 (`7997ad4d4497`, APP `b81d3a4f…`). Non è una release stable. Procedura di flash e collaudo: [FLASH_AND_TEST.md](FLASH_AND_TEST.md).
