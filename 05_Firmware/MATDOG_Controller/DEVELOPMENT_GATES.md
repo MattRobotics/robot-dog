@@ -1,5 +1,8 @@
 # MATDOG Controller — Development Gates
 
+> **Applicabilità — 07/11/2026:** questa mappa di gate fu redatta per le fasi iniziali del Controller (ottobre 2026) e va trattata come **registro storico**, non come nuova sequenza obbligatoria di autorizzazioni per il firmware operativo già qualificato. La baseline installata/Released è **[Stable v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1)** (APP interna `1.0.1-dev.17`); [report HW](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md), [lavoro residuo](../../09_Logs/OPEN_ITEMS.md). Protezioni fisiche e STOP restano sempre attivi; nessun PASS storico costituisce prova di altri comportamenti hardware.
+
+
 **Canonical owner of the technical pass/fail authorization criteria for each Controller
 development gate.** Last updated 2026-10-08 (only the Calibration Persistence V1 status
 notes below were revised; the gate criteria are as of 2026-10-01).

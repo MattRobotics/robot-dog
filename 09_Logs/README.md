@@ -2,7 +2,7 @@
 
 Stato corrente 07/11/2026: **prima Stable GitHub `v1.0.1`** = APP `1.0.1-dev.17` / `17db0efe2324` installata e collaudata, promossa senza ricompilazione — [report HW](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest release](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md) · [evidenze](Validation_Reports/Dev17_HW_2026-11-07/EVIDENCE_MANIFEST.md); rollback dev.16 ([report](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md)). Indice completo: [Validation_Reports](Validation_Reports/README.md).
 
-Storico 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [RCA timing 07/11](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente solo ASUS locale, main non sincronizzato al device; nessuna stable.
+Storico 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) · [manifest SHA256 grezzi locali](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) · [analisi video](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md) · [RCA timing 07/11](Validation_Reports/Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md). Dev.7 pre-release storica → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata 06/11**, sorgente all'epoca solo locale, main non sincronizzato al device; **nessuna stable a quella data** (situazione poi superata da v1.0.1).
 
 Historical scoped closeout (11/10/2026): [non-motion closeout](Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) · [Motion handoff](Development_Log/2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
@@ -22,8 +22,8 @@ automatically describe the robot after a later rebuild or architecture change.
 
 | Area | Purpose |
 |---|---|
-| [History index](HISTORY_INDEX.md) | One chronology, June–October 2026: phases, status, documents and available evidence |
-| [Open items](OPEN_ITEMS.md) | Current overview as of 06/11/2026; previous dated states preserved in Historical/ |
+| [History index](HISTORY_INDEX.md) | Chronology June–November 2026; dated checkpoints, evidence and published v1.0.1 |
+| [Open items](OPEN_ITEMS.md) | Current overview as of Stable v1.0.1 (07/11/2026); previous dated states in historical reports |
 | [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#41 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 (PR #38 merged with original SHAs; PR #41 is documentation only) |
 | [External archives](EXTERNAL_ARCHIVES.md) | Deleted branches (last tips), remaining tags, the non-public archive status and recovery steps; items without evidence stay `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |
