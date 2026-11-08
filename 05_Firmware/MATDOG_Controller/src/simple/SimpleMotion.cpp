@@ -1049,7 +1049,15 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
   // Large edge-biased roll solutions do not preserve this model's nominal
   // support strip. Keep its existing contact domain, not a new IMU-angle cap.
-  const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:0);
+  // A HEIGHT/PRONE_HEIGHT unwind retires a correction that a steered
+  // WALK_SETTLE may have accepted in the fillet edge model (up to
+  // kEdgeContactMaxTiltRad): its steps are solved in that model. Inside the
+  // nominal strip it gives the same joints (zero fillet lift); beyond it the
+  // strip refused every step and the deadline ended the move (H1-RCA
+  // 2026-11-08: +63.7/-66.5 mrad, NATIVE_TARGET_NOT_REACHED). Every other
+  // check of compensationSafe is unchanged.
+  const double edgeTilt=walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:unwind?kEdgeContactMaxTiltRad:0;
+  const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
   if(compensationSafe(q,safeBox,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{

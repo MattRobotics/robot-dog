@@ -582,6 +582,72 @@ static void joystickWalk(){
   std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP only when mostly backward, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
 }
 
+// H1-RCA 2026-11-08 (hardware, twice): on the fixture a steered WALK_SETTLE
+// ended with +63.7/-66.5 mrad of level correction, accepted in the fillet edge
+// model; the HEIGHT unwind of the joystick restart solved its steps in the
+// nominal strip, every one invalid, until NATIVE_TARGET_NOT_REACHED. Plant:
+// the commanded pose minus the sag of the hardware exit snapshot (exit_j, with
+// its loads), servo speed in sign-magnitude, a servo whose goal moved this
+// release reporting motion (the hardware WALK_SETTLE lasted until the growth
+// stopped), IMU held by the fixture (open loop). Routes: (0) forward ->
+// lateral -> full reversal -> restart through HEIGHT -> backward walk ->
+// release -> STOP -> STAND -> PRONE; (1) reversal -> release -> PRONE. Every
+// HEIGHT/PRONE_HEIGHT unwind release must retire the correction (the whole
+// compensationSafe chain accepts the step), at the stand drive, inside the
+// certified boxes; no fault and every state completes.
+static void steeredSettleUnwind(){
+  constexpr double degree=3.14159265358979323846/180,T=simple::kJoystickPeriodS;
+  static const int err[12]={-2,-1,-1,0,2,3,3,-4,-1,7,5,2},load[12]={24,0,0,0,1048,1056,1056,40,0,1088,1072,1048};
+  const double hp=3.9*degree/2,hr=-3.4*degree/2;
+  for(unsigned route=0;route<2;++route){
+    Rig r;bool plant=false;unsigned unwinds=0,settles=0;double settled=0;
+    auto boxed=[](const simple::collision::Box& b,const uint16_t* raw){for(unsigned i=0;i<12;++i){const double q=(int(raw[i])-2048)*simple::kTickRad;if(q<b.lo[i]||q>b.hi[i])return false;}return true;};
+    auto tick=[&]{
+      r.in.quaternion[0]=std::cos(hr)*std::cos(hp);r.in.quaternion[1]=std::sin(hr)*std::cos(hp);r.in.quaternion[2]=std::cos(hr)*std::sin(hp);r.in.quaternion[3]=-std::sin(hr)*std::sin(hp);
+      const bool on=plant&&r.m.energized();
+      for(unsigned i=0;i<12;++i){auto& o=r.p.observed[i];const int raw=int(r.p.target[i])-(on?err[i]:0),v=raw-int(o.raw);
+        o.speed=on&&v?std::max(51,std::abs(v)*50)|(v<0?0x8000:0):0;o.raw=uint16_t(raw);o.q=(raw-2048)*simple::kTickRad;o.load=on?load[i]:0;}
+      const bool unwinding=r.m.state()==simple::State::MOVING&&(!std::strcmp(r.m.phase(),"HEIGHT")||!std::strcmp(r.m.phase(),"PRONE_HEIGHT"))&&
+                           (simple::StopReferenceProbe::roll(r.m)!=0||simple::StopReferenceProbe::pitch(r.m)!=0);
+      const double before=std::fmax(std::abs(simple::StopReferenceProbe::roll(r.m)),std::abs(simple::StopReferenceProbe::pitch(r.m)));
+      std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
+      const bool settling=!std::strcmp(r.m.phase(),"WALK_SETTLE");
+      r.tick(false);assert(r.m.state()!=simple::State::FAULT);
+      using namespace simple::collision;
+      assert(boxed(kEntry,r.p.target)||boxed(kWalk,r.p.target)||boxed(kHeight,r.p.target)||boxed(kDeploy,r.p.target)||boxed(kLift,r.p.target)||boxed(kSteer,r.p.target));
+      if(settling&&std::strcmp(r.m.phase(),"WALK_SETTLE")){++settles;settled=std::fmax(settled,before);}
+      if(unwinding&&!std::strcmp(r.m.imuReason(),"WORKSPACE")){std::printf("unwind refused: phase=%s corr=%.6f,%.6f\n",r.m.phase(),simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));std::fflush(stdout);}
+      if(unwinding&&r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.imuReason(),"SLEW")){  // a retired step, never a retained one
+        const double after=std::fmax(std::abs(simple::StopReferenceProbe::roll(r.m)),std::abs(simple::StopReferenceProbe::pitch(r.m)));
+        assert(after<before);++unwinds;
+        for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(previous[i]))<=int(simple::kStandDrive.speed*simple::kPeriodUs/1000000));}
+      if(unwinding)assert(std::strcmp(r.m.imuReason(),"WORKSPACE"));};
+    auto until=[&](auto done,unsigned n){for(unsigned k=0;k<n&&!done();++k)tick();return done();};
+    auto drive=[&](double fx,double ly){return r.m.drive(fx*simple::kJoystickStrideM/T,ly*simple::kJoystickLateralM/T,0,r.p.now);};
+    auto hold=[&](double fx,double ly,double seconds){for(unsigned k=0;k<unsigned(seconds/.02);++k){if(k%12==0)assert(!drive(fx,ly));tick();}};
+    assert(!r.m.stand(.12,r.p.now));assert(until([&]{return r.m.state()==simple::State::STANDING;},4000));plant=true;
+    for(unsigned k=0;k<100;++k)tick();
+    for(unsigned k=0;k<4000&&r.m.state()!=simple::State::WALKING;++k){if(k%12==0)drive(1,0);tick();}
+    hold(1,0,1.5*T);hold(std::sqrt(.5),-std::sqrt(.5),T);hold(0,-1,T);hold(-.5,-.866,T);
+    assert(!drive(-1,0)&&!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING"));
+    assert(until([&]{return r.m.state()==simple::State::STANDING;},6000));
+    const double corr[2]={simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m)};
+    assert(corr[0]>.05&&corr[1]<-.05);  // the H1 condition: beyond the 2 deg nominal strip
+    for(unsigned k=0;k<20;++k)tick();
+    if(route==0){
+      for(unsigned k=0;k<3000&&!(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>1);++k){if(k%12==0)assert(!drive(-1,0));tick();}
+      assert(r.m.state()==simple::State::WALKING&&r.m.walkVelocityX()<0);
+      r.m.walkStop();assert(until([&]{return r.m.state()==simple::State::STANDING;},6000));
+      r.m.stop();assert(until([&]{return r.m.stopVerified();},400));
+      assert(!r.m.stand(.12,r.p.now));assert(until([&]{return r.m.state()==simple::State::STANDING;},4000));
+    }else{r.m.walkStop();for(unsigned k=0;k<50;++k)tick();}
+    assert(!r.m.prone(r.p.now));assert(until([&]{return r.m.proneRest();},6000));
+    assert(unwinds>=40);
+    std::printf("H1 steered settle unwind route %u: settle correction %+.4f/%+.4f rad (max over %u settles %.4f), %u retired unwind steps, PRONE_REST\n",
+                route,corr[0],corr[1],settles,settled,unwinds);
+  }
+}
+
 // IMU level slew in physical time (dev.15): a regular release moves the
 // correction by at most kImuSlewRadS x period, a late one by its real elapsed
 // time capped at kImuSlewMaxDtUs, never a catch-up jump; reason and values
@@ -954,6 +1020,7 @@ int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopR
   proneStopRecovery();
   imuSlewTime();
   joystickWalk();
+  steeredSettleUnwind();
   walkLevelBoard();
   walkTxLatency();
   proneHandoverWait();
