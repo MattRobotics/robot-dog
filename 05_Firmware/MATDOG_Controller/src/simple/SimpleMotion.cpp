@@ -1174,25 +1174,25 @@ void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,dou
   const uint64_t gridUs=nextUs_-kPeriodUs;
   auto cyc=[&](uint64_t us){return walkClock(double(us-walkStartUs_)/1e6)/period();};
   const bool shape=walkExactUs_&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g);
-  if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
-  if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactUs_+2*kPeriodUs)){
-    // Start, missed release or structural change: exact solution at this grid
-    // point, sent as it is; the look-ahead is solved by the next release so
-    // that no release ever carries two nominal solves. A late release solves
-    // its own clock instead and leaves the bracket to the next one: a frame
-    // lagging `now` by the lateness made the next release catch up (one period
-    // plus the lateness of law in one frame, an inflated STOP secant).
-    const bool late=nowUs_>gridUs+kPeriodUs/20;
-    solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(late?nowUs_:gridUs),0,0,terminal),&walkPrevious_,false);
-    walkExactUs_=late?0:gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
+  if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkExactGridUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
+  if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactGridUs_+2*kPeriodUs)){
+    // Start, missed release or structural change: exact solution at this
+    // release's own clock (the law at `now`, as v1.0.1), sent as it is, the
+    // bracket anchored to its grid point; the look-ahead is solved by the next
+    // release so that no release ever carries two nominal solves. Solving the
+    // grid point of a late release sent a frame behind `now` by the lateness,
+    // and the next release then carried that lateness plus a period of law in
+    // one frame (an inflated STOP secant).
+    solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(nowUs_),0,0,terminal),&walkPrevious_,false);
+    walkExactUs_=nowUs_;walkExactGridUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
     f=walkExact_;return;
   }
   bool solved=false;
   if(!walkAheadValid_){
-    const double ca=cyc(walkExactUs_+2*kPeriodUs);
+    const double ca=cyc(walkExactGridUs_+2*kPeriodUs);
     if(terminal<0||ca<=terminal+gaitSettleCycles(g)){
       solveGaitInto(walkAhead_,g,gaitTrackCartesian(track_,g,ca,0,0,terminal),&walkExact_,false);solved=true;
-      if(walkAhead_.target.valid){walkAheadUs_=walkExactUs_+2*kPeriodUs;walkAheadGait_=g;walkAheadValid_=true;}
+      if(walkAhead_.target.valid){walkAheadUs_=walkExactGridUs_+2*kPeriodUs;walkAheadGait_=g;walkAheadValid_=true;}
     }
   }
   nominalSolved_=solved;if(solved)++lookaheadStats_.exact;else ++lookaheadStats_.interp;

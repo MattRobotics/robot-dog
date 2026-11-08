@@ -447,7 +447,7 @@ private:
   // point outside the bracket rebuilds both solutions; steerWalk retargets
   // stay continuous by construction and are tolerated.
   motion::LocomotionFrame walkExact_{},walkAhead_{};
-  uint64_t walkExactUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1;
+  uint64_t walkExactUs_=0,walkExactGridUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1;  // exact solve time, its grid point, look-ahead time
   motion::GaitParameters walkExactGait_{},walkAheadGait_{};  // laws at the two exact samples (shape check; shadow compare)
   bool walkAheadValid_=false,nominalSolved_=true;  // nominalSolved_: this release paid a nominal IK solve
   void resetLookahead(){walkAheadValid_=false;walkExactUs_=0;nominalSolved_=true;

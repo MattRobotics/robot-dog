@@ -23,7 +23,13 @@ struct StopPlan {
     }
     // Choose the shortest 20 ms multiple satisfying the entire polynomial,
     // including extrema between frames. No servo tuning or clipping of q,v,a.
-    for(unsigned steps=2;steps<=60;++steps){
+    // With a = 0 (every caller) the arrest acceleration peaks at 1.5|v|/t
+    // (u = 1/2), so no multiple below 1.5 max|v|/amax can pass: the search
+    // starts there (floor, the loop still checks it) and finds the same plan.
+    unsigned first=2;bool rest=true;double vpeak=0;
+    for(unsigned i=0;i<12;++i){rest=rest&&acceleration[i]==0;vpeak=std::fmax(vpeak,std::abs(velocity[i]));}
+    if(rest&&std::isfinite(vpeak))first=std::max(2u,static_cast<unsigned>(std::fmin(61.,std::floor(1.5*vpeak/amax/.02))));
+    for(unsigned steps=first;steps<=60;++steps){
       const double t=steps*.02;bool valid=true;
       for(unsigned i=0;i<12&&valid;++i){
         const double c1=a[i]*t,c2=-3*v[i]-2*c1,c3=2*v[i]+c1;
