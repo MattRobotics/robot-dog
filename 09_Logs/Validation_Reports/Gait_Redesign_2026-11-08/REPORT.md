@@ -1,5 +1,7 @@
 # MATDOG — WALK STANDARD v2: riprogettazione della locomozione — candidata `1.0.2-dev.2` — 2026-11-08
 
+> **Aggiornamento 2026-11-08 (pre-flash):** la candidata corrente è **`1.0.2-dev.3`** (sorgente `94a260c`, APP `cef30d8c…`), stessa legge v2 con le correzioni pre-flash e il joystick dinamico: [`PREFLASH_REPORT.md`](PREFLASH_REPORT.md), collaudo [`HW_TEST_PLAN.md`](HW_TEST_PLAN.md). La build `c68842e` (§10) è superata e non va flashata.
+
 **Natura:** sessione autonoma **offline** (ricerca, analisi, patch, test host, build). Nessun flash, riavvio, movimento, scrittura NVS/EEPROM o calibrazione. Installato resta `1.0.1-dev.17` (Stable `v1.0.1`, APP `14e055a0…`). Classi: **VH** verificato hardware, **VO** verificato offline (riproducibile), **INV** implementato non validato, **HYP** ipotesi, **UNK** ignoto.
 
 ## 0. Esito
