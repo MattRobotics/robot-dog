@@ -1114,6 +1114,11 @@ static void entryRecovery(){
   {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
     refused(r,&service);
     const auto a=ack(r,service);assert(a.find("\"outcome\":\"ABORTED\",\"reason\":\"INITIAL_POSE_OUTSIDE_SAFE_ENTRY\",\"id\":\"entry-1\"")!=std::string::npos);
+    // dev.5 diagnostics: the status names the joint farthest outside the entry region.
+    auto status=[&]{test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s,r.p.now/1000));return std::string(s);};
+    // (SAFE_OFF verification pauses the fast reads: one population of fresh reads first)
+    for(unsigned k=0;k<12;++k)r.tick();
+    assert(status().find("\"entry_violation\":{\"joint\":\"RH_UPPER\",\"outside_mrad\":-60}")!=std::string::npos);
     for(unsigned k=0;k<500;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
     assert(!std::strcmp(r.m.stand(.15,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.m.state()==simple::State::STOPPED);
     assert(!std::strcmp(r.m.drive(.005,0,0,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&!std::strcmp(r.m.walk(2,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));
@@ -1122,7 +1127,7 @@ static void entryRecovery(){
     pose(r,placed);const unsigned k=readyAfter(r,3*cycle);
     assert(k>=cycle&&k<=2*cycle+20&&!std::strcmp(r.m.reason(),"READY")&&!std::strcmp(r.m.poseRegion(r.p.now),"PRONE_ENTRY"));
     for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()==simple::State::READY&&r.p.frames==0&&r.p.enables==0);}  // the aborted STAND never runs
-    assert(ack(r,service)==a);
+    assert(ack(r,service)==a&&status().find("entry_violation")==std::string::npos);
     // A NEW explicit STAND re-acquires the placed pose and stands.
     assert(!r.m.stand(.15,r.p.now)&&!std::strcmp(r.m.reason(),"ACQUIRING_REAL_POSE"));
     for(unsigned n=0;n<200&&r.p.frames==0;++n)r.tick();
@@ -1177,6 +1182,15 @@ static void entryRecovery(){
   // 7. Unchanged: STOP after a re-admitted READY (or at boot READY) is the ordinary SAFE_OFF latch.
   {Rig r;refused(r);pose(r,placed);assert(readyAfter(r,3*cycle));r.m.stop();for(unsigned k=0;k<60;++k)r.tick();
     assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.stand(.15,r.p.now),"SAFE_OFF_STAND_REFUSED"));}
+  // 8. dev.5 diagnostics: a level correction beyond the HOLD box saturates
+  // (WORKSPACE) and the status names the compensationSafe check that refused.
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    const double roll=.20;r.in.quaternion[0]=std::cos(roll/2);r.in.quaternion[1]=std::sin(roll/2);r.in.quaternion[2]=r.in.quaternion[3]=0;
+    for(unsigned k=0;k<400&&std::strcmp(r.m.imuReason(),"WORKSPACE");++k)r.tick();
+    assert(!std::strcmp(r.m.imuReason(),"WORKSPACE")&&r.m.imuRefusedBy()>0&&r.m.imuRefusedBy()<std::size(simple::kSafeChecks));
+    test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s,r.p.now/1000));
+    const std::string want=std::string("\"refused_by\":\"")+simple::kSafeChecks[r.m.imuRefusedBy()]+"\"";assert(std::strstr(s,want.c_str()));
+    std::printf("refusal diagnostics: HOLD 150 under 0.2 rad of board roll, WORKSPACE refused_by %s\n",simple::kSafeChecks[r.m.imuRefusedBy()]);}
   std::puts("ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged");
 }
 int main(){proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 namespace matdog { namespace core {
 namespace {
 const char* boolean(bool b){return b?"true":"false";}
@@ -163,6 +164,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.tempSpikes=motion_->tempSpikes();s.hotPendingMask=motion_->hotPendingMask();
  s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
+ s.imuRefusedBy=motion_->imuRefusedBy();
+ {double d=0;s.entrySlot=static_cast<uint8_t>(motion_->entryViolation(esp_timer_get_time(),d));s.entryOutsideMrad=static_cast<int16_t>(std::lround(std::clamp(d*1e3,-32767.,32767.)));}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
  s.releases=motion_->releases();
@@ -237,7 +240,13 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    add("%s[%u,%d,%d,\"%s\",%llu]",i?",":"",unit?unit->bus_id:0,t.bulk,t.direct,servo::toString(static_cast<servo::BusOutcome>(t.outcome)),
        (unsigned long long)(s.capturedUs>=t.stampUs?(s.capturedUs-t.stampUs)/1000:0));}
  add("%s","]}");
- add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]}",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
+ add(",\"imu_correction\":{\"reason\":\"%s\",\"wanted_mrad\":[%.1f,%.1f],\"applied_mrad\":[%.1f,%.1f]",s.imuReason,s.imuWanted[0]*1e3,s.imuWanted[1]*1e3,s.imuApplied[0]*1e3,s.imuApplied[1]*1e3);
+ // dev.5: the compensationSafe check behind a refused correction (first divergence).
+ if(s.imuRefusedBy&&s.imuRefusedBy<std::size(simple::kSafeChecks))add(",\"refused_by\":\"%s\"",simple::kSafeChecks[s.imuRefusedBy]);
+ add("%s","}");
+ // dev.5: a refused entry names the measured joint farthest outside the entry region.
+ if(s.state==simple::State::STOPPED&&!strcmp(s.reason,"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&s.entrySlot<12){const auto* unit=actuator::slotServo(s.entrySlot);
+   add(",\"entry_violation\":{\"joint\":\"%s\",\"outside_mrad\":%d}",unit?unit->joint:"?",int(s.entryOutsideMrad));}
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

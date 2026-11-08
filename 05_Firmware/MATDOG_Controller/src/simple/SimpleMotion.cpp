@@ -359,6 +359,13 @@ void SimpleMotion::refuseEntry(){
 // The evidence must hold until every servo's torque has been read again by
 // its periodic control read (one cycle, ~1.4 s): a pose crossing an
 // uncertified region or still moving restarts the window.
+unsigned SimpleMotion::entryViolation(uint64_t now,double& outsideRad) const {
+  unsigned slot=12;outsideRad=0;if(!fresh(now))return slot;
+  const auto& b=collision::kEntry;
+  for(unsigned i=0;i<12;++i){const double q=fb_[i].q,d=q<b.lo[i]?q-b.lo[i]:q>b.hi[i]?q-b.hi[i]:0;
+    if(std::abs(d)>std::abs(outsideRad)){outsideRad=d;slot=i;}}
+  return slot;
+}
 bool SimpleMotion::entryReadmitted(uint64_t now){
   InitialRoute route;
   bool ok=fresh(now)&&certifiedRegion(measured(),route);
@@ -968,47 +975,48 @@ JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const
   return q;
 }
 bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box,bool stopProof) const {
-  if(!pointSafe(q)||!contains(box,q))return false;
+  auto refuse=[this](uint8_t check){safeRefusal_=check;return false;};
+  if(!pointSafe(q)||!contains(box,q))return refuse(1);
   // The same gen-1 conversion as TX/readback; an in-box floating point IK
   // solution alone is insufficient at a box edge after RAW quantization.
   auto decoded=q;
-  for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return false;}
-  if(!pointSafe(decoded)||!contains(box,decoded))return false;
+  for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return refuse(2);}
+  if(!pointSafe(decoded)||!contains(box,decoded))return refuse(3);
   const collision::Box* arrestBox=&box;
   if(phase_!=Phase::WALK){
     // Keep the measured static-load residual when checking the next small
     // HOLD step. A goal alone being in-box is insufficient: the recorded
     // loaded pose must retain a common certified region with its reference.
     auto loaded=decoded;double lagRoom[12];const uint64_t at=esp_timer_get_time();
-    for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
+    for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return refuse(2);
       jointSlot(loaded,i)+=fb_[i].q-old;
       // Feedback is staggered across a population. Reserve the proposed RAW
       // step over its age plus this release, rather than treating it as a
       // simultaneous observation of the current reference under static load.
       lagRoom[i]=std::abs(jointSlot(decoded,i)-old)*(1+double(at>=fb_[i].stampUs?at-fb_[i].stampUs:0)/kPeriodUs);
-      if(jointSlot(loaded,i)-lagRoom[i]<input_.minRad[i]||jointSlot(loaded,i)+lagRoom[i]>input_.maxRad[i])return false;}
+      if(jointSlot(loaded,i)-lagRoom[i]<input_.minRad[i]||jointSlot(loaded,i)+lagRoom[i]>input_.maxRad[i])return refuse(4);}
     auto loadedInside=[&](const collision::Box& b){for(unsigned i=0;i<12;++i)
       if(jointSlot(loaded,i)-lagRoom[i]<b.lo[i]||jointSlot(loaded,i)+lagRoom[i]>b.hi[i])return false;return true;};
     const auto actual=measured();
     if(!contains(box,actual)||!loadedInside(box)){
-      if(!contains(collision::kLift,decoded)||!contains(collision::kLift,actual)||!loadedInside(collision::kLift))return false;
+      if(!contains(collision::kLift,decoded)||!contains(collision::kLift,actual)||!loadedInside(collision::kLift))return refuse(5);
       arrestBox=&collision::kLift;
     }
-    if(!pointSafe(loaded))return false;
+    if(!pointSafe(loaded))return refuse(6);
   }
   if(!stopProof)return true;
   // A reachable boundary is not necessarily stoppable from its sampled RAW
   // rate. Reuse STOP's own proof before issuing a new levelled reference;
   // no second trajectory law, relaxed limit or retained cache is introduced.
   const uint64_t at=esp_timer_get_time();
-  if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return false;
+  if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return refuse(7);
   const Drive drive=phase_==Phase::WALK?kWalkDrive:kStandDrive;
   // Same secant STOP would take after this send: both samples on the reference clock.
-  if(nowUs_<=issuedUs_)return false;
+  if(nowUs_<=issuedUs_)return refuse(7);
   StopPlan arrest;double lo[12],hi[12];
   for(unsigned i=0;i<12;++i){arrest.q[i]=jointSlot(decoded,i);lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
-  if(!rateFromHistory(arrest.q,nowUs_,0,drive.speed*kTickRad,arrest.v))return false;  // same estimate beginStop would take after this send
-  return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad);
+  if(!rateFromHistory(arrest.q,nowUs_,0,drive.speed*kTickRad,arrest.v))return refuse(8);  // same estimate beginStop would take after this send
+  return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad)||refuse(9);
 }
 // One slew step per Motion release, scaled by the physical time since the last
 // one: a group boundary regenerates the reference in the same release and must
@@ -1023,6 +1031,7 @@ void SimpleMotion::rememberCorrection(const JointTargetFrame& accepted,const Joi
   reusePhase_=phase_;reuseUs_=now;
 }
 void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
+  safeRefusal_=0;  // diagnostics: the refusals of this release only
   const bool walk=phase_==Phase::WALK;
   const collision::Box& safeBox=(walk||phase_==Phase::WALK_HOLD)?walkBox():collision::kHeight;
   // T1 light release (dev.7 WALK budget, restored for WALK and HOLD): while

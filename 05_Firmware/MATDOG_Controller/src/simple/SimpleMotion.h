@@ -122,6 +122,8 @@ constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontal
 // roll/pitch BODY-in-support radians, not independent
 // rectangular limits or a claim of physical contact. kWalkTilt75 serves the
 // 50 and 75 mm strides, kWalkTilt100 the 100 mm stride.
+// compensationSafe refusal codes (imuRefusedBy), in check order.
+inline constexpr const char* kSafeChecks[]={"","POINT_SAFE","RAW_CONVERSION","RAW_BOX","LOAD_LIMIT","LOAD_BOX","LOAD_POINT","STOP_CLOCK","STOP_RATE","STOP_PLAN"};
 struct TiltVertex { double roll,pitch; };
 constexpr TiltVertex kWalkTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019071,0.046042},{0.000000,0.066738},{-0.019000,0.045870},{-0.019700,0.019700},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.017392,-0.041987},{-0.000000,-0.081773},{0.017392,-0.041987},{0.018313,-0.018313},{0.018722,-0.007755}};
 constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.013234,0.031951},{0.000000,0.038069},{-0.013234,0.031951},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018693,-0.007743},{-0.012106,-0.012106},{-0.006313,-0.015242},{-0.000000,-0.018660},{0.006325,-0.015271},{0.012106,-0.012106},{0.018693,-0.007743}};
@@ -281,6 +283,12 @@ class SimpleMotion {
   // ATTENUATED, WORKSPACE, SUPPORT_FIT or IMU_STALE; requested and applied
   // body roll/pitch (rad). Values of the latest compensation, never re-solved.
   const char* imuReason() const { return imuReason_; }
+  // dev.5 diagnostics, read-only. The compensationSafe check that refused last
+  // in this release (kSafeChecks; 0 none): the first divergence behind WORKSPACE.
+  uint8_t imuRefusedBy() const { return safeRefusal_; }
+  // Measured joint farthest outside the entry region (12 when inside or not
+  // fresh) and its signed distance (rad, < 0 under the low bound).
+  unsigned entryViolation(uint64_t now,double& outsideRad) const;
   double imuWanted(unsigned i) const { return imuWanted_[i&1]; }
   double imuApplied(unsigned i) const { return (i&1?pitchCorrection_:rollCorrection_)*correctionScale_; }
   uint64_t nextReleaseUs() const { return nextUs_; }
@@ -508,5 +516,6 @@ private:
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
   const char* imuReason_="IMU_STALE";double imuWanted_[2]{};
+  mutable uint8_t safeRefusal_=0;
 };
 } }

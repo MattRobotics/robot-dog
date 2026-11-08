@@ -24,9 +24,11 @@ struct MotionStatusSnapshot {
   uint16_t workHist[8]{};  // this command's releases by work: <5,<10,<15,<20,<25,<30,<40,>=40 ms (saturated)
   unsigned referenceFaultSlot=12;
   simple::State state=simple::State::STOPPED;
+  uint8_t imuRefusedBy=0,entrySlot=12;  // dev.5 diagnostics, in the padding after state
   float imuWanted[2]{},imuApplied[2]{};
   uint16_t commandedRaw[12]{};
   uint16_t offMask=0,referenceFaultRaw=0,hotPendingMask=0;
+  int16_t entryOutsideMrad=0;  // dev.5 diagnostics (SimpleMotion::entryViolation)
   // MotionTiming records (same release): parts us, previous release parts us,
   // work counters. Copies of data already held; USB @MOTION TIMING has the rest.
   uint16_t timing[2][16]{};  // saturated at 65535

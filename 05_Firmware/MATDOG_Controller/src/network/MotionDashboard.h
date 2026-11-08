@@ -169,6 +169,7 @@ const demoReason=code=>code==='OFFLINE_UI_FIXTURE'||code==='OFFLINE_DISPLAY_ONLY
 const reasonCodes=[s.reason,...(s.ready?[]:[s.readiness_reason])].filter(Boolean);
 const reasonMessages=[...new Set(reasonCodes.filter(code=>!demoReason(code)).map(code=>reasons[code]||code))];
 if(s.fault&&!reasonMessages.length)reasonMessages.push('Guasto segnalato dal Controller.');
+if(s.entry_violation&&s.entry_violation.joint)reasonMessages.push('Giunto più lontano dalla regione d’ingresso: '+s.entry_violation.joint+' ('+s.entry_violation.outside_mrad+' mrad).');
 // Once loaded, the Twin owns the single demo badge. Never suppress real faults.
 if(!twinReady&&reasonCodes.some(demoReason))reasonMessages.unshift('Modalità offline');
 if(stopInfo.active===true&&stopInfo.support_verified!==true)reasonMessages.push('Supporto non verificato');
@@ -204,7 +205,7 @@ const dl=by('simple-values');dl.replaceChildren();let off=0;for(let m=s.safe_off
 const ct=s.command_timing||{},active=s.active_command||{},cal=typeof st==='object'&&st?st:{};
 const ic=s.imu_correction||{},tm=s.timing||{},th=s.thermal||{};
 const rec=r=>Array.isArray(r)?'lettura '+r[0]+' · nominale '+r[1]+' · compensazione '+r[2]+' · conversione '+r[3]+' · frame '+r[4]+' µs; release precedente '+r.slice(6,12).join('/')+' µs; solve '+r[12]+', IK '+r[13]+', Newton '+r[14]+', FK '+r[15]:'nessuna';
-const extra=[['Correzione IMU (richiesta → applicata, mrad)',ic.reason?ic.reason+' · roll '+ic.wanted_mrad[0]+' → '+ic.applied_mrad[0]+' · pitch '+ic.wanted_mrad[1]+' → '+ic.applied_mrad[1]:'N/D'],
+const extra=[['Correzione IMU (richiesta → applicata, mrad)',ic.reason?ic.reason+(ic.refused_by?' ['+ic.refused_by+']':'')+' · roll '+ic.wanted_mrad[0]+' → '+ic.applied_mrad[0]+' · pitch '+ic.wanted_mrad[1]+' → '+ic.applied_mrad[1]:'N/D'],
  ['Temperature servo','picchi isolati scartati '+(th.spikes??'N/D')+' · finestre calde aperte 0x'+((th.hot_pending_mask??0).toString(16))+' · conferme dirette '+(th.checks??'N/D')+(Array.isArray(th.last)?th.last.map(e=>' · ID '+e[0]+' bulk '+e[1]+' °C diretta '+(e[2]<0?'non valida':e[2]+' °C')+' ('+e[3]+', '+e[4]+' ms fa)').join(''):'')],
  ['Release più pesante · partizioni',rec(tm.max_work)],['Prima release persa · partizioni',rec(tm.first_miss)],
  ['Release oltre 20 ms / periodi persi','comando '+(ct.overruns??'N/D')+' / '+(ct.missed??'N/D')+' · dall\'avvio '+(s.overrun_releases??'N/D')+' / '+(s.missed_releases??'N/D')+(Array.isArray(tm.max_work_meta)?' · release più pesante: ritardo '+tm.max_work_meta[0]+' µs, fuori Motion '+tm.max_work_meta[1]+' µs, servizi '+tm.max_work_meta[2]+' µs':'')],
