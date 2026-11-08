@@ -45,6 +45,17 @@ void report(const char* name,Rig& r,size_t from){
    std::printf(" maxRawStep=%u framesOutsideBox=%u",maxStep,outside);}
   std::printf("\n");
 }
+// B5: STOP latency on the rig. stop() is the atomic latch; the first release
+// after it builds the plan (stopActive) and sends the first arrest frame; the
+// plan lasts StopPlan::duration (deadline - start - 3 s); verification needs
+// the dwell. Counts releases, not wall time (each rig release is one period).
+template<class Release> void stopLatency(Rig& r,Release release){
+  const uint64_t at=r.p.now;r.m.stop();unsigned toPlan=0,toVerified=0;const size_t frames=r.p.sent.size();
+  for(unsigned n=1;n<=300&&!r.m.stopVerified();++n){release();if(!toPlan&&r.m.stopActive())toPlan=n;if(r.m.stopVerified())toVerified=n;}
+  const double plan=r.m.stopActive()?double(r.m.deadlineUs()-at)/1e6-3.0:-1;
+  std::printf("  STOP: plan built after %u release(s), first arrest frame sent=%s, plan duration %.2f s, verified after %u releases (%.2f s)\n",
+    toPlan,r.p.sent.size()>frames?"yes":"no",plan,toVerified,toVerified*.02);
+}
 struct Lcg { uint64_t s; explicit Lcg(uint64_t seed):s(seed){} double next(){s=s*6364136223846793005ull+1442695040888963407ull;return double(s>>11)/9007199254740992.0;} };
 }
 int main(int argc,char** argv){
@@ -73,7 +84,7 @@ int main(int argc,char** argv){
     r.m.walkStop();assert(r.reachStand());char name[32];std::snprintf(name,sizeof name,"JOYSTICK_random_%llu",(unsigned long long)seed);report(name,r,from);}
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(1,r.p.now));
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
-    for(unsigned n=0;n<300;++n)r.tick();r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());
+    for(unsigned n=0;n<300;++n)r.tick();stopLatency(r,[&](){r.tick();});assert(r.m.stopVerified());
     report("WALK45_STOP_at300",r,from);}
   // Review of T2 under retargets (2026-11-08): the joystick command changes on
   // EVERY release (bounded random walk inside the ellipsoid, forward only),
@@ -102,7 +113,7 @@ int main(int argc,char** argv){
       if(r.m.state()==simple::State::FAULT){std::printf("  FAULT at release %u: %s phase=%s cycles=%.4f v=%.5f,%.5f,%.5f imu=%s\n",n,r.m.reason(),r.m.phase(),r.m.walkCycles(),v[0],v[1],v[2],r.m.imuReason());break;}}
     char name[48];std::snprintf(name,sizeof name,"JOY_retarget_jitter_%s_%llu",seed%2==0?"STOP":"WALKSTOP",(unsigned long long)seed);
     if(r.m.state()==simple::State::FAULT){report(name,r,from);continue;}
-    if(seed%2==0){r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)release();assert(r.m.stopVerified());report(name,r,from);}
+    if(seed%2==0){stopLatency(r,release);assert(r.m.stopVerified());report(name,r,from);}
     else{r.m.walkStop();for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)release();
       if(r.m.state()!=simple::State::STANDING)std::printf("  FAULT in WALK STOP settle: %s phase=%s cycles=%.4f\n",r.m.reason(),r.m.phase(),r.m.walkCycles());
       std::printf("  (skipped releases=%u, missed counter=%u)\n",skipped,r.m.missed());report(name,r,from);}}

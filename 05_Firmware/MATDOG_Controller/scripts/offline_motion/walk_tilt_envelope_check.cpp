@@ -63,11 +63,14 @@ int main(int argc,char** argv){
   // --drive-speed/--drive-acc: what-if ST3215 RAM profile (model only; the
   // firmware WALK drive is kWalkDrive and a change needs hardware qualification).
   double strideMm=45,start=simple::kWalkStartCycles,stop=simple::kWalkStopCycles,period=simple::kWalkPeriodS,driveSpeed=simple::kWalkDrive.speed,driveAcc=simple::kWalkDrive.acc;
+  // --lift-mm/--swayx-mm/--duty: what-if law shape (model only; the firmware law is SimpleMotion.h).
+  double liftMm=simple::kWalkLiftM*1000,swayXMm=simple::kWalkSwayXM*1000,duty=simple::kWalkDuty;
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))strideMm=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--start"))start=std::atof(argv[i+1]);
     else if(!std::strcmp(argv[i],"--stop"))stop=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--period"))period=std::atof(argv[i+1]);
-    else if(!std::strcmp(argv[i],"--drive-speed"))driveSpeed=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--drive-acc"))driveAcc=std::atof(argv[i+1]);else return 2;}
-  GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=strideMm/1000;
-  g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=start;g.stopCycles=stop;
+    else if(!std::strcmp(argv[i],"--drive-speed"))driveSpeed=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--drive-acc"))driveAcc=std::atof(argv[i+1]);
+    else if(!std::strcmp(argv[i],"--lift-mm"))liftMm=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--swayx-mm"))swayXMm=std::atof(argv[i+1]);else if(!std::strcmp(argv[i],"--duty"))duty=std::atof(argv[i+1]);else return 2;}
+  GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=liftMm/1000;g.duty=duty;g.advanceXM=strideMm/1000;
+  g.swayXM=swayXMm/1000;g.swayYM=simple::kWalkSwayYM;g.startCycles=start;g.stopCycles=stop;
   const auto& box=simple::collision::kHeight;
   std::vector<V> rays;auto addRays=[&](const V* v,unsigned n){for(unsigned i=0;i<n;++i){rays.push_back(v[i]);rays.push_back({.5*(v[i].roll+v[(i+1)%n].roll),.5*(v[i].pitch+v[(i+1)%n].pitch)});}};
   if(strideMm>=59.9)addRays(kWalkTilt60,sizeof(kWalkTilt60)/sizeof(V));else addRays(kWalkTilt45,sizeof(kWalkTilt45)/sizeof(V));
@@ -102,10 +105,10 @@ int main(int argc,char** argv){
       prev=f;have=true;}
   }
   const bool pass=!st.failNominal&&!st.failIk&&!st.failBox&&!st.failStop&&st.vmax<vmaxDrive&&st.amax<amaxDrive;
-  std::printf("stride=%.0f start=%.2f stop=%.2f period=%.3f drive=%.0f/%.0f v_cmd=%.2f mm/s samples=%u checks=%u fail nominal/ik/box/stop=%u/%u/%u/%u "
+  std::printf("stride=%.0f lift=%.0f swayx=%.0f duty=%.3f start=%.2f stop=%.2f period=%.3f drive=%.0f/%.0f v_cmd=%.2f mm/s samples=%u checks=%u fail nominal/ik/box/stop=%u/%u/%u/%u "
               "box_margin_ticks nominal/compensated=%.2f/%.2f step_ticks/release nominal/compensated=%.2f/%.2f joint vmax=%.3f rad/s (drive %.3f) amax=%.2f rad/s2 (drive %.2f) "
               "body a_x/a_y/a_z max=%.3f/%.3f/%.3f m/s2 zmp_shift_y~%.1f mm %s\n",
-    strideMm,start,stop,period,driveSpeed,driveAcc,strideMm/period,st.samples,st.checks,st.failNominal,st.failIk,st.failBox,st.failStop,st.minBoxNominal,st.minBox,st.maxStepNom,st.maxStepComp,
+    strideMm,liftMm,swayXMm,duty,start,stop,period,driveSpeed,driveAcc,strideMm/period,st.samples,st.checks,st.failNominal,st.failIk,st.failBox,st.failStop,st.minBoxNominal,st.minBox,st.maxStepNom,st.maxStepComp,
     st.vmax,vmaxDrive,st.amax,amaxDrive,st.axMax,st.ayMax,st.azMax,st.ayMax/9.81*simple::kWalkHeightM*1000,pass?"PASS(geometry+law only)":"FAIL");
   return pass?0:1;
 }

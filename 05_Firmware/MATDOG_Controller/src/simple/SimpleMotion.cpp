@@ -114,7 +114,7 @@ GaitParameters walkGait(unsigned stride){
 }
 GaitParameters steerGait(const double goal[3]){
   auto g=walkGait(0);g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
-  g.swayYM=kJoystickSwayYM;g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
+  g.swayYM=joystickSwayYM(goal[1],goal[2]);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
 // Inner convex envelope of kSteer, gen-1 RAW, the tread fillet up to
 // kEdgeContactMaxTiltRad and STOP over the steered phase set (offline rays).
@@ -896,7 +896,10 @@ void SimpleMotion::steerWalk(uint64_t now){
   for(unsigned j=0;j<3;++j){
     const double goal=j==0&&(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[j],rate=limit[j]/kJoystickRampCycles;  // never against the leg order
     *axis[j]+=std::clamp(goal-*axis[j],-rate*dc,rate*dc);track_.goal[j]=goal;track_.goalRate[j]=rate;}
-  if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad)&&gaitRetarget(track_,gait_,next,cycles_)){
+  // Lateral sway follows the rate-limited lateral/yaw demand with the same ramp.
+  const double swayRate=(kJoystickSwayYM-kWalkSwayYM)/kJoystickSwayRampCycles;
+  next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad)-next.swayYM,-swayRate*dc,swayRate*dc);
+  if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_)){
 #ifdef MATDOG_T2_SHADOW
     gaitRetarget(shadowTrack_,gait_,next,cycles_);
 #endif
@@ -1124,11 +1127,12 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;imuReason_="WORKSPACE";
 }
 namespace {
-// Fields of the law other than the steered displacement per cycle: a change
-// of these is structural (new walk or WALK STOP terminal); advance, lateral
-// and yaw change through gaitRetarget, which keeps the body pose continuous.
+// Fields of the law other than the steered displacement per cycle and the
+// steered sway: a change of these is structural (new walk or WALK STOP
+// terminal); advance, lateral, yaw and sway amplitude change through
+// gaitRetarget by rate-limited steps that keep the body pose continuous.
 bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
-  return a.type==b.type&&a.heightM==b.heightM&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&a.swayYM==b.swayYM&&
+  return a.type==b.type&&a.heightM==b.heightM&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&
     a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition;
 }
 }

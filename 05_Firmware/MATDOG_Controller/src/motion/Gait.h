@@ -82,7 +82,10 @@ struct GaitTrack {
 };
 CartesianSample gaitTrackCartesian(GaitTrack& track,const GaitParameters& p,double cycles,
                                    double cyclesPerS,double cyclesPerS2,double terminalCycle=-1);
-// Only advanceXM/advanceYM/yawRad may differ. False leaves the track unchanged.
+// Only advanceXM/advanceYM/yawRad and swayYM may differ (the lateral offset is
+// applied in the heading frame after the law frame, so a sway change moves the
+// body by the amplitude difference times the current lateral law value; the
+// caller rate-limits it). False leaves the track unchanged.
 bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParameters& to,
                   double cycles,double terminalCycle=-1);
 // Four locked contacts, interpolation between geometric body configurations.

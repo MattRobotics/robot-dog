@@ -254,7 +254,7 @@ CartesianSample gaitTrackCartesian(GaitTrack& track,const GaitParameters& p,doub
 bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParameters& to,double cycles,double terminal){
   if(!validGaitParameters(from)||!validGaitParameters(to)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(terminal)||
      from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||from.swayXM!=to.swayXM||
-     from.swayYM!=to.swayYM||from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad)return false;
+     from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad)return false;
   // Same world pose of the nominal body at this progress under both laws.
   const double r=progress(from,cycles,terminal,true);
   const auto world=place(track.frame,nominal(from,r)),next=nominal(to,r);

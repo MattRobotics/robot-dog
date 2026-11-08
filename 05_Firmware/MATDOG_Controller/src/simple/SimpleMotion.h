@@ -1,5 +1,7 @@
 #pragma once
 #include <atomic>
+#include <algorithm>
+#include <cmath>
 #include <stdint.h>
 #include "../motion/MotionContract.h"
 #include "../motion/Gait.h"
@@ -36,7 +38,18 @@ constexpr double kStrideM[]={.030,.045,.060};
 // ends the walk with WALK STOP when no admitted joystick command arrives for
 // kJoystickTimeoutUs (ESP clock).
 constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
-constexpr double kJoystickSwayYM=.014;
+// Steered lateral sway (motion-perf-next): proportional to the lateral/yaw
+// demand instead of a fixed 14 mm. A purely longitudinal joystick walks with
+// the WALK STANDARD sway (2 mm); the amplitude rises linearly with the
+// lateral/yaw fraction of the ellipsoid and reaches kJoystickSwayYM at
+// kJoystickSwayFullDemand of it, rate limited over kJoystickRampCycles like
+// the three axes, so the body offset changes by <= 0.02 mm per release and
+// every step keeps the four-contact transfer of the law.
+constexpr double kJoystickSwayYM=.014, kJoystickSwayFullDemand=.10, kJoystickSwayRampCycles=.5;
+inline double joystickSwayYM(double advanceYM,double yawRad){
+  const double y=advanceYM/kJoystickLateralM,w=yawRad/kJoystickYawRad,s=std::sqrt(y*y+w*w);
+  return kWalkSwayYM+(kJoystickSwayYM-kWalkSwayYM)*std::fmin(1.,s/kJoystickSwayFullDemand);
+}
 constexpr uint64_t kJoystickTimeoutUs=1000000;
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
