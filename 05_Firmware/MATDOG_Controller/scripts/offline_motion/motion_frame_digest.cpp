@@ -1,6 +1,6 @@
 // Motion frame digest (motion-perf-next, 2026-11-07), host only. Runs the
 // production SimpleMotion on the scripted rig of test_simple_motion.cpp through
-// fixed scenarios (HOLD tilted, WALK45/60 + WALK STOP, steady and seeded random
+// fixed scenarios (HOLD tilted, WALK75/100 + WALK STOP, steady and seeded random
 // JOYSTICK, STOP in WALK) and prints, per scenario, the number of transmitted
 // SYNC_WRITE frames, an FNV-1a 64-bit digest of every transmitted RAW frame in
 // order, the final state and the T1/T2 reuse counters. Two source trees that
@@ -60,7 +60,7 @@ struct Lcg { uint64_t s; explicit Lcg(uint64_t seed):s(seed){} double next(){s=s
 }
 int main(int argc,char** argv){
   for(int i=1;i<argc;++i)if(!std::strcmp(argv[i],"--dump")&&i+1<argc)dump=std::fopen(argv[++i],"w");
-  constexpr double degree=3.14159265358979323846/180;const double T=simple::kWalkPeriodS;
+  constexpr double degree=3.14159265358979323846/180;const double T=simple::kJoystickPeriodS;
   const double lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
   {Rig r;assert(!r.m.stand(.10,r.p.now));assert(r.reachStand());tilt(r,.8*degree,1.2*degree);const size_t from=r.p.sent.size();
     for(unsigned n=0;n<650;++n)r.tick();report("HOLD100_tilted",r,from);}
@@ -70,10 +70,11 @@ int main(int argc,char** argv){
     // C7: WALK STOP -> STANDING decomposition on the rig (ideal tracking): quarter wait, decel cycle, settle window, native arrival.
     {const double c0=r.m.walkCycles();r.m.walkStop();unsigned n=0,settle=0;for(;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();if(!settle&&!std::strcmp(r.m.phase(),"WALK_SETTLE"))settle=n;}
      const double quarter=std::fmax(1.,std::ceil(c0*4)/4)-c0;
+     const double w=motion::gaitSettleCycles(simple::walkGait(stride));
      std::printf("  WALK STOP at cycle %.3f: wait to touchdown %.2f s + decel %.2f s + recentre %.2f s = %.2f s law; WALK_SETTLE entered at %.2f s, STANDING at %.2f s (native arrival %.2f s)\n",
-       c0,quarter*simple::kWalkPeriodS,simple::kWalkPeriodS,.075*simple::kWalkPeriodS,(quarter+1.075)*simple::kWalkPeriodS,settle*.02,n*.02,(n-settle)*.02);}
+       c0,quarter*simple::kWalkPeriodS,simple::kWalkStopCycles*simple::kWalkPeriodS,w*simple::kWalkPeriodS,(quarter+simple::kWalkStopCycles+w)*simple::kWalkPeriodS,settle*.02,n*.02,(n-settle)*.02);}
     assert(r.m.state()==simple::State::STANDING);
-    report(stride==1?"WALK45_tilted_stop":"WALK60_tilted_stop",r,from);}
+    report(stride==1?"WALK75_tilted_stop":"WALK100_tilted_stop",r,from);}
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double v[3]={.5*lim[0],.5*lim[1],.5*lim[2]};
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
@@ -91,7 +92,7 @@ int main(int argc,char** argv){
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(1,r.p.now));
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
     for(unsigned n=0;n<300;++n)r.tick();stopLatency(r,[&](){r.tick();});assert(r.m.stopVerified());
-    report("WALK45_STOP_at300",r,from);}
+    report("WALK75_STOP_at300",r,from);}
   // Review of T2 under retargets (2026-11-08): the joystick command changes on
   // EVERY release (bounded random walk inside the ellipsoid, forward only),
   // releases run late by a random 0..19 ms after their grid point (never a

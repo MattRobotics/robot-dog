@@ -59,7 +59,7 @@ int main(int argc,char** argv){
   // "rand:SEED:SECONDS" = random commands inside the Controller ellipsoid.
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
-  const double T=simple::kWalkPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
   struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);

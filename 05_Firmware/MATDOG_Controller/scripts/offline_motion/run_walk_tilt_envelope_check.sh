@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds walk_tilt_envelope_check.cpp on the production sources and runs it.
-# Usage: run_walk_tilt_envelope_check.sh [--stride 45|60] [--start c] [--stop c] [--period s]
+# Usage: run_walk_tilt_envelope_check.sh [--stride 0|1|2] [--search N] [what-if flags, see the .cpp]
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)";out="$(mktemp -d /tmp/matdog-tilt.XXXXXX)";trap 'rm -rf "$out"' EXIT
 src=("$sketch/src/simple/SimpleMotion.cpp" "$sketch/src/servo/ServoPopulation.cpp")

@@ -1,6 +1,6 @@
 // Motion release cost, offline (dev.15). Production SimpleMotion on the scripted
 // rig of test_simple_motion.cpp with a constant tilted IMU (compensation active):
-// HOLD100, WALK45, WALK60, a steered combined walk. Counts per Motion release
+// HOLD100, WALK75, WALK100, a steered combined walk. Counts per Motion release
 // (SimpleMotion::update only; cooperative telemetry excluded): libm
 // transcendental/sqrt calls through link-time wrappers (opcount.c, soft-double
 // cost proxy for the ESP32-S3) and the firmware's own work counters. Host wall
@@ -45,8 +45,8 @@ int main(){
     for(unsigned n=0;n<650;++n)s.release(r);s.print("HOLD100 tilted");}
   for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);Stat s;
-    for(unsigned n=0;n<975;++n)s.release(r);assert(r.m.state()==simple::State::WALKING);s.print(stride==1?"WALK45 tilted":"WALK60 tilted");}
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kWalkPeriodS,v[3]={.5*simple::kJoystickStrideM/T,.5*simple::kJoystickLateralM/T,.5*simple::kJoystickYawRad/T};
+    for(unsigned n=0;n<975;++n)s.release(r);assert(r.m.state()==simple::State::WALKING);s.print(stride==1?"WALK75 tilted":"WALK100 tilted");}
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kJoystickPeriodS,v[3]={.5*simple::kJoystickStrideM/T,.5*simple::kJoystickLateralM/T,.5*simple::kJoystickYawRad/T};
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     tilt(r,.3*degree,.8*degree);Stat s;for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);s.release(r);}
     assert(r.m.state()==simple::State::WALKING);s.print("JOYSTICK tilted");}
