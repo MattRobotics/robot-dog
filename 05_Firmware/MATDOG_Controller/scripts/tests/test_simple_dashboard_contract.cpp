@@ -24,6 +24,7 @@
 #include "../../src/network/PortalSecurity.h"
 #include "../../src/update/Sha256.h"
 #include <fstream>
+#include <map>
 #include <sstream>
 using namespace matdog;
 namespace {
@@ -160,6 +161,30 @@ int fixtures(const char* path) {
     const auto a = service.command(stand, stand.issued_at_ms);
     check(a.outcome == motion::CommandOutcome::REJECTED, "fixture STAND rejected while not ready");
     put("ack_rejected", ackJson(service, a));
+  }
+  {
+    // Pre-flash dynamic joystick: the real status of a joystick walk, of the
+    // Controller's own reversal (JOYSTICK_REVERSING: WALK STOP) and of its
+    // settling, read by the page's hold through a reversal.
+    Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    const double vx = simple::kJoystickStrideM / simple::kJoystickPeriodS;
+    check(!rig.m.drive(vx, 0, 0, rig.p.now), "fixture joystick walk accepted");
+    for (unsigned i = 0; i < 3000 && rig.m.state() != simple::State::WALKING; ++i) { if (i % 12 == 0) rig.m.drive(vx, 0, 0, rig.p.now); rig.tick(); }
+    for (unsigned i = 0; i < 120; ++i) { if (i % 12 == 0) rig.m.drive(vx, 0, 0, rig.p.now); rig.tick(); }
+    service.update();
+    check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive(), "fixture joystick walking");
+    put("status_joystick_walking", statusJson(service, rig));
+    auto back = semantic(motion::Intent::BASE_VELOCITY, rig, -vx); std::strcpy(back.gait, "JOYSTICK");
+    const auto reversal = service.command(back, back.issued_at_ms);
+    check(reversal.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(reversal.reason, "JOYSTICK_REVERSING") &&
+          !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING") && !rig.m.joystickActive(), "fixture joystick reversal, ACK JOYSTICK_REVERSING");
+    put("ack_joystick_reversing", ackJson(service, reversal));
+    rig.tick(); service.update();
+    put("status_joystick_reversing", statusJson(service, rig));
+    for (unsigned i = 0; i < 4000 && rig.m.state() == simple::State::WALKING; ++i) rig.tick();
+    service.update();
+    check(rig.m.state() == simple::State::MOVING && !std::strcmp(rig.m.reason(), "WALK_SETTLING") && !rig.m.joystickActive(), "fixture reversal settling");
+    put("status_walk_settling", statusJson(service, rig));
   }
   {
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
@@ -377,12 +402,16 @@ void anchors(const std::string& src) {
   check(controller.find("if(c->http_transport_.stopPending())c->http_transport_.serviceStopLane(millis());") != std::string::npos &&
         controller.find("http_transport_.serviceStopLane(now_ms);") != std::string::npos,
         "STOP lane served by the Controller loop and by servo-bus preemption");
+  // Pre-flash: the page's joystick link deadline is the Controller's own deadman.
+  check(slurp(src + "/network/MotionDashboard.h").find("JOY_DEADLINE_MS=" + std::to_string(simple::kJoystickTimeoutUs / 1000) + ",") != std::string::npos,
+        "dashboard JOY_DEADLINE_MS equals kJoystickTimeoutUs");
 }
 
 int envelopes(const char* path, const char* src) {
   anchors(src);
   std::ifstream in(path);
   std::string line, standBody, stopBody, walkBody;
+  std::map<std::string, std::string> dynamic;  // the page's dynamic joystick press, replayed in order below
   unsigned seen = 0, previousSequence = 0;
   while (std::getline(in, line)) {
     const auto tab = line.find('\t'); if (tab == std::string::npos) continue;
@@ -397,7 +426,12 @@ int envelopes(const char* path, const char* src) {
     const char* why = nullptr;
     const uint32_t now = c.issued_at_ms + 40;  // HTTP latency after the dashboard's uptime estimate
     check(motion::validCommand(c, now, &why), name + ": validCommand " + (why ? why : ""));
-    if (name == "stand50" || name == "stand150") {
+    if (name.rfind("joystick_dynamic_", 0) == 0) {
+      const double T = simple::kJoystickPeriodS, nx = c.vx * T / simple::kJoystickStrideM, ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
+            name + ": BASE_VELOCITY gait JOYSTICK inside the Controller ellipsoid, mailbox");
+      dynamic[name] = body;
+    } else if (name == "stand50" || name == "stand150") {
       const double h = name == "stand50" ? .05 : .15;
       check(c.intent == motion::Intent::STAND && c.target_height_m == h && c.ttl_ms == 5000 && !gate.stopLane, name + ": POSTURE.STAND, exact height, mailbox");
       if (name == "stand150") standBody = body;
@@ -472,7 +506,75 @@ int envelopes(const char* path, const char* src) {
             name + ": feedback-verified motion arrest, existing torque ON, support unknown");
     } else check(false, "unknown envelope case " + name);
   }
-  check(seen == 14, "fourteen dashboard envelopes captured (" + std::to_string(seen) + ")");
+  check(seen == 21, "twenty-one dashboard envelopes captured (" + std::to_string(seen) + ")");
+  // Pre-flash dynamic joystick, end to end (dev.17 HW: a sideways move of the
+  // held stick ended the walk). The page's own envelopes of one press, through
+  // the handler gate, session, parser, MotionService and SimpleMotion, each
+  // refreshed every 240 ms like the page: forward, forward-right, right a hair
+  // behind centre, forward-left never stop the walk; a full pull back reverses
+  // through one WALK STOP (the page silent meanwhile), the held intent starts
+  // the backward walk at STANDING, the release ends it. Software only.
+  {
+    const char* names[] = {"joystick_dynamic_forward", "joystick_dynamic_diagonal", "joystick_dynamic_lateral", "joystick_dynamic_left",
+                           "joystick_dynamic_back", "joystick_dynamic_reverse", "joystick_dynamic_release"};
+    for (const char* n : names) check(dynamic.count(n) == 1, std::string(n) + " envelope present");
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(.15, rig.p.now) && rig.reachStand(), "dynamic joystick: STAND 150 HOLD");
+    unsigned seq = 1000, stops = 0; bool stopping = false;
+    auto observe = [&] {  // a WALK STOP began: walking, the joystick walk ended
+      const bool now = rig.m.state() == simple::State::WALKING && !rig.m.joystickActive();
+      stops += now && !stopping; stopping = now;
+    };
+    // A later refresh of the same page: next page sequence (id suffix too), Controller time.
+    auto post = [&](const std::string& name) {
+      const auto& body = dynamic[name]; motion::MotionCommand parsed; const char* why = nullptr;
+      check(core::parseMotionJson(body.data(), body.size(), &parsed, &why), name + ": envelope parses");
+      const std::string id = parsed.id; ++seq;
+      auto fresh = replace(body, "\"id\":\"" + id + "\"", "\"id\":\"" + id.substr(0, id.rfind('-') + 1) + std::to_string(seq) + "\"");
+      fresh = replace(fresh, "\"sequence\":" + std::to_string(parsed.sequence), "\"sequence\":" + std::to_string(seq));
+      fresh = replace(fresh, "\"issued_at_ms\":" + std::to_string(parsed.issued_at_ms), "\"issued_at_ms\":" + std::to_string(rig.p.now / 1000));
+      const auto code = serve(request(fresh, session), session, service, rig, rig.p.now / 1000).code; observe(); return code;
+    };
+    auto step = [&](const std::string& what) {
+      rig.tick(); service.update(); observe();
+      check(rig.m.state() != simple::State::FAULT && !rig.m.stopActive(), what + ": no fault, no STOP");
+    };
+    auto hold = [&](const std::string& name, double cycles) {  // refreshed every 12 releases (240 ms)
+      const double end = rig.m.walkCycles() + cycles;
+      for (unsigned k = 0; k < 20000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() >= end); ++k) {
+        if (k % 12 == 0) check(post(name) == "ACCEPTED COMMAND_ACCEPTED", name + ": refresh accepted");
+        step(name);
+      }
+      check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive() && !std::strcmp(rig.m.reason(), "WALK_JOYSTICK"), name + ": joystick walk goes on");
+    };
+    hold("joystick_dynamic_forward", 1.5);
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() == 0, "dynamic: forward");
+    // Intent -> reference: the next release moves the lateral reference; full
+    // scale takes kJoystickRampCycles cycles (rate limit, envelope gate).
+    const double vy0 = rig.m.walkVelocityY(), c0 = rig.m.walkCycles();
+    check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: forward-right accepted");
+    step("joystick_dynamic_diagonal");
+    const double firstMove = std::abs(rig.m.walkVelocityY() - vy0);
+    hold("joystick_dynamic_diagonal", 2.5);
+    check(firstMove > 0 && rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() < 0, "dynamic: forward-right reached, reference moved at the next release");
+    hold("joystick_dynamic_lateral", 2.5);
+    check(rig.m.walkVelocityX() == 0 && rig.m.walkVelocityY() < 0, "dynamic: right, fore/aft at zero, no reversal");
+    hold("joystick_dynamic_left", 3);
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 0, "dynamic: forward-left; no WALK STOP in four direction changes");
+    std::printf("dynamic joystick: intent->reference at the next release (%.3f mm/s of lateral per release), full scale %.1f s (kJoystickRampCycles %.1f x %.1f s); %.2f cycles without a stop\n",
+                firstMove * 1000, simple::kJoystickRampCycles * simple::kJoystickPeriodS, simple::kJoystickRampCycles, simple::kJoystickPeriodS, rig.m.walkCycles() - c0);
+    check(post("joystick_dynamic_back") == "ACCEPTED JOYSTICK_REVERSING" && !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING"), "dynamic: full pull back reverses (WALK STOP), the ACK says so");
+    bool settled = false;
+    for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) { step("reversal"); settled |= !std::strcmp(rig.m.reason(), "WALK_SETTLING"); }
+    check(rig.m.state() == simple::State::STANDING && settled && stops == 1, "dynamic: one WALK STOP, settling, STANDING (page silent)");
+    for (unsigned k = 0; k < 3000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() > 1); ++k) {
+      if (k % 12 == 0) check(post("joystick_dynamic_reverse") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held backward intent accepted at STANDING");
+      step("joystick_dynamic_reverse");
+    }
+    check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive() && rig.m.walkVelocityX() < 0, "dynamic: the held intent walks backward");
+    check(post("joystick_dynamic_release") == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), "dynamic: release, WALK STOP");
+    check(rig.reachStand(), "dynamic: release ends in STAND (software only)");
+  }
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
   // Reuse the shipped STOP/STAND envelopes for the new WALK recovery path.
   for(unsigned stride:{1u,2u}){

@@ -386,7 +386,7 @@ async function boot(initialStatus = fx.status_ready) {
     const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
     // Pointer ids as a browser gives them: one per finger (pad 1, rotation 2).
     const pointer = (el, type, x, y, id = el === pad ? 1 : 2) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
     assert(!q('#joy-left').disabled && !q('#joy-right').disabled, 'rotation buttons enabled with the joystick');
@@ -443,7 +443,7 @@ async function boot(initialStatus = fx.status_ready) {
   {
     const pad = q('#joy-pad'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5], doc = p.dom.window.document;
     const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
     let rect = { left: 0, top: 0, width: 180, height: 180 };
     pad.getBoundingClientRect = () => ({ ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height });
@@ -496,6 +496,102 @@ async function boot(initialStatus = fx.status_ready) {
     assert.strictEqual(commands().length, idle, 'no refresh after any release');
     delete pad.getBoundingClientRect;
     q('#message').click();
+  }
+  // 4d. Pre-flash addendum, dynamic joystick (dev.17 HW: a sideways move of the
+  // held stick ended the walk). One press goes forward -> forward-right ->
+  // right a hair behind centre (fore/aft dead band: no backward sign) ->
+  // forward-left with no neutral, real Controller statuses (fixtures) between
+  // the refreshes. Late polls do not end the hold while the Controller accepts
+  // the refreshes; a lost link does. A reversal stays held and silent through
+  // the Controller's WALK STOP and settling and starts the other walk at
+  // STANDING. The Controller's own end of the walk (WALK STOP, deadline) ends
+  // the hold. The named envelopes replay in order through the real parser,
+  // MotionService and SimpleMotion (test_simple_dashboard_contract envelopes).
+  await refresh(fx.status_standing);
+  {
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const at = (x, y) => { const f = (90 - y) / 58, l = (90 - x) / 58, m = Math.hypot(f, l); return m > 1 ? [f / m, l / m] : [f, l]; };  // pad point, knob travel 58 of 180
+    const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
+    const held = () => joyBox.dataset.active === 'true' && joyBox.getAttribute('aria-disabled') === 'false';
+    const walking = (vx, vy) => { const t = JSON.parse(fx.status_joystick_walking); t.walk_velocity = { ...t.walk_velocity, vx_m_s: vx, vy_m_s: vy }; return JSON.stringify(t); };
+    const ended = reason => { const t = JSON.parse(fx.status_joystick_reversing); t.reason = reason; return JSON.stringify(t); };
+    assert.strictEqual(JSON.parse(fx.status_joystick_walking).walk_velocity.joystick, true, 'fixture: Controller joystick walk');
+    assert(JSON.parse(fx.status_joystick_reversing).reason === 'JOYSTICK_REVERSING' && JSON.parse(fx.status_joystick_reversing).walk_velocity.joystick === false, 'fixture: Controller reversal');
+    assert(JSON.parse(fx.status_walk_settling).state === 'MOVING' && JSON.parse(fx.status_walk_settling).reason === 'WALK_SETTLING', 'fixture: settling');
+    await send('joystick_dynamic_forward', () => pointer(pad, 'pointerdown', 90, 32, 21), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick = p.intervals.filter(i => i.ms === 240).at(-1);
+    await refresh(fx.status_joystick_walking);
+    assert(held(), 'held over the Controller joystick walk');
+    let v = at(131, 49);
+    pointer(pad, 'pointermove', 131, 49, 21);
+    const diagonal = await send('joystick_dynamic_diagonal', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(diagonal.params.vx > 0 && diagonal.params.vy < 0, 'forward-right');
+    await refresh(walking(L[0] * .8, -L[1] * .2));
+    v = at(148, 95);
+    pointer(pad, 'pointermove', 148, 95, 21);
+    const lateral = await send('joystick_dynamic_lateral', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(v[0] < 0 && lateral.params.vx === 0 && lateral.params.vy < 0, 'a sideways stick a hair behind centre carries no backward sign');
+    await refresh(walking(L[0] * .5, -L[1] * .5));
+    v = at(49, 49);
+    pointer(pad, 'pointermove', 49, 49, 21);
+    const left = await send('joystick_dynamic_left', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(left.params.vx > 0 && left.params.vy > 0 && held() && q('#joy-knob').getAttribute('cx') === String(90 - 58 * v[1]), 'forward-left, still held, knob under the finger');
+    // Late polls: the status reads hang for 2.8 s (8 renders, the 1.5 s link
+    // limit passed); the refreshes are accepted, so the hold and the intent go on.
+    device.holdUrl = '/api/motion/status';
+    for (let k = 0; k < 8; ++k) {
+      await p.poll();
+      await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    }
+    assert(held() && /FEEDBACK NON FRESCO|COLLEGAMENTO PERSO/.test(q('#simple-state').textContent), 'late polls shown as such, the hold goes on');
+    // Link lost: polls still hang and a refresh fails. 1 s without an accepted
+    // refresh: the Controller deadline has ended the walk; one neutral, released.
+    await send('', () => tick.fn(), 'network', 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    device.replies.push(ok(fx.ack_walk_stop)); ++sequence;
+    let count = commands().length;
+    await p.poll(); await p.poll();
+    assert(held() && commands().length === count, 'hold kept inside the Controller deadline');
+    await p.poll();
+    assert(!held() && commands().length === count + 1 && JSON.parse(commands().at(-1).body).params.vx === 0, 'lost link: one neutral, stick released');
+    assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, neutral);
+    device.release(); await settle();
+    // Reversal: the Controller ends the forward walk (JOYSTICK_REVERSING, WALK
+    // STOP); held and silent through the stop and the settling; at STANDING the
+    // held intent starts the backward walk.
+    await refresh(fx.status_joystick_walking);
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 22), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick2 = p.intervals.filter(i => i.ms === 240).at(-1);
+    pointer(pad, 'pointermove', 90, 148, 22);
+    assert.strictEqual(JSON.parse(fx.ack_joystick_reversing).reason, 'JOYSTICK_REVERSING', 'fixture: the reversal ACK');
+    await send('joystick_dynamic_back', () => tick2.fn(), ok(fx.ack_joystick_reversing), 'BASE_VELOCITY', body(shaped(-1, 0, 0)), 1000);
+    count = commands().length; tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal ACK: held, silent before the next poll (no refresh into the WALK STOP)');
+    await refresh(fx.status_joystick_reversing);
+    tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal: held, no refresh while the Controller stops the walk');
+    assert(/inversione avanti\/indietro/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    await refresh(fx.status_walk_settling);
+    tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal: held and silent while settling');
+    await refresh(fx.status_standing);
+    await send('joystick_dynamic_reverse', () => tick2.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(-1, 0, 0)), 1000);
+    assert(held() && q('#joy-knob').getAttribute('cy') === String(90 - 58 * -1), 'the held intent starts the other walk at STANDING');
+    await send('joystick_dynamic_release', () => pointer(pad, 'pointerup', 90, 148, 22), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    assert(!held() && q('#joy-knob').getAttribute('cy') === '90', 'release: neutral, knob centred');
+    // The Controller's own end of a joystick walk ends the hold: operator WALK
+    // STOP and its deadline (JOYSTICK_TIMEOUT), one neutral each.
+    for (const reason of ['WALK_STOPPING', 'JOYSTICK_TIMEOUT']) {
+      await refresh(fx.status_joystick_walking);
+      await send('', () => pointer(pad, 'pointerdown', 90, 32, 23), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+      device.replies.push(ok(fx.ack_walk_stop)); ++sequence; count = commands().length;
+      await refresh(ended(reason));
+      assert(!held() && commands().length === count + 1, reason + ': one neutral, released');
+      assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, neutral);
+    }
+    const idle = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
+    assert.strictEqual(commands().length, idle, 'no refresh after the dynamic sequence');
   }
   // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);

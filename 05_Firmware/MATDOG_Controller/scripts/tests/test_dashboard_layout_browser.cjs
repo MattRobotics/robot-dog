@@ -106,6 +106,21 @@ async function scenario(browser, base, name, viewport, touch) {
     result.requests_while_held = held.length;
     result.request_max_change_pct = held.length ? +(100 * Math.max(...held.map(c => Math.hypot(c.params.vx - held[0].params.vx, c.params.vy - held[0].params.vy))) / Math.hypot(held[0].params.vx, held[0].params.vy)).toFixed(2) : null;
     result.request_constant = held.length > 3 && result.request_max_change_pct < 2;
+    // 5. Pre-flash dynamic joystick (dev.17 HW): over the Controller's joystick
+    // walk the same press sweeps forward-right, right OUTSIDE the pad a hair
+    // behind centre (pointer capture; fore/aft dead band) and forward-left:
+    // each direction is sent, never a neutral, the pad stays held.
+    device.status = fx.status_joystick_walking;
+    const cx = r0.x + r0.w / 2, cy = r0.y + r0.h / 2, sweep = {}, from = device.commands.length;
+    const aim = async (label, x, y) => { await finger(x, y); await page.waitForTimeout(700); const c = joystickCommands().at(-1); sweep[label] = { vx: c.params.vx, vy: c.params.vy }; };
+    await aim('forward_right', cx + 0.3 * r0.w, cy - 0.3 * r0.h);
+    await aim('right_outside', r0.x + r0.w + 40, cy + 0.02 * r0.h);
+    await aim('forward_left', cx - 0.3 * r0.w, cy - 0.3 * r0.h);
+    const swept = device.commands.slice(from);
+    result.dynamic = sweep;
+    result.dynamic_ok = sweep.forward_right.vx > 0 && sweep.forward_right.vy < 0 && sweep.right_outside.vx === 0 && sweep.right_outside.vy < 0 &&
+      sweep.forward_left.vx > 0 && sweep.forward_left.vy > 0 && swept.length >= 6 && swept.every(c => c.params.vx || c.params.vy) &&
+      await page.evaluate(() => document.getElementById('simple-joystick').dataset.active === 'true');
     // Release: one neutral command; the deferred Twin height is applied.
     const before = device.commands.length;
     if (touch) await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
@@ -137,9 +152,9 @@ async function scenario(browser, base, name, viewport, touch) {
   let failures = 0;
   for (const r of results) {
     const worst = Math.max(...Object.values(r.shifts));
-    const ok = worst < 0.5 && r.request_constant && r.neutral_on_release && r.stop.hit === 'simple-stop' && r.stop_with_banner === 'simple-stop' && r.stop.top >= 0 && r.stop.bottom <= r.stop.viewport && r.errors.length === 0;
+    const ok = worst < 0.5 && r.request_constant && r.dynamic_ok && r.neutral_on_release && r.stop.hit === 'simple-stop' && r.stop_with_banner === 'simple-stop' && r.stop.top >= 0 && r.stop.bottom <= r.stop.viewport && r.errors.length === 0;
     if (!ok) failures++;
-    console.log('LAYOUT ' + r.name + ' ' + r.viewport + ' ' + r.input + ' pad_shift_px=' + JSON.stringify(r.shifts) + ' request_constant=' + r.request_constant +
+    console.log('LAYOUT ' + r.name + ' ' + r.viewport + ' ' + r.input + ' pad_shift_px=' + JSON.stringify(r.shifts) + ' request_constant=' + r.request_constant + ' dynamic_ok=' + r.dynamic_ok + ' dynamic=' + JSON.stringify(r.dynamic) +
       ' requests_while_held=' + r.requests_while_held + ' request_max_change_pct=' + r.request_max_change_pct + ' neutral_on_release=' + r.neutral_on_release + ' after_release=' + JSON.stringify(r.after_release) + ' server_after_release=' + JSON.stringify(r.server_after_release) + ' stop=' + JSON.stringify(r.stop) +
       ' twin_deferred=' + r.twin_deferred + ' errors=' + r.errors.length + ' -> ' + (ok ? 'PASS' : 'FAIL'));
   }

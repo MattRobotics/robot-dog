@@ -99,7 +99,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  const bool joystick=c.intent==motion::Intent::BASE_VELOCITY&&!strcmp(c.gait,"JOYSTICK");
  if(joystick&&c.owner==motion::ClientOwner::DASHBOARD)
    if(const char* r=admitJoystickOrder(c)){a.reason=r;return last_=a;}
- auto result=[&](const char* r){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:"COMMAND_ACCEPTED";
+ auto result=[&](const char* r,const char* accepted="COMMAND_ACCEPTED"){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:accepted;
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
    if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
@@ -117,7 +117,10 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  if(!motion_->stopActive()&&prepare_&&(why=prepare_(context_)))return result(why);
  if(c.intent==motion::Intent::LIE_DOWN)return result(motion_->prone(us));
  if(c.intent==motion::Intent::STAND)return result(motion_->stand(c.target_height_m,us));
- if(joystick)return result(motion_->drive(c.vx,c.vy,c.yaw_rate,us));
+ // A joystick reversal is accepted as a WALK STOP first: the ACK says so, and
+ // the page holds the stick silent until STANDING (no refresh into the stop).
+ if(joystick){const char* r=motion_->drive(c.vx,c.vy,c.yaw_rate,us);
+   return result(r,!r&&!strcmp(motion_->reason(),"JOYSTICK_REVERSING")?"JOYSTICK_REVERSING":"COMMAND_ACCEPTED");}
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
  if(preset>=0)return result(motion_->walk(static_cast<unsigned>(preset),us));
  return result("STANDARD_STRIDE_REQUIRED");

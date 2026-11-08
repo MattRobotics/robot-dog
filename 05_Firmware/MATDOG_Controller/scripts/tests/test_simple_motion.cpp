@@ -517,6 +517,17 @@ static void joystickWalk(){
       r.tick();stood|=r.m.state()==simple::State::STANDING;assert(r.m.state()!=simple::State::FAULT);}
     assert(stood&&r.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(r.m)&&r.m.walkCycles()<1);
     r.m.walkStop();assert(r.reachStand());}
+  // Pre-flash (dev.17 HW: a sideways stick a hair behind centre stopped the
+  // walk): a demand mainly lateral or at most 45 deg behind keeps the forward
+  // walk, its contrary fore/aft held at zero; only a mostly backward one reverses.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0],0,0});hold(r,{lim[0],0,0},300);
+    const V3 side{-.1*lim[0],-.99*lim[1],0},diagonal{-.55*lim[0],-.6*lim[1],0},back{-.8*lim[0],-.6*lim[1],0};
+    assert(!drive(r,side)&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK")&&r.m.joystickActive());
+    hold(r,side,unsigned(2.5*T/.02));
+    assert(simple::StopReferenceProbe::gait(r.m).advanceXM==0&&r.m.walkVelocityY()<0&&!simple::StopReferenceProbe::reverse(r.m));
+    hold(r,diagonal,unsigned(T/.02));assert(simple::StopReferenceProbe::gait(r.m).advanceXM==0&&r.m.joystickActive());
+    assert(!drive(r,back));assert(!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING")&&!r.m.joystickActive());
+    assert(r.reachStand());}
   // Steps on every axis: each follows at its limited rate, fore/aft never crosses
   // zero inside a walk, every RAW step stays below the WALK drive per release.
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0],0,0});hold(r,{lim[0],0,0},300);
@@ -568,7 +579,7 @@ static void joystickWalk(){
     std::snprintf(want,sizeof want,"\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000",lim[0],lim[1],lim[2]);assert(std::strstr(caps,want));
     ack=send("{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}");assert(ack.outcome==motion::CommandOutcome::ACCEPTED&&!std::strcmp(api.m.reason(),"WALK_STOPPING"));
     assert(api.reachStand());std::printf("JOYSTICK API status %zu bytes, capabilities %zu bytes\n",std::strlen(status),std::strlen(caps));}
-  std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
+  std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP only when mostly backward, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
 }
 
 // IMU level slew in physical time (dev.15): a regular release moves the

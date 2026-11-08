@@ -543,13 +543,17 @@ const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)
   double norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(goal[j]))return "JOYSTICK_VELOCITY_RANGE";norm+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
   if(norm==0||norm>1+1e-9)return "JOYSTICK_VELOCITY_RANGE";
   // A walk keeps the leg order of its fore/aft direction: forward, or its time
-  // reverse backward. The opposite direction ends it with WALK STOP; the next
-  // command after STANDING starts the other one. Lateral and yaw are continuous.
-  const bool reverse=goal[0]<0;
+  // reverse backward. A demand pointing mostly the opposite way (its fore/aft
+  // part above lateral and yaw together, in the ellipsoid) ends it with WALK
+  // STOP; the next command after STANDING starts the other one. Lateral and yaw
+  // are continuous: a mainly lateral/yaw demand keeps walking, its contrary
+  // fore/aft part held at zero by steerWalk (dev.17 HW: a sideways stick a hair
+  // behind centre stopped the walk).
+  const bool reverse=goal[0]<0;const double fore=(goal[0]/limit[0])*(goal[0]/limit[0]);
   if(state_==State::WALKING){
     if(!joystick_)return "WALK_STANDARD_ACTIVE";
     if(walkStopping_)return "WALK_STOPPING";
-    if(goal[0]!=0&&reverse!=gait_.reverse){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
+    if(goal[0]!=0&&reverse!=gait_.reverse&&fore>norm-fore){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
   }else if(joystick_&&walkRequested_){
     if(goal[0]!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction
   }else{
