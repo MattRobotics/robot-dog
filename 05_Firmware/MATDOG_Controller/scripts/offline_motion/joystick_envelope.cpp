@@ -95,9 +95,12 @@ int main(int argc,char** argv){
       const auto& b=f.cartesian.body;const double cy=b.rotation[0][0],sy=b.rotation[1][0];const auto& c=motion::canonicalStandDefinition().contactsWorldM;
       for(unsigned l=0;l<4;++l)if(f.cartesian.phases[l].stance){const double dx=f.cartesian.feet[l].x-b.translationM.x,dy=f.cartesian.feet[l].y-b.translationM.y;
         const double x=cy*dx+sy*dy-c[l].x;r.footLo=std::fmin(r.footLo,x);r.footHi=std::fmax(r.footHi,x);r.nominalTilt=std::fmax(r.nominalTilt,std::abs(f.target.legs[l].hip));}
-      // IMU tilt envelope: 32 rays to its boundary, same lift and checks as compensationTarget.
+      // IMU tilt envelope: 32 rays to its boundary (heading frame), same lift and checks as compensationTarget.
       for(unsigned k=0;k<32;++k){const double ang=2*M_PI*k/32,dr=std::cos(ang),dp=std::sin(ang);
-        const double sc=rayScale(kSteerTilt,dr,dp),roll=sc*dr,pitch=sc*dp;
+        // Rays on the certified polygon in the heading (body) frame, taken into
+        // the support frame like SimpleMotion::limitWalkTilt (the hip/fillet
+        // loading they bound does not depend on the accumulated heading).
+        const double sc=rayScale(kSteerTilt,dr,dp),rb=sc*dr,pb=sc*dp,roll=cy*rb-sy*pb,pitch=sy*rb+cy*pb;
         auto body=motion::bodyPoseFromRollPitch({},roll,pitch);const auto t=b.translationM;
         {double rr[3][3];for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)rr[i][j]=body.rotation[i][0]*b.rotation[0][j]+body.rotation[i][1]*b.rotation[1][j]+body.rotation[i][2]*b.rotation[2][j];
          for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)body.rotation[i][j]=rr[i][j];}  // same heading as compensateLevel

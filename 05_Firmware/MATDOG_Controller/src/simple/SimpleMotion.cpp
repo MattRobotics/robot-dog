@@ -908,9 +908,18 @@ void SimpleMotion::steerWalk(uint64_t now){
 #endif
     gait_=next;}
 }
-bool SimpleMotion::limitWalkTilt(double& roll,double& pitch) const {
-  if(steered_)return projectWalkTilt(kSteerTilt,roll,pitch);
-  return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
+bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) const {
+  if(!steered_)return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
+  // The steered envelope bounds the hip roll and fillet tilt the correction
+  // loads on the stance legs, a body-frame quantity, while the fitted tilt and
+  // headed() live in the support frame. Take the tilt vector into the heading
+  // frame (R_z(theta)^T), project it on the certified polygon there and take it
+  // back; identity heading keeps roll/pitch bit for bit. Review 2026-11-08:
+  // projected in the support frame, a continuous full-scale turn past ~0.9 rad
+  // of heading reached the 12 deg fillet limit on the pitch-up boundary ray
+  // (WALK_IK_OR_WORKSPACE in the firmware), unseen by the 4-cycle gate.
+  double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(kSteerTilt,rb,pb);
+  if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;
 }
 JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
   timing::count(timing::SOLVES);
@@ -1042,7 +1051,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   timing::count(timing::FK,unwind?0:3);
   imuLimited_=!fitted;imuReason_=fitted?"OK":up.x==0&&up.y==0&&up.z==0?"IMU_STALE":"SUPPORT_FIT";
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
-  if(walk&&limitWalkTilt(wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
+  if(walk&&limitWalkTilt(wantedRoll,wantedPitch,f.cartesian.body.rotation[0][0],f.cartesian.body.rotation[1][0])){imuLimited_=true;imuReason_="ENVELOPE";}
   imuWanted_[0]=wantedRoll;imuWanted_[1]=wantedPitch;
   const double slew=slewStep(now,afterLight?std::min<uint64_t>(kPeriodUs,sinceIssuedUs):kImuSlewMaxDtUs);
   auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};

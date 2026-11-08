@@ -41,6 +41,7 @@ struct StopReferenceProbe {
   static const StopPlan& stopPlan(const SimpleMotion& m){return m.stopPlan_;}
   static const uint16_t* commandedRaw(const SimpleMotion& m){return m.commandedRaw_;}
   static const uint16_t* previous2Raw(const SimpleMotion& m){return m.previous2Raw_;}
+  static bool limitWalkTilt(const SimpleMotion& m,double& roll,double& pitch,double c,double s){return m.limitWalkTilt(roll,pitch,c,s);}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -454,7 +455,7 @@ static void joystickWalk(){
       for(unsigned l=0;l<4;++l)if(!f.cartesian.phases[l].stance)first=int(l);}
     assert(first==(v[0]<0?3:2));  // first swing: LH backward, RH otherwise
     while(r.m.walkCycles()<1.5)hold(r,v,1);
-    const auto a=pose(r);hold(r,v,650);const auto b=pose(r);
+    const auto a=pose(r);hold(r,v,unsigned(std::lround(2*T/.02)));const auto b=pose(r);  // two whole cycles
     const double w=2*v[2]*T,si=w!=0?std::sin(w)/(v[2]*T):2,co=w!=0?(1-std::cos(w))/(v[2]*T):0;
     const double dx=v[0]*T*si-v[1]*T*co,dy=v[0]*T*co+v[1]*T*si;
     // The body sway (<= 18 mm, body frame) turns with the heading: |R(w)-I| x sway.
@@ -555,8 +556,9 @@ static void joystickWalk(){
     for(unsigned n=0;n<200;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED);api.tick();}
     std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/T);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
     test_clock_us=api.p.now;service.update();char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,api.p.now/1000));
-    assert(std::strstr(status,"\"walk_velocity\":{\"vx_m_s\":-0.00415,\"vy_m_s\":-0.00154,\"yaw_rate_rad_s\":0.01538,\"joystick\":true}"));
-    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));assert(std::strstr(caps,"\"joystick\":{\"vx_max_m_s\":0.00692,\"vy_max_m_s\":0.00308,\"yaw_rate_max_rad_s\":0.03077,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000"));
+    char want[256];std::snprintf(want,sizeof want,"\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":true}",-lim[0]*.6,-lim[1]*.5,lim[2]*.5);assert(std::strstr(status,want));
+    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));
+    std::snprintf(want,sizeof want,"\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000",lim[0],lim[1],lim[2]);assert(std::strstr(caps,want));
     ack=send("{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}");assert(ack.outcome==motion::CommandOutcome::ACCEPTED&&!std::strcmp(api.m.reason(),"WALK_STOPPING"));
     assert(api.reachStand());std::printf("JOYSTICK API status %zu bytes, capabilities %zu bytes\n",std::strlen(status),std::strlen(caps));}
   std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
@@ -915,7 +917,21 @@ static void swayMap(){
   {Rig r;walking(r,.033*simple::kJoystickLateralM/T);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);r.m.walkStop();assert(r.reachStand());}  // full from the start
   std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %, amplitude changes only with four feet down PASS (software only)");
 }
-int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();
+// Steered tilt envelope in the heading frame (review 2026-11-08): with
+// identity heading the limit is bit for bit the old one; at a 90 deg heading
+// a support-frame pitch at the polygon's pitch-up vertex is a body roll and is
+// limited to the roll vertex, taken back into the support frame.
+static void steeredEnvelopeHeading(){
+  Rig r;const double T=simple::kWalkPeriodS;assert(!r.m.drive(.5*simple::kJoystickStrideM/T,0,0,r.p.now));
+  for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.5*simple::kJoystickStrideM/T,0,0,r.p.now);r.tick();}assert(r.m.state()==simple::State::WALKING);
+  double roll=.0,pitch=.05;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&pitch==.05);           // inside, identity heading, untouched
+  roll=.0;pitch=.10;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&std::abs(pitch-.07)<1e-12);     // pitch-up vertex, identity heading
+  roll=.0;pitch=.05;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&std::abs(roll)<1e-12&&std::abs(pitch-.0245)<1e-12);  // heading 90 deg: a body roll, roll vertex
+  roll=.0;pitch=.02;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&roll==0&&pitch==.02);                    // inside at 90 deg too
+  r.m.walkStop();assert(r.reachStand());
+  std::puts("steered tilt envelope: heading-frame projection, identity bit for bit, 90 deg heading maps pitch to the roll vertex PASS (software only)");
+}
+int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();

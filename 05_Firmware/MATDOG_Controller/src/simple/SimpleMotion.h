@@ -15,6 +15,14 @@ constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
 // WALK STANDARD: one gait law, three strides per cycle. Constant clock; C2
 // geometric stride ramps over one cycle at start and at WALK STOP; fore/aft
 // and lateral body offsets change only with four feet down.
+// Period 6.5 s (v1.0.1). Cadence review (motion-perf-next, 2026-11-08) with
+// the qualified drive kWalkDrive{1000,50}: the binding constraint is the STOP
+// proof (compensationSafe/StopPlan) on the UPPER joint of a swinging front
+// leg moving toward the kHeight lower bound under IMU compensation; its
+// stop distance exceeds the box margin from ~6.1 s (TX-latency and late-release
+// rig), with ~8 mrad of margin left at 6.5 s. 6.2 s passes every offline
+// stress (+5 %), 5.8 s passes the ideal grid only. Not changed: +5 % does not
+// justify re-qualifying the hardware-validated cadence.
 constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
 // Lower WALK posture stays in the existing HEIGHT joint box. The 2 mm
 // lateral sway leaves room for STOP and the recorded loaded HIP residuals.
@@ -300,7 +308,7 @@ class SimpleMotion {
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void steerWalk(uint64_t);
-  bool limitWalkTilt(double& roll,double& pitch) const;
+  bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
   const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
   void serviceOff();
   bool serviceStop();
