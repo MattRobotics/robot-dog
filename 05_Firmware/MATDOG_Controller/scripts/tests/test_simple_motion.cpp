@@ -777,8 +777,9 @@ static void proneRest(){
     r.p.holdObservation=true;auto& f=r.p.observed[1];f.q+=.6;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));
     for(unsigned k=0;k<20;++k)r.tick();assert(!std::strcmp(r.m.poseRegion(r.p.now),"OUTSIDE_CERTIFIED"));
     const auto enables=r.p.enables,frames=r.p.frames;assert(!r.m.stand(.10,r.p.now));
-    for(unsigned k=0;k<200&&r.m.state()!=simple::State::FAULT;++k)r.tick();
-    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.enables==enables&&r.p.frames==frames&&!r.m.energized());}
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k)r.tick();
+    // dev.5: a pre-actuation refusal, not a latched fault (entryRecovery below).
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.enables==enables&&r.p.frames==frames&&!r.m.energized());}
   std::puts("PRONE REST PASS: automatic torque OFF only after the verified terminal, STOP latch kept, STAND from the settled pose through ACQUIRE/ENABLE; passive support NOT validated");
 }
 
@@ -1015,7 +1016,107 @@ static void steeredEnvelopeHeading(){
   r.m.walkStop();assert(r.reachStand());
   std::puts("steered tilt envelope: heading-frame projection, identity bit for bit, 90 deg heading maps pitch to the roll vertex PASS (software only)");
 }
-int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+// dev.5 entry recovery (ground HW 08/11/2026, dev.4): a STAND150 refused with
+// INITIAL_POSE_OUTSIDE_SAFE_ENTRY latched a FAULT that STOP could not clear;
+// the robot was repositioned by hand and only KEY OFF/ON made STAND possible,
+// from a pose identical (+/-1 tick) to the repositioned one. Here the refusal
+// is a pre-actuation STOPPED state: torque stays OFF, nothing is written, and
+// READY returns by itself only when the same ACQUIRE evidence (12 fresh
+// positions in a certified region, at rest, no alarm, torque OFF read again on
+// every servo) holds for one full control-read cycle. The aborted STAND never
+// runs again; a new explicit STAND re-acquires the pose. Software only.
+static void entryRecovery(){
+  // Boot-1 repositioned pose, trace matdog-motion-trace.json @116.6 s (rad,
+  // slot order LF RF RH LH x hip/upper/lower): PRONE_ENTRY, accepted after reboot.
+  const double placed[12]={-0.049087,1.417398,-1.59534,0.01534,1.415864,-1.583068,0.02301,1.411262,-1.596874,-0.029146,1.425068,-1.59534};
+  // Rear raised (operator note): both rear UPPER 60 mrad under the entry box.
+  double raised[12];std::copy(placed,placed+12,raised);
+  for(unsigned s:{7u,10u})raised[s]=simple::collision::kEntry.lo[s]-.060;
+  auto pose=[](Rig& r,const double* q){for(unsigned i=0;i<12;++i){auto& f=r.p.observed[i];f.q=q[i];f.raw=uint16_t(2048+std::lround(q[i]/simple::kTickRad));f.speed=0;}};
+  auto ack=[](Rig& r,core::MotionService& service){test_clock_us=r.p.now;service.update();static char status[core::kMotionStatusJsonBytes];
+    assert(service.statusJson(status,sizeof status,r.p.now/1000));const char* a=std::strstr(status,"\"active_command\":{");assert(a);return std::string(a,std::strcspn(a,"}"));};
+  auto refused=[&](Rig& r,core::MotionService* service=nullptr){
+    r.p.holdObservation=true;pose(r,raised);for(unsigned k=0;k<20;++k)r.tick();
+    assert(!std::strcmp(r.m.poseRegion(r.p.now),"OUTSIDE_CERTIFIED")&&r.m.state()==simple::State::READY);
+    if(service){motion::MotionCommand c;c.owner=motion::ClientOwner::DASHBOARD;c.intent=motion::Intent::STAND;c.target_height_m=.15;c.sequence=1;
+      c.issued_at_ms=r.p.now/1000;c.ttl_ms=1000;std::strcpy(c.id,"entry-1");test_clock_us=r.p.now;assert(service->command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);}
+    else assert(!r.m.stand(.15,r.p.now));
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k){r.tick();if(service){test_clock_us=r.p.now;service->update();}}
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.m.offVerified()&&!r.m.energized());
+    assert(r.p.frames==0&&r.p.enables==0);for(const auto& f:r.p.observed)assert(f.torque==0);};
+  // Releases until READY (bounded); 0 if it never came.
+  auto readyAfter=[](Rig& r,unsigned n){for(unsigned k=1;k<=n;++k){r.tick();assert(r.p.frames==0&&r.p.enables==0);if(r.m.state()==simple::State::READY)return k;}return 0u;};
+  constexpr unsigned cycle=72;  // one control read per 6 releases, 12 servos
+  // 1. The field sequence: refusal, the pose stays outside, STOP pressed, repositioned.
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    refused(r,&service);
+    const auto a=ack(r,service);assert(a.find("\"outcome\":\"ABORTED\",\"reason\":\"INITIAL_POSE_OUTSIDE_SAFE_ENTRY\",\"id\":\"entry-1\"")!=std::string::npos);
+    for(unsigned k=0;k<500;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    assert(!std::strcmp(r.m.stand(.15,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.m.state()==simple::State::STOPPED);
+    assert(!std::strcmp(r.m.drive(.005,0,0,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&!std::strcmp(r.m.walk(2,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));
+    const auto offs=r.p.offCalls;r.m.stop();for(unsigned k=0;k<40;++k)r.tick();  // STOP only re-verifies the OFF
+    assert(r.p.offCalls>offs&&r.m.offVerified()&&r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));
+    pose(r,placed);const unsigned k=readyAfter(r,3*cycle);
+    assert(k>=cycle&&k<=2*cycle+20&&!std::strcmp(r.m.reason(),"READY")&&!std::strcmp(r.m.poseRegion(r.p.now),"PRONE_ENTRY"));
+    for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()==simple::State::READY&&r.p.frames==0&&r.p.enables==0);}  // the aborted STAND never runs
+    assert(ack(r,service)==a);
+    // A NEW explicit STAND re-acquires the placed pose and stands.
+    assert(!r.m.stand(.15,r.p.now)&&!std::strcmp(r.m.reason(),"ACQUIRING_REAL_POSE"));
+    for(unsigned n=0;n<200&&r.p.frames==0;++n)r.tick();
+    assert(r.p.frames==1&&r.p.sentTorqueOn[0]==0);for(unsigned i=0;i<12;++i)assert(r.p.sent[0][i]==r.p.observed[i].raw);  // REFERENCE = placed RAW, torque OFF
+    r.p.holdObservation=false;assert(r.reachStand()&&r.p.enables==12);
+    std::printf("entry recovery: refusal -> STOPPED (no frame, no enable, torque OFF), ACK ABORTED, STOP keeps it, repositioned HW pose READY after %u releases, aborted STAND not run, new STAND reaches STANDING\n",k);}
+  // 2. No STOP, refusal at REFERENCE (the pose moves after ACQUIRE): same state.
+  {Rig r;r.p.holdObservation=true;pose(r,placed);for(unsigned k=0;k<20;++k)r.tick();
+    assert(!r.m.stand(.15,r.p.now));for(unsigned n=0;n<40&&std::strcmp(r.m.phase(),"REFERENCE");++n)r.tick();
+    assert(!std::strcmp(r.m.phase(),"REFERENCE")&&r.p.frames==0);pose(r,raised);
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.frames==0&&r.p.enables==0);
+    pose(r,placed);assert(readyAfter(r,3*cycle));}
+  // 3. Negative cases: each blocks READY while it lasts; READY follows once it ends.
+  struct Case {const char* name;void (*on)(ScriptedObservationPort&);void (*off)(ScriptedObservationPort&);};
+  const Case cases[]={
+    {"feedback lost",[](ScriptedObservationPort& p){p.missing=true;},[](ScriptedObservationPort& p){p.missing=false;}},
+    {"one joint 2 ticks outside kEntry",[](ScriptedObservationPort& p){auto& f=p.observed[11];f.q=simple::collision::kEntry.lo[11]-2*simple::kTickRad;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));},
+      [](ScriptedObservationPort& p){auto& f=p.observed[11];f.q=-1.59534;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));}},
+    {"servo still moving",[](ScriptedObservationPort& p){p.observed[4].speed=60;},[](ScriptedObservationPort& p){p.observed[4].speed=0;}},
+    {"moving backwards (sign bit)",[](ScriptedObservationPort& p){p.observed[4].speed=0x8000|51;},[](ScriptedObservationPort& p){p.observed[4].speed=0x8000;}},
+    {"unexpected torque",[](ScriptedObservationPort& p){p.observed[8].torque=1;},[](ScriptedObservationPort& p){p.observed[8].torque=0;}},
+    {"servo status alarm",[](ScriptedObservationPort& p){p.observed[2].status=8;},[](ScriptedObservationPort& p){p.observed[2].status=0;}},
+    {"servo 70 C",[](ScriptedObservationPort& p){p.observed[9].temp=70;},[](ScriptedObservationPort& p){p.observed[9].temp=30;}},
+    {"voltage 3.9 V",[](ScriptedObservationPort& p){p.observed[0].voltage=39;},[](ScriptedObservationPort& p){p.observed[0].voltage=120;}}};
+  for(const auto& c:cases){Rig r;refused(r);pose(r,placed);c.on(r.p);
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED&&r.p.frames==0&&r.p.enables==0);}
+    c.off(r.p);const unsigned k=readyAfter(r,3*cycle);
+    if(!k)std::printf("entry case %s: no READY after the condition ended\n",c.name);assert(k>=cycle/2);  // READY needs fresh evidence again
+    std::printf("entry recovery negative '%s': STOPPED for %u releases, READY %u releases after it ended\n",c.name,4*cycle,k);}
+  // 4. A pose crossing an uncertified region while being placed: no READY on
+  // the way, and a brief pass through PRONE_ENTRY shorter than one control
+  // cycle is not enough; the final placement then needs its own full cycle.
+  {Rig r;refused(r);
+    double mid[12];for(unsigned i=0;i<12;++i)mid[i]=.5*(placed[i]+raised[i]);mid[1]=1.0;  // LF_UPPER far outside every box
+    pose(r,mid);for(unsigned k=0;k<cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,placed);for(unsigned k=0;k<cycle/2;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,raised);for(unsigned k=0;k<cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,placed);const unsigned k=readyAfter(r,3*cycle);assert(k>=cycle);
+    std::printf("entry recovery: crossing an uncertified region and a %u-release pass through PRONE_ENTRY never READY; final placement READY after %u releases\n",cycle/2,k);}
+  // 5. A different physical fault stays latched; a stale ACQUIRE stays a fault.
+  {Rig r;refused(r);r.m.fault("SERVO_COMMUNICATION_LOST");pose(r,placed);
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"SERVO_COMMUNICATION_LOST"));}
+    assert(!std::strcmp(r.m.stand(.15,r.p.now),"FAULT_STOP_REQUIRED"));}
+  {Rig r;r.p.holdObservation=true;pose(r,placed);r.p.observed[3].torque=1;for(unsigned k=0;k<20;++k)r.tick();assert(!r.m.stand(.15,r.p.now));
+    for(unsigned k=0;k<60&&r.m.state()!=simple::State::FAULT;++k)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"INITIAL_SERVO_NOT_READY"));r.p.observed[3].torque=0;
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::FAULT);}}
+  // 6. SAFE_OFF requested in the refused state behaves like STOP: no operator latch.
+  {Rig r;refused(r);r.m.safeOff();for(unsigned k=0;k<40;++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));pose(r,placed);assert(readyAfter(r,3*cycle));}
+  // 7. Unchanged: STOP after a re-admitted READY (or at boot READY) is the ordinary SAFE_OFF latch.
+  {Rig r;refused(r);pose(r,placed);assert(readyAfter(r,3*cycle));r.m.stop();for(unsigned k=0;k<60;++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.stand(.15,r.p.now),"SAFE_OFF_STAND_REFUSED"));}
+  std::puts("ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged");
+}
+int main(){proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
@@ -1196,8 +1297,8 @@ int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopR
   std::printf("API status %zu bytes (%zu B transport, 640 B reserved); JSON=%s\n",std::strlen(status),core::kMotionStatusJsonBytes,status);
   std::strcpy(cmd.id,"new-browser-session-1");cmd.intent=motion::Intent::STATUS;cmd.issued_at_ms=api.p.now/1000;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
   cmd.intent=motion::Intent::STOP;cmd.ttl_ms=0;cmd.issued_at_ms=0;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);api.tick(false);assert(api.m.stopping());
-  Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()!=simple::State::FAULT;++i)unsafe.tick(false);
-  assert(unsafe.m.state()==simple::State::FAULT&&unsafe.p.enables==0);
+  Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()==simple::State::MOVING;++i)unsafe.tick(false);
+  assert(unsafe.m.state()==simple::State::STOPPED&&!std::strcmp(unsafe.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&unsafe.p.enables==0&&unsafe.p.frames==0);
   Rig off;off.p.verify=false;off.m.stop();for(unsigned i=0;i<30;++i)off.tick(false);assert(!off.m.offVerified()&&off.m.stopping());
   // PRONE -> STAND50: one DEPLOY and one LIFT reference, no HEIGHT move and
   // so no STAND150 detour. The rig IMU stays level while the route nominal is

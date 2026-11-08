@@ -331,6 +331,10 @@ async function boot(initialStatus = fx.status_ready) {
     await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Ripresa dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
     await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
+    {const e=JSON.parse(JSON.stringify(s));e.reason='INITIAL_POSE_OUTSIDE_SAFE_ENTRY';await refresh(JSON.stringify(e));
+     assert.strictEqual(q('#simple-state').textContent,'POSA D’INGRESSO NON RICONOSCIUTA · COPPIA OFF');
+     assert(q('#simple-state').dataset.tone==='warn'&&q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-reason').textContent.includes('torna PRONTO da solo'), 'dev.5: a refused entry pose is a recoverable STOPPED state with STAND disabled until the Controller reports READY');
+     e.state='READY';e.reason='READY';await refresh(JSON.stringify(e));assert(!q('#simple-stand').disabled, 'READY from the Controller re-enables STAND');}
     s.fault=true;s.state='FAULT';s.reason='SERVO_COMMUNICATION_LOST';s.stale=false;await refresh(JSON.stringify(s));
     assert(q('#simple-state').textContent.startsWith('FAULT') && q('#simple-state').dataset.tone==='bad' && q('#simple-reason').textContent.includes('Comunicazione servo persa'), 'fresh feedback after a fault keeps FAULT red and preserves the original reason');
     const faultStopAck=JSON.parse(fx.ack_stop);faultStopAck.reason='STOP_REQUESTED_FAULT_LATCHED';

@@ -301,6 +301,10 @@ class SimpleMotion {
   bool frameTimed(const uint16_t raw[12],Drive);
   bool planInitialReference();
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
+  // Pre-actuation refusal of the measured entry pose (torque never enabled):
+  // SAFE_OFF re-verified, no latch; READY again only through entryReadmitted.
+  void refuseEntry();
+  bool entryReadmitted(uint64_t now);
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
@@ -369,7 +373,8 @@ class SimpleMotion {
   const char* holdReason_=nullptr; // automatic support hold (PRONE not completed); null for an operator STOP
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
-  bool operatorStopped_=false,proneRest_=false;
+  bool operatorStopped_=false,proneRest_=false,entryRefused_=false;
+  uint64_t entrySinceUs_=0; // start of the current continuous re-admission evidence
   bool stopActive_=false,stopVerified_=false,stopIo_=false,stopFrame_=false,readInterrupted_=false;
   const uint16_t* stopRaw_=nullptr;
   Drive stopDrive_=kStandDrive;

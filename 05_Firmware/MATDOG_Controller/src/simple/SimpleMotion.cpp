@@ -142,9 +142,12 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   // re-broadcasts in serviceOff. A fault, or a STOP after a fault, during
   // motion or after completion starts SAFE_OFF again from the broadcast.
   const bool repeated=!fault&&state_==State::STOPPED&&offPending_;
+  // A STOP or SAFE_OFF while a refused entry waits for re-admission only
+  // re-verifies the OFF: no servo was enabled and the refusal stays the cause.
+  if(entryRefused_&&!fault)r="INITIAL_POSE_OUTSIDE_SAFE_ENTRY";
   faultLatched_=faultLatched_||fault;state_=faultLatched_?State::FAULT:State::STOPPED;reason_=r;
   stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=previous2Us_=0;
-  if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
+  if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0&&!entryRefused_;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;proneRest_=false;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
   walkRequested_=joystick_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
@@ -159,7 +162,7 @@ void SimpleMotion::serviceOff(){
 }
 bool SimpleMotion::serviceStop(){
   if(safeOffRequest_.exchange(false,std::memory_order_acq_rel)){
-    stop_.store(false,std::memory_order_release);operatorStopped_=true;
+    stop_.store(false,std::memory_order_release);operatorStopped_=!entryRefused_;
     if(!offPending_||proneRest_)enterOff(false,faultLatched_?reason_:"SAFE_OFF_REQUESTED");
     serviceOff();return true;
   }
@@ -344,6 +347,27 @@ bool SimpleMotion::planInitialReference(){
   // This is physical path selection from measured Q, never route tracking.
   return certifiedRegion(reference_,initialRoute_);
 }
+void SimpleMotion::refuseEntry(){
+  // Only before REFERENCE wrote anything: an enabled servo is a fault.
+  if(energized_){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+  entryRefused_=true;entrySinceUs_=0;enterOff(false,"INITIAL_POSE_OUTSIDE_SAFE_ENTRY");
+}
+// The refused entry is re-evaluated passively, never acted on: the operator
+// repositions the robot, then a NEW explicit STAND runs the full ACQUIRE.
+// Same evidence as ACQUIRE, continuously: 12 fresh positions in a certified
+// region, at rest, no alarm, ACQUIRE temperature/voltage limits, torque OFF.
+// The evidence must hold until every servo's torque has been read again by
+// its periodic control read (one cycle, ~1.4 s): a pose crossing an
+// uncertified region or still moving restarts the window.
+bool SimpleMotion::entryReadmitted(uint64_t now){
+  InitialRoute route;
+  bool ok=fresh(now)&&certifiedRegion(measured(),route);
+  for(const auto& f:fb_)ok=ok&&f.torque==0&&!f.status&&f.temp<70&&f.voltage>=40&&f.voltage<=140&&magnitude(f.speed)<=50;
+  if(!ok){entrySinceUs_=0;return false;}
+  if(!entrySinceUs_)entrySinceUs_=now;
+  for(const auto& f:fb_)if(f.controlStampUs<entrySinceUs_)return false;
+  return true;
+}
 bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFrame& b,const collision::Box& box) const {
   // All independent joint progress between two endpoints is enclosed. No
   // assumption that twelve motors have the same instantaneous response.
@@ -380,6 +404,7 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
 const char* SimpleMotion::stand(double h,uint64_t now){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
+  if(entryRefused_)return "INITIAL_POSE_OUTSIDE_SAFE_ENTRY";  // until re-admitted (READY)
   // Reuse this admission's computed handoff; no second IK solve or persistent cache.
   WalkRecoveryStart recovery;
   if(stopActive_){if(const char* r=standResumeRefusal(now,recovery))return r;}
@@ -1271,7 +1296,8 @@ void SimpleMotion::update(uint64_t now){
   // Electrical supervision is not gated by the 20 ms trajectory release.
   if(engaged()&&!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!engaged()&&state_==State::READY&&(!input_.ready||!input_.powerOk||!input_.imuValid)){state_=State::STOPPED;reason_=input_.refusal;}
-  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_=proneRest_?"PRONE_REST":"READY";}
+  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_&&
+     (!entryRefused_||entryReadmitted(now))){state_=State::READY;reason_=proneRest_?"PRONE_REST":"READY";entryRefused_=false;}
   if(!input_.ready&&!engaged())return;
   if(!nextUs_)nextUs_=now;
   if(now<nextUs_)return;
@@ -1319,7 +1345,10 @@ void SimpleMotion::update(uint64_t now){
     if(f.torque!=0||f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");return;}
     if(++acquire_==12){
       reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-      if(!fresh(esp_timer_get_time())||!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+      // Stale feedback is a bus condition and stays a latched fault; a fresh
+      // pose outside every certified region is a recoverable entry refusal.
+      if(!fresh(esp_timer_get_time())){fault("SERVO_FEEDBACK_STALE");return;}
+      if(!planInitialReference()){refuseEntry();return;}
       phase_=Phase::REFERENCE;
     }
     return;
@@ -1327,7 +1356,7 @@ void SimpleMotion::update(uint64_t now){
   if(phase_==Phase::REFERENCE){
     // Write the real measured reference with torque OFF before enabling.
     reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-    if(!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+    if(!planInitialReference()){refuseEntry();return;}
     // ST-3215-C018 position-profile writes can arm torque (QC V6.1).
     // Restore OFF immediately; ENABLE independently verifies it per joint.
     energized_=true;offMask_=0; // even an uncertain reference TX may have armed
