@@ -80,7 +80,7 @@ int main(int argc,char** argv){
     tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
     for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}assert(r.m.state()==simple::State::WALKING);
     r.m.walkStop();assert(r.reachStand());report("JOYSTICK_steady",r,from);}
-  for(uint64_t seed:{1ull,2ull,3ull}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g(seed);double v[3]={lim[0]*.6,0,0};
+  for(uint64_t seed:{1ull,2ull,3ull}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g(seed);double v[3]={lim[0]*.6,lim[1]*.3,0};  // steered from the start (dev.5: fore/aft alone walks WALK STANDARD)
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     tilt(r,.2*degree,.5*degree);const size_t from=r.p.sent.size();
     // forward only (no reversal): every ~1.2 s a new point inside the ellipsoid
@@ -105,7 +105,7 @@ int main(int argc,char** argv){
   // (even seed: STOP, odd: WALK STOP) for a fault-rate comparison between trees.
   std::vector<uint64_t> seeds{11ull,12ull};
   if(const char* env=std::getenv("MATDOG_STRESS_SEEDS")){seeds.clear();std::string t(env);size_t p=0;while(p<t.size()){size_t q=t.find(' ',p);if(q==std::string::npos)q=t.size();if(q>p)seeds.push_back(std::stoull(t.substr(p,q-p)));p=q+1;}}
-  for(uint64_t seed:seeds){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g(seed);double v[3]={lim[0]*.5,0,0};
+  for(uint64_t seed:seeds){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g(seed);double v[3]={lim[0]*.5,lim[1]*.3,0};  // steered from the start (dev.5)
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     tilt(r,.2*degree,.5*degree);const size_t from=r.p.sent.size();uint64_t grid=r.p.now;unsigned skipped=0;
     auto release=[&](){grid+=simple::kPeriodUs;const uint64_t now=grid+uint64_t(g.next()*19000);

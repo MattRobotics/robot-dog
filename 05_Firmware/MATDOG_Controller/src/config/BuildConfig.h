@@ -95,7 +95,14 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   level correction accepted by a steered WALK_SETTLE in the fillet edge
 //   model is solved in that model (dev.3 hardware: NATIVE_TARGET_NOT_REACHED
 //   on the joystick restart after a reversal). Everything else unchanged.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.4"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.5: 1.0.2-dev.4 (installed, VH on fixture and floor 08/11) + a
+//   refused entry pose recoverable without power cycle (READY again on the
+//   ACQUIRE evidence, no movement); fore/aft joystick on the WALK STANDARD v2
+//   law (up to 20 mm/s forward, 10 mm/s backward, touch jitter never steers);
+//   in-place HTTP response reset (loop stack worst path -7 KB); refusal and
+//   entry diagnostics. Steered law, boxes, envelopes, geometry, calibration,
+//   STOP and drive {1000,50} unchanged. Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.5"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
