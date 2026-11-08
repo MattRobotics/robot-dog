@@ -60,7 +60,7 @@ int main(int argc,char** argv){
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
   const double T=simple::kWalkPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
-  struct Step{double seconds,v[3];bool silent;};std::vector<Step> steps;
+  struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);
       for(double t=0;t<total;){Step s{.25+std::rand()%700/100.,{0,0,0},false};double n=0;
@@ -68,6 +68,7 @@ int main(int argc,char** argv){
         n=std::sqrt(n);const double radius=std::rand()%3==0?1:std::rand()%1001/1000.;for(unsigned j=0;j<3;++j)s.v[j]*=radius/n*lim[j];
         steps.push_back(s);t+=s.seconds;}
       steps.push_back({1,{0,0,0},false});}
+    else if(std::sscanf(argv[a],"walk:%d:%lf",&seed,&total)==2){Step s{total,{0,0,0},false};s.walk=int(seed);steps.push_back(s);}  // "walk:<preset>:<seconds>"
     else{Step s{0,{0,0,0},false};char v[64]{};if(std::sscanf(argv[a],"%lf:%63s",&s.seconds,v)!=2)return 2;
       if(!std::strcmp(v,"-"))s.silent=true;else std::sscanf(v,"%lf,%lf,%lf",&s.v[0],&s.v[1],&s.v[2]);steps.push_back(s);}}
   simple::SimpleMotion m;Port port;simple::Inputs in;m.begin(&port);
@@ -80,7 +81,8 @@ int main(int argc,char** argv){
   Result r;motion::JointTargetFrame last{};
   for(const auto& st:steps){
     for(int n=0;n<std::lround(st.seconds*50);++n){
-      if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
+      if(st.walk>=0){if(n==0)m.walk(unsigned(st.walk),port.now);}
+      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
       tick();
       if(m.state()==simple::State::FAULT){r.end=std::string("FAULT ")+m.reason();break;}
       if(std::strcmp(m.phase(),"WALK_STANDARD"))continue;

@@ -176,7 +176,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
     uint64_t ext=0;for(unsigned k=0;k<simple::timing::EXTERNALS;++k)ext+=r.externalUs[k];
     auto sat64=[](uint64_t v){return static_cast<uint16_t>(v>65535?65535:v);};
     s.timingMeta[i][0]=sat64(r.latenessUs);s.timingMeta[i][1]=sat64(r.sinceReleaseUs);s.timingMeta[i][2]=sat64(ext);}
-  s.commandOverruns=t.overruns;s.overrunsTotal=simple::timing::overrunsTotal;
+  s.commandOverruns=t.overruns;s.overrunsTotal=simple::timing::overrunsTotal;for(unsigned k=0;k<8;++k)s.workHist[k]=static_cast<uint16_t>(t.workHist[k]>65535?65535:t.workHist[k]);
   if(t.maximum.valid){s.commandMaxWorkUs=t.maximum.workUs;s.commandMaxWorkPhase=t.maximum.phase;s.commandMaxCompensateUs=t.sectionMax[simple::timing::COMPENSATE];s.commandMaxSolves=t.maximum.work[simple::timing::SOLVES];}}
  s.offVerifiedUs=motion_->offVerifiedUs();
  s.referenceFaultSlot=motion_->referenceFaultSlot();
@@ -212,6 +212,8 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    boolean(s.stopActive),boolean(s.stopInProgress),boolean(s.stopVerified),boolean(s.stopSupportVerified),boolean(s.standResumeAllowed),s.standResumeReason?s.standResumeReason:"STAND_RECOVERY_AVAILABLE");
  add(",\"command_timing\":{\"missed\":%lu,\"first_miss_phase\":\"%s\",\"first_miss_lateness_us\":%lu,\"max_work_us\":%lu,\"max_work_phase\":\"%s\",\"max_compensate_us\":%lu,\"max_work_solves\":%lu,\"overruns\":%lu}",
    (unsigned long)s.commandMissed,s.firstMissPhase,(unsigned long)s.firstMissLatenessUs,(unsigned long)s.commandMaxWorkUs,s.commandMaxWorkPhase,(unsigned long)s.commandMaxCompensateUs,(unsigned long)s.commandMaxSolves,(unsigned long)s.commandOverruns);
+ // Releases of this command by work: <5,<10,<15,<20,<25,<30,<40,>=40 ms (fixed bins, p50/p95/p99 derived offline).
+ add(",\"work_hist\":[%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu]",(unsigned long)s.workHist[0],(unsigned long)s.workHist[1],(unsigned long)s.workHist[2],(unsigned long)s.workHist[3],(unsigned long)s.workHist[4],(unsigned long)s.workHist[5],(unsigned long)s.workHist[6],(unsigned long)s.workHist[7]);
  // [read,nominal,compensate,convert,frame,rest] us of one release, the same six
  // of the release before, then solves, ik, newton, fk of that release.
  for(unsigned i=0;i<2;++i){add("%s",i?",\"first_miss\":":",\"timing\":{\"max_work\":");

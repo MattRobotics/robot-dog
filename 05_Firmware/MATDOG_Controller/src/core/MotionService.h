@@ -1,7 +1,7 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
 namespace matdog { namespace core {
-constexpr size_t kMotionStatusJsonBytes=5248; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case)
+constexpr size_t kMotionStatusJsonBytes=5376; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case); 5248 + 128 for the work histogram (motion-perf-next D11)
 // Immutable per-request observation, transferred by the existing HTTP mailbox.
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
@@ -21,6 +21,7 @@ struct MotionStatusSnapshot {
   uint32_t activeSequence=0,acceptedMs=0,finishedMs=0;
   uint32_t tempSpikes=0,tempChecks=0;
   uint32_t overrunsTotal=0,commandOverruns=0;  // releases whose work exceeded 20 ms
+  uint16_t workHist[8]{};  // this command's releases by work: <5,<10,<15,<20,<25,<30,<40,>=40 ms (saturated)
   unsigned referenceFaultSlot=12;
   simple::State state=simple::State::STOPPED;
   float imuWanted[2]{},imuApplied[2]{};
@@ -36,7 +37,7 @@ struct MotionStatusSnapshot {
   bool joystick=false;
   char activeId[49]{};
 };
-static_assert(sizeof(MotionStatusSnapshot)<=1536,"bounded per-request Motion observation");
+static_assert(sizeof(MotionStatusSnapshot)<=1552,"bounded per-request Motion observation");  // 1536 + the 16 B work histogram (motion-perf-next D11)
 // Transport adapter only. SimpleMotion is the one operational state owner.
 class MotionService {
  public:

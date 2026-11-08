@@ -66,7 +66,13 @@ int main(int argc,char** argv){
     for(unsigned n=0;n<650;++n)r.tick();report("HOLD100_tilted",r,from);}
   for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
-    for(unsigned n=0;n<975;++n)r.tick();assert(r.m.state()==simple::State::WALKING);r.m.walkStop();assert(r.reachStand());
+    for(unsigned n=0;n<975;++n)r.tick();assert(r.m.state()==simple::State::WALKING);
+    // C7: WALK STOP -> STANDING decomposition on the rig (ideal tracking): quarter wait, decel cycle, settle window, native arrival.
+    {const double c0=r.m.walkCycles();r.m.walkStop();unsigned n=0,settle=0;for(;n<3000&&r.m.state()!=simple::State::STANDING;++n){r.tick();if(!settle&&!std::strcmp(r.m.phase(),"WALK_SETTLE"))settle=n;}
+     const double quarter=std::fmax(1.,std::ceil(c0*4)/4)-c0;
+     std::printf("  WALK STOP at cycle %.3f: wait to touchdown %.2f s + decel %.2f s + recentre %.2f s = %.2f s law; WALK_SETTLE entered at %.2f s, STANDING at %.2f s (native arrival %.2f s)\n",
+       c0,quarter*simple::kWalkPeriodS,simple::kWalkPeriodS,.075*simple::kWalkPeriodS,(quarter+1.075)*simple::kWalkPeriodS,settle*.02,n*.02,(n-settle)*.02);}
+    assert(r.m.state()==simple::State::STANDING);
     report(stride==1?"WALK45_tilted_stop":"WALK60_tilted_stop",r,from);}
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double v[3]={.5*lim[0],.5*lim[1],.5*lim[2]};
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
