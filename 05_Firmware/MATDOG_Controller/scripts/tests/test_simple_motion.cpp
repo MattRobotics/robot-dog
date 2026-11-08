@@ -1115,7 +1115,7 @@ static void entryRecovery(){
     refused(r,&service);
     const auto a=ack(r,service);assert(a.find("\"outcome\":\"ABORTED\",\"reason\":\"INITIAL_POSE_OUTSIDE_SAFE_ENTRY\",\"id\":\"entry-1\"")!=std::string::npos);
     // dev.5 diagnostics: the status names the joint farthest outside the entry region.
-    auto status=[&]{test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s,r.p.now/1000));return std::string(s);};
+    auto status=[&]{test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s-640,r.p.now/1000));return std::string(s);};  // inside the bounded budget
     // (SAFE_OFF verification pauses the fast reads: one population of fresh reads first)
     for(unsigned k=0;k<12;++k)r.tick();
     assert(status().find("\"entry_violation\":{\"joint\":\"RH_UPPER\",\"outside_mrad\":-60}")!=std::string::npos);
@@ -1188,7 +1188,8 @@ static void entryRecovery(){
     const double roll=.20;r.in.quaternion[0]=std::cos(roll/2);r.in.quaternion[1]=std::sin(roll/2);r.in.quaternion[2]=r.in.quaternion[3]=0;
     for(unsigned k=0;k<400&&std::strcmp(r.m.imuReason(),"WORKSPACE");++k)r.tick();
     assert(!std::strcmp(r.m.imuReason(),"WORKSPACE")&&r.m.imuRefusedBy()>0&&r.m.imuRefusedBy()<std::size(simple::kSafeChecks));
-    test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s,r.p.now/1000));
+    test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s-640,r.p.now/1000));  // inside the bounded budget
+    std::printf("refusal diagnostics: status %zu bytes (bounded budget %zu)\n",std::strlen(s),sizeof s-640);
     const std::string want=std::string("\"refused_by\":\"")+simple::kSafeChecks[r.m.imuRefusedBy()]+"\"";assert(std::strstr(s,want.c_str()));
     std::printf("refusal diagnostics: HOLD 150 under 0.2 rad of board roll, WORKSPACE refused_by %s\n",simple::kSafeChecks[r.m.imuRefusedBy()]);}
   std::puts("ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged");
