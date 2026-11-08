@@ -1,0 +1,16 @@
+HOLD100_tilted     frames=   39 digest=e28dce5b9db9d8bc state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=305/345/0 shadow=0.000tick maxRawStep=2 framesOutsideBox=0
+  WALK STOP at cycle 3.800: wait to touchdown 1.00 s + decel 5.00 s + recentre 0.50 s = 6.50 s law; WALK_SETTLE entered at 6.48 s, STANDING at 6.62 s (native arrival 0.14 s)
+WALK75_tilted_stop frames= 1293 digest=e888f3bf8bfe1c28 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=545/761/0 shadow=0.000tick maxRawStep=13 framesOutsideBox=0
+  WALK STOP at cycle 3.800: wait to touchdown 1.00 s + decel 5.00 s + recentre 0.50 s = 6.50 s law; WALK_SETTLE entered at 6.48 s, STANDING at 6.62 s (native arrival 0.14 s)
+WALK100_tilted_stop frames= 1294 digest=ad91c19a3bf276e1 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=617/689/0 shadow=0.000tick maxRawStep=17 framesOutsideBox=0
+JOYSTICK_steady    frames= 1299 digest=15d2d0f5fe006536 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=542/789/0 shadow=0.000tick maxRawStep=13 framesOutsideBox=0
+JOYSTICK_random_1  frames= 2137 digest=656bbe8f172dca65 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=938/1287/0 shadow=0.000tick maxRawStep=12 framesOutsideBox=0
+JOYSTICK_random_2  frames= 2153 digest=e56806ddc620ee1f state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=937/1288/0 shadow=0.000tick maxRawStep=13 framesOutsideBox=0
+JOYSTICK_random_3  frames= 2142 digest=dda06bdba81e7d65 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=914/1311/0 shadow=0.000tick maxRawStep=12 framesOutsideBox=0
+  STOP: plan built after 1 release(s), first arrest frame sent=yes, plan duration 0.20 s, verified after 103 releases (2.06 s)
+WALK75_STOP_at300  frames=  305 digest=62485bcc1b2567f2 state=STOPPED/STOP reason=STOPPED_SUPPORT_UNVERIFIED T1 light/full/rejected=115/185/0 shadow=0.000tick maxRawStep=12 framesOutsideBox=0
+  (skipped releases=20, missed counter=20)
+JOY_retarget_jitter_WALKSTOP_11 frames= 2297 digest=26296635915e3aa0 state=STANDING/HOLD reason=STAND_REACHED T1 light/full/rejected=987/1380/0 shadow=0.000tick maxRawStep=22 framesOutsideBox=0
+  STOP: plan built after 1 release(s), first arrest frame sent=yes, plan duration 0.09 s, verified after 102 releases (2.04 s)
+JOY_retarget_jitter_STOP_12 frames= 1937 digest=4839c4bc937e297e state=STOPPED/STOP reason=STOPPED_SUPPORT_UNVERIFIED T1 light/full/rejected=842/1158/0 shadow=0.000tick maxRawStep=22 framesOutsideBox=0
+digest complete (host replay only, no hardware)

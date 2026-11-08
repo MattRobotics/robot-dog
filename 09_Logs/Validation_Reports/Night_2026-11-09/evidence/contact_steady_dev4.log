@@ -1,0 +1,23 @@
+forward support 1.07 mm c0.120 | non-foot clearance 2.61 mm (lf_lower_leg_link) | foot penetration 0.077 mm | stance tilt 0.78 deg
+backward support 1.29 mm c0.249 | non-foot clearance 2.61 mm (rf_lower_leg_link) | foot penetration 0.077 mm | stance tilt 0.78 deg
+left support 2.93 mm c3.748 | non-foot clearance 2.29 mm (rh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 8.47 deg
+right support 2.45 mm c3.249 | non-foot clearance 2.28 mm (lh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 8.46 deg
+ccw support 2.30 mm c2.575 | non-foot clearance 2.24 mm (lh_lower_leg_link) | foot penetration 0.200 mm | stance tilt 9.65 deg
+cw support 1.85 mm c2.077 | non-foot clearance 2.24 mm (rh_lower_leg_link) | foot penetration 0.202 mm | stance tilt 9.67 deg
+octant_ppp support 4.19 mm c2.575 | non-foot clearance 2.23 mm (rf_lower_leg_link) | foot penetration 0.198 mm | stance tilt 8.43 deg
+octant_ppm support 4.50 mm c2.077 | non-foot clearance 2.18 mm (rh_lower_leg_link) | foot penetration 0.207 mm | stance tilt 9.74 deg
+octant_pmp support 4.91 mm c2.575 | non-foot clearance 2.18 mm (lh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 9.72 deg
+octant_pmm support 3.74 mm c2.077 | non-foot clearance 2.23 mm (lf_lower_leg_link) | foot penetration 0.201 mm | stance tilt 8.42 deg
+octant_mpp support 3.75 mm c3.748 | non-foot clearance 2.23 mm (rf_lower_leg_link) | foot penetration 0.202 mm | stance tilt 8.40 deg
+octant_mpm support 4.92 mm c3.249 | non-foot clearance 2.20 mm (lh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 9.72 deg
+octant_mmp support 4.51 mm c3.748 | non-foot clearance 2.20 mm (rh_lower_leg_link) | foot penetration 0.205 mm | stance tilt 9.74 deg
+octant_mmm support 4.18 mm c3.249 | non-foot clearance 2.23 mm (lf_lower_leg_link) | foot penetration 0.194 mm | stance tilt 8.42 deg
+lat_small support 3.26 mm c0.129 | non-foot clearance 2.49 mm (lf_lower_leg_link) | foot penetration 0.179 mm | stance tilt 2.00 deg
+yaw_small support 3.26 mm c0.129 | non-foot clearance 2.49 mm (lf_lower_leg_link) | foot penetration 0.183 mm | stance tilt 2.04 deg
+lat_mid support 5.91 mm c0.120 | non-foot clearance 2.35 mm (rf_lower_leg_link) | foot penetration 0.197 mm | stance tilt 5.64 deg
+yaw_mid support 5.91 mm c0.120 | non-foot clearance 2.35 mm (rf_lower_leg_link) | foot penetration 0.197 mm | stance tilt 5.69 deg
+turn_cw support 1.85 mm c5.077 | non-foot clearance 2.24 mm (rh_lower_leg_link) | foot penetration 0.203 mm | stance tilt 9.67 deg
+turn_ccw support 2.29 mm c5.575 | non-foot clearance 2.24 mm (lh_lower_leg_link) | foot penetration 0.201 mm | stance tilt 9.65 deg
+reverse_twice support 1.00 mm c2.077 | non-foot clearance 2.61 mm (rf_lower_leg_link) | foot penetration 0.077 mm | stance tilt 0.78 deg
+silent_client support 4.47 mm c2.575 | non-foot clearance 2.26 mm (rf_lower_leg_link) | foot penetration 0.193 mm | stance tilt 7.91 deg
+release_in_start support NOT_APPLICABLE | non-foot clearance NOT_APPLICABLE (no WALK frame)

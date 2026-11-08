@@ -1,0 +1,3 @@
+STOP preemption: short retry retains torque; continuous duplicates/concurrent STAND cannot extend deadline; crossing deadline in TX faults to SAFE_OFF 13/13
+FAULT: bounded feedback continues after SAFE_OFF 13/13; reason/FAULT/write fence retained, incoming STOP and SAFE_OFF still preempt reads
+PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED

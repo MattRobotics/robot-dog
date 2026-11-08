@@ -1,0 +1,8 @@
+random_1 support 0.57 mm c2.077 | non-foot clearance 2.27 mm (rh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 9.34 deg
+random_2 support 2.65 mm c1.077 | non-foot clearance 2.21 mm (rh_lower_leg_link) | foot penetration 0.203 mm | stance tilt 9.84 deg
+random_3 support 1.84 mm c14.166 | non-foot clearance 2.24 mm (lf_lower_leg_link) | foot penetration 0.204 mm | stance tilt 9.38 deg
+random_4 support 2.51 mm c2.578 | non-foot clearance 2.27 mm (lh_lower_leg_link) | foot penetration 0.202 mm | stance tilt 8.67 deg
+random_5 support 2.37 mm c4.080 | non-foot clearance 2.22 mm (lf_lower_leg_link) | foot penetration 0.203 mm | stance tilt 9.20 deg
+random_6 support 2.52 mm c1.246 | non-foot clearance 2.25 mm (rf_lower_leg_link) | foot penetration 0.202 mm | stance tilt 8.90 deg
+random_7 support 1.49 mm c2.640 | non-foot clearance 2.23 mm (lf_lower_leg_link) | foot penetration 0.202 mm | stance tilt 8.68 deg
+random_8 support 2.43 mm c11.157 | non-foot clearance 2.21 mm (lf_lower_leg_link) | foot penetration 0.205 mm | stance tilt 8.75 deg
