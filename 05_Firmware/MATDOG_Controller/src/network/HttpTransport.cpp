@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <memory>
 #include <new>
+#include <type_traits>
 
 #include "../config/TlsIdentity.h"
 #include "../update/Sha256.h"
@@ -574,8 +575,11 @@ void HttpTransport::update(uint32_t now_ms) {
 }
 
 void HttpTransport::serviceRequest(uint32_t now_ms) {
-  HttpTransportResponse &resp = pending_response_;
-  resp = HttpTransportResponse{};
+  // Reset in place: `resp = HttpTransportResponse{}` materialized a whole
+  // temporary (status text + Motion snapshot) on the loop task stack, the
+  // 7.4 KB frame under which a STAND/WALK command runs the Motion planner.
+  static_assert(std::is_trivially_destructible<HttpTransportResponse>::value,"in-place reset skips the destructor");
+  HttpTransportResponse &resp = *new (&pending_response_) HttpTransportResponse();
   const HttpTransportRequest &req = pending_request_;
   resp.sequence = req.sequence;
 
