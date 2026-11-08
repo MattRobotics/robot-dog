@@ -50,4 +50,10 @@ int main(){
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     tilt(r,.3*degree,.8*degree);Stat s;for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);s.release(r);}
     assert(r.m.state()==simple::State::WALKING);s.print("JOYSTICK tilted");}
+  // dev.5: fore/aft joystick at the dev.4 full scale (6.9 mm/s) with the ground
+  // touch jitter (0.1-0.4 mm/s lateral); dev.4 walked it with the steered law.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double jit[]={.0001,.0002,-.0003,.0004,-.0001,.0003};unsigned k=0;
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.0069,jit[k++%6],0,r.p.now);r.tick();}
+    tilt(r,.3*degree,.8*degree);Stat s;for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(.0069,jit[k++%6],0,r.p.now);s.release(r);}
+    assert(r.m.state()==simple::State::WALKING);s.print("JOY fore/aft jit");}
 }
