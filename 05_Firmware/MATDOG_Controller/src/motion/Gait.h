@@ -18,20 +18,33 @@ struct GaitParameters {
   // a front leg swings, changing only inside four-contact windows. Open-loop
   // geometry, not a feedback/stabilization controller.
   double swayXM = 0;
+  // WALK constant fore/aft body offset (m, forward +) that centres the COM
+  // over the foothold pattern; added to swayXM's offset with the same entry
+  // and recentring windows (four contacts), so the walk starts and ends in
+  // the canonical stand.
+  double comShiftXM = 0;
   // WALK lateral COM offset: +Y while the right legs swing, -Y while the left
   // legs swing. It changes only inside four-contact windows (duty-0.75 cycle),
   // so every three-contact interval holds a constant offset. With a terminal
-  // cycle T the walk ends at T+duty-0.75: the last window recentres to zero
-  // with four contacts. Open-loop geometry, not a balance controller.
+  // cycle T the walk ends at T+gaitSettleCycles: the last window recentres to
+  // zero with four contacts. Open-loop geometry, not a balance controller.
   double swayYM = 0;
   // Geometric stride ramps (cycles), C2 in the gait clock: the body progress
   // rate rises 0->1 over startCycles and, with a terminal cycle T, falls 1->0
   // over the stopCycles that end at T. Zero keeps the legacy law.
   double startCycles = 0, stopCycles = 0;
+  // WALK recentring window after the terminal touchdown (four contacts), in
+  // cycles; 0 keeps duty-0.75, the length of the regular four-contact window.
+  double settleCycles = 0;
   // > 0: stance contact may leave the nominal strip for the tread fillet up
   // to this foot-axis tilt (<= kEdgeContactMaxTiltRad); every foot target
   // then carries edgeContactLiftM. 0 keeps the nominal strip.
   double edgeTiltRad = 0;
+  // Horizontal swing profile. 0: smootherstep (C2). r in (0, 0.5): trapezoidal
+  // foot velocity, linear ramps over the first and last fraction r of the
+  // swing (C1): peak 1/(1-r) and acceleration 1/(r(1-r)) times the mean
+  // (smootherstep 1.875 and 5.77).
+  double swingRamp = 0;
   // WALK only: the time reverse of the forward leg order (LF, LH, RF, RH
   // instead of RH, RF, LH, LF), for backward travel. Same swing and four-contact
   // windows and fore/aft offsets; the lateral offset still moves away from
