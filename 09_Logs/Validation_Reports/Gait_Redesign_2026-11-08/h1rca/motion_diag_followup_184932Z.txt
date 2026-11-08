@@ -1,0 +1,27 @@
+2026-11-08T18:49:32.583+00:00 >>> @MOTION DIAG
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live us=749377882 ms=749377 state=FAULT phase=IDLE reason=NATIVE_TARGET_NOT_REACHED energized=0 releases=37171 missed=23 max_gap_us=46586 drive=480/13 goal_sent_us=462259634 settle_us=0 deadline_us=475807433 bms_valid=1 bms_ms=749361 pack_v=11.20 pack_a=-0.40 loaded_phase=NONE loaded_mask=0x000 loaded_since_us=0 temp_spikes=0 hot_pending=0x000
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live_j s=0 cmd=1986 raw=1989 err=-3 spd=0 load=0 cur=0 v=113 t=26 st=0 tq=0 tlim=1000 goal=1986 gs=480 acc=13 valid=1 age_us=17120 cage_us=1235344
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live_j s=1 cmd=2469 raw=2470 err=-1 spd=0 load=0 cur=0 v=113 t=25 st=0 tq=0 tlim=1000 goal=2469 gs=480 acc=13 valid=1 age_us=16277 cage_us=1115579
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live_j s=2 cmd=2075 raw=2076 err=-1 spd=0 load=0 cur=0 v=113 t=27 st=0 tq=0 tlim=1000 goal=2075 gs=480 acc=13 valid=1 age_us=117016 cage_us=993158
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live_j s=3 cmd=2031 raw=2031 err=0 spd=0 load=0 cur=0 v=113 t=25 st=0 tq=0 tlim=1000 goal=2031 gs=480 acc=13 valid=1 age_us=116261 cage_us=875011
+2026-11-08T18:49:32.588+00:00 MOTION_DIAG live_j s=4 cmd=1654 raw=1652 err=2 spd=0 load=0 cur=0 v=113 t=26 st=0 tq=0 tlim=1000 goal=1654 gs=480 acc=13 valid=1 age_us=97335 cage_us=755084
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=5 cmd=1873 raw=1870 err=3 spd=0 load=0 cur=0 v=113 t=27 st=0 tq=0 tlim=1000 goal=1873 gs=480 acc=13 valid=1 age_us=96533 cage_us=632952
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=6 cmd=2091 raw=2088 err=3 spd=0 load=0 cur=0 v=113 t=25 st=0 tq=0 tlim=1000 goal=2091 gs=480 acc=13 valid=1 age_us=77340 cage_us=514893
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=7 cmd=1177 raw=1181 err=-4 spd=0 load=0 cur=0 v=113 t=25 st=0 tq=0 tlim=1000 goal=1177 gs=480 acc=13 valid=1 age_us=76537 cage_us=395064
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=8 cmd=1615 raw=1616 err=-1 spd=0 load=0 cur=0 v=112 t=27 st=0 tq=0 tlim=1000 goal=1615 gs=480 acc=13 valid=1 age_us=57486 cage_us=273448
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=9 cmd=2030 raw=2022 err=8 spd=0 load=0 cur=0 v=113 t=28 st=0 tq=0 tlim=1000 goal=2030 gs=480 acc=13 valid=1 age_us=56707 cage_us=155509
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=10 cmd=2896 raw=2891 err=5 spd=0 load=0 cur=0 v=113 t=25 st=0 tq=0 tlim=1000 goal=2896 gs=480 acc=13 valid=1 age_us=35212 cage_us=35212
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG live_j s=11 cmd=2411 raw=2409 err=2 spd=0 load=0 cur=0 v=112 t=26 st=0 tq=0 tlim=1000 goal=2411 gs=480 acc=13 valid=1 age_us=36531 cage_us=1353853
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit valid=1 fault=1 reason=NATIVE_TARGET_NOT_REACHED phase=HEIGHT state=MOVING at_us=477842858 now_us=477839727 energized=1 releases=23595 missed=23 max_gap_us=46586 drive=480/13 goal_sent_us=462259634 settle_us=461239388 deadline_us=477832841 last_polled=5 loaded_phase=NONE loaded_mask=0x000
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit_j s=0 cmd=1986 raw=1988 err=-2 spd=0 load=24 cur=0 v=112 t=25 st=0 tq=1 tlim=1000 goal=1986 gs=480 acc=13 valid=1 age_us=42061 cage_us=419930
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit_j s=1 cmd=2469 raw=2470 err=-1 spd=0 load=0 cur=0 v=113 t=24 st=0 tq=1 tlim=1000 goal=2469 gs=480 acc=13 valid=1 age_us=41300 cage_us=299868
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit_j s=2 cmd=2075 raw=2076 err=-1 spd=0 load=0 cur=0 v=113 t=26 st=0 tq=1 tlim=1000 goal=2075 gs=480 acc=13 valid=1 age_us=22094 cage_us=179995
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit_j s=3 cmd=2031 raw=2031 err=0 spd=0 load=0 cur=0 v=113 t=24 st=0 tq=1 tlim=1000 goal=2031 gs=480 acc=13 valid=1 age_us=21094 cage_us=60257
+2026-11-08T18:49:32.589+00:00 MOTION_DIAG exit_j s=4 cmd=1654 raw=1652 err=2 spd=0 load=1048 cur=0 v=113 t=25 st=0 tq=1 tlim=1000 goal=1654 gs=480 acc=13 valid=1 age_us=1449 cage_us=1379937
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=5 cmd=1873 raw=1870 err=3 spd=0 load=1056 cur=0 v=113 t=26 st=0 tq=1 tlim=1000 goal=1873 gs=480 acc=13 valid=1 age_us=145 cage_us=1260372
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=6 cmd=2091 raw=2088 err=3 spd=0 load=1056 cur=1 v=113 t=25 st=0 tq=1 tlim=1000 goal=2091 gs=480 acc=13 valid=1 age_us=101798 cage_us=1140392
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=7 cmd=1177 raw=1181 err=-4 spd=0 load=40 cur=1 v=113 t=24 st=0 tq=1 tlim=1000 goal=1177 gs=480 acc=13 valid=1 age_us=100554 cage_us=1020331
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=8 cmd=1615 raw=1616 err=-1 spd=0 load=0 cur=0 v=113 t=26 st=0 tq=1 tlim=1000 goal=1615 gs=480 acc=13 valid=1 age_us=81327 cage_us=900312
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=9 cmd=2030 raw=2023 err=7 spd=0 load=1088 cur=2 v=113 t=27 st=0 tq=1 tlim=1000 goal=2030 gs=480 acc=13 valid=1 age_us=80033 cage_us=779853
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=10 cmd=2896 raw=2891 err=5 spd=0 load=1072 cur=2 v=113 t=24 st=0 tq=1 tlim=1000 goal=2896 gs=480 acc=13 valid=1 age_us=62355 cage_us=659677
+2026-11-08T18:49:32.590+00:00 MOTION_DIAG exit_j s=11 cmd=2411 raw=2409 err=2 spd=0 load=1048 cur=0 v=112 t=25 st=0 tq=1 tlim=1000 goal=2411 gs=480 acc=13 valid=1 age_us=61587 cage_us=539931
