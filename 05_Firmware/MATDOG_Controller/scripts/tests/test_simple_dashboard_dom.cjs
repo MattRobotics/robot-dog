@@ -105,9 +105,9 @@ async function boot(initialStatus = fx.status_ready) {
   assert(joystick && q('#joy-pad') && joystick.textContent.includes('Rotazione') && !joystick.querySelector('.joystick-badge') &&
     !/VERIFICATO SU HARDWARE|mm\/s|Trascinare/.test(joystick.textContent.replace(q('#joy-state').textContent, '')), 'compact joystick: no badge, no prose');
   assert(/Joystick \(verificato su hardware in dev\.15\): trascinare/.test(q('#simple-diagnostics').textContent) &&
-    /🐢 30, 45 o 🐇 60 mm è il passo per ciclo/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
+    /🐢 50, 75 o 🐇 100 mm è il passo per ciclo/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
   {
-    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); stride: 🐢 30 / 45 / 🐇 60 mm per cycle.
+    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); stride: 🐢 50 / 75 / 🐇 100 mm per cycle.
     // Choosing a value sends nothing: only STAND or WALK sends, and the Controller may refuse.
     const h = q('#simple-height'), before = p.calls.filter(c => c.url === '/api/motion/command').length;
     assert(h.type === 'range' && h.min === '50' && h.max === '150' && h.step === '5' && h.value === '150' && q('#simple-height-value').textContent === '150 mm');
@@ -119,7 +119,7 @@ async function boot(initialStatus = fx.status_ready) {
     h.value = '75'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true })); h.dispatchEvent(new p.dom.window.Event('change', { bubbles: true }));
     assert.strictEqual(q('#simple-height-value').textContent, '75 mm');
     const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-stride"]')];
-    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['0:🐢 30 mm', '1:45 mm', '2:🐇 60 mm']);
+    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['0:🐢 50 mm', '1:75 mm', '2:🐇 100 mm']);
     assert(radios[1].checked && /passo per ciclo/.test(q('#simple-stride').closest('fieldset').textContent) && /non velocità/.test(q('#simple-stride').getAttribute('aria-label')));
     radios[2].click(); radios[0].click(); radios[1].click(); await settle();
     assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a value change');
@@ -366,11 +366,11 @@ async function boot(initialStatus = fx.status_ready) {
   await send('stand150', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/STAND 150 mm/.test(last()));
 
-  // 3. WALK STANDARD presets 30/45/60 mm per 6.5 s cycle.
-  for (const [i, mm] of [[0, 30], [1, 45], [2, 60]]) {
+  // 3. WALK STANDARD presets 50/75/100 mm per 5 s cycle (WALK STANDARD v2).
+  for (const [i, mm] of [[0, 50], [1, 75], [2, 100]]) {
     await refresh(fx.status_ready);
     q('input[name="simple-stride"][value="' + i + '"]').click();
-    await send('walk' + mm, () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
+    await send('walk' + mm, () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.050, .075, .100][i] / 5.0, vy: 0, yaw_rate: 0 }, 1000);
     assert(new RegExp('WALK STANDARD ' + mm + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last());
   }
   // 4. WALK STOP: zero velocity, available while WALKING.
@@ -522,8 +522,8 @@ async function boot(initialStatus = fx.status_ready) {
   // dev.17: WALK after STOP is the ordinary WALK STANDARD preset; the Controller admits it.
   await refresh(fx.status_stopped_on);
   { const i = Number(q('input[name="simple-stride"]:checked').value);
-    await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
-    assert(new RegExp('WALK STANDARD ' + [30, 45, 60][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
+    await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.050, .075, .100][i] / 5.0, vy: 0, yaw_rate: 0 }, 1000);
+    assert(new RegExp('WALK STANDARD ' + [50, 75, 100][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
   await refresh(fx.status_stopped);
   // 6. Escape sends the same STOP intent, also while another command is in flight.
   await refresh(fx.status_ready);

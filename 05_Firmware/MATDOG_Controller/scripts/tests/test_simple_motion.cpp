@@ -326,8 +326,8 @@ static void standHoldTilt(){
 // production's use of the other three settled references. This models slow
 // planar/no-slip contact, not impact, friction, COM or physical stability.
 struct WalkBoardPlant {
-  Rig& r;motion::BodyPose actual{};double q[12]{};unsigned maxRawStep=0;double maxSteadyError=0;
-  explicit WalkBoardPlant(Rig& rig):r(rig){assert(r.m.state()==simple::State::WALKING);for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;}
+  Rig& r;motion::BodyPose actual{};double q[12]{};unsigned maxRawStep=0;double maxSteadyError=0;uint64_t lastUs=0;
+  explicit WalkBoardPlant(Rig& rig):r(rig),lastUs(rig.p.now){assert(r.m.state()==simple::State::WALKING);for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;}
   motion::BodyPose measuredBody(){
     const auto& f=simple::StopReferenceProbe::walkNominal(r.m);assert(f.target.valid);bool stance[4];unsigned count=0,newest=0;
     for(unsigned l=0;l<4;++l){stance[l]=f.cartesian.phases[l].stance;if(stance[l]){++count;if(f.cartesian.phases[l].phase<f.cartesian.phases[newest].phase)newest=l;}}
@@ -344,12 +344,16 @@ struct WalkBoardPlant {
     std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
     for(unsigned i=0;i<12;++i){const double target=(int(r.p.target[i])-2048)*simple::kTickRad;q[i]+=.2*(target-q[i]);r.p.observed[i].raw=2048+std::lround(q[i]/simple::kTickRad);r.p.observed[i].q=(int(r.p.observed[i].raw)-2048)*simple::kTickRad;}
     const auto world=LevelBoardPlant::multiply(motion::bodyPoseFromRollPitch({},boardRoll,boardPitch),measuredBody());LevelBoardPlant::quaternion(world,r.in.quaternion);r.tick(false);
+    // A late or missed release carries the law over the whole time since the
+    // last frame that changed the goals: the drive bound is per elapsed time.
+    const uint64_t intervalUs=std::max<uint64_t>(r.p.now-lastUs,simple::kPeriodUs);
+    if(!std::equal(previous.begin(),previous.end(),r.p.target))lastUs=r.p.now;
     if(r.m.state()==simple::State::FAULT){std::printf("WALK board fault=%s phase=%s board=%.6f,%.6f accepted=%.6f,%.6f cycles=%.6f\n",r.m.reason(),r.m.phase(),boardRoll,boardPitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.walkCycles());std::fflush(stdout);}assert(r.m.state()!=simple::State::FAULT);
     for(unsigned i=0;i<12;++i){const double target=motion::jointSlot(r.m.target(),i),decoded=(int(r.p.target[i])-2048)*simple::kTickRad;
       assert(target>=r.in.minRad[i]&&target<=r.in.maxRad[i]&&decoded>=r.in.minRad[i]&&decoded<=r.in.maxRad[i]);
       const auto& box=simple::StopReferenceProbe::box(r.m);  // the walk's own certified box
       assert(target>=box.lo[i]&&target<=box.hi[i]&&decoded>=box.lo[i]&&decoded<=box.hi[i]);
-      const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*simple::kPeriodUs/1e6))+1);}
+      const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*intervalUs/1e6))+1);}
     const auto frames=r.p.frames;const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m);r.m.update(r.p.now);
     assert(r.p.frames==frames&&simple::StopReferenceProbe::roll(r.m)==roll&&simple::StopReferenceProbe::pitch(r.m)==pitch);return world;
   }
@@ -364,9 +368,9 @@ struct WalkBoardPlant {
     for(unsigned n=1;n<=count;++n)step(fromRoll+(toRoll-fromRoll)*n/count,fromPitch+(toPitch-fromPitch)*n/count);}
   void holdLimited(double pitch,unsigned count=1000){double minimum=10,maximum=0;unsigned limited=0;const unsigned cycle=unsigned(std::ceil(simple::kWalkPeriodS*1e6/simple::kPeriodUs));
     for(unsigned n=0;n<count;++n){const auto world=step(0,pitch);if(n+cycle>=count){const double e=LevelBoardPlant::error(world);minimum=std::fmin(minimum,e);maximum=std::fmax(maximum,e);limited+=r.m.stabilizationLimited();}}
-    // Positive board pitch reaches the real front-joint/STOP boundary sooner.
-    // Outside that demonstrated domain require a declared bounded residual,
-    // rather than calling a non-level body fully compensated.
+    // Past the stride's tilt envelope (kWalkTilt75/kWalkTilt100) require a
+    // declared bounded residual, rather than calling a non-level body fully
+    // compensated.
     assert(limited>cycle/2&&minimum>.25*3.14159265358979323846/180&&maximum<std::abs(pitch));
     assert(pitch*simple::StopReferenceProbe::pitch(r.m)<0&&std::abs(simple::StopReferenceProbe::pitch(r.m))>.001);
     std::printf("WALK board bounded pitch=%.3fdeg residual=[%.6f,%.6f]deg limited_tail=%u/%u\n",pitch*180/3.14159265358979323846,minimum*180/3.14159265358979323846,maximum*180/3.14159265358979323846,limited,cycle);}
@@ -382,14 +386,17 @@ static void walkLevelBoard(){
     assert(entry&&r.m.state()==simple::State::WALKING&&r.m.requestedHeightM()==simple::kWalkHeightM&&r.p.enables==enables&&r.p.offCalls==off);
     for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(before[i]))<=1);
     WalkBoardPlant plant(r);plant.hold(0,0,650);
-    for(double pitch:{(stride==1?2.:.3)*degree,-2*degree,-4*degree}){plant.ramp(0,0,0,pitch);plant.hold(0,pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
-    for(double pitch:{2*degree,4*degree}){if(stride==1&&pitch==2*degree)continue;plant.ramp(0,0,0,pitch);plant.holdLimited(pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    // Board pitch inside / past the stride's envelope: the correction is about
+    // minus the board pitch, kWalkTilt75 +3.8/-4.7 deg, kWalkTilt100 +2.2/-1.07 deg.
+    const std::vector<double> feasible=stride==1?std::vector<double>{2,-2,4}:std::vector<double>{.3,-2},bounded=stride==1?std::vector<double>{-5,6}:std::vector<double>{2,4,-4};
+    for(double pitch:feasible){pitch*=degree;plant.ramp(0,0,0,pitch);plant.hold(0,pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    for(double pitch:bounded){pitch*=degree;plant.ramp(0,0,0,pitch);plant.holdLimited(pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
     for(double sign:{1.,-1.}){plant.ramp(0,0,sign*.25*degree,0);plant.hold(sign*.25*degree,0,650);plant.ramp(sign*.25*degree,0,sign*.25*degree,-2*degree);plant.hold(sign*.25*degree,-2*degree);plant.ramp(sign*.25*degree,-2*degree,0,0);plant.hold(0,0,650);}
     plant.ramp(0,0,.25*degree,-2*degree);plant.hold(.25*degree,-2*degree);r.m.walkStop();
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n)plant.step(.25*degree,-2*degree);
     assert(r.m.state()==simple::State::STANDING&&!std::strcmp(r.m.reason(),"STAND_REACHED")&&r.m.requestedHeightM()==simple::kWalkHeightM);plant.hold(.25*degree,-2*degree,650);
     assert(r.p.enables==enables&&r.p.offCalls==off);
-    std::printf("WALK%u closed-loop movingboard feasible pitch %.1f/-2/-4deg, bounded +4%s, roll+/-0.25deg/combined, HOLD%.0f reached; max_RAW=%u max_steady_error=%.6fdeg\n",unsigned(simple::kStrideM[stride]*1000),stride==1?2.:.3,stride==2?"/+2":"",simple::kWalkHeightM*1000,plant.maxRawStep,plant.maxSteadyError/degree);
+    std::printf("WALK%u closed-loop movingboard feasible pitch %s deg, bounded %s deg, roll+/-0.25deg/combined, HOLD%.0f reached; max_RAW=%u max_steady_error=%.6fdeg\n",unsigned(simple::kStrideM[stride]*1000),stride==1?"+2/-2/+4":"+0.3/-2",stride==1?"-5/+6":"+2/+4/-4",simple::kWalkHeightM*1000,plant.maxRawStep,plant.maxSteadyError/degree);
   }
   for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const auto enables=r.p.enables,off=r.p.offCalls;assert(!r.m.walk(stride,r.p.now));for(unsigned n=0;n<10;++n)r.tick();assert(r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.phase(),"HEIGHT"));
     r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
@@ -430,7 +437,7 @@ static void walkTxLatency(){
 // law, the ESP clock deadline, the fore/aft leg order latched per walk.
 // Scripted observation and a kinematic board plant: no motor or contact model.
 static void joystickWalk(){
-  constexpr double degree=3.14159265358979323846/180,T=simple::kWalkPeriodS;
+  constexpr double degree=3.14159265358979323846/180,T=simple::kJoystickPeriodS;
   const double lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
   using V3=std::array<double,3>;
   auto drive=[](Rig& r,V3 v){return r.m.drive(v[0],v[1],v[2],r.p.now);};
@@ -554,7 +561,7 @@ static void joystickWalk(){
     for(unsigned n=0;n<3000&&api.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED||api.m.state()==simple::State::MOVING);api.tick();}
     assert(api.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(api.m));
     for(unsigned n=0;n<200;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED);api.tick();}
-    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/T);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
+    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/simple::kWalkPeriodS);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
     test_clock_us=api.p.now;service.update();char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,api.p.now/1000));
     char want[256];std::snprintf(want,sizeof want,"\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":true}",-lim[0]*.6,-lim[1]*.5,lim[2]*.5);assert(std::strstr(status,want));
     char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));
@@ -810,7 +817,7 @@ static void lookaheadWalk(){
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();for(unsigned n=0;n<300+extra;++n)r.tick();
     r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized());}
   // Steered walk with a rate-limited retarget every 12 releases: alternation continues (retargets are tolerated).
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kWalkPeriodS;double v[3]={.5*simple::kJoystickStrideM/T,.2*simple::kJoystickLateralM/T,.1*simple::kJoystickYawRad/T};
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kJoystickPeriodS;double v[3]={.5*simple::kJoystickStrideM/T,.2*simple::kJoystickLateralM/T,.1*simple::kJoystickYawRad/T};
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
     const auto s0=r.m.lookaheadStats();
     for(unsigned n=0;n<600;++n){if(n%12==0){v[1]=(n%24?.3:-.3)*simple::kJoystickLateralM/T;assert(!r.m.drive(v[0],v[1],v[2],r.p.now));}r.tick();assert(r.m.state()==simple::State::WALKING);}
@@ -836,7 +843,7 @@ static void stopRateHistory(){
   auto stopSpan=[](const Rig& r){const uint64_t t[3]={P::issuedUs(r.m),P::previousUs(r.m),P::previous2Us(r.m)};uint64_t span=0;
     for(unsigned k=1;k<3;++k){if(!t[k]||t[0]<=t[k])break;span=t[0]-t[k];if(span>=simple::kPeriodUs)break;}return span;};
   auto maxPlanV=[](const Rig& r){double v=0;for(double x:P::stopPlan(r.m).v)v=std::fmax(v,std::abs(x));return v;};
-  const double T=simple::kWalkPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
   // The law's joint speed stays below 0.82 rad/s (walk tilt envelope check);
   // one RAW tick of quantization over one period adds 0.077 rad/s.
   constexpr double kLawRateBound=1.0;
@@ -899,10 +906,10 @@ static void stopRateHistory(){
 // band (<= 5 mm), 3.3 % takes the full 14 mm and keeps it until the demand
 // falls under 1.5 %; the amplitude changes only while all four feet are down.
 static void swayMap(){
-  using P=simple::StopReferenceProbe;const double T=simple::kWalkPeriodS,vx=.8*simple::kJoystickStrideM/T;
-  auto walking=[](Rig& r,double vy){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(!r.m.drive(.8*simple::kJoystickStrideM/simple::kWalkPeriodS,vy,0,r.p.now));r.tick();}assert(r.m.state()==simple::State::WALKING);};
+  using P=simple::StopReferenceProbe;const double T=simple::kJoystickPeriodS,vx=.8*simple::kJoystickStrideM/T;
+  auto walking=[](Rig& r,double vy){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(!r.m.drive(.8*simple::kJoystickStrideM/simple::kJoystickPeriodS,vy,0,r.p.now));r.tick();}assert(r.m.state()==simple::State::WALKING);};
   {Rig r;walking(r,.029*simple::kJoystickLateralM/T);for(unsigned n=0;n<200;++n){if(n%12==0)r.m.drive(vx,.029*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}
-    const double a=P::gait(r.m).swayYM;assert(a>simple::kWalkSwayYM&&a<=simple::kJoystickSwayLowM+1e-12);
+    const double a=P::gait(r.m).swayYM;assert(a>simple::kJoystickSwayBaseYM&&a<=simple::kJoystickSwayLowM+1e-12);
     // raise to 3.3 %: full amplitude, reached only through four-contact windows
     double last=a;unsigned changes=0,changesWithSwing=0;
     for(unsigned n=0;n<1300;++n){if(n%12==0)r.m.drive(vx,.033*simple::kJoystickLateralM/T,0,r.p.now);
@@ -912,7 +919,7 @@ static void swayMap(){
     // 2.5 %: above the release threshold, stays full; 1 %: back to the low band
     for(unsigned n=0;n<400;++n){if(n%12==0)r.m.drive(vx,.025*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
     for(unsigned n=0;n<1300;++n){if(n%12==0)r.m.drive(vx,.01*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}
-    const double low=P::gait(r.m).swayYM;assert(low<simple::kJoystickSwayLowM&&low>simple::kWalkSwayYM&&r.m.state()==simple::State::WALKING);
+    const double low=P::gait(r.m).swayYM;assert(low<simple::kJoystickSwayLowM&&low>simple::kJoystickSwayBaseYM&&r.m.state()==simple::State::WALKING);
     r.m.walkStop();assert(r.reachStand());}
   {Rig r;walking(r,.033*simple::kJoystickLateralM/T);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);r.m.walkStop();assert(r.reachStand());}  // full from the start
   std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %, amplitude changes only with four feet down PASS (software only)");
@@ -922,7 +929,7 @@ static void swayMap(){
 // a support-frame pitch at the polygon's pitch-up vertex is a body roll and is
 // limited to the roll vertex, taken back into the support frame.
 static void steeredEnvelopeHeading(){
-  Rig r;const double T=simple::kWalkPeriodS;assert(!r.m.drive(.5*simple::kJoystickStrideM/T,0,0,r.p.now));
+  Rig r;const double T=simple::kJoystickPeriodS;assert(!r.m.drive(.5*simple::kJoystickStrideM/T,0,0,r.p.now));
   for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.5*simple::kJoystickStrideM/T,0,0,r.p.now);r.tick();}assert(r.m.state()==simple::State::WALKING);
   double roll=.0,pitch=.05;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&pitch==.05);           // inside, identity heading, untouched
   roll=.0;pitch=.10;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&std::abs(pitch-.07)<1e-12);     // pitch-up vertex, identity heading
@@ -942,9 +949,11 @@ int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopR
   // Exercise the production gait + IK across every join: swing lift-off and
   // touchdown, four-contact sway windows, end of the start ramp, decel start,
   // terminal touchdown and recentring end, for each stride and quarter stop.
+  // Velocity is continuous everywhere (C1); acceleration too (C2) except the
+  // swinging foot's own lift-off/touchdown with the trapezoidal swing, whose
+  // velocity ramps start and end there by design (Gait.h swingRamp).
   for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
-    motion::GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
-    g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=simple::kWalkStartCycles;g.stopCycles=simple::kWalkStopCycles;
+    const auto g=simple::walkGait(stride);
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
       const double c=base+event;if(c<=1e-6||c>=terminal+w-1e-6)continue;
@@ -959,7 +968,8 @@ int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopR
       for(unsigned l=0;l<4;++l){
         const auto av=a.velocityRadS[l],bv=b.velocityRadS[l],aa=a.accelerationRadS2[l],ba=b.accelerationRadS2[l];
         assert(std::abs(av.hip-bv.hip)<1e-4&&std::abs(av.upper-bv.upper)<1e-4&&std::abs(av.lower-bv.lower)<1e-4);
-        assert(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002);
+        const bool corner=g.swingRamp>0&&a.cartesian.phases[l].stance!=b.cartesian.phases[l].stance;
+        assert(corner||(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002));
       }
       for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(a.target,i)-motion::jointSlot(b.target,i))<1e-5);
     }
