@@ -309,8 +309,11 @@ class SimpleMotion {
   Phase stopOrigin_=Phase::IDLE;
   // Writer-owned samples of the accepted RAW reference (including unchanged
   // held goals). Timestamped with the ESP clock after TX, not release entry.
-  uint16_t previousRaw_[12]{};
-  uint64_t issuedUs_=0,previousUs_=0;
+  // Two accepted references before the current one: the STOP reference rate
+  // is a secant over a window of at least one release period (rateFromHistory).
+  uint16_t previousRaw_[12]{},previous2Raw_[12]{};
+  uint64_t issuedUs_=0,previousUs_=0,previous2Us_=0;
+  bool rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const;
   Phase issuedPhase_=Phase::IDLE;
   bool issuedPlanned_=false;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;

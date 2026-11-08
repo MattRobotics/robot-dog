@@ -166,7 +166,7 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   // motion or after completion starts SAFE_OFF again from the broadcast.
   const bool repeated=!fault&&state_==State::STOPPED&&offPending_;
   faultLatched_=faultLatched_||fault;state_=faultLatched_?State::FAULT:State::STOPPED;reason_=r;
-  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=0;
+  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=previous2Us_=0;
   if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;proneRest_=false;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
@@ -199,13 +199,32 @@ void SimpleMotion::rememberReference(uint64_t now){
   // for an unchanged RAW goal. Never publish a failed/preempted frame.
   // now is the instant the reference was sampled at, not TX completion:
   // compute/bus latency must not shorten the secant of the reference.
-  if(issuedUs_&&now>issuedUs_){previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
+  if(issuedUs_&&now>issuedUs_){
+    previous2Us_=previousUs_;std::copy(previousRaw_,previousRaw_+12,previous2Raw_);
+    previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
   issuedUs_=now;
   if(stopActive_)return; // keep the revoked operation metadata, not stale RAW history
   // A pending posture command first releases the levelled HOLD reference.
   // Its samples are synchronous HOLD, not an endpoint-only native move. Set
   // this before send() services a STOP which may have arrived during TX.
   issuedPhase_=pendingGoalValid_&&(phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)?Phase::HOLD:phase_;issuedPlanned_=planned_;
+}
+// Reference rate for a STOP plan: secant between q (sampled at atUs) and the
+// most recent accepted reference at least one release period older, from the
+// history (current, previous, previous but one), after skipping `skip`
+// entries; the oldest available if none spans a period. Two references issued
+// a few ms apart differ by RAW quantization (one tick over 1.5 ms would read
+// as ~1 rad/s, a rate no law commands), so the window is never shorter than
+// the reference's own sampling period when the history allows it. The span
+// is bounded to 100 ms (stale history); only C0 is claimed at the handoff.
+bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
+  const uint16_t* raws[3]={commandedRaw_,previousRaw_,previous2Raw_};const uint64_t times[3]={issuedUs_,previousUs_,previous2Us_};
+  const uint16_t* far=nullptr;uint64_t farUs=0;
+  for(unsigned k=skip;k<3;++k){if(!times[k]||atUs<=times[k])break;far=raws[k];farUs=times[k];if(atUs-times[k]>=kPeriodUs)break;}
+  if(!far||atUs-farUs>100000)return false;
+  const double dt=(atUs-farUs)/1e6;
+  for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,far[i],old))return false;v[i]=std::clamp((q[i]-old)/dt,-vmax,vmax);}
+  return true;
 }
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
@@ -231,23 +250,13 @@ void SimpleMotion::beginStop(uint64_t now){
   // only a new bounded reference rate; it is not a measured motor velocity
   // or an analytic derivative of the preceding IMU-corrected signal.
   double q[12]{},v[12]{},a[12]{},lo[12],hi[12];JointTargetFrame start;start.valid=true;
-  const double dtRaw=previousUs_&&issuedUs_>previousUs_?(issuedUs_-previousUs_)/1e6:0;
-  if(!(dtRaw>0&&dtRaw<=.1)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
-  // The rate is read over at least one release period: two references issued
-  // a few ms apart (a late release followed by one on time) differ by RAW
-  // quantization, and one tick over 1.5 ms reads as ~1 rad/s, a rate no law
-  // commands. Only C0 is claimed at the handoff (StopPlan.h); the same floor
-  // is used by compensationSafe's proof (review 2026-11-08).
-  const double dt=std::fmax(dtRaw,kPeriodUs/1e6);
-  const double vmax=commandedDrive_.speed*kTickRad;
-  for(unsigned i=0;i<12;++i){double previous=0;
-    if(!port_->decodeRaw(i,commandedRaw_[i],q[i])||!port_->decodeRaw(i,previousRaw_[i],previous)){
-      fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
-    jointSlot(start,i)=q[i];
-    v[i]=std::clamp((q[i]-previous)/dt,-vmax,vmax);
-    // Zero is the chosen initial acceleration of the NEW reference. We do
-    // not fit or promise continuity of an undefined prior acceleration.
-  }
+  if(!(previousUs_&&issuedUs_>previousUs_&&issuedUs_-previousUs_<=100000)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
+  for(unsigned i=0;i<12;++i){if(!port_->decodeRaw(i,commandedRaw_[i],q[i])){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}jointSlot(start,i)=q[i];}
+  // Rate: secant from the current reference back over at least one period
+  // (rateFromHistory, the same estimate compensationSafe proves against).
+  // Zero is the chosen initial acceleration of the NEW reference. We do not
+  // fit or promise continuity of an undefined prior acceleration.
+  if(!rateFromHistory(q,issuedUs_,1,commandedDrive_.speed*kTickRad,v)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
   stopBox_=source==Phase::WALK?&walkBox():segmentBox_;
   if(!stopBox_)stopBox_=contains(collision::kHeight,start)?&collision::kHeight:&collision::kLift;
   if((!contains(*stopBox_,measured())||!contains(*stopBox_,start))&&contains(collision::kLift,start)&&contains(collision::kLift,measured()))stopBox_=&collision::kLift;
@@ -949,10 +958,9 @@ bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::B
   const Drive drive=phase_==Phase::WALK?kWalkDrive:kStandDrive;
   // Same secant STOP would take after this send: both samples on the reference clock.
   if(nowUs_<=issuedUs_)return false;
-  StopPlan arrest;double lo[12],hi[12];const double dt=std::fmax((nowUs_-issuedUs_)/1e6,kPeriodUs/1e6);  // same rate floor as beginStop
-  for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
-    arrest.q[i]=jointSlot(decoded,i);arrest.v[i]=std::clamp((arrest.q[i]-old)/dt,-drive.speed*kTickRad,drive.speed*kTickRad);
-    lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
+  StopPlan arrest;double lo[12],hi[12];
+  for(unsigned i=0;i<12;++i){arrest.q[i]=jointSlot(decoded,i);lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
+  if(!rateFromHistory(arrest.q,nowUs_,0,drive.speed*kTickRad,arrest.v))return false;  // same estimate beginStop would take after this send
   return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad);
 }
 // One slew step per Motion release, scaled by the physical time since the last
@@ -1173,13 +1181,15 @@ void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,dou
   auto cyc=[&](uint64_t us){return double(us-walkStartUs_)/1e6/kWalkPeriodS;};
   const bool shape=walkExactUs_&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g);
   if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
-  bool solved=false;
   if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactUs_+2*kPeriodUs)){
-    // Start, missed release or structural change: exact solution at this grid point.
+    // Start, missed release or structural change: exact solution at this grid
+    // point, sent as it is; the look-ahead is solved by the next release so
+    // that no release ever carries two nominal solves.
     solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(gridUs),0,0,terminal),&walkPrevious_,false);
-    walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;solved=true;++lookaheadStats_.resync;
-    if(!walkExact_.target.valid){f=walkExact_;return;}
+    walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
+    f=walkExact_;return;
   }
+  bool solved=false;
   if(!walkAheadValid_){
     const double ca=cyc(walkExactUs_+2*kPeriodUs);
     if(terminal<0||ca<=terminal+gaitSettleCycles(g)){
