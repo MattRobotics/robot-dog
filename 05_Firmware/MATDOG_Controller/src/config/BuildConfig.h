@@ -81,7 +81,12 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   gait law, geometry, boxes, calibration, STOP and drive profile unchanged.
 //   Identity proposed by the motion-perf-next branch, to be agreed before any
 //   flash; the installed firmware stays 1.0.1-dev.17 (APP 14e055a0...).
-constexpr const char* kFirmwareVersion = "1.0.2-dev.1"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.2: 1.0.2-dev.1 + WALK STANDARD v2 (gait redesign): COM-centred
+//   crawl, duty .80, trapezoidal swing velocity, 50/75/100 mm per 5 s cycle
+//   (10/15/20 mm/s) with the qualified drive {1000,50} and the kHeight box;
+//   eased walk start clock; IMU tilt envelopes recomputed; JOYSTICK law,
+//   geometry, boxes, calibration, STOP unchanged. Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.2"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

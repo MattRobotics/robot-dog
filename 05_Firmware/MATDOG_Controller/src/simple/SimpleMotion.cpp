@@ -65,32 +65,6 @@ template<unsigned N> unsigned nearestVia(const unsigned (&knots)[N],const JointT
 }
 constexpr unsigned kDeployEnd=collision::kDeployKnots[sizeof(collision::kDeployKnots)/sizeof(collision::kDeployKnots[0])-1];
 static_assert(kDeployEnd==collision::kLiftKnots[0],"DEPLOY ends where LIFT starts");
-// Inner convex envelope of the unchanged HEIGHT box, gen-1 RAW, nominal
-// support strip (including rounding), and the existing StopPlan over the full
-// WALK120/2mm-sway phase set. Vertices are roll/pitch BODY-in-support radians;
-// they are not independent rectangular limits or a claim of physical contact.
-struct TiltVertex { double roll,pitch; };
-constexpr TiltVertex kWalkTilt45[]={
- {0.014807950855685186,0.03574955578674701},
- {0,0.11930093706093331},
- {-0.014656913177372907,0.035384918575352142},
- {-0.011779818742757926,-0.028438998171065412},
- {-0,-0.053422005857361891},
- {0.011644818622368949,-0.028113079049515703},
-};
-constexpr TiltVertex kWalkTilt60[]={
- {0.014373513909108453,0.014373513909108453},
- {0.013471848316828587,0.032523918916725118},
- {0,0.10137685731507248},
- {-0.013436993467988561,0.032439771867942953},
- {-0.014373513909108453,0.014373513909108453},
- {-0.0085559368620721186,-0.0035439850870762082},
- {-0.0067072009272594714,-0.0067072009272594714},
- {-0.0034862036684149191,-0.0084164401774712468},
- {-0,-0.0084610410728295175},
- {0.0065962325017923174,-0.0065962325017923174},
- {0.0085559368620717925,-0.0035439850870778045},
-};
 // Level correction about the support axes, composed with the gait heading:
 // the support fit returns gravity's tilt in the support frame. Identity
 // heading (every unsteered walk) returns the roll/pitch pose bit for bit.
@@ -108,17 +82,20 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
   if(scale>=1)return false;
   roll*=scale;pitch*=scale;return true;
 }
-GaitParameters walkGait(unsigned stride){
-  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
-  g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;return g;
-}
-GaitParameters steerGait(const double goal[3]){
-  auto g=walkGait(0);g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
-  g.swayYM=joystickSwayYM(goal[1],goal[2],kWalkSwayYM);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
-}
 // Inner convex envelope of kSteer, gen-1 RAW, the tread fillet up to
 // kEdgeContactMaxTiltRad and STOP over the steered phase set (offline rays).
 constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.07},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
+}
+GaitParameters walkGait(unsigned stride){
+  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
+  g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+  g.comShiftXM=kWalkComShiftXM;g.swingRamp=kWalkSwingRamp;g.settleCycles=kWalkSettleCycles;return g;
+}
+GaitParameters steerGait(const double goal[3]){
+  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kJoystickDuty;
+  g.swayXM=kJoystickSwayXM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+  g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
+  g.swayYM=joystickSwayYM(goal[1],goal[2],kJoystickSwayBaseYM);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
 bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   timing::Section section(timing::READ);
@@ -393,7 +370,7 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   held.valid=true;
   for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return false;
   const auto& g=gait_;
-  c=cycles_+.5*stopPlan_.duration/kWalkPeriodS;
+  c=cycles_+.5*stopPlan_.duration/period();
   stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
   c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
   auto track=track_;  // the admission check never advances the live track
@@ -562,7 +539,7 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
 }
 const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now){
   if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
-  const double goal[3]={vx*kWalkPeriodS,vy*kWalkPeriodS,yawRate*kWalkPeriodS},limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};
+  const double goal[3]={vx*kJoystickPeriodS,vy*kJoystickPeriodS,yawRate*kJoystickPeriodS},limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};
   double norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(goal[j]))return "JOYSTICK_VELOCITY_RANGE";norm+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
   if(norm==0||norm>1+1e-9)return "JOYSTICK_VELOCITY_RANGE";
   // A walk keeps the leg order of its fore/aft direction: forward, or its time
@@ -899,7 +876,7 @@ void SimpleMotion::steerWalk(uint64_t now){
   // Lateral sway follows the rate-limited lateral/yaw demand, changing only
   // while all four feet are down (last nominal sample): the body never crosses
   // the fillet contact band (SimpleMotion.h) during a three-contact phase.
-  const double swayRate=(kJoystickSwayYM-kWalkSwayYM)/kJoystickSwayRampCycles;
+  const double swayRate=(kJoystickSwayYM-kJoystickSwayBaseYM)/kJoystickSwayRampCycles;
   bool fourDown=true;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
   if(fourDown)next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad,gait_.swayYM)-next.swayYM,-swayRate*dc,swayRate*dc);
   if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_)){
@@ -909,7 +886,7 @@ void SimpleMotion::steerWalk(uint64_t now){
     gait_=next;}
 }
 bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) const {
-  if(!steered_)return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
+  if(!steered_)return stride_==2?projectWalkTilt(kWalkTilt100,roll,pitch):projectWalkTilt(kWalkTilt75,roll,pitch);
   // The steered envelope bounds the hip roll and fillet tilt the correction
   // loads on the stance legs, a body-frame quantity, while the fitted tilt and
   // headed() live in the support frame. Take the tilt vector into the heading
@@ -1145,7 +1122,8 @@ namespace {
 // gaitRetarget by rate-limited steps that keep the body pose continuous.
 bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
   return a.type==b.type&&a.heightM==b.heightM&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&
-    a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition;
+    a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition&&
+    a.comShiftXM==b.comShiftXM&&a.swingRamp==b.swingRamp&&a.settleCycles==b.settleCycles;
 }
 }
 // T2: the reference at the release clock, linear in joint space between the
@@ -1194,15 +1172,19 @@ void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,dou
   // before this release): the law's track is sampled in order, two periods
   // at a time, and every release clock falls inside [exact, ahead).
   const uint64_t gridUs=nextUs_-kPeriodUs;
-  auto cyc=[&](uint64_t us){return double(us-walkStartUs_)/1e6/kWalkPeriodS;};
+  auto cyc=[&](uint64_t us){return walkClock(double(us-walkStartUs_)/1e6)/period();};
   const bool shape=walkExactUs_&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g);
   if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
   if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactUs_+2*kPeriodUs)){
     // Start, missed release or structural change: exact solution at this grid
     // point, sent as it is; the look-ahead is solved by the next release so
-    // that no release ever carries two nominal solves.
-    solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(gridUs),0,0,terminal),&walkPrevious_,false);
-    walkExactUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
+    // that no release ever carries two nominal solves. A late release solves
+    // its own clock instead and leaves the bracket to the next one: a frame
+    // lagging `now` by the lateness made the next release catch up (one period
+    // plus the lateness of law in one frame, an inflated STOP secant).
+    const bool late=nowUs_>gridUs+kPeriodUs/20;
+    solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(late?nowUs_:gridUs),0,0,terminal),&walkPrevious_,false);
+    walkExactUs_=late?0:gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
     f=walkExact_;return;
   }
   bool solved=false;
@@ -1240,11 +1222,11 @@ void SimpleMotion::generateWalk(uint64_t now){
       // Recheck the actual pose after I/O in the same certified WALK box.
       if(!pointSafe(measured())||!contains(walkBox(),measured())){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
       recoverUs_=now;}
-    // Same C2 ease as the WALK start ramp: gait rate 0->1 over one second.
-    const double t=(now-recoverUs_)/1e6,u=std::fmin(1.,t);
-    cycles_=recoverCycles_+(t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5)/kWalkPeriodS;
-    fade=1-quinticTimeLaw(u,1).progress;
-  }else cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
+    // The walk start clock: gait rate 0->1 over one second.
+    const double t=(now-recoverUs_)/1e6;
+    cycles_=recoverCycles_+walkClockS(t)/period();
+    fade=1-quinticTimeLaw(std::fmin(1.,t),1).progress;
+  }else cycles_=walkClock((now-walkStartUs_)/1e6)/period();
   steerWalk(now);
   const auto g=gait_;
   const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
