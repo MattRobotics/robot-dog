@@ -86,7 +86,12 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   (10/15/20 mm/s) with the qualified drive {1000,50} and the kHeight box;
 //   eased walk start clock; IMU tilt envelopes recomputed; JOYSTICK law,
 //   geometry, boxes, calibration, STOP unchanged. Offline candidate.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.2"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.3: 1.0.2-dev.2 + pre-flash fixes: late T2 resync anchored to its
+//   grid point, StopPlan search start (same plans), dynamic joystick (a mainly
+//   lateral/yaw demand never reverses; the page holds the stick through late
+//   polls and through a reversal). Gait law, envelopes, geometry, boxes,
+//   calibration, STOP and drive unchanged. Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.3"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
