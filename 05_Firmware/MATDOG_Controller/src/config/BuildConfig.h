@@ -91,7 +91,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   lateral/yaw demand never reverses; the page holds the stick through late
 //   polls and through a reversal). Gait law, envelopes, geometry, boxes,
 //   calibration, STOP and drive unchanged. Offline candidate.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.3"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.4: 1.0.2-dev.3 + H1-RCA fix: the HEIGHT/PRONE_HEIGHT unwind of a
+//   level correction accepted by a steered WALK_SETTLE in the fillet edge
+//   model is solved in that model (dev.3 hardware: NATIVE_TARGET_NOT_REACHED
+//   on the joystick restart after a reversal). Everything else unchanged.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.4"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
