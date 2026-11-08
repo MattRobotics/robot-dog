@@ -272,7 +272,6 @@ class SimpleMotion {
   // (target.valid false when a solve failed). Solves go through solveGaitInto
   // so the loop task stack never holds a temporary frame.
   void nominalRelease(motion::LocomotionFrame&,const motion::GaitParameters&,double terminal,bool clockDone);
-  void resyncExact(motion::LocomotionFrame&,const motion::GaitParameters&,const motion::CartesianSample&,uint64_t gridUs,double terminal);
   void compensate(motion::LocomotionFrame&,uint64_t);
   double slewStep(uint64_t now,uint64_t maxDtUs=kImuSlewMaxDtUs);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
@@ -363,21 +362,35 @@ private:
   double joystickGoal_[3]{},steeredCycles_=0;  // displacement per cycle: x, y (m), yaw (rad)
   uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
-  // T2 (motion-perf-next): the walking law is solved exactly on alternate
-  // releases, one period ahead, at the release grid point; the release between
-  // sends the joint-space midpoint of the two exact solutions and carries the
-  // exact Cartesian sample of its own grid point for the IMU compensation.
-  // Every release still runs pointSafe, the WALK box, RAW, loaded and STOP
-  // proofs on what it sends. A structural change of the law (terminal, STOP
-  // recovery, end of the clock), a missed release or a failed look-ahead
-  // re-synchronises with an exact solve; steerWalk retargets stay continuous
-  // by construction and are tolerated.
+  // T2 (motion-perf-next): the walking law is solved exactly at release grid
+  // points two periods apart (one solve every other release) and every
+  // release sends the joint-space linear interpolation of the two solutions
+  // that bracket its own clock, so the reference is the law at `now` as in
+  // v1.0.1 (the RAW secant STOP and compensationSafe read stays consistent
+  // with wall time under late releases). Every release still runs pointSafe,
+  // the WALK box, RAW, loaded and STOP proofs on what it sends. A structural
+  // change of the law (terminal, STOP recovery, end of the clock) or a grid
+  // point outside the bracket rebuilds both solutions; steerWalk retargets
+  // stay continuous by construction and are tolerated.
   motion::LocomotionFrame walkExact_{},walkAhead_{};
-  uint64_t walkExactUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1,walkAheadTerminal_=-1;
-  motion::GaitParameters walkExactGait_{},walkAheadGait_{};
+  uint64_t walkExactUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1;
+  motion::GaitParameters walkExactGait_{},walkAheadGait_{};  // laws at the two exact samples (shape check; shadow compare)
   bool walkAheadValid_=false,nominalSolved_=true;  // nominalSolved_: this release paid a nominal IK solve
-  void resetLookahead(){walkAheadValid_=false;walkExactUs_=0;nominalSolved_=true;}
+  void resetLookahead(){walkAheadValid_=false;walkExactUs_=0;nominalSolved_=true;
+#ifdef MATDOG_T2_SHADOW
+    shadowTrack_=track_;
+#endif
+  }
+  void lerpFrame(motion::LocomotionFrame&,double u,const motion::GaitParameters&,double terminal) const;
+#ifdef MATDOG_T2_SHADOW
+  motion::GaitTrack shadowTrack_{};  // test builds: the law's track sampled at every release clock
+#endif
 public:
+  // exact: releases that solved the law; interp: releases that only
+  // interpolated; resync: exact solutions rebuilt (start, missed release,
+  // WALK STOP terminal). maxShadowRad (MATDOG_T2_SHADOW builds): largest
+  // joint difference between the sent reference and the exact solve at the
+  // release clock on the law's own track (v1.0.1 sampling).
   struct LookaheadStats { uint32_t exact=0,interp=0,resync=0; double maxShadowRad=0; };
   const LookaheadStats& lookaheadStats() const { return lookaheadStats_; }
 private:

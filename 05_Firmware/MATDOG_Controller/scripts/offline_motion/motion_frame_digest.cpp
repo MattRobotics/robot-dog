@@ -17,6 +17,8 @@
 #pragma GCC diagnostic pop
 #include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 namespace {
 struct Digest { uint64_t h=1469598103934665603ull; void add(uint16_t v){for(unsigned k=0;k<2;++k){h^=(v>>(8*k))&0xff;h*=1099511628211ull;}} };
 FILE* dump=nullptr;
@@ -31,8 +33,16 @@ void report(const char* name,Rig& r,size_t from){
     simple::name(r.m.state()),r.m.phase(),r.m.reason(),s.light,s.full,s.rejected,s.maxShadowRad/simple::kTickRad);
 #ifdef MATDOG_T2_STATS
   const auto& l=r.m.lookaheadStats();
-  std::printf(" T2 exact/interp/resync=%u/%u/%u maxInterpErr=%.3e rad (%.3f tick)",l.exact,l.interp,l.resync,l.maxShadowRad,l.maxShadowRad/simple::kTickRad);
+  std::printf(" T2 solved/lerp/resync=%u/%u/%u lerpVsExactNow=%.3e rad (%.3f tick)",l.exact,l.interp,l.resync,l.maxShadowRad,l.maxShadowRad/simple::kTickRad);
 #endif
+  // Continuity and safety of every transmitted frame of the scenario: largest
+  // RAW step between consecutive frames (WALK drive allows 20 ticks per 20 ms)
+  // and every frame inside the walk's certified box and the gen-1 limits.
+  {unsigned maxStep=0,outside=0;const auto& box=simple::StopReferenceProbe::box(r.m);
+   for(size_t k=from;k<r.p.sent.size();++k){for(unsigned i=0;i<12;++i){
+     if(k>from)maxStep=std::max(maxStep,unsigned(std::abs(int(r.p.sent[k][i])-int(r.p.sent[k-1][i]))));
+     const double q=(int(r.p.sent[k][i])-2048)*simple::kTickRad;if(q<box.lo[i]||q>box.hi[i]||q<r.in.minRad[i]||q>r.in.maxRad[i])++outside;}}
+   std::printf(" maxRawStep=%u framesOutsideBox=%u",maxStep,outside);}
   std::printf("\n");
 }
 struct Lcg { uint64_t s; explicit Lcg(uint64_t seed):s(seed){} double next(){s=s*6364136223846793005ull+1442695040888963407ull;return double(s>>11)/9007199254740992.0;} };
@@ -65,6 +75,37 @@ int main(int argc,char** argv){
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
     for(unsigned n=0;n<300;++n)r.tick();r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());
     report("WALK45_STOP_at300",r,from);}
+  // Review of T2 under retargets (2026-11-08): the joystick command changes on
+  // EVERY release (bounded random walk inside the ellipsoid, forward only),
+  // releases run late by a random 0..19 ms after their grid point (never a
+  // whole period), one release in 97 is skipped; then WALK STOP (seed 11) or
+  // STOP in the walk (seed 12). Retargets therefore hit every stance/swing
+  // transition. The shadow stats compare the transmitted reference with the
+  // exact solve under the law of the release that sends it and with the
+  // exact solve at the release clock (v1.0.1 sampling).
+  // Seeds 11 (WALK STOP) and 12 (STOP); MATDOG_STRESS_SEEDS="a b c" runs more
+  // (even seed: STOP, odd: WALK STOP) for a fault-rate comparison between trees.
+  std::vector<uint64_t> seeds{11ull,12ull};
+  if(const char* env=std::getenv("MATDOG_STRESS_SEEDS")){seeds.clear();std::string t(env);size_t p=0;while(p<t.size()){size_t q=t.find(' ',p);if(q==std::string::npos)q=t.size();if(q>p)seeds.push_back(std::stoull(t.substr(p,q-p)));p=q+1;}}
+  for(uint64_t seed:seeds){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g(seed);double v[3]={lim[0]*.5,0,0};
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
+    tilt(r,.2*degree,.5*degree);const size_t from=r.p.sent.size();uint64_t grid=r.p.now;unsigned skipped=0;
+    auto release=[&](){grid+=simple::kPeriodUs;const uint64_t now=grid+uint64_t(g.next()*19000);
+      r.p.now=now;r.in.imuStampUs=now;r.m.inputs(r.in);r.p.publishCommandedPose();test_clock_us=now;r.m.update(now);r.m.updateTelemetry(now);};
+    for(unsigned n=0;n<2000;++n){
+      // new command every release: random step of up to 10 % of each axis range, kept inside the ellipsoid, forward only
+      for(unsigned j=0;j<3;++j)v[j]+=lim[j]*.1*(2*g.next()-1);if(v[0]<lim[0]*.05)v[0]=lim[0]*.05;
+      double norm=0;for(unsigned j=0;j<3;++j)norm+=(v[j]/lim[j])*(v[j]/lim[j]);if(norm>.9)for(unsigned j=0;j<3;++j)v[j]*=std::sqrt(.9/norm);
+      const char* why=r.m.drive(v[0],v[1],v[2],r.p.now);assert(!why||!std::strcmp(why,"WALK_STOPPING"));
+      if(n%97==96){grid+=simple::kPeriodUs;++skipped;}  // a missed release: the next one is two periods after the previous grid point
+      release();
+      if(r.m.state()==simple::State::FAULT){std::printf("  FAULT at release %u: %s phase=%s cycles=%.4f v=%.5f,%.5f,%.5f imu=%s\n",n,r.m.reason(),r.m.phase(),r.m.walkCycles(),v[0],v[1],v[2],r.m.imuReason());break;}}
+    char name[48];std::snprintf(name,sizeof name,"JOY_retarget_jitter_%s_%llu",seed%2==0?"STOP":"WALKSTOP",(unsigned long long)seed);
+    if(r.m.state()==simple::State::FAULT){report(name,r,from);continue;}
+    if(seed%2==0){r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)release();assert(r.m.stopVerified());report(name,r,from);}
+    else{r.m.walkStop();for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)release();
+      if(r.m.state()!=simple::State::STANDING)std::printf("  FAULT in WALK STOP settle: %s phase=%s cycles=%.4f\n",r.m.reason(),r.m.phase(),r.m.walkCycles());
+      std::printf("  (skipped releases=%u, missed counter=%u)\n",skipped,r.m.missed());report(name,r,from);}}
   if(dump)std::fclose(dump);
   std::puts("digest complete (host replay only, no hardware)");
 }
