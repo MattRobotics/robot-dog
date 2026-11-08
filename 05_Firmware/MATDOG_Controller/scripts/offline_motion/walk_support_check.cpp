@@ -6,7 +6,8 @@
 // start ramp to the first steady cycle, solves the production contact IK and
 // reports:
 //  - static support: distance of the URDF COM (REV01-FIX inertials below,
-//    cross-checked against scripts/offline_prone/geometry.py to 1e-6 m) inside
+//    cross-checked against scripts/offline_prone/geometry.py to 1e-6 m; the
+//    --com-error-x/y-mm flags shift it in base_link to bound model error) inside
 //    the polygon of the stance contacts (nominal strip: contact = foot target);
 //  - cart-table ZMP margin (COM minus z/g times its acceleration, 5 ms central
 //    differences) inside the same polygon;
@@ -65,16 +66,17 @@ int main(int argc,char** argv){
   unsigned stride=2;
   for(int i=1;i+1<argc;i+=2)if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);
   if(stride>2)return 2;
-  GaitParameters g=simple::walkGait(stride);double period=simple::kWalkPeriodS;
+  GaitParameters g=simple::walkGait(stride);double period=simple::kWalkPeriodS,comDx=0,comDy=0;
   struct Opt{const char* name;double* value;double scale;};
   const Opt opts[]={{"--period",&period,1},{"--duty",&g.duty,1},{"--lift-mm",&g.liftM,1e-3},{"--swayx-mm",&g.swayXM,1e-3},{"--swayy-mm",&g.swayYM,1e-3},
-    {"--com-mm",&g.comShiftXM,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3}};
+    {"--com-mm",&g.comShiftXM,1e-3},{"--com-error-x-mm",&comDx,1e-3},{"--com-error-y-mm",&comDy,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3}};
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;bool known=false;
     for(const auto& o:opts)if(!std::strcmp(argv[i],o.name)){*o.value=std::atof(argv[i+1])*o.scale;known=true;}if(!known)return 2;}
   if(!validGaitParameters(g))return 2;
   const auto& box=simple::kWalkBox;const double dt=.005,gravity=9.80665;
   const double vDrive=simple::kWalkDrive.speed*simple::kTickRad,aDrive=simple::kWalkDrive.acc*100*simple::kTickRad,settle=gaitSettleCycles(g);
   double support=1e9,supportC=0,zmp=1e9,vmax=0,amax=0,margin[12];int vJ=0,aJ=0;unsigned fails=0;for(double& m:margin)m=1e9;
+  double phaseMin[3]={1e9,1e9,1e9};  // start ramp, steady cycles, WALK STOP segments
   auto run=[&](const std::vector<Sample>& seg,double terminal){
     std::vector<double> cx,cy,cz;std::vector<std::vector<Vector3>> polygons;LocomotionFrame prev;bool have=false;
     for(const auto& smp:seg){
@@ -83,10 +85,11 @@ int main(int argc,char** argv){
       for(unsigned l=0;l<4;++l){const double v[3]={f.velocityRadS[l].hip,f.velocityRadS[l].upper,f.velocityRadS[l].lower},a[3]={f.accelerationRadS2[l].hip,f.accelerationRadS2[l].upper,f.accelerationRadS2[l].lower};
         for(unsigned k=0;k<3;++k){if(std::abs(v[k])>vmax){vmax=std::abs(v[k]);vJ=l*3+k;}if(std::abs(a[k])>amax){amax=std::abs(a[k]);aJ=l*3+k;}}}
       for(unsigned i=0;i<12;++i){const double q=jointSlot(f.target,i);margin[i]=std::fmin(margin[i],std::fmin(q-box.lo[i],box.hi[i]-q));}
-      double cb[3];com(f.target,cb);const auto& t=s.body.translationM;const auto& r=s.body.rotation;
+      double cb[3];com(f.target,cb);cb[0]+=comDx;cb[1]+=comDy;const auto& t=s.body.translationM;const auto& r=s.body.rotation;
       const double w[3]={t.x+r[0][0]*cb[0]+r[0][1]*cb[1]+r[0][2]*cb[2],t.y+r[1][0]*cb[0]+r[1][1]*cb[1]+r[1][2]*cb[2],t.z+r[2][0]*cb[0]+r[2][1]*cb[1]+r[2][2]*cb[2]};
       std::vector<Vector3> pts;for(unsigned l=0;l<4;++l)if(s.phases[l].stance)pts.push_back(s.feet[l]);
-      if(pts.size()>=3){const double m=inside(pts,w[0],w[1]);if(m<support){support=m;supportC=smp.c;}}
+      if(pts.size()>=3){const double m=inside(pts,w[0],w[1]);if(m<support){support=m;supportC=smp.c;}
+        double& pm=phaseMin[terminal>=0?2:smp.c<g.startCycles+.25?0:1];pm=std::fmin(pm,m);}
       cx.push_back(w[0]);cy.push_back(w[1]);cz.push_back(w[2]);polygons.push_back(pts);prev=f;have=true;}
     for(size_t k=1;k+1<cx.size();++k){if(polygons[k].size()<3||!std::isfinite(cx[k-1]+cx[k+1]))continue;
       const double ax=(cx[k+1]-2*cx[k]+cx[k-1])/(dt*dt),ay=(cy[k+1]-2*cy[k]+cy[k-1])/(dt*dt);
@@ -102,8 +105,9 @@ int main(int argc,char** argv){
   for(unsigned i=0;i<12;++i)(i%3==0?hip:i%3==1?upper:lower)=std::fmin(i%3==0?hip:i%3==1?upper:lower,margin[i]);
   const bool pass=!fails&&support>0&&zmp>0&&vmax<vDrive&&amax<aDrive&&hip>0&&upper>0&&lower>0;
   std::printf("stride=%.0f period=%.2f v=%.2f mm/s duty=%.3f com=%.1f swayx/y=%.1f/%.1f ramp=%.2f settle=%.2f | solve fails=%u | static support min %.2f mm (c%.3f) | ZMP min %.2f mm | "
-              "joint vmax %.3f rad/s %s (drive %.3f) amax %.2f rad/s2 %s (drive %.2f) | box margin ticks HIP %.1f UPPER %.1f LOWER %.1f | %s\n",
+              "start/steady/stop %.2f/%.2f/%.2f mm | joint vmax %.3f rad/s %s (drive %.3f) amax %.2f rad/s2 %s (drive %.2f) | box margin ticks HIP %.1f UPPER %.1f LOWER %.1f | %s\n",
     g.advanceXM*1000,period,g.advanceXM/period*1000,g.duty,g.comShiftXM*1000,g.swayXM*1000,g.swayYM*1000,g.swingRamp,settle,fails,support*1000,supportC,zmp*1000,
+    phaseMin[0]*1000,phaseMin[1]*1000,phaseMin[2]*1000,
     vmax,kJoint[vJ],vDrive,amax,kJoint[aJ],aDrive,hip/simple::kTickRad,upper/simple::kTickRad,lower/simple::kTickRad,pass?"PASS(static model only)":"FAIL");
   return pass?0:1;
 }
