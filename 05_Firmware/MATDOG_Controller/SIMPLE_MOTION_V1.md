@@ -21,7 +21,11 @@ Contatti (modello di appoggio statico sagittale, mesh V5 + masse URDF) sui rifer
 
 **Quota minima 50 mm, confermata.** A 50 mm: margine gen1 nominale 105 mrad, 29,6 mrad con correzione IMU massima (roll+pitch 20 mrad); clearance non-piede 2,37 mm, peggiore 2,25 mm con IMU ±20 mrad ed errore servo ±18,4 mrad. A 48 mm il margine con correzione diventa −5,6 mrad, a 46/44 mm l'IK con correzione non è risolvibile: sotto 50 mm non qualificato.
 
-## WALK STANDARD
+## WALK STANDARD v2 (1.0.2-dev.2, 2026-11-08, offline)
+
+Sostituisce la legge descritta sotto (storica rc.3–v1.0.1). Stesso gait engine, IK, box `kHeight`, drive `{1000,50}` e STOP. Preset 50/75/100 mm per ciclo da 5,0 s (**10/15/20 mm/s**), duty 0,80, lift 8 mm. Il corpo cammina 11 mm avanti rispetto al pattern canonico delle impronte (il COM URDF REV01-FIX sta 9,4 mm dietro il centro dei contatti canonici), sway 3 mm avanti/indietro e 1,5 mm laterale nelle finestre a quattro appoggi, swing orizzontale a velocità trapezoidale in terzi, ricentraggio finale di 0,1 ciclo, clock d'avvio con rampa C² di 1 s. Supporto statico minimo (COM URDF 2,928 kg, avvio, regime e ogni WALK STOP) +2,12 mm, ZMP +2,10 mm; picchi 1,275 rad/s e 5,81 rad/s². Joystick invariato (legge dev.15). Dettagli e prove: [`Gait_Redesign_2026-11-08/REPORT.md`](../../09_Logs/Validation_Reports/Gait_Redesign_2026-11-08/REPORT.md); strumenti `scripts/offline_motion/run_walk_support_check.sh` e `run_walk_tilt_envelope_check.sh`.
+
+## WALK STANDARD (storico rc.3 → v1.0.1)
 
 Stesso gait engine (`Gait.cpp`), stessa IK, clock costante 6,5 s/ciclo. Preset 30/45/60 mm/ciclo (4,62/6,92/9,23 mm/s), duty 0,825, lift 8 mm. Modifiche alla legge:
 
