@@ -21,9 +21,10 @@ Kit di ingresso estratto in `~/MATDOG/verification-artifacts/MATDOG_MOTION_PERF_
 | Checker inviluppo tilt WALK / cadenza | FATTA (baseline PASS; stop 0.5 FAIL; cadenze >1,25× FAIL) | d890da7 |
 | Fase B gait: nessuna cadenza ammissibile senza nuovo profilo servo; stop 0,5 e ramp 1 bocciati; sway documentato | FATTA (REPORT §6) | — |
 | T2 frame di stack (`solveGaitInto`, in place) | FATTA | 2569401, e01e95a, 2d95b99 |
-| Build ROBOT_POWERED CLEAN + manifest/SHA | FATTA: 2d95b99, APP 1.716.064 B, SHA256 492f5ac1… | — |
+| Build ROBOT_POWERED CLEAN + manifest/SHA | FATTA: **131ca53**, APP 1.717.024 B, SHA256 e32c062c… (sostituisce 2d95b99) | — |
+| Revisione T2 retarget/jitter: difetto confermato e corretto (riferimento a `now`, rate STOP ≥ 1 periodo) | FATTA, 36 semi 0 fault (Stable 3) | 131ca53 |
 | Static audit completo | PASS | 27c409f |
-| Draft PR + commento #52 | IN CORSO | — |
+| Draft PR #67 + commento #52 | FATTA; commento di revisione in aggiunta | — |
 
 ## Risultati chiave finora
 

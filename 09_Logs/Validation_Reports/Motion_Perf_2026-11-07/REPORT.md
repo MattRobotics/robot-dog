@@ -13,6 +13,7 @@ Classi usate: **VERIFIED HARDWARE** (dati delle tracce dev.16/dev.17), **VERIFIE
 | Cosa fa la candidata | A2 (IK esatta più economica), A1 (campionamento gait senza jet inutilizzati), T2 (nominale esatto a release alterne con interpolazione a metà), T1b (riuso T1 anche durante i retarget joystick). Legge del gait, box, geometria, calibrazione, STOP e profilo servo invariati. | IMPLEMENTED (§4) |
 | Quanto costa in meno (proxy host) | libm/release WALK45: media 383 → 236 (−38 %), p50 440 → 223, p90 512 → 269; JOYSTICK: media 484 → 306 (−37 %), p50 523 → 261, p90 621 → 465; HOLD invariato. p99/max invariati dove T1 non è leggera. Frame di stack della catena nominale +112 B, compensazione −592 B (§9). | VERIFIED OFFLINE (§5) |
 | Quanto vale sul robot | **Non misurabile offline.** Se il tempo resta proporzionale al calcolo (RCA dev.15, HYPOTHESIS), la release piena joystick tipica scende sotto i 20 ms e la WALK piena da ~17,5 a ~12 ms; l'inflazione ×2 resta UNKNOWN e continuerà a produrre overrun, in numero minore. | HYPOTHESIS |
+| Revisione T2 (retarget/jitter) | Difetto **confermato e corretto** (§12): il campionamento sulla griglia gonfiava la secante RAW della prova di arresto sotto jitter → fault dove la Stable completava; ora riferimento a `now` e rate STOP su ≥ 1 periodo; 36 semi: 0 fault (Stable 3). | VERIFIED OFFLINE |
 | Velocità del gait | Con la legge attuale e il profilo servo `{1000,50}` il modello ammette solo ~1,1–1,25× e in modo fragile; `kWalkStopCycles` 0,5 è geometricamente invalido; ≥1,5× richiede un profilo drive ≥ `{1500,100}` (2× ≥ `{2000,200}`) da qualificare su hardware. **Nessun cambio di cadenza nella candidata.** | VERIFIED OFFLINE (modello, §6) |
 
 ## 1. Identità e perimetro
@@ -21,9 +22,9 @@ Classi usate: **VERIFIED HARDWARE** (dati delle tracce dev.16/dev.17), **VERIFIE
 |---|---|
 | Base | `main` `40728b7ed2370f1cbfc5a73238fb0054af811ed7` (HEAD verificato, solo documentazione oltre il tag `v1.0.1` = `35f5ca4`) |
 | Branch / worktree | `feat/motion-perf-next-20261107`, `~/MATDOG/worktrees/matdog-motion-perf-next-20261107` |
-| Commit firmware | 7029e17 (A2 + digest tool) → 99329c5 (probe) → 52e2865 (A1) → d7ed9da (T2) → affa60c (T1b + test) → d890da7 (checker) → 67a4bc6 (identità 1.0.2-dev.1) → 27e60dc (checkpoint) → 2569401, e01e95a, **2d95b99** (T2 frame di stack: `solveGaitInto`, frame scritti in place, rimozione `reuseGait_`) → 27c409f (pin del gate sorgenti, solo dati di test) |
+| Commit firmware | 7029e17 (A2 + digest tool) → 99329c5 (probe) → 52e2865 (A1) → d7ed9da (T2) → affa60c (T1b + test) → d890da7 (checker) → 67a4bc6 (identità 1.0.2-dev.1) → 27e60dc (checkpoint) → 2569401, e01e95a, **2d95b99** (T2 frame di stack: `solveGaitInto`, frame scritti in place, rimozione `reuseGait_`) → 27c409f (pin del gate sorgenti, solo dati di test) → 6d44393 (dossier) → **131ca53** (revisione §12: riferimento T2 all'istante della release, rate STOP su ≥ 1 periodo) |
 | Versione proposta | `1.0.2-dev.1` (`kFirmwareVersion`), da concordare prima di qualunque flash |
-| Build candidata | vedi §7 (manifest, SHA256, dimensioni) |
+| Build candidata | §7: `131ca53`, APP 1.717.024 B, SHA256 `e32c062c…` |
 | Kit di ingresso | `~/MATDOG/verification-artifacts/MATDOG_MOTION_PERF_KIT_20261107/` — ZIP `6c183db5…`, tracce dev.16 `3e21a255…`, dev.17 `b1edd6cf…` (SHA256 verificati) |
 
 Invariati: `SimpleMotion.h` costanti del gait (`kWalkPeriodS` 6,5, `kWalkDuty` 0,825, lift 8 mm, quota 120 mm, stride 30/45/60, sway 2/14 mm, `kJoystickRampCycles` 2), `kWalkDrive{1000,50}`, box `kHeight`/`kSteer`, inviluppi `kWalkTilt45/60`/`kSteerTilt`, calibrazione gen-1, URDF, STOP/SAFE_OFF/deadman, HTTP, dashboard, `MotionService`.
@@ -78,7 +79,7 @@ Sull'host la seconda risoluzione «edge» del joystick scatta nel 10–12 % dell
 |---|---|---|---|
 | A2 | `motion/LegInverseKinematics.cpp` | niente `remainder` per angoli già in (−π, π]; un solo `atan2` per i due rami del ginocchio (atan2 dispari in y); costanti di catena (b, φ, outer) memorizzate per input esatti | digest frame RAW **identici** su 8 scenari (`run_motion_frame_digest.sh`) |
 | A1 | `motion/Gait.cpp`, `generateWalk` | legge del gait templata sul tipo di clock: le release campionano senza jet (A1); il percorso con jet resta per gli sweep | digest identici; dump 5301 campioni con jet **bit-identico** (posizioni, velocità, accelerazioni, condizionamento) |
-| T2 | `SimpleMotion::nominalRelease` | nominale esatto a release alterne sul punto di griglia dei 20 ms, un periodo avanti; la release intermedia invia il punto medio in spazio giunti dei due esatti e porta il campione cartesiano esatto del proprio punto di griglia alla compensazione; ri-sincronizzazione esatta su cambio strutturale della legge (terminale WALK STOP, recupero da STOP, fine clock), release persa o look-ahead fallito; retarget steerWalk tollerati; **tutte** le prove (pointSafe, box WALK, RAW, loaded, StopPlan) a ogni release; T1 leggera solo sulle release che pagano il nominale | shadow: max |interpolato − esatto| 0,57–0,75 tick (< 1 tick RAW) su WALK45/60, joystick stabile e 3 joystick casuali; alternanza 662/661 e 1108/1108; 2–3 risincronizzazioni per camminata; test `lookaheadWalk` |
+| T2 | `SimpleMotion::nominalRelease`, `lerpFrame` | soluzioni esatte della legge sui punti di griglia a due periodi (una risoluzione ogni due release, track campionato in ordine); **ogni release invia l'interpolazione lineare in spazio giunti fra le due soluzioni che racchiudono il proprio istante** (legge a `now` come v1.0.1, §12), con campione cartesiano ricostruito a quell'istante per la compensazione; ricostruzione di entrambe le soluzioni su cambio strutturale della legge (terminale WALK STOP, recupero da STOP, fine clock) o punto di griglia fuori bracket; retarget steerWalk tollerati; **tutte** le prove (pointSafe, box WALK, RAW, loaded, StopPlan) a ogni release; T1 leggera solo sulle release che pagano una soluzione | interpolato vs esatto a legge ferma 0,57–0,75 tick (< 1 tick RAW); alternanza 663/662 e 1109/1110; 2–3 ricostruzioni per camminata; stress retarget+jitter 36 semi: 0 fault (Stable 3), §12; test `lookaheadWalk` |
 | T1b | `compensateLevel` | il riuso leggero della correzione IMU non è più annullato da un retarget joystick | joystick casuale: release leggere 8 % → 40 %, errore shadow T1 invariato (1,15–1,25 tick; meccanismo dev.16) |
 
 Non adottati (misurati e scartati): `kWalkStopCycles` 0,5 (§6), `kJoystickRampCycles` 1 (gate inviluppo joystick FAIL: `random_1` → `FAULT WALK_IK_OR_WORKSPACE`, 110 raggi di tilt fuori; test `joystickWalk` fallito), `-O2` selettivo (già scartato in dev.17, nessuna evidenza nuova), `double→float` (non affrontato: richiede prova differenziale dedicata).
@@ -121,14 +122,13 @@ Conclusioni Fase B: la velocità utile è limitata dal **profilo servo** (`kWalk
 
 | Campo | Valore |
 |---|---|
-| Sorgente | `2d95b993d728a70962865f72017494071bf68aba`, `SOURCE_STATE=CLEAN`, `GIT_DIRTY=0` |
+| Sorgente | `131ca53104494ec92cbd4d81a7948b8b0e355b42` (dopo la revisione §12), `SOURCE_STATE=CLEAN`, `GIT_DIRTY=0` |
 | Profilo | `ROBOT_POWERED`, `OTA_INGEST_ENABLED=0`, FQBN pinnato di `build.sh`, layout `MATDOG_16M_2x5M_NVS_V1` (tabella `8f756ecb…`, identica a dev.17) |
-| Versione / build id | `1.0.2-dev.1` / `2d95b993d728` |
-| APP | `MATDOG_Controller.ino.bin` **1.716.064 B** (dev.17: 1.707.808, **+8.256 B, +0,48 %**), slot 32,7 % |
-| SHA256 APP | **`492f5ac18cbfb5b626fd14c6baf8759a0e81bcf8ad201ad9deb147fa3390a289`** |
-| RAM statica | 137.684 B (42 %), invariata rispetto al compile check |
-| Percorso (solo ASUS) | `~/MATDOG/build-output/motion-perf-next-20261107/build-2d95b99/artifacts/ROBOT_POWERED-ota0/` (APP, ELF, map, manifest, sdkconfig) + `README_CANDIDATE.txt` |
-| Build precedenti | `build-27e60dc`, `build-2569401`, `build-e01e95a` (stessa versione, frame T2 più grandi), `compilecheck-dirty`: **superate, non flashare** |
+| Versione / build id | `1.0.2-dev.1` / `131ca5310449` |
+| APP | `MATDOG_Controller.ino.bin` **1.717.024 B** (dev.17: 1.707.808, **+9.216 B, +0,54 %**), slot 32,7 % |
+| SHA256 APP | **`e32c062cee1209ba1511e4637dc313089f46e6804f5cb73a6313766b5acc1819`** |
+| Percorso (solo ASUS) | `~/MATDOG/build-output/motion-perf-next-20261107/build-131ca53/artifacts/ROBOT_POWERED-ota0/` (APP, ELF, map, manifest, sdkconfig) + `README_CANDIDATE.txt` |
+| Build precedenti | `build-2d95b99` (pre-revisione, APP `492f5ac1…`), `build-27e60dc`, `build-2569401`, `build-e01e95a`, `compilecheck-dirty`: **superate, non flashare** |
 
 **Non flashata.** Il flash APP-only, se autorizzato, usa `scripts/flash_app_only.sh` con verifica del manifest; NVS gen-1, partizioni e bootloader non vengono scritti.
 
@@ -137,7 +137,8 @@ Conclusioni Fase B: la velocità utile è limitata dal **profilo servo** (`kWalk
 | Suite | Esito |
 |---|---|
 | `run_simple_motion_tests.sh` (+ `lookaheadWalk`, `-DMATDOG_T2_SHADOW`) | PASS (board plant WALK45/60 errore stabile max 0,14°, STOP in ogni fase WALK, joystick, PRONE, STAND) |
-| `run_motion_frame_digest.sh` | A1/A2 digest identici a `main`; T2/T1b: tutti gli scenari a STANDING, STOP verificato, shadow < 1 tick |
+| `run_motion_frame_digest.sh` | A1/A2 digest identici a `main`; T2/T1b: tutti gli scenari a STANDING, STOP verificato, interpolazione < 1 tick a legge ferma; stress retarget+jitter 36 semi 0 fault / 18 STOP verificati (§12) |
+| `run_stop_support_tests.sh`, `run_prone_tests.sh` (dopo la modifica di `beginStop`) | PASS |
 | `run_joystick_envelope.sh` | PASS: supporto statico min 0,55 mm (casuale) / 1,85 mm (stabile), clearance ≥ 2,18 mm, inviluppo tilt 0 fail — identico a dev.15 |
 | `run_walk_tilt_envelope_check.sh` (legge v1.0.1) | PASS 45 e 60 mm |
 | `run_motion_cost_probe.sh` | §5 |
@@ -154,14 +155,14 @@ Frame di stack statici decodificati dalle istruzioni `entry a1, N` dell'ELF (`ob
 |---|---:|---:|
 | `SimpleMotion::update` | 1.312 | 1.296 |
 | `generateWalk` | 1.760 | 1.184 |
-| `nominalRelease` (nuova) | — | 704 |
+| `nominalRelease` / `lerpFrame` (nuove) | — | 688 / 352 |
 | `solveGait` / `solveGaitInto` | 1.232 | 32 / 1.232 |
-| `compensateLevel` / `compensationSafe` | 592 / 816 | 592 / 816 |
-| **Catena nominale** update→generateWalk→(nominalRelease)→solveGait(Into)→IK→FK | **6.224** | **6.336** (+112) |
+| `compensateLevel` / `compensationSafe` / `beginStop` | 592 / 816 / 704 | 592 / 816 / 704 |
+| **Catena nominale** update→generateWalk→(nominalRelease)→solveGait(Into)→IK→FK | **6.224** | **6.320** (+96); release senza soluzione (lerpFrame+FK) 4.240 |
 | **Catena compensazione** update→generateWalk→compensate→…→IK inclinata→FK | **7.040** | **6.448** (−592) |
 | Frame massimo del firmware (handler HTTPD, task proprio) | 9.648 | 9.648 |
 
-Storia della correzione: la prima forma di T2 (build `27e60dc`) aveva `nominalRelease` a **3.184 B** (catena nominale ~8,8 KB, +2,6 KB); la forma «per valore» 2.240/2.608 B; la forma finale scrive i frame in place tramite `solveGaitInto` (un solo corpo, `solveGait` è il wrapper). Misura reale del minimo libero: solo su hardware (piano H0/H2).
+Frame misurati sulla build `131ca53`. Storia della correzione: la prima forma di T2 (build `27e60dc`) aveva `nominalRelease` a **3.184 B** (catena nominale ~8,8 KB, +2,6 KB); la forma «per valore» 2.240/2.608 B; la forma finale scrive i frame in place tramite `solveGaitInto` (un solo corpo, `solveGait` è il wrapper); la revisione §12 aggiunge `lerpFrame` (352 B) sulle release senza soluzione. Misura reale del minimo libero: solo su hardware (piano H0/H2).
 
 ## 10. UNKNOWN e rischi residui
 
@@ -177,3 +178,32 @@ Storia della correzione: la prima forma di T2 (build `27e60dc`) aveva `nominalRe
 2. Se qualificare un profilo servo più alto (`kWalkDrive` ≥ `{1500,100}`) come premessa a qualunque cadenza > 1×.
 3. Se finanziare la legge di sway continuo (estensione della legge + ri-certificazione `kSteer`).
 4. Se misurare l'inflazione C1 con il dump USB prima di ulteriori ottimizzazioni (float, IRAM).
+
+## 12. Revisione conclusiva T2 sotto retarget e jitter (08/11/2026) — difetto CONFERMATO e corretto
+
+**Domanda.** `sameLawShape()` ignora `advanceXM/advanceYM/yawRad`: il riuso del look-ahead dopo un retarget joystick produce riferimenti coerenti con la soluzione esatta? Il campionamento sulla griglia `nextUs_` invece che a `now` introduce un errore rispetto alla Stable?
+
+**Metodo (rig host, nessuna modifica preventiva).** Due scenari nuovi in `run_motion_frame_digest.sh` (`JOY_retarget_jitter_*`, semi configurabili con `MATDOG_STRESS_SEEDS`): comando joystick cambiato **a ogni release** (passo casuale ≤ 10 % per asse, dentro l'ellissoide, solo avanti), release in ritardo casuale 0–19 ms rispetto al punto di griglia (mai un periodo intero), una release saltata ogni 97, poi WALK STOP (semi dispari) o STOP (pari). I retarget cadono quindi su ogni transizione stance/swing. Per ogni frame trasmesso: box del WALK e limiti gen-1, passo RAW massimo fra frame consecutivi, stato finale; con `MATDOG_T2_SHADOW` il confronto con la soluzione esatta. Il runner compila il tool **dall'albero selezionato** (`MATDOG_SKETCH`): un vizio precedente (header del worktree con sorgenti pristine) rendeva inattendibili i confronti pristine dello stress, ora corretto; i confronti A1/A2 di ieri erano validi (header identici allora).
+
+**Prima divergenza (candidata, VERIFIED OFFLINE).** Fault `WALK_IK_OR_WORKSPACE` dopo 16–41 release, mentre la Stable completava lo scenario. Strumentando `compensationSafe`: `StopPlan FAIL dt=4,2 ms, |Δq|=4 tick, |v|=1,455 rad/s (cap 1,534)`. Il riferimento campionato sulla griglia avanzava di un passo di legge per release, mentre l'intervallo di parete fra due riferimenti emessi era il solo jitter: la secante RAW letta dalla prova di arresto (e da `beginStop`) era gonfiata fino al cap. **Sì, il passaggio da `now` alla griglia introduceva un errore temporale significativo**: fino a un passo di legge (~10–13 tick) per release in ritardo, con la secante incoerente col tempo di parete.
+
+**Patch minima 1 (T2).** Le soluzioni esatte restano sui punti di griglia a due periodi (una risoluzione ogni due release); ogni release invia l'interpolazione lineare in spazio giunti fra le due soluzioni che racchiudono il **proprio istante** (`u=(now−t_e)/2T`), cioè la legge a `now` come nella Stable; il campione cartesiano per la compensazione è ricostruito a quell'istante (appoggi dal lato piantato del bracket, piede in volo = riferimento di contatto dei giunti interpolati con il lift del raccordo rimosso, posa del corpo interpolata, fasi della legge). Release persa o cambio strutturale → ricostruzione di entrambe le soluzioni.
+
+**Seconda divergenza (condivisa con la Stable).** Dopo la patch 1, fault residui con `dt=1,2–2,5 ms, |Δq|=1–2 tick, v=0,94–1,53 rad/s` vicino a un bordo del box: due riferimenti emessi a 1–2 ms di distanza (release molto in ritardo seguita da una puntuale) differiscono per quantizzazione RAW, e 1 tick su 1,6 ms vale ~1 rad/s. **La Stable v1.0.1 fallisce allo stesso modo: 3 fault su 36 semi** (settle del WALK STOP e cammino); la candidata ne mostrava 7/36 perché l'interpolazione si muove alla pendenza media del bracket anche dove la legge istantanea è quasi ferma (più flip di 1 tick a `dt` minuscoli). Sul rig le release sono istantanee: sull'hardware l'intervallo fra due invii è almeno la durata della release (~6–12 ms), quindi lo scenario è più severo del reale (nessun fault di questo tipo nelle tracce dev.16/17).
+
+**Patch minima 2 (prova e STOP, stesso punto in due sedi).** La rate del riferimento per `StopPlan` è letta su almeno un periodo di release (`dt = max(dt, 20 ms)`) sia in `compensationSafe` sia in `beginStop`, che devono restare identiche perché la prova sia garanzia dello STOP reale; `StopPlan.h` dichiara già che al passaggio si assume solo C0 e nessuna derivata del segnale precedente. Una compensazione piena dopo una leggera limita inoltre il proprio passo di slew all'intervallo di parete dall'ultimo riferimento emesso (rate ≤ 0,04 rad/s fra riferimenti consecutivi). Nessuna prova è stata tolta o allentata nei box, limiti, RAW, loaded.
+
+**Risultati (36 semi, VERIFIED OFFLINE).**
+
+| | Stable v1.0.1 | candidata prima della revisione | candidata corretta |
+|---|---:|---:|---:|
+| Fault `WALK_IK_OR_WORKSPACE` | 3 | 7 (grid) / 7 (lerp) / 6 (slew) | **0** |
+| STOP verificati (18 scenari) | 18/18 | — | **18/18** |
+| Frame fuori box/limiti | 0 | 0 | 0 |
+| Passo RAW max per release | 19–22 tick | 18–23 | 20–23 |
+
+Interpolazione vs soluzione esatta a `now` sullo stesso track (legge ferma): 0,57–0,75 tick (WALK45/60, joystick stabile). Sotto retarget continui il confronto con un track campionato ogni release **non è definito**: i due track pianificano gli appoggi in istanti diversi con goal diversi (fino a ~27 tick ≈ 5 mm di appoggio), lo stesso effetto che una release persa ha su v1.0.1; la prova resta comportamentale (tabella). Regressioni: suite SimpleMotion PASS, gate inviluppo joystick PASS (supporto 0,57 mm), STOP support PASS, PRONE PASS, libm/release +4 (FK del piede in volo).
+
+**Costo e identità.** build CLEAN `131ca53`: APP 1.717.024 B (+1.936 B rispetto alla build pre-revisione, +9.216 vs dev.17), SHA256 `e32c062cee1209ba1511e4637dc313089f46e6804f5cb73a6313766b5acc1819`; frame di stack: catena nominale 6.320 B (dev.17 6.224), compensazione 6.448 (7.040), `beginStop` invariato 704; libm/release +4 (FK del piede in volo nelle release interpolate). Static audit: **PASS** (`STATIC_AUDIT = PASS`, `HOST_TESTS = PASS` incluso `MOTION_CONVERGENCE_SOURCE`; log `~/MATDOG/build-output/motion-perf-next-20261107/build-131ca53/static_audit.log`).
+
+**Idoneità al collaudo supervisionato.** La candidata corretta è idonea al piano `HW_TEST_PLAN.md` (H0–H7); la Stable resta installata. Il piano H2/H5 ora legge `timing.max_work` per quello che è: il record della release di massimo del comando (sezioni correnti e della release precedente), non una misura per release.
