@@ -26,7 +26,7 @@ constexpr double kStrideM[]={.030,.045,.060};
 // kJoystickYawRad)^2 <= 1, each axis rate limited to full scale over two gait
 // cycles; swing targets are planned on that ramp. A steered walk keeps the
 // WALK height, duty, lift and stride ramps and differs from WALK STANDARD only
-// where lateral and turning steps need it: 14 mm lateral sway and stance
+// where lateral and turning steps need it: up to 14 mm lateral sway and stance
 // contact on the tread fillet (FootContact.h), inside its own certified joint
 // box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
 // the URDF COM, the binding support edge is the RF-LH diagonal while RH swings;
@@ -38,17 +38,25 @@ constexpr double kStrideM[]={.030,.045,.060};
 // ends the walk with WALK STOP when no admitted joystick command arrives for
 // kJoystickTimeoutUs (ESP clock).
 constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
-// Steered lateral sway (motion-perf-next): proportional to the lateral/yaw
-// demand instead of a fixed 14 mm. A purely longitudinal joystick walks with
-// the WALK STANDARD sway (2 mm); the amplitude rises linearly with the
-// lateral/yaw fraction of the ellipsoid and reaches kJoystickSwayYM at
-// kJoystickSwayFullDemand of it, rate limited over kJoystickRampCycles like
-// the three axes, so the body offset changes by <= 0.02 mm per release and
-// every step keeps the four-contact transfer of the law.
-constexpr double kJoystickSwayYM=.014, kJoystickSwayFullDemand=.10, kJoystickSwayRampCycles=.5;
-inline double joystickSwayYM(double advanceYM,double yawRad){
+// Steered lateral sway (motion-perf-next). A purely longitudinal joystick walks
+// with the WALK STANDARD sway (2 mm); up to kJoystickSwayOnDemand of the
+// lateral/yaw fraction of the ellipsoid the amplitude rises linearly to
+// kJoystickSwayLowM, and from there any lateral or turning intent uses the
+// full kJoystickSwayYM until the demand falls below kJoystickSwayOffDemand
+// (hysteresis keyed on the current amplitude, no extra state). The gap is
+// physical, not a tuning choice: at ~5.5 mm of body sway the stance hips tilt
+// the foot axis past the 2 deg nominal strip and the real contact migrates
+// ~5 mm along the tread fillet in the sway direction, so the support polygon
+// follows the COM. Offline (URDF COM, real fillet contacts) a steady 6 mm
+// amplitude gives -0.08 mm of static support at the first swing, 2 mm +1.07,
+// 4.4 mm +2.9, 10 mm +3.0, 14 mm +5.9. The amplitude changes only with four
+// feet down (steerWalk), rate limited over kJoystickSwayRampCycles, so no
+// three-contact phase is crossed inside the 5-9 mm band.
+constexpr double kJoystickSwayYM=.014, kJoystickSwayLowM=.005, kJoystickSwayOnDemand=.03, kJoystickSwayOffDemand=.015, kJoystickSwayRampCycles=.5;
+inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){
   const double y=advanceYM/kJoystickLateralM,w=yawRad/kJoystickYawRad,s=std::sqrt(y*y+w*w);
-  return kWalkSwayYM+(kJoystickSwayYM-kWalkSwayYM)*std::fmin(1.,s/kJoystickSwayFullDemand);
+  if(s>=(currentSwayYM>kJoystickSwayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return kJoystickSwayYM;
+  return kWalkSwayYM+(kJoystickSwayLowM-kWalkSwayYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
 }
 constexpr uint64_t kJoystickTimeoutUs=1000000;
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per

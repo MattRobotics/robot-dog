@@ -9,7 +9,7 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
-# Usage: run_joystick_envelope.sh [output-dir]. Geometry only.
+# Usage: run_joystick_envelope.sh [output-dir]. Geometry only. 30 scenarios.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)"
 out="${1:-$(mktemp -d /tmp/matdog-joystick.XXXXXX)}";mkdir -p "$out"
@@ -25,6 +25,11 @@ print('left','26:'+v([0,lim[1],0]));print('right','26:'+v([0,-lim[1],0]))
 print('ccw','26:'+v([0,0,lim[2]]));print('cw','26:'+v([0,0,-lim[2]]))
 for s in itertools.product((1,-1),repeat=3):
     print('octant_'+''.join('p' if x>0 else 'm' for x in s),'26:'+v([s[j]*lim[j]/math.sqrt(3) for j in range(3)]))
+# Small steady lateral/yaw demands (motion-perf-next): 2.9 % stays in the low sway band
+# (<= 5 mm), 3.3 % takes the full sway. A steady mid amplitude (~6 mm) sits on the
+# fillet contact band and gave negative static support with a linear sway map.
+for k,tag in ((.029,'small'),(.033,'mid')):
+    print(f'lat_{tag}','20:'+v([.8*lim[0],k*lim[1],0]));print(f'yaw_{tag}','20:'+v([.8*lim[0],0,k*lim[2]]))
 print('reverse_twice','8:'+v([lim[0],0,0])+' 14:'+v([-lim[0],0,0])+' 14:'+v([lim[0],lim[1]/2,0]))
 print('silent_client','15:'+v([lim[0]/2,lim[1]/2,lim[2]/2])+' 30:-')
 print('release_in_start','1:'+v([-lim[0],0,lim[2]/2]))

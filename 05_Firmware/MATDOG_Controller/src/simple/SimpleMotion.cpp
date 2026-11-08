@@ -114,7 +114,7 @@ GaitParameters walkGait(unsigned stride){
 }
 GaitParameters steerGait(const double goal[3]){
   auto g=walkGait(0);g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
-  g.swayYM=joystickSwayYM(goal[1],goal[2]);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
+  g.swayYM=joystickSwayYM(goal[1],goal[2],kWalkSwayYM);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
 // Inner convex envelope of kSteer, gen-1 RAW, the tread fillet up to
 // kEdgeContactMaxTiltRad and STOP over the steered phase set (offline rays).
@@ -896,9 +896,12 @@ void SimpleMotion::steerWalk(uint64_t now){
   for(unsigned j=0;j<3;++j){
     const double goal=j==0&&(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[j],rate=limit[j]/kJoystickRampCycles;  // never against the leg order
     *axis[j]+=std::clamp(goal-*axis[j],-rate*dc,rate*dc);track_.goal[j]=goal;track_.goalRate[j]=rate;}
-  // Lateral sway follows the rate-limited lateral/yaw demand with the same ramp.
+  // Lateral sway follows the rate-limited lateral/yaw demand, changing only
+  // while all four feet are down (last nominal sample): the body never crosses
+  // the fillet contact band (SimpleMotion.h) during a three-contact phase.
   const double swayRate=(kJoystickSwayYM-kWalkSwayYM)/kJoystickSwayRampCycles;
-  next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad)-next.swayYM,-swayRate*dc,swayRate*dc);
+  bool fourDown=true;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
+  if(fourDown)next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad,gait_.swayYM)-next.swayYM,-swayRate*dc,swayRate*dc);
   if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_)){
 #ifdef MATDOG_T2_SHADOW
     gaitRetarget(shadowTrack_,gait_,next,cycles_);

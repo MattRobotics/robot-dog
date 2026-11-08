@@ -34,6 +34,13 @@ struct StopReferenceProbe {
   static double stride(const SimpleMotion& m){return m.gait_.advanceXM;}
   static const motion::GaitParameters& gait(const SimpleMotion& m){return m.gait_;}
   static const collision::Box& box(const SimpleMotion& m){return m.walkBox();}
+  // STOP reference history (read-only): issue instants and the built plan.
+  static uint64_t issuedUs(const SimpleMotion& m){return m.issuedUs_;}
+  static uint64_t previousUs(const SimpleMotion& m){return m.previousUs_;}
+  static uint64_t previous2Us(const SimpleMotion& m){return m.previous2Us_;}
+  static const StopPlan& stopPlan(const SimpleMotion& m){return m.stopPlan_;}
+  static const uint16_t* commandedRaw(const SimpleMotion& m){return m.commandedRaw_;}
+  static const uint16_t* previous2Raw(const SimpleMotion& m){return m.previous2Raw_;}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -809,7 +816,106 @@ static void lookaheadWalk(){
     r.m.walkStop();assert(r.reachStand());}
   std::puts("T2 look-ahead: alternation, missed-release and WALK STOP re-sync, STOP on both release kinds, retarget tolerance PASS (software only)");
 }
-int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();
+// P1 (review 2026-11-08): the STOP reference rate is a secant over at least
+// one release period whenever the 3-deep reference history allows it. On the
+// release grid (lateness < one period, skipped periods only widen the spans)
+// the reference two entries back is always >= one period older, so the
+// "oldest available" fallback can only act when fewer than three grid
+// references exist or an off-grid reference was recorded (STAND resume after
+// STOP). Direct cases: jitter 0-19 ms with a skipped release and a retarget
+// every release; STOP on both release kinds; identical RAW (zero rate); stale
+// history (fail closed); STOP on the first references after ENABLE; STOP at
+// the first release of a STAND resume whose preceding hold release was late.
+static void stopRateHistory(){
+  using P=simple::StopReferenceProbe;
+  struct Lcg{uint64_t s;double next(){s=s*6364136223846793005ull+1442695040888963407ull;return double(s>>11)/9007199254740992.0;}};
+  auto release=[](Rig& r,uint64_t now){r.p.now=now;r.in.imuStampUs=now;r.m.inputs(r.in);r.p.publishCommandedPose();test_clock_us=now;r.m.update(now);r.m.updateTelemetry(now);};
+  // The span beginStop's selection takes at the current reference (skip 1).
+  auto stopSpan=[](const Rig& r){const uint64_t t[3]={P::issuedUs(r.m),P::previousUs(r.m),P::previous2Us(r.m)};uint64_t span=0;
+    for(unsigned k=1;k<3;++k){if(!t[k]||t[0]<=t[k])break;span=t[0]-t[k];if(span>=simple::kPeriodUs)break;}return span;};
+  auto maxPlanV=[](const Rig& r){double v=0;for(double x:P::stopPlan(r.m).v)v=std::fmax(v,std::abs(x));return v;};
+  const double T=simple::kWalkPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  // The law's joint speed stays below 0.82 rad/s (walk tilt envelope check);
+  // one RAW tick of quantization over one period adds 0.077 rad/s.
+  constexpr double kLawRateBound=1.0;
+  // A. Jitter, skipped releases, retargets: the selected span is never below
+  // one period and a STOP at a random release plans a law-plausible rate.
+  {uint64_t minSpan=~0ull;unsigned spans=0;double maxV=0;
+    for(uint64_t seed:{21ull,22ull,23ull,24ull,25ull,26ull}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g{seed};double v[3]={lim[0]*.5,0,0};
+      for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
+      uint64_t grid=r.p.now;const unsigned stopAt=300+unsigned(g.next()*400);
+      for(unsigned n=0;n<stopAt;++n){
+        for(unsigned j=0;j<3;++j)v[j]+=lim[j]*.1*(2*g.next()-1);if(v[0]<lim[0]*.05)v[0]=lim[0]*.05;
+        double norm=0;for(unsigned j=0;j<3;++j)norm+=(v[j]/lim[j])*(v[j]/lim[j]);if(norm>.9)for(unsigned j=0;j<3;++j)v[j]*=std::sqrt(.9/norm);
+        r.m.drive(v[0],v[1],v[2],r.p.now);
+        if(n%97==96)grid+=simple::kPeriodUs;grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));assert(r.m.state()==simple::State::WALKING);
+        if(P::previous2Us(r.m)){const uint64_t s=stopSpan(r);minSpan=std::min(minSpan,s);++spans;assert(s>=simple::kPeriodUs);}}
+      r.m.stop();grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));assert(r.m.stopActive());maxV=std::fmax(maxV,maxPlanV(r));assert(maxPlanV(r)<kLawRateBound);
+      for(unsigned n=0;n<300&&!r.m.stopVerified();++n){grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));}assert(r.m.stopVerified()&&r.m.energized());}
+    std::printf("P1-A jitter/skip/retarget: %u releases, min STOP span %.1f ms (>= 20), max planned rate %.3f rad/s\n",spans,minSpan/1e3,maxV);}
+  // B. Identical RAW references (HOLD): zero rate, shortest plan.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());for(unsigned n=0;n<30;++n)r.tick();
+    assert(stopSpan(r)>=simple::kPeriodUs);r.m.stop();r.tick();assert(r.m.stopActive()&&maxPlanV(r)==0&&P::stopPlan(r.m).duration==.04);
+    for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+  // C. Stale history (no release for 150 ms): fail closed, torque released.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());for(unsigned n=0;n<30;++n)r.tick();
+    r.m.stop();release(r,r.p.now+150000);assert(r.m.state()==simple::State::FAULT&&!r.m.stopActive());
+    assert(!std::strcmp(r.m.reason(),"MOTION_DEADLINE_LOST")||!std::strcmp(r.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));
+    for(unsigned n=0;n<40&&!r.m.offVerified();++n)r.tick(false);assert(r.m.offVerified()&&!r.m.energized());}
+  // D. STOP on each of the first six references after ENABLE (two entries,
+  // then three): either a plan with a law-plausible rate or fail closed.
+  {unsigned planned=0,closed=0;
+    for(unsigned k=1;k<=6;++k){Rig r;assert(!r.m.stand(.15,r.p.now));
+      for(unsigned n=0;n<3000&&r.p.enables<12;++n)r.tick();assert(r.p.enables==12);  // the k-th release after the last ENABLE
+      for(unsigned n=1;n<k;++n)r.tick();assert(r.m.state()==simple::State::MOVING);
+      const uint64_t span=stopSpan(r);const char* phase=r.m.phase();r.m.stop();r.tick();
+      if(r.m.stopActive()){++planned;assert(span>=simple::kPeriodUs&&maxPlanV(r)<kLawRateBound);for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+      else{++closed;assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));  // native move: endpoint only, no in-flight reference (unchanged rule)
+        if(k==1||k==6)std::printf("P1-D STOP on release %u after ENABLE in %s: %s -> SAFE_OFF\n",k,phase,r.m.reason());}}
+    std::printf("P1-D STOP on the first 6 releases after ENABLE: planned=%u fail-closed=%u\n",planned,closed);}
+  // E. STAND resume after STOP in WALK whose preceding hold release ran 19 ms
+  // late, then STOP at the first recovery release: the only fallback case.
+  {Rig r;assert(!r.m.walk(1,r.p.now));for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();for(unsigned n=0;n<200;++n)r.tick();
+    r.m.stop();for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());for(unsigned n=0;n<50;++n)r.tick();
+    uint64_t grid=r.p.now;release(r,grid+simple::kPeriodUs+19000);  // late hold release
+    const uint64_t at=grid+simple::kPeriodUs+19500;r.p.now=at;test_clock_us=at;assert(!r.m.stand(.15,at));
+    release(r,grid+2*simple::kPeriodUs);  // first recovery release, 1 ms after the late one
+    assert(!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK")&&r.m.state()==simple::State::MOVING);
+    const uint64_t span=stopSpan(r);unsigned step=0;for(unsigned i=0;i<12;++i)step=std::max(step,unsigned(std::abs(int(P::commandedRaw(r.m)[i])-int(P::previous2Raw(r.m)[i]))));
+    r.m.stop();release(r,grid+3*simple::kPeriodUs);
+    std::printf("P1-E resume then STOP: selected span %.1f ms, RAW step %u tick, %s, planned rate %.3f rad/s, duration %.2f s\n",span/1e3,step,
+      r.m.stopActive()?"plan built":r.m.reason(),r.m.stopActive()?maxPlanV(r):0.,r.m.stopActive()?P::stopPlan(r.m).duration:0.);
+    // The fallback is reached (span < one period) and is exact: every resume
+    // route starts from the held RAW (recovery fade, HEIGHT from held), so the
+    // secant is zero whatever its span. A non-zero step here would be the
+    // first divergence that justifies a floor on the fallback span.
+    assert(span<simple::kPeriodUs&&step==0&&r.m.stopActive()&&maxPlanV(r)==0);
+    for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+  std::puts("P1 STOP rate history: span >= one period on the grid, zero rate on identical RAW, fail-closed on stale history, first references, STAND resume fallback PASS (software only)");
+}
+// Steered sway map (motion-perf-next): 2.9 % lateral demand stays in the low
+// band (<= 5 mm), 3.3 % takes the full 14 mm and keeps it until the demand
+// falls under 1.5 %; the amplitude changes only while all four feet are down.
+static void swayMap(){
+  using P=simple::StopReferenceProbe;const double T=simple::kWalkPeriodS,vx=.8*simple::kJoystickStrideM/T;
+  auto walking=[](Rig& r,double vy){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(!r.m.drive(.8*simple::kJoystickStrideM/simple::kWalkPeriodS,vy,0,r.p.now));r.tick();}assert(r.m.state()==simple::State::WALKING);};
+  {Rig r;walking(r,.029*simple::kJoystickLateralM/T);for(unsigned n=0;n<200;++n){if(n%12==0)r.m.drive(vx,.029*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}
+    const double a=P::gait(r.m).swayYM;assert(a>simple::kWalkSwayYM&&a<=simple::kJoystickSwayLowM+1e-12);
+    // raise to 3.3 %: full amplitude, reached only through four-contact windows
+    double last=a;unsigned changes=0,changesWithSwing=0;
+    for(unsigned n=0;n<1300;++n){if(n%12==0)r.m.drive(vx,.033*simple::kJoystickLateralM/T,0,r.p.now);
+      bool four=true;for(const auto& ph:P::walkNominal(r.m).cartesian.phases)four=four&&ph.stance;r.tick();
+      const double s=P::gait(r.m).swayYM;if(s!=last){++changes;if(!four)++changesWithSwing;last=s;}}
+    assert(changes>0&&changesWithSwing==0&&std::abs(last-simple::kJoystickSwayYM)<1e-12);
+    // 2.5 %: above the release threshold, stays full; 1 %: back to the low band
+    for(unsigned n=0;n<400;++n){if(n%12==0)r.m.drive(vx,.025*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
+    for(unsigned n=0;n<1300;++n){if(n%12==0)r.m.drive(vx,.01*simple::kJoystickLateralM/T,0,r.p.now);r.tick();}
+    const double low=P::gait(r.m).swayYM;assert(low<simple::kJoystickSwayLowM&&low>simple::kWalkSwayYM&&r.m.state()==simple::State::WALKING);
+    r.m.walkStop();assert(r.reachStand());}
+  {Rig r;walking(r,.033*simple::kJoystickLateralM/T);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);r.m.walkStop();assert(r.reachStand());}  // full from the start
+  std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %, amplitude changes only with four feet down PASS (software only)");
+}
+int main(){proneRest();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
