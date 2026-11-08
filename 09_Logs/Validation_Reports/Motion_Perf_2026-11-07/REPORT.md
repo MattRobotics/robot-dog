@@ -288,3 +288,93 @@ Lo sway fore/aft da 10 mm è ciò che tiene il margine statico positivo (+1,07 m
 | Stack catena nominale/compensazione | 6.224 / 7.040 B | 6.320 / 6.448 B | B statici | ELF | VO | high-water fisico N.D. |
 | Diagnostica | max per comando | + istogrammi work/READ/lateness | — | codice | INV | — |
 | APP / RAM | 1.707.808 B / 137.684 B | 1.718.304 B / 137.908 B | B | manifest, build log | VO | — |
+
+## 14. Revisione finale P1–P5 (mandato 08/11/2026) — candidata `4c897ed`
+
+Classi: VH = VERIFIED HARDWARE, VO = VERIFIED OFFLINE, INV = IMPLEMENTED NOT VALIDATED, HYP = HYPOTHESIS, UNK = UNKNOWN. Nessuna azione hardware; la Stable installata resta `1.0.1-dev.17`.
+
+### P1 — Rate STOP (`rateFromHistory`): invariante verificato, nessuna patch
+
+- **Griglia delle release (VO).** Con lateness < 1 periodo (una lateness ≥ periodo è conteggiata come release saltata e sposta la griglia) il riferimento due posizioni indietro è sempre ≥ 1 periodo più vecchio: `issued ≥ grid_k`, `previous2 ≤ grid_{k−2} + T = grid_{k−1} ≤ grid_k − T`. Test diretto (`stopRateHistory`, caso A): 2.644 release con lateness casuale 0–19 ms, una release saltata ogni 97, retarget joystick a ogni release, STOP a un istante casuale in 6 semi: finestra minima scelta **20,0 ms**, rate pianificata massima **0,378 rad/s** (legge < 0,82 + 1 tick/periodo), STOP verificato in tutti.
+- **Fallback «più vecchio disponibile» (VO).** È raggiungibile solo quando esiste un riferimento fuori griglia: le tre `rememberReference(now)` dell'ammissione STAND dopo STOP, seguite da una release a < 20 ms dalla hold-release precedente in ritardo. In quel caso (span 1 ms misurato) il primo frame di ripresa **è il RAW tenuto** (bridge dal RAW fermo nella ripresa WALK; HEIGHT dal RAW tenuto): passo RAW 0 in **55/55** istanti di STOP in WALK (ogni 6 tick di un ciclo) e nella ripresa HOLD→HEIGHT. Secante 0 qualunque sia la finestra: nessuna prima divergenza → nessun floor aggiunto; il test pinna `span < T && step == 0` (un passo ≠ 0 qui sarebbe la prima divergenza che giustifica un floor).
+- **Casi diretti.** RAW identici (HOLD): v = 0, piano 0,04 s. Storia stantia (150 ms senza release): `MOTION_DEADLINE_LOST`/`STOP_REFERENCE_UNAVAILABLE` → SAFE_OFF (fail-closed). STOP nelle prime 6 release dopo ENABLE (fase DISENGAGE, mossa nativa senza riferimento sincrono): `STOP_REFERENCE_UNAVAILABLE` → SAFE_OFF, **identico sull'albero Stable 40728b7** (6/6). STOP prima/dopo il TX: `send()` serve lo STOP prima di `frameTimed` (storia vecchia) o dopo `rememberReference` (storia nuova): la storia riflette sempre ciò che è stato trasmesso (test `walkTxLatency` PASS).
+- **`beginStop` vs `compensationSafe` (VO, per ispezione).** Stessi estremi temporali: `compensationSafe` campiona a `nowUs_` con skip 0 sulla storia [issued, previous, previous2]; `send(q,drive,now)` registra lo stesso `now` della release, quindi `beginStop` (skip 1 su [now, issued, previous]) legge gli stessi punti. Stesso drive per fase (WALK → `kWalkDrive`, HOLD/WALK_HOLD → `kStandDrive`, uguale a `commandedDrive_`), box comparabili (`arrestBox`/`stopBox_` con lo stesso ripiego `kLift`). Secante del riferimento, non velocità misurata dei servo: dichiarato così in entrambe.
+- Comando→prima azione, fallimenti StopPlan, arresto verificato, holding, SAFE_OFF: digest invariato (piano alla release successiva, primo frame subito, verifica 2,04–2,06 s, 0 fault nei semi di stress).
+
+### P2 — Sway joystick: mappa misurata, causa fisica, nuova mappa
+
+**Misura della mappa trasmessa** (sweep stazionaria, `joy_sway` scratch + `foot_edge_contact` per frame, avanti 80 % + laterale/yaw k):
+
+| domanda laterale/yaw | sway trasmesso (mappa 128c480) | supporto statico min | dove |
+|---|---|---|---|
+| 0 | 2,0 mm | +1,07 mm | c 0,08–0,11, LF RF LH a terra (RH in swing) |
+| 2 % | 4,4 mm | +2,88 mm | idem |
+| 3,3 % | 6,0 mm | **−0,08 mm** | idem (13 frame < 0; quarti successivi +0,78) |
+| 5 % | 8,0 mm | +1,44 mm | idem |
+| 6,7 % | 10,0 mm | +2,96 mm | idem |
+| 8,3 % | 12,0 mm | +4,39 mm | idem |
+| ≥ 10 % | 14,0 mm | +5,9 mm | idem |
+
+**Causa (VO, dati del frame c = 0,089).** A 4,4 mm il tilt dell'asse piede delle zampe in appoggio è 1,5–1,7° (striscia nominale, contatto = riferimento). A 6 mm è 2,04–2,35° > 2°: il contatto reale migra sul raccordo (RF −98,40 → −94,94 mm, LH 89,60 → 93,07 mm: **+3,5…+5 mm nella direzione dello sway**) mentre il COM si è spostato di 1,6 mm → la diagonale RF–LH supera il COM (margine 2,89 → −0,08). Il poligono «insegue» il COM finché il raccordo lo consente; oltre 9–10 mm il margine riprende a crescere. Le mappe graduali già bocciate (piena al 50 %/25 %) fallivano per questo: sosta stazionaria in 5–9 mm. La mappa lineare di 128c480 ha lo stesso buco a una domanda **stazionaria** del 3,3 % (joystick quasi dritto), che il gate a 26 scenari non conteneva.
+
+**Nuova mappa (commit 7c8ea01, INV):** 2 → 5 mm proporzionale fino al 3 % della domanda normalizzata; 14 mm dal 3 % con rilascio sotto l'1,5 % (isteresi sull'ampiezza corrente, nessuno stato nuovo); l'ampiezza cambia **solo con quattro piedi a terra** (campione nominale precedente), rampa 0,5 ciclo (≤ 24 mm/ciclo = 0,074 mm/release; 0,25 ciclo non migliora: random_1 0,46 vs 0,42). Confronto sulle stesse sequenze:
+
+| scenario | lineare 128c480 | **nuova** | 14 mm fissi (dev.17) |
+|---|---|---|---|
+| sweep stazionaria 0,5–30 % (min) | −0,08 (3,3 %) | **+1,45** (0,5 %), monotona | +5,9 |
+| random_1 / 2 / 3 / 5 | 0,44 / 0,54 / 1,53 / 1,44 | **0,57 / 2,36 / 1,45 / 3,04** | 0,57 / 2,36 / 3,30 / 3,04 |
+| step avanti→laterale 20 %→avanti, yaw 30 %, laterale 4 % | — | 1,07 (fase puro avanti) | 5,9 |
+
+Il minimo residuo (random_1, 0,57 mm, c 2,08, 14 mm, yaw 27 %) è lo stesso dei 14 mm fissi: transitorio dello sterzo, non della mappa. Continuità: passo RAW massimo 12–13 tick/release (12 in 128c480), 22 con release saltate (identico); nessun frame fuori box; T2 resync 2–3 per scenario (invariati: `sameLawShape` ignora `swayYM`). Gate di inviluppo esteso a 32 scenari (+ `lat/yaw_small` 2,9 %, `lat/yaw_mid` 3,3 %, giri completi): **PASS** — supporto minimo +0,57 mm (random_1), stazionari piccoli +3,26 mm (2,9 %) e +5,91 mm (3,3 %), clearance non-piede ≥ 2,18 mm, 0 raggi di tilt fuori, tilt compensato massimo 11,63°. **Limiti:** modello statico su contatto ideale; stabilità dinamica e sensazione: N.D. (collaudo H5/H6/H8/H9).
+
+### P2-bis — Difetto preesistente trovato: inviluppo tilt steered nel frame di supporto (fix in `4c897ed`)
+
+Prolungando le rotazioni joystick oltre i 26 s del gate (4 cicli a 6,5 s) i raggi del poligono `kSteerTilt` (vertice pitch-up 0,07 rad) portano il tilt del piede d'appoggio al limite del raccordo (12°) da heading ≈ 0,9 rad in poi: **181–283 raggi al bordo su 7 cicli**, presenti in 128c480 **e nella legge v1.0.1** (stesso codice). In firmware un bersaglio di compensazione non valido in WALK è `WALK_IK_OR_WORKSPACE` → SAFE_OFF: con l'IMU al bordo dell'inviluppo (pendenza 4° lungo l'asse del supporto) e heading 50–75° il robot si sarebbe spento in rotazione. Causa: il poligono vincola il carico sull'anca/raccordo, grandezza del **frame corpo**, ma era applicato al tilt nel **frame di supporto** (il frame del fit e di `headed()`), e l'heading accumulato ruota un pitch di supporto in roll corpo. Fix minimo: `limitWalkTilt` porta il vettore di tilt nel frame heading (`R_z(θ)ᵀ`), proietta sul poligono e riporta indietro; heading identità bit-identico (WALK STANDARD invariato). Il gate proietta i raggi allo stesso modo e aggiunge due giri completi (cw/ccw, 206 s): **0 raggi al bordo in 2,1 giri**, tilt compensato ≤ 11,42° (era 11,95 al bordo). Test unitario sulla proiezione (identità, heading 90°). Classe INV (hardware: H8).
+
+### P3 — ESP32-S3: configurazione reale e prove offline
+
+**Configurazione della candidata (VO su ELF/map/sdkconfig/compile_commands):** `-Os` su tutte le unità (`CONFIG_COMPILER_OPTIMIZATION_SIZE`), `F_CPU 240000000`/`CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240` (frequenza effettiva da leggere al boot), flash QIO 80 MHz, PSRAM 80 MHz (FQBN `PSRAM=opi`; lo `sdkconfig` esportato riporta `SPIRAM_MODE_QUAD`: discrepanza da chiarire sul log di boot), I-cache 16 kB 8 vie/32 B, D-cache 32 kB. Codice `motion::`+`simple::` **95.982 B, tutto in flash mappata** (IROM 0x4200…); `libm` double (`sin/cos/atan2/acos/asin/sqrt/hypot/remainder/floor`, ~5,5 kB) in flash, **nulla in IRAM né ROM**; `.iram0.text` 82 kB (IDF/Wi-Fi), segmento IRAM 358 kB. Hot set di una release WALK (legge + IK + FK + libm + driver) ≫ 16 kB di I-cache: miss strutturali plausibili (HYP).
+
+**Scheduling (VO su sorgenti/sdkconfig):** core 1: `loopTask` prio 1 (Motion + Controller, `delay(1)`), `arduino_events` prio 19 (`ESP_TASKD_EVENT_PRIO−1`, eventi Wi-Fi/IP), `ipc1` prio 24, IDLE1; core 0: `md_imu` prio 2, `md_network` prio 1, `md_http_life` prio 1, HTTPD ×2 prio 2 (24/28 kB), Wi-Fi, lwIP, `esp_timer`, NimBLE. Nessuna scrittura flash/NVS durante Motion (solo salvataggi di calibrazione e configurazione di rete). Le cache I/D sono condivise fra i due core: il traffico di core 0 può evincere le linee di Motion (rallentamento diffuso), mentre i dati dev.17 (calcolo ×1,44 vs READ ×1,18, ρ −0,31) indicano eventi discreti: candidati `arduino_events`, ISR UART/USB-CDC su core 1, miss di I-cache dopo preemption. Causa **UNK**; nessun task o core cambiato; gli istogrammi forniscono le distribuzioni ma non discriminano da soli (serve il dump USB con `externalUs[]` e `sinceReleaseUs`).
+
+**`-Os` vs `-O2` selettivo (scratch `/tmp/mp-o2`, 9 unità Motion con `#pragma GCC optimize("O2")`, stesso FQBN):** APP **1.718.304 → 1.735.024 B** (+16.720), codice Motion **+16,2 %** (94.961 → 110.336 B; `sampleLaw` +1.708, `update` +1.198, `compensationSafe` +1.158); frame di stack: catena nominale **−176 B**, compensazione **+1.104 B**, prova STOP **+2.160 B** (inlining di `StopPlan::build`), STOP +304 B; tempo Xtensa **N.D.**; la parte soft-double (`libm`, `__muldf3`…) è identica. **Respinto**: costo misurabile (cache/stack), beneficio non misurabile offline.
+
+**`double` → `float` selettivo (scratch `/tmp/mp-float`: LegKinematics, LegInverseKinematics, FootContact, BodyPose, TiltedContactIk in `float`; 78.200 casi dalla legge: WALK45/60, sterzo laterale/yaw con raccordo, 9 raggi di tilt):**
+
+| percorso | esito con tolleranze di produzione | con tolleranza piana 1e-6 | dove entrambi OK: |Δq| p50/p95/p99/max | contatto (mm) | rami | tick RAW cambiati |
+|---|---|---|---|---|---|---|---|
+| IK piana analitica (`solveGait`) | float fallisce **19.217/19.520** (`NUMERICAL_FAILURE`, FK 1e-9 irraggiungibile) | ancora **2.032** fallimenti (`validBodyPose` 1e-10) | 1,1e-7 / 2,6e-7 / 3,4e-7 / 4,8e-7 rad (≤ 0,0003 tick) | 1,5e-5 / 2,7e-5 / 3,2e-5 / 5,1e-5 | 0 | 5 / 52.464 (0,01 %) |
+| Newton inclinata (`compensationTarget`, 1e-6, 8 passi) | float fallisce **49.940/58.680** (`INVALID_INPUT`: ortonormalità 1e-10) | idem | 1,4e-7 / 3,2e-7 / 4,2e-7 / 6,1e-7 rad | 1,6e-5 / 3,0e-5 / 3,7e-5 / 5,4e-5 | 0 | 5 / 26.220 (0,02 %) |
+
+La sola tolleranza (double 1e-9 vs 1e-6) non cambia nulla (0 differenze). Conclusione: numericamente il `float` sarebbe entro 0,0004 tick/0,05 µm, ma la catena di validità (1e-9, 1e-10, 1e-12) delle protezioni andrebbe ri-derivata per intero: **respinto** (nessun allentamento). Tempo on-target N.D. **IRAM:** non adottato (wrapper in IRAM non sposta `libm`; nessun beneficio verificabile offline).
+
+### P4 — Cadenza e WALK_SETTLE: vincolo attivo, margini, decisione
+
+**Attribuzione (checker con attribuzione, scratch):** a 1,25× (5,2 s, 60 mm) i 6 fallimenti StopPlan sono sui giunti **UPPER anteriori** (j1/j4) a q ≈ 0,416 rad contro il bordo inferiore `kHeight` 0,385, v −0,54 rad/s, zampa anteriore in swing sotto i raggi di tilt 15/17; a 1,5× (4,33 s, 45 mm) si aggiungono a_max 9,85 rad/s² (UPPER, finestre a quattro appoggi = transizione dello sway fore/aft) e StopPlan su j1/4/8/11. **Scan del periodo** (griglia ideale, con offset di campionamento 1/4 e 1/7 di release — un primo tentativo con secante su 5 ms era un artefatto di quantizzazione): 45 mm PASS fino a 5,3 s; 60 mm PASS da 6,5 a 5,65 s, FAIL a 5,6 (6–9 prove), poi alternante; 5,8 s PASS a qualunque offset. **Rig con latenza TX 7 ms e release in ritardo di 15 ms (test `walkTxLatency`, board plant con lag servo):** 6,2 s PASS, **6,0 e 5,8 s FAIL** (`WALK_IK_OR_WORKSPACE` da `compensationSafe`: j4 v −0,92 rad/s verso lo 0,385 con margine 0,074 rad; la durata comune dello StopPlan imposta dal giunto più veloce dà una distanza d'arresto 0,083 > margine; a 6,5 s v 0,82 → 0,066, **margine ≈ 8 mrad ≈ 5 tick**).
+
+**Decisione:** `kWalkPeriodS` **invariato** (6,5 s). Il guadagno robusto a tutte le prove offline è +5 % (6,2 s): non giustifica la ri-qualifica hardware della cadenza validata; velocità 6,92/9,23 mm/s e WALK STOP→STANDING (legge 6,99 s + arrivo) **INVARIATI**. Il vincolo è la prova di arresto al bordo `kHeight` dei giunti UPPER anteriori con il profilo `{1000,50}`: la via per 1,5× resta un profilo drive ≥ `{1500,100}` qualificato (piano minimo: (1) WALK45 a 6,5 s con registri `{1500,100}` 2 cicli, tracking/corrente/termica ID21-31 vs `{1000,50}`; (2) STOP a metà swing: tempo fisico d'arresto e `STOP_HOLD_TRACKING`; (3) solo se (1)-(2) puliti, periodo 4,33 s per 2 cicli con gli stessi osservabili); oppure la ri-certificazione del bordo UPPER del box (non ammessa). Finestre dello sway fore/aft: la transizione in 0,075 cicli è l'altro vincolo (a_max); allargarla sposta il COM in tre appoggi dove il margine è +1,07 mm → limite fisico, non riparametrizzato. I test che codificavano 6,5 s come letterale (SE(2) su due cicli, JSON di stato/capabilities) ora derivano dal periodo.
+
+### P5 — Diagnostica: costo misurato, utilità, nessun layer
+
+Compilazione Xtensa della sola `SimpleMotion.cpp` con la riga di `compile_commands.json`, con e senza istogrammi: `timing::Release::~Release` **244 → 400 B** (+156 B), tabella `kWorkBinsUs` 28 B, `timing::state` **824 → 896 B** (+72 B `.data`), `update()` 0x131c invariata, frame di stack invariati. Dinamica per release: tre scansioni di soglia (≤ 7+4+6 confronti) + 3 incrementi ≈ < 100 istruzioni → < 0,5 µs a 240 MHz **(HYP, non misurato)**. Riarmo a ogni comando (`timing::arm`), quindi un istogramma per **comando**, non per fase: il comando WALK include HEIGHT→WALK e WALK_SETTLE; il p99 del solo WALK va letto per differenza (HOLD = 0 overrun). Saturazione `uint16` solo nel JSON (65.535 release = 21,8 min dello stesso comando; USB `uint32`). Mantenuti tutti e tre perché ciascuno decide una cosa del collaudo: work → accettazione A/B di p99/overrun; READ → UART/preemption vs calcolo; lateness → latenza di schedulazione vs esecuzione. Nessun logging per release, nessun ring buffer.
+
+### Build e tabella finale
+
+`ROBOT_POWERED` CLEAN da **`4c897ed0bb7fb6976c3a76ef6e97dee8cc9666b1`**: APP **1.718.736 B** (+432 B vs 128c480, +10.928 B vs dev.17), RAM 137.908 B (= 128c480, +224 B vs dev.17), SHA256 **`03c84606e3d45616cbcd6985fdad6253d9af13691edeb3664503b6f5bdcbeb9e`**, `FW_VERSION=1.0.2-dev.1`, `~/MATDOG/build-output/motion-perf-next-20261107/build-4c897ed/`. Frame di stack Xtensa (somme di catena con la stessa decodifica ENTRY, dev.17 → candidata): nominale 6.624 → **7.200 B** (+576: `sampleLaw` separata e `solveGaitInto`), compensazione 5.200 → **4.608 B** (−592), prova STOP 3.248 → **2.656 B** (−592), STOP 2.048 → 2.128 B; identici a 128c480 (`limitWalkTilt` 96 → 112 B); i 6.320/6.448 B del §9 usano catene più corte. Il candidato 128c480 (APP `e3e69368…`) è **superato**.
+
+| Requisito | Stable v1.0.1 | A1+A2 | integrata `4c897ed` | Prova | Classe | Rischio |
+|---|---|---|---|---|---|---|
+| libm/release WALK45 p50/p90/p99/max | 440/512/542/555 | 378/450/480/492 | 230/277/468/510 | probe host | VO | tempo Xtensa N.D. |
+| libm/release JOYSTICK | 523/621/970/1008 | 454/544/855/892 | 278/462/815/898 | probe host | VO | idem |
+| -Os → -O2 selettivo | — | — | APP +16.720 B, codice Motion +16 %, stack prova STOP +2.160 B, tempo N.D. → respinto | ELF scratch | VO | — |
+| double → float selettivo | — | — | Δq ≤ 0,0004 tick, 0,01–0,02 % tick RAW, ma 19.217/19.520 e 49.940/58.680 fallimenti di validità → respinto | 78.200 casi | VO | — |
+| Rate STOP: finestra | floor/2 campioni | — | ≥ 20,0 ms su griglia (2.644 release), fallback solo con passo 0 | test diretti | VO | — |
+| STOP comando→piano/frame/verifica | 1 release / sì / 2,0 s | — | identico | digest | VO | tempo fisico N.D. |
+| Sway joystick: supporto stazionario min | +5,9 (14 mm fissi) | — | **+1,45** (0,5 %), monotona; 128c480 lineare: **−0,08** | sweep | VO | dinamica N.D. |
+| Sway joystick: random min | +0,57 | — | **+0,57** (128c480: +0,44) | gate | VO | — |
+| Inviluppo steered in rotazione > 4 cicli | 181–283 raggi al bordo | — | **0** (2,1 giri), tilt ≤ 11,42° | gate giri | VO/INV | H8 |
+| Velocità WALK45/60 | 6,92 / 9,23 mm/s | — | **INVARIATA** (vincolo StopPlan bordo UPPER; +5 % non adottato) | checker + rig | VO | — |
+| WALK STOP → STANDING | 8,9 s (dev.17) | — | **INVARIATO** | rig/traccia | VH/VO | — |
+| Stack catene nominale / compensazione / prova STOP / STOP (stessa decodifica) | 6.624 / 5.200 / 3.248 / 2.048 B (dev.17) | — | 7.200 / 4.608 / 2.656 / 2.128 B; frame massimo 9.648 → 9.792 B (HTTPD, task proprio) | ELF | VO | high-water N.D. |
+| Diagnostica | max per comando | — | +156 B codice, +72 B RAM, < 0,5 µs/release (HYP) | ELF | VO/HYP | — |
+| APP / RAM | 1.707.808 / 137.684 B | — | 1.718.736 / 137.908 B | manifest | VO | — |

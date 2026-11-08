@@ -26,6 +26,13 @@ Kit di ingresso estratto in `~/MATDOG/verification-artifacts/MATDOG_MOTION_PERF_
 | Revisione T2 retarget/jitter: difetto confermato e corretto (riferimento a `now`, rate STOP ≥ 1 periodo) | FATTA, 36 semi 0 fault (Stable 3) | 131ca53 |
 | Static audit completo | PASS | 27c409f |
 | Draft PR #67 + commento #52 | FATTA; commento di revisione in aggiunta | — |
+| Revisione P1 rate STOP: invariante su griglia, fallback solo con passo 0, casi diretti; nessuna patch | FATTA (REPORT §14) | 7c8ea01 |
+| Revisione P2 sway: buco fisico della mappa lineare (contatto sul raccordo a ~5,5 mm, −0,08 mm al 3,3 %); nuova mappa 2–5 mm / 14 mm con isteresi, cambi solo a 4 appoggi; gate 32 scenari | FATTA | 7c8ea01 |
+| Difetto preesistente inviluppo steered in rotazione > 4 cicli (anche v1.0.1): proiezione nel frame heading; gate con giri completi | FATTA | 4c897ed |
+| P3: audit configurazione ESP32-S3, -Os/-O2 selettivo e double/float (entrambi respinti con misure), scheduling | FATTA (REPORT §14) | — |
+| P4: vincolo di cadenza attivo (StopPlan bordo UPPER kHeight), 6,2 s unico periodo robusto (+5 %), periodo invariato | FATTA | 4c897ed |
+| P5: costo istogrammi misurato su ELF (+156 B codice, +72 B RAM) | FATTA | — |
+| Build ROBOT_POWERED CLEAN finale | FATTA: **4c897ed**, APP 1.718.736 B, SHA256 03c84606… (sostituisce 128c480) | — |
 
 ## Risultati chiave finora
 
