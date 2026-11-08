@@ -9,7 +9,7 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
-# Usage: run_joystick_envelope.sh [output-dir]. Geometry only. 32 scenarios.
+# Usage: run_joystick_envelope.sh [output-dir]. Geometry only. 43 scenarios.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)"
 out="${1:-$(mktemp -d /tmp/matdog-joystick.XXXXXX)}";mkdir -p "$out"
@@ -19,8 +19,23 @@ for n in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKinemat
 mapfile -t lines < <(python3 - <<'PY'
 import itertools,math
 lim=[.045/6.5,.020/6.5,.20/6.5]
+pub,back=.100/5.0,.050/5.0  # dev.5: fore/aft walks the WALK STANDARD law up to 100 mm (backward 50 mm)
 v=lambda a:','.join(repr(x) for x in a)
-print('forward','26:'+v([lim[0],0,0]));print('backward','26:'+v([-lim[0],0,0]))
+print('forward','26:'+v([pub,0,0]));print('backward','26:'+v([-pub,0,0]))
+print('forward_steered','6:'+v([lim[0],lim[1]/2,0])+' 20:'+v([lim[0],0,0]));print('backward_steered','6:'+v([-lim[0],lim[1]/2,0])+' 20:'+v([-lim[0],0,0]))
+print('frontal_changes','6:'+v([.2*pub,0,0])+' 6:'+v([pub,0,0])+' 6:'+v([.1*pub,0,0])+' 8:'+v([.7*pub,0,0]))
+# Ground HW 08/11: a forward stick carried 0.1-0.4 mm/s of lateral, alternating sides.
+print('frontal_jitter',' '.join('0.48:'+v([.0069,s*1e-4,0]) for s in [1,2,-3,4,-1,3,-2,1]*7))
+print('frontal_to_steer','10:'+v([pub,0,0])+' 20:'+v([pub/2,lim[1]/2,0]))
+# Stride increases while walking (kJoystickFrontalRampCycles), at several phases, and seeded fore/aft sequences.
+for k,t0 in enumerate((6.0,7.2,8.4)):print(f'frontal_accel{k}',f'{t0}:'+v([.1*pub,0,0])+' 12:'+v([pub,0,0]))
+import random
+for seed in range(1,4):
+    random.seed(seed);steps=[];t=0
+    while t<120:
+        d=.5+random.random()*3.5;x=random.uniform(-1,1)*pub
+        steps.append(f'{d:.2f}:'+v([x,random.uniform(-4e-4,4e-4),0]) if random.random()>=.15 else f'{d:.2f}:0,0,0');t+=d
+    print(f'frontal_random_{seed}',' '.join(steps))
 print('left','26:'+v([0,lim[1],0]));print('right','26:'+v([0,-lim[1],0]))
 print('ccw','26:'+v([0,0,lim[2]]));print('cw','26:'+v([0,0,-lim[2]]))
 for s in itertools.product((1,-1),repeat=3):

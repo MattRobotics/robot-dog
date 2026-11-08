@@ -1,4 +1,5 @@
-// JOYSTICK envelope, offline (dev.15). Drives the production SimpleMotion with
+// JOYSTICK envelope, offline (dev.15; dev.5: fore/aft demands walk the WALK
+// STANDARD law, checked on its own envelope kWalkTilt100 and box). Drives the production SimpleMotion with
 // scripted joystick commands (ideal tracking, flat IMU) and checks every WALK
 // release of the nominal law: joint margin to the walk box and gen-1, foot
 // axis tilt, and the IMU tilt envelope (rays to the boundary of the steered
@@ -17,6 +18,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <iterator>
 static int64_t clock_us=1000000;
 extern "C" int64_t esp_timer_get_time(){return clock_us;}
 using namespace matdog;
@@ -60,6 +62,7 @@ int main(int argc,char** argv){
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
   const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  V walk100[std::size(simple::kWalkTilt100)];for(unsigned i=0;i<std::size(walk100);++i)walk100[i]={simple::kWalkTilt100[i].roll,simple::kWalkTilt100[i].pitch};
   struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);
@@ -100,7 +103,9 @@ int main(int argc,char** argv){
         // Rays on the certified polygon in the heading (body) frame, taken into
         // the support frame like SimpleMotion::limitWalkTilt (the hip/fillet
         // loading they bound does not depend on the accumulated heading).
-        const double sc=rayScale(kSteerTilt,dr,dp),rb=sc*dr,pb=sc*dp,roll=cy*rb-sy*pb,pitch=sy*rb+cy*pb;
+        // The fore/aft JOYSTICK walks the WALK STANDARD law: its envelope, support frame (limitWalkTilt).
+        const bool steered=&box==&simple::collision::kSteer;
+        const double sc=steered?rayScale(kSteerTilt,dr,dp):rayScale(walk100,dr,dp),rb=sc*dr,pb=sc*dp,roll=steered?cy*rb-sy*pb:rb,pitch=steered?sy*rb+cy*pb:pb;
         auto body=motion::bodyPoseFromRollPitch({},roll,pitch);const auto t=b.translationM;
         {double rr[3][3];for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)rr[i][j]=body.rotation[i][0]*b.rotation[0][j]+body.rotation[i][1]*b.rotation[1][j]+body.rotation[i][2]*b.rotation[2][j];
          for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)body.rotation[i][j]=rr[i][j];}  // same heading as compensateLevel

@@ -427,7 +427,8 @@ int envelopes(const char* path, const char* src) {
     const uint32_t now = c.issued_at_ms + 40;  // HTTP latency after the dashboard's uptime estimate
     check(motion::validCommand(c, now, &why), name + ": validCommand " + (why ? why : ""));
     if (name.rfind("joystick_dynamic_", 0) == 0) {
-      const double T = simple::kJoystickPeriodS, nx = c.vx * T / simple::kJoystickStrideM, ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      // Published ellipsoid (dev.5): fore/aft at the WALK STANDARD 100 speed, lateral/yaw of the steered law.
+      const double T = simple::kJoystickPeriodS, nx = c.vx * simple::kWalkPeriodS / simple::kStrideM[2], ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
       check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
             name + ": BASE_VELOCITY gait JOYSTICK inside the Controller ellipsoid, mailbox");
       dynamic[name] = body;
@@ -466,8 +467,9 @@ int envelopes(const char* path, const char* src) {
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
       check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
     } else if (name == "joystick_forward" || name == "joystick_backward" || name == "joystick_lateral" || name == "joystick_turn") {
-      const double T = simple::kJoystickPeriodS, nx = c.vx * T / simple::kJoystickStrideM, ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
-      const bool shape = name == "joystick_forward" ? c.vx == simple::kJoystickStrideM / T && c.vy == 0 && c.yaw_rate == 0 :
+      // Published ellipsoid (dev.5): fore/aft at the WALK STANDARD 100 speed, lateral/yaw of the steered law.
+      const double T = simple::kJoystickPeriodS, nx = c.vx * simple::kWalkPeriodS / simple::kStrideM[2], ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      const bool shape = name == "joystick_forward" ? c.vx == simple::kStrideM[2] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 :
                          name == "joystick_backward" ? c.vx < 0 && c.vy == 0 && c.yaw_rate == 0 :
                          name == "joystick_lateral" ? c.vx == 0 && c.vy > 0 && c.yaw_rate == 0 : c.vx == 0 && c.vy == 0 && c.yaw_rate > 0;
       check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && shape && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
@@ -549,8 +551,19 @@ int envelopes(const char* path, const char* src) {
     };
     hold("joystick_dynamic_forward", 1.5);
     check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() == 0, "dynamic: forward");
+    // dev.5: forward alone walks the WALK STANDARD law; the first steering demand
+    // changes law through one WALK STOP (ACK JOYSTICK_STEERING, page silent), then
+    // the held intent walks steered from STANDING.
+    check(post("joystick_dynamic_diagonal") == "ACCEPTED JOYSTICK_STEERING" && !std::strcmp(rig.m.reason(), "JOYSTICK_STEERING"), "dynamic: forward-right during a fore/aft walk changes law (WALK STOP), the ACK says so");
+    for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) step("law change");
+    check(rig.m.state() == simple::State::STANDING && stops == 1, "dynamic: law change ends in STANDING (page silent)");
+    for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) {
+      if (k % 12 == 0) check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held forward-right accepted at STANDING");
+      step("joystick_dynamic_diagonal");
+    }
     // Intent -> reference: the next release moves the lateral reference; full
     // scale takes kJoystickRampCycles cycles (rate limit, envelope gate).
+    hold("joystick_dynamic_forward", .5);
     const double vy0 = rig.m.walkVelocityY(), c0 = rig.m.walkCycles();
     check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: forward-right accepted");
     step("joystick_dynamic_diagonal");
@@ -560,13 +573,13 @@ int envelopes(const char* path, const char* src) {
     hold("joystick_dynamic_lateral", 2.5);
     check(rig.m.walkVelocityX() == 0 && rig.m.walkVelocityY() < 0, "dynamic: right, fore/aft at zero, no reversal");
     hold("joystick_dynamic_left", 3);
-    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 0, "dynamic: forward-left; no WALK STOP in four direction changes");
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 1, "dynamic: forward-left; no further WALK STOP in four steered direction changes");
     std::printf("dynamic joystick: intent->reference at the next release (%.3f mm/s of lateral per release), full scale %.1f s (kJoystickRampCycles %.1f x %.1f s); %.2f cycles without a stop\n",
                 firstMove * 1000, simple::kJoystickRampCycles * simple::kJoystickPeriodS, simple::kJoystickRampCycles, simple::kJoystickPeriodS, rig.m.walkCycles() - c0);
     check(post("joystick_dynamic_back") == "ACCEPTED JOYSTICK_REVERSING" && !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING"), "dynamic: full pull back reverses (WALK STOP), the ACK says so");
     bool settled = false;
     for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) { step("reversal"); settled |= !std::strcmp(rig.m.reason(), "WALK_SETTLING"); }
-    check(rig.m.state() == simple::State::STANDING && settled && stops == 1, "dynamic: one WALK STOP, settling, STANDING (page silent)");
+    check(rig.m.state() == simple::State::STANDING && settled && stops == 2, "dynamic: one more WALK STOP, settling, STANDING (page silent)");
     for (unsigned k = 0; k < 3000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() > 1); ++k) {
       if (k % 12 == 0) check(post("joystick_dynamic_reverse") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held backward intent accepted at STANDING");
       step("joystick_dynamic_reverse");

@@ -564,30 +564,47 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
 }
 const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now){
   if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
-  const double goal[3]={vx*kJoystickPeriodS,vy*kJoystickPeriodS,yawRate*kJoystickPeriodS},limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};
-  double norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(goal[j]))return "JOYSTICK_VELOCITY_RANGE";norm+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
+  // Published range (capabilities): fore/aft at the WALK STANDARD 100 speed,
+  // lateral and yaw of the steered law, inside one ellipsoid.
+  const double v[3]={vx,vy,yawRate},range[3]={kStrideM[2]/kWalkPeriodS,kJoystickLateralM/kJoystickPeriodS,kJoystickYawRad/kJoystickPeriodS};
+  double n[3],norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(v[j]))return "JOYSTICK_VELOCITY_RANGE";n[j]=(v[j]/range[j])*(v[j]/range[j]);norm+=n[j];}
   if(norm==0||norm>1+1e-9)return "JOYSTICK_VELOCITY_RANGE";
+  const bool frontal=n[1]+n[2]<kJoystickFrontalBand*kJoystickFrontalBand;
   // A walk keeps the leg order of its fore/aft direction: forward, or its time
   // reverse backward. A demand pointing mostly the opposite way (its fore/aft
   // part above lateral and yaw together, in the ellipsoid) ends it with WALK
   // STOP; the next command after STANDING starts the other one. Lateral and yaw
-  // are continuous: a mainly lateral/yaw demand keeps walking, its contrary
-  // fore/aft part held at zero by steerWalk (dev.17 HW: a sideways stick a hair
-  // behind centre stopped the walk).
-  const bool reverse=goal[0]<0;const double fore=(goal[0]/limit[0])*(goal[0]/limit[0]);
+  // are continuous in a steered walk: a mainly lateral/yaw demand keeps walking,
+  // its contrary fore/aft part held at zero by steerWalk (dev.17 HW: a sideways
+  // stick a hair behind centre stopped the walk). A fore/aft walk runs the WALK
+  // STANDARD law: a steering demand ends it the same way (JOYSTICK_STEERING).
+  const bool reverse=vx<0;
   if(state_==State::WALKING){
     if(!joystick_)return "WALK_STANDARD_ACTIVE";
     if(walkStopping_)return "WALK_STOPPING";
-    if(goal[0]!=0&&reverse!=gait_.reverse&&fore>norm-fore){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
+    if(!steered_&&!frontal){walkStop();reason_="JOYSTICK_STEERING";return nullptr;}
+    // "Mostly" in the walking law's own ellipsoid (the steered fore/aft range is shorter).
+    const double fore=steered_?(vx*kJoystickPeriodS/kJoystickStrideM)*(vx*kJoystickPeriodS/kJoystickStrideM):n[0];
+    if(vx!=0&&reverse!=gait_.reverse&&fore>n[1]+n[2]){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
   }else if(joystick_&&walkRequested_){
-    if(goal[0]!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction
+    if(vx!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction and law
   }else{
     // One command can acquire, energize, stand at the WALK height and walk.
     const char* r=stand(kWalkHeightM,now);if(r)return r;
-    gait_=steerGait(goal);walkRequested_=true;
+    gait_.reverse=reverse;walkRequested_=true;
   }
-  joystick_=true;for(unsigned j=0;j<3;++j)joystickGoal_[j]=goal[j];joystickDeadlineUs_=now+kJoystickTimeoutUs;
+  joystick_=true;std::copy(v,v+3,joystickVel_);joystickFrontal_=frontal;joystickDeadlineUs_=now+kJoystickTimeoutUs;
   return nullptr;
+}
+// The WALK STANDARD law takes the fore/aft part alone (backward up to
+// kJoystickBackM); the steered law the whole demand, saturated onto its
+// ellipsoid with the direction kept (a diagonal stick asks more fore/aft than
+// the steered law walks).
+void SimpleMotion::joystickGoal(bool frontal,double goal[3]) const {
+  if(frontal){goal[0]=std::clamp(joystickVel_[0]*kWalkPeriodS,-kJoystickBackM,kStrideM[2]);goal[1]=goal[2]=0;return;}
+  const double limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};double n=0;
+  for(unsigned j=0;j<3;++j){goal[j]=joystickVel_[j]*kJoystickPeriodS;n+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
+  if(n>1)for(unsigned j=0;j<3;++j)goal[j]/=std::sqrt(n);
 }
 void SimpleMotion::walkStop(){
   walkRequested_=false;
@@ -884,29 +901,38 @@ void SimpleMotion::generateStand(uint64_t now){
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
+  steered_=joystick_&&!joystickFrontal_;
   if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_);}
-  plannedHeight_=kWalkHeightM;track_={};steered_=joystick_;steeredCycles_=0;resetLookahead();
-  // The latest target, from the start ramp; never against the leg order.
-  if(steered_){gait_.advanceXM=(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[0];gait_.advanceYM=joystickGoal_[1];gait_.yawRad=joystickGoal_[2];}
+  else{
+    // The latest target, from the start ramp; never against the leg order. A
+    // fore/aft demand walks the WALK STANDARD 100 law and envelope.
+    double goal[3];joystickGoal(!steered_,goal);const bool reverse=gait_.reverse;
+    if(steered_)gait_=steerGait(goal);else{stride_=2;gait_=walkGait(2);}
+    gait_.reverse=reverse;gait_.advanceXM=(goal[0]<0)!=reverse?0:goal[0];gait_.advanceYM=goal[1];gait_.yawRad=goal[2];}
+  plannedHeight_=kWalkHeightM;track_={};steeredCycles_=0;resetLookahead();
   walkPrevious_=solveGait(gait_,gaitTrackCartesian(track_,gait_,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(walkBox(),walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
-  phase_=Phase::WALK;state_=State::WALKING;reason_=steered_?"WALK_JOYSTICK":"WALK_STANDARD";
+  phase_=Phase::WALK;state_=State::WALKING;reason_=joystick_?"WALK_JOYSTICK":"WALK_STANDARD";
 }
 void SimpleMotion::steerWalk(uint64_t now){
   if(!joystick_||walkStopping_||walkRecover_){for(double& r:track_.goalRate)r=0;return;}
   // Released, unreachable or silent client: the Controller ends the walk itself.
   if(now>joystickDeadlineUs_){walkStop();reason_="JOYSTICK_TIMEOUT";return;}
-  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad};
-  const double limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad},dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
+  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad},goal[3];joystickGoal(!steered_,goal);
+  // Full scale over kJoystickRampCycles (steered) or, on the WALK STANDARD law,
+  // over its own start ramp (the stride change of a walk started at rest).
+  const double limit[3]={steered_?kJoystickStrideM:kStrideM[2],kJoystickLateralM,kJoystickYawRad},ramp=steered_?kJoystickRampCycles:kJoystickFrontalRampCycles;
+  const double dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
   for(unsigned j=0;j<3;++j){
-    const double goal=j==0&&(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[j],rate=limit[j]/kJoystickRampCycles;  // never against the leg order
-    *axis[j]+=std::clamp(goal-*axis[j],-rate*dc,rate*dc);track_.goal[j]=goal;track_.goalRate[j]=rate;}
+    const double g=j==0&&(goal[0]<0)!=gait_.reverse?0:goal[j],rate=limit[j]/ramp;  // never against the leg order
+    *axis[j]+=std::clamp(g-*axis[j],-rate*dc,rate*dc);track_.goal[j]=g;track_.goalRate[j]=rate;}
   // Lateral sway follows the rate-limited lateral/yaw demand, changing only
   // while all four feet are down (last nominal sample): the body never crosses
-  // the fillet contact band (SimpleMotion.h) during a three-contact phase.
+  // the fillet contact band (SimpleMotion.h) during a three-contact phase. The
+  // WALK STANDARD law keeps its own sway.
   const double swayRate=(kJoystickSwayYM-kJoystickSwayBaseYM)/kJoystickSwayRampCycles;
-  bool fourDown=true;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
+  bool fourDown=steered_;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
   if(fourDown)next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad,gait_.swayYM)-next.swayYM,-swayRate*dc,swayRate*dc);
   if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_)){
 #ifdef MATDOG_T2_SHADOW

@@ -387,10 +387,10 @@ async function boot(initialStatus = fx.status_ready) {
   // on release, dead zone silent; disabled over WALK STANDARD and STOP.
   await refresh(fx.status_ready);
   {
-    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.100 / 5.0, .020 / 6.5, .20 / 6.5], BACK = .050 / 5.0;
     // Pointer ids as a browser gives them: one per finger (pad 1, rotation 2).
     const pointer = (el, type, x, y, id = el === pad ? 1 : 2) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
     assert(!q('#joy-left').disabled && !q('#joy-right').disabled, 'rotation buttons enabled with the joystick');
@@ -398,7 +398,7 @@ async function boot(initialStatus = fx.status_ready) {
     pointer(pad, 'pointerdown', 90, 90); pointer(pad, 'pointerup', 90, 90); await settle();
     assert.strictEqual(commands().length, before, 'dead-zone press and release issue no request');
     await send('joystick_forward', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
-    assert(/JOYSTICK avanti 6\.9 mm\/s/.test(last()), last());
+    assert(/JOYSTICK avanti 20\.0 mm\/s/.test(last()), last());
     const tick = p.intervals.filter(i => i.ms === 240).at(-1);
     assert(tick, 'refresh period inside the Controller 1 s deadline');
     await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
@@ -427,7 +427,7 @@ async function boot(initialStatus = fx.status_ready) {
     const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: L[0], vy_m_s: 0, yaw_rate_rad_s: 0, joystick: true }; steered.reason = 'WALK_JOYSTICK';
     await refresh(JSON.stringify(steered));
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'Controller joystick walk keeps the joystick operable');
-    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 6\.9 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 20\.0 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
     await send('', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
     // Admission lost while pressed (STOP in progress): one neutral command, then disabled.
     device.replies.push(ok(fx.ack_walk_stop)); const pressed = commands().length;
@@ -445,9 +445,9 @@ async function boot(initialStatus = fx.status_ready) {
   // stuck sender; the Twin's resize waits for the release.
   await refresh(fx.status_ready);
   {
-    const pad = q('#joy-pad'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5], doc = p.dom.window.document;
+    const pad = q('#joy-pad'), L = [.100 / 5.0, .020 / 6.5, .20 / 6.5], BACK = .050 / 5.0, doc = p.dom.window.document;
     const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
     let rect = { left: 0, top: 0, width: 180, height: 180 };
     pad.getBoundingClientRect = () => ({ ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height });
@@ -513,9 +513,9 @@ async function boot(initialStatus = fx.status_ready) {
   // MotionService and SimpleMotion (test_simple_dashboard_contract envelopes).
   await refresh(fx.status_standing);
   {
-    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.100 / 5.0, .020 / 6.5, .20 / 6.5], BACK = .050 / 5.0;
     const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
     const at = (x, y) => { const f = (90 - y) / 58, l = (90 - x) / 58, m = Math.hypot(f, l); return m > 1 ? [f / m, l / m] : [f, l]; };  // pad point, knob travel 58 of 180
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
     const held = () => joyBox.dataset.active === 'true' && joyBox.getAttribute('aria-disabled') === 'false';

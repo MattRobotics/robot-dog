@@ -124,17 +124,18 @@ int main(int argc,char** argv){
   unsigned stride=2,search=0;Law L{simple::walkGait(2),simple::kWalkPeriodS,simple::kWalkDrive.speed*simple::kTickRad,simple::kWalkDrive.acc*100*simple::kTickRad};
   // What-if flags reshape the production law (model only; the firmware law is SimpleMotion.h).
   struct Opt{const char* name;double* value;double scale;};
-  double period=simple::kWalkPeriodS,driveSpeed=simple::kWalkDrive.speed,driveAcc=simple::kWalkDrive.acc;
+  double period=simple::kWalkPeriodS,driveSpeed=simple::kWalkDrive.speed,driveAcc=simple::kWalkDrive.acc,reverse=0;
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);}
   if(stride>2)return 2;
   GaitParameters g=simple::walkGait(stride);
   const Opt opts[]={{"--period",&period,1},{"--drive-speed",&driveSpeed,1},{"--drive-acc",&driveAcc,1},{"--duty",&g.duty,1},{"--lift-mm",&g.liftM,1e-3},
     {"--swayx-mm",&g.swayXM,1e-3},{"--swayy-mm",&g.swayYM,1e-3},{"--com-mm",&g.comShiftXM,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},
-    {"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3}};
+    {"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3},{"--reverse",&reverse,1}};
   std::vector<V> single;
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;if(!std::strcmp(argv[i],"--search")){search=std::atoi(argv[i+1]);continue;}
     if(!std::strcmp(argv[i],"--ray")){V v{};if(std::sscanf(argv[i+1],"%lf,%lf",&v.roll,&v.pitch)!=2)return 2;single.push_back(v);continue;}
     bool known=false;for(const auto& o:opts)if(!std::strcmp(argv[i],o.name)){*o.value=std::atof(argv[i+1])*o.scale;known=true;}if(!known)return 2;}
+  if(reverse!=0){g.reverse=true;g.advanceXM=-std::abs(g.advanceXM);}  // backward: time reverse, negative advance (steerGait)
   L.g=g;L.period=period;L.vmaxDrive=driveSpeed*simple::kTickRad;L.amaxDrive=driveAcc*100*simple::kTickRad;
   if(!validGaitParameters(L.g))return 2;
   std::vector<V> poly;

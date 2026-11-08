@@ -66,12 +66,13 @@ int main(int argc,char** argv){
   unsigned stride=2;
   for(int i=1;i+1<argc;i+=2)if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);
   if(stride>2)return 2;
-  GaitParameters g=simple::walkGait(stride);double period=simple::kWalkPeriodS,comDx=0,comDy=0;
+  GaitParameters g=simple::walkGait(stride);double period=simple::kWalkPeriodS,comDx=0,comDy=0,reverse=0;
   struct Opt{const char* name;double* value;double scale;};
   const Opt opts[]={{"--period",&period,1},{"--duty",&g.duty,1},{"--lift-mm",&g.liftM,1e-3},{"--swayx-mm",&g.swayXM,1e-3},{"--swayy-mm",&g.swayYM,1e-3},
-    {"--com-mm",&g.comShiftXM,1e-3},{"--com-error-x-mm",&comDx,1e-3},{"--com-error-y-mm",&comDy,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3}};
+    {"--com-mm",&g.comShiftXM,1e-3},{"--com-error-x-mm",&comDx,1e-3},{"--com-error-y-mm",&comDy,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3},{"--reverse",&reverse,1}};
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;bool known=false;
     for(const auto& o:opts)if(!std::strcmp(argv[i],o.name)){*o.value=std::atof(argv[i+1])*o.scale;known=true;}if(!known)return 2;}
+  if(reverse!=0){g.reverse=true;g.advanceXM=-std::abs(g.advanceXM);}  // backward: time reverse, negative advance (steerGait)
   if(!validGaitParameters(g))return 2;
   const auto& box=simple::kWalkBox;const double dt=.005,gravity=9.80665;
   const double vDrive=simple::kWalkDrive.speed*simple::kTickRad,aDrive=simple::kWalkDrive.acc*100*simple::kTickRad,settle=gaitSettleCycles(g);
