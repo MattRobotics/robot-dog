@@ -342,6 +342,58 @@ int main(){
     }
     std::puts("BUS_ACC_REGISTER_READ 40/41/85/86 1-byte reads: captured == uncaptured (value and wire), invalid replies fail");
   }
+  // ===== trace 45: writeAccDiagnosticByte, THE one reviewed 1-byte write =====
+  {
+    using V=ServoWriteVerifyResult;
+    auto frame=[](uint8_t inst,uint8_t reg,uint8_t v){
+      std::vector<uint8_t> f={255,255,kId,4,inst,reg,v};f.push_back(HardwareSerial::checksum(f));return f;};
+    auto tail=[](Rig& r,size_t from){return std::vector<std::vector<uint8_t>>(r.uart->requests.begin()+from,r.uart->requests.end());};
+    // Outside {41:1..254, 55:0/1, 85:1..254}: refused with zero bytes on the wire.
+    const uint8_t refused[][2]={{40,0},{40,1},{42,0},{43,0},{46,0},{48,0},{5,1},{6,0},{31,0},{84,100},{86,1},{80,1},
+                                {41,0},{41,255},{55,2},{85,0},{85,255}};
+    for(const auto& p:refused){
+      Rig r;r.uart->regs[kId][40]=0;const size_t b=r.uart->requests.size();
+      const auto w=r.bus.writeAccDiagnosticByte(kId,p[0],p[1]);
+      CHECK(w.refused&&r.uart->requests.size()==b&&r.uart->regs[kId][40]==0);
+    }
+    { // Torque ON: only the TorqueEnable READ reaches the wire, nothing is written.
+      Rig r;r.uart->regs[kId][40]=1;const uint8_t acc=r.uart->regs[kId][41];const size_t b=r.uart->requests.size();
+      const auto w=r.bus.writeAccDiagnosticByte(kId,41,180);
+      CHECK(w.refused&&tail(r,b)==std::vector<std::vector<uint8_t>>{frame(2,40,1)}&&r.uart->regs[kId][41]==acc);
+    }
+    { // Clamp to factory 85 (trace 45), then the causal sequence 85 50 -> 100 -> 50.
+      Rig r;auto& u=*r.uart;u.regs[kId][40]=0;u.regs[kId][55]=1;u.factory_readable=u.factory_writable=u.acc_clamp_from_85=true;
+      u.factory[kId][85-80]=50;u.factory[kId][86-80]=1;u.factory[kId][84-80]=33;
+      size_t b=u.requests.size();auto w=r.bus.writeAccDiagnosticByte(kId,41,180);
+      CHECK(!w.refused&&w.readback==50&&w.verify==V::VERIFIED_NOT_APPLIED&&w.torque_after==0&&!w.safe_off_issued);
+      CHECK((tail(r,b)==std::vector<std::vector<uint8_t>>{frame(2,40,1),frame(3,41,180),frame(2,41,1),frame(2,40,1)}));
+      w=r.bus.writeAccDiagnosticByte(kId,85,100);CHECK(w.verify==V::VERIFIED_APPLIED&&w.readback==100);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,41,180).readback==100);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,41,90).verify==V::VERIFIED_APPLIED);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,85,50).verify==V::VERIFIED_APPLIED);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,41,180).readback==50);
+      CHECK(u.factory[kId][86-80]==1&&u.factory[kId][84-80]==33&&u.regs[kId][55]==1&&u.regs[kId][40]==0);
+    }
+    { // A servo that takes 85 only unlocked: Lock 1 keeps 50; 55:=0, 85:=100, 55:=1 applies.
+      Rig r;auto& u=*r.uart;u.regs[kId][40]=0;u.regs[kId][55]=1;u.factory_readable=u.factory_writable=u.lock_gates_factory=true;
+      u.factory[kId][85-80]=50;
+      auto w=r.bus.writeAccDiagnosticByte(kId,85,100);CHECK(w.verify==V::VERIFIED_NOT_APPLIED&&w.readback==50);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,55,0).verify==V::VERIFIED_APPLIED);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,85,100).verify==V::VERIFIED_APPLIED);
+      CHECK(r.bus.writeAccDiagnosticByte(kId,55,1).verify==V::VERIFIED_APPLIED&&u.regs[kId][55]==1);
+    }
+    { // The write arms torque: TorqueEnable read 1 -> SAFE_OFF at once, verified OFF.
+      Rig r;auto& u=*r.uart;u.regs[kId][40]=0;u.arm_on_write_addr=41;
+      const auto w=r.bus.writeAccDiagnosticByte(kId,41,60);
+      CHECK(!w.refused&&w.torque_after==1&&w.safe_off_issued&&w.safe_off==SafeOffResult::VERIFIED_OFF&&u.regs[kId][40]==0);
+    }
+    { // Silent after the write: unverified, SAFE_OFF still issued (and honestly unverified).
+      Rig r;auto& u=*r.uart;u.regs[kId][40]=0;u.silent_after_write=true;
+      const auto w=r.bus.writeAccDiagnosticByte(kId,41,60);
+      CHECK(!w.refused&&w.readback==-1&&w.torque_after==-1&&w.verify==V::UNVERIFIED_NO_RESPONSE&&w.safe_off_issued);
+    }
+    std::puts("BUS_ACC_DIAG_WRITE allowlist 41/55/85 (17 refusals, zero bytes), torque-ON precondition, clamp 180->50, 85 50->100->50 causal model, lock-gated model, arming -> SAFE_OFF, silence -> unverified + SAFE_OFF");
+  }
   std::printf("SERVO_BUS_DEADLINE %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;
 }

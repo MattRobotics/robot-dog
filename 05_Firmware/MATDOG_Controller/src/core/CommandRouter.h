@@ -215,6 +215,12 @@ class CommandRouter {
   // issues no bus transaction: the service already did the reading.
   void printServoPreflightResult();
   void printServoRead(int id);
+  // Trace-45 ACC ceiling diagnostic, MAINTENANCE/idle only (gated by the
+  // caller): BACKUP (read-only), SRAM 41 write test, register 85 test on ONE
+  // servo per boot behind a per-value confirmation token. Each write holds a
+  // DIAGNOSTICS authority lease (Motion cannot start meanwhile) and goes
+  // through ServoBus::writeAccDiagnosticByte() only.
+  void handleServoAcc(const char* upper);
   void printServoSafeOff(int id);
   void printModeStatus();
   // Read-only presentation of the central arbiter. There is deliberately no
@@ -279,6 +285,11 @@ class CommandRouter {
   bool servo_scan_result_pending_ = false;
   bool servo_census_result_pending_ = false;
   bool servo_preflight_result_pending_ = false;
+  // @SERVO ACC: the one servo whose register 85 may be written this boot, the
+  // value 85 held before the first write, and a latch set by any failed or
+  // unverified write/restore (every further ACC write refused until reboot).
+  int acc_factory_id_ = -1, acc_factory_original85_ = -1;
+  bool acc_diag_failed_ = false;
   bool q0_capture_result_pending_ = false;
   bool evidence_export_pending_ = false;
   uint16_t evidence_export_next_ = 0;

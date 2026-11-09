@@ -507,5 +507,30 @@ bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32
   return true;
 }
 
+ServoBus::AccDiagWrite ServoBus::writeAccDiagnosticByte(int id, uint8_t address, uint8_t value) {
+  AccDiagWrite r;
+  const bool allowed = (address == kAccDiagAcc && value >= 1 && value <= 254) ||
+                       (address == kAccDiagLock && value <= 1) ||
+                       (address == kAccDiagMaxAcc && value >= 1 && value <= 254);
+  if (id < 0 || id > 253 || !allowed) return r;
+  {
+    // Four replies: TorqueEnable, the write's ACK, the readback, TorqueEnable.
+    BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs, 4), us(kDiagnosticTimeoutMs), false);
+    if (!guard.ok()) return r;
+    if (st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE) != 0) return r;
+    r.refused = false;
+    st_.writeByte(static_cast<uint8_t>(id), address, value);  // ACK informational only
+    r.readback = st_.readByte(static_cast<uint8_t>(id), address);
+    r.torque_after = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+    r.verify = classifyServoWriteVerify(r.readback, value);
+    guard.result(r.readback >= 0 && r.torque_after >= 0);
+  }
+  if (r.torque_after != 0) {  // armed or unknown: never leave it so
+    r.safe_off_issued = true;
+    r.safe_off = safeOff(id);
+  }
+  return r;
+}
+
 }  // namespace servo
 }  // namespace matdog

@@ -43,6 +43,32 @@ bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32
   *out = s->values[address];
   return true;
 }
+// Same contract as the real primitive (allowlist, torque precondition,
+// readback verdict, SAFE_OFF on a torque not read 0) over the scripted servo.
+ServoBus::AccDiagWrite ServoBus::writeAccDiagnosticByte(int, uint8_t address, uint8_t value) {
+  ++router_test::hardware_calls;
+  AccDiagWrite r;
+  auto* s = router_test::servo_read_script;
+  const bool allowed = (address == kAccDiagAcc && value >= 1 && value <= 254) ||
+                       (address == kAccDiagLock && value <= 1) ||
+                       (address == kAccDiagMaxAcc && value >= 1 && value <= 254);
+  if (s == nullptr || !allowed || !s->answers[40] || s->values[40] != 0) return r;
+  r.refused = false;
+  s->writes += std::to_string(address) + "=" + std::to_string(value) + " ";
+  if (address == kAccDiagMaxAcc) {
+    if (!(s->reject_85_locked && s->values[55] != 0)) s->values[85] = value;
+    if (s->clobber_86_on_85) s->values[86] ^= 1;
+  } else {
+    s->values[address] = value;
+  }
+  if (address == kAccDiagAcc && s->clamp_from_85 && s->values[41] > s->values[85]) s->values[41] = s->values[85];
+  if (s->arm_on_write) s->values[40] = 1;
+  r.readback = s->values[address];
+  r.torque_after = s->values[40];
+  r.verify = r.readback == value ? ServoWriteVerifyResult::VERIFIED_APPLIED : ServoWriteVerifyResult::VERIFIED_NOT_APPLIED;
+  if (r.torque_after != 0) { r.safe_off_issued = true; s->values[40] = 0; r.safe_off = SafeOffResult::VERIFIED_OFF; }
+  return r;
+}
 bool ServoBus::readRuntimeState(int, RuntimeState* out) {
   ++router_test::hardware_calls;
   if (router_test::servo_read_script == nullptr) return false;

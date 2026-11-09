@@ -478,8 +478,17 @@ def check_servo_id_write(files):
     for path, code in files:
         if "ServoBus.cpp" not in str(path):
             continue
-        if re.search(r"\bwriteByte\(", code):
-            fail(f"{path}: raw writeByte() call found - ServoBus has no reviewed byte write")
+        # Trace 45: the ONE reviewed byte write is writeAccDiagnosticByte(), whose
+        # exact shape check_acc_diagnostic_write_path() pins. Any other raw
+        # writeByte() in ServoBus still fails here.
+        acc_diag = re.search(r"ServoBus::AccDiagWrite ServoBus::writeAccDiagnosticByte\(int id, uint8_t address, uint8_t value\)"
+                             r"\s*\{(.*?)\n\}", code, re.DOTALL)
+        for m in re.finditer(r"\bwriteByte\(", code):
+            if not acc_diag or not (acc_diag.start() <= m.start() <= acc_diag.end()):
+                fail(f"{path}: raw writeByte() call found - ServoBus's one reviewed byte write is "
+                     f"writeAccDiagnosticByte() (trace-45 ACC diagnostic)")
+        if len(re.findall(r"\bwriteByte\(", code)) > 1:
+            fail(f"{path}: more than one raw writeByte() call - only writeAccDiagnosticByte() may write a byte")
         words = [m.start() for m in re.finditer(r"\bwriteWord\(", code)]
         if len(words) != 2:
             fail(f"{path}: exactly two reviewed raw writeWord() calls (RAM TorqueLimit) may "
@@ -529,6 +538,90 @@ def check_servo_id_write(files):
                 path.name not in ("SMS_STS.h", "SMS_STS.cpp"):
             if re.search(r"(writeWord|writeByte|genWrite)\s*\([^;]*(SMS_STS_MAX_TORQUE|SMS_STS_ID)", code):
                 fail(f"{path}: an EEPROM torque/ID write is expressible here")
+
+
+def check_acc_diagnostic_write_path(files):
+    """Trace 45 (ACC 180 written, 50 stored; register 85 = 50 on 12/12): the
+    causal test needs SRAM 41, Lock 55 and register 85 writes. They exist ONLY
+    as ServoBus::writeAccDiagnosticByte() and ONLY behind CommandRouter's
+    @SERVO ACC handler. Pinned here, not reviewed by eye:
+      - addresses {41: 1..254, 55: 0/1, 85: 1..254}, one byte, nothing else;
+      - TorqueEnable read 0 BEFORE the write, in the same BusGuard;
+      - verdict from the independent readback via classifyServoWriteVerify();
+      - TorqueEnable read after the write; not 0 -> safeOff() at once;
+      - callers: the @SERVO ACC handler only, behind MAINTENANCE, the CR2-B
+        q0 refusal and servoDiagnosticBusy(); register 85 behind a per-value
+        token, one servo per boot, ACC 41 != 0, Lock 1, a failure latch,
+        restore steps and a DIAGNOSTICS authority lease that is released."""
+    by_name = {path.name: (path, code) for path, code in files if "tests" not in path.parts}
+    header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", (None, ""))[1])
+    if header.count("static constexpr uint8_t kAccDiagAcc = 41, kAccDiagLock = 55, kAccDiagMaxAcc = 85;") != 1:
+        fail("ServoBus.h: the ACC diagnostic addresses must be exactly kAccDiagAcc = 41, "
+             "kAccDiagLock = 55, kAccDiagMaxAcc = 85")
+    if "AccDiagWrite writeAccDiagnosticByte(int id, uint8_t address, uint8_t value);" not in header:
+        fail("ServoBus.h: writeAccDiagnosticByte(int id, uint8_t address, uint8_t value) declaration changed")
+    bus_path, bus = by_name.get("ServoBus.cpp", (None, ""))
+    body = function_body(bus, "ServoBus::AccDiagWrite ServoBus::writeAccDiagnosticByte(int id, uint8_t address, uint8_t value)")
+    if body is None:
+        fail(f"{bus_path}: ServoBus::writeAccDiagnosticByte() not found")
+    else:
+        compact = re.sub(r"\s+", "", strip_comments(body))
+        steps = ("constboolallowed=(address==kAccDiagAcc&&value>=1&&value<=254)||(address==kAccDiagLock&&value<=1)||"
+                 "(address==kAccDiagMaxAcc&&value>=1&&value<=254);",
+                 "if(id<0||id>253||!allowed)returnr;",
+                 "BusGuardguard(st_.bus,us(kDiagnosticTimeoutMs,4),us(kDiagnosticTimeoutMs),false);",
+                 "if(!guard.ok())returnr;",
+                 "if(st_.readByte(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE)!=0)returnr;",
+                 "r.refused=false;",
+                 "st_.writeByte(static_cast<uint8_t>(id),address,value);",
+                 "r.readback=st_.readByte(static_cast<uint8_t>(id),address);",
+                 "r.torque_after=st_.readByte(static_cast<uint8_t>(id),SMS_STS_TORQUE_ENABLE);",
+                 "r.verify=classifyServoWriteVerify(r.readback,value);",
+                 "if(r.torque_after!=0){r.safe_off_issued=true;r.safe_off=safeOff(id);}")
+        rest = compact
+        for step in steps:  # in this order
+            _, found, rest = rest.partition(step)
+            if not found:
+                fail(f"{bus_path}: writeAccDiagnosticByte() lost or reordered {step!r}")
+                break
+        for forbidden in ("st_.Error", "writeWord", "genWrite", "RegWrite", "SyncWrite", "WritePos", "EnableTorque(",
+                          "SMS_STS_ID", "SMS_STS_OFS", "SMS_STS_GOAL", "SMS_STS_MAX_TORQUE"):
+            if forbidden in compact:
+                fail(f"{bus_path}: writeAccDiagnosticByte() contains {forbidden!r}")
+    router_path, router = by_name.get("CommandRouter.cpp", (None, ""))
+    for path, code in by_name.values():
+        if path.name in ("ServoBus.h", "ServoBus.cpp", "CommandRouter.h", "CommandRouter.cpp"):
+            continue
+        if "writeAccDiagnosticByte" in code or "handleServoAcc" in code:
+            fail(f"{path}: the ACC diagnostic write path may be reached only from CommandRouter's @SERVO ACC handler")
+    handler = function_body(router, "void CommandRouter::handleServoAcc(const char* upper)")
+    if handler is None:
+        fail(f"{router_path}: CommandRouter::handleServoAcc() not found")
+        return
+    stripped_router = strip_comments(router)
+    calls = len(re.findall(r"\bwriteAccDiagnosticByte\(", stripped_router))
+    if calls != 1 or "bus.writeAccDiagnosticByte(id,address,v)" not in re.sub(r"\s+", "", handler):
+        fail(f"{router_path}: writeAccDiagnosticByte() must be called exactly once, inside handleServoAcc()")
+    if len(re.findall(r"\bhandleServoAcc\(", stripped_router)) != 2:  # definition + the one dispatch call
+        fail(f"{router_path}: handleServoAcc() must have exactly one caller (the @SERVO ACC branch)")
+    branch = re.search(r'upper\.startsWith\("@SERVO ACC"\)\s*\)\s*\{(.*?)\}\s*else', router, re.DOTALL)
+    if not branch:
+        fail(f"{router_path}: @SERVO ACC branch not found")
+    else:
+        text = re.sub(r"\s+", " ", branch.group(1))
+        for required in ("modules_.operating_mode->mode() != OperatingMode::MAINTENANCE", "servoDiagnosticBusy()",
+                         "q0CaptureOwnsServoDiagnostics()", "CALIBRATION_Q0_CAPTURE_ACTIVE", "handleServoAcc(upper.c_str());"):
+            if required not in text:
+                fail(f"{router_path}: @SERVO ACC branch lost gate {required!r}")
+    compact = re.sub(r"\s+", "", strip_comments(handler))
+    for required in ('"CONFIRM_ACC85_PERSIST_%d_%d":"CONFIRM_ACC85_%d_%d"', "if(acc_factory_id_>=0&&acc_factory_id_!=id)",
+                     "if(acc_diag_failed_){", "acc_diag_failed_=true;", "servo::legServoAt(i)", "value<1||value>254",
+                     "modules_.authority->request(ActuatorAuthority::DIAGNOSTICS,", "pre=pre&&t40==0&&a41!=0&&l55==1;",
+                     "p84==r84&&p86==r86", '"RESTORE85"', '"RESTORE_RELOCK55"', '"RELOCK55"'):
+        if required not in compact:
+            fail(f"{router_path}: handleServoAcc() lost {required!r}")
+    if compact.count("modules_.authority->release(lease);") != 3:
+        fail(f"{router_path}: handleServoAcc() must release its DIAGNOSTICS lease on each of its 3 exits after the grant")
 
 
 # The complete DALY transmit vocabulary. Each entry is re-verified below
@@ -4322,6 +4415,8 @@ def check_calibration_q0_production_wiring(files, sketch_dir):
          r'upper == "@SERVO PREFLIGHT"\s*\)\s*\{(.*?)\}\s*else'),
         ("@SERVO READ",
          r'upper\.startsWith\("@SERVO READ"\)\s*\)\s*\{(.*?)\}\s*else'),
+        ("@SERVO ACC",
+         r'upper\.startsWith\("@SERVO ACC"\)\s*\)\s*\{(.*?)\}\s*else'),
     )
     for command, pattern in diagnostic_branches:
         branch = re.search(pattern, rcode, re.DOTALL)
@@ -6763,6 +6858,7 @@ def main():
     check_sync_frame_boundary(files)
     check_loop_task_stack(files)
     check_servo_id_write(files)
+    check_acc_diagnostic_write_path(files)
     check_daly_write(files)
     check_bms_command_surface(files)
     check_daly_protocol_is_host_linkable(files)

@@ -359,6 +359,23 @@ class ServoBus {
   bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
                            diagnostics::ReadCapture* capture = nullptr);
 
+  // Trace-45 ACC diagnostic (@SERVO ACC, MAINTENANCE only): THE one reviewed
+  // 1-byte register write. Addresses: 41 ACC (SRAM, 1..254: never 0, so an
+  // unexpected torque arming stays profile-limited), 55 Lock (0/1), 85
+  // Maximum_Acceleration (1..254). In one bus transaction: TorqueEnable must
+  // read 0 before the write, then the written address and TorqueEnable are
+  // read back; the verdict is the readback only (the ACK proves nothing).
+  // TorqueEnable not read back 0 afterwards: safeOff() at once.
+  static constexpr uint8_t kAccDiagAcc = 41, kAccDiagLock = 55, kAccDiagMaxAcc = 85;
+  struct AccDiagWrite {
+    bool refused = true;   // argument, bus or torque precondition: nothing sent
+    ServoWriteVerifyResult verify = ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
+    int readback = -1, torque_after = -1;  // -1: no valid answer
+    bool safe_off_issued = false;
+    SafeOffResult safe_off = SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  };
+  AccDiagWrite writeAccDiagnosticByte(int id, uint8_t address, uint8_t value);
+
  private:
   // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -
   // ONE absolute budget (total + per-reply phase) on a wrap-safe microsecond

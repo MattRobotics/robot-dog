@@ -47,6 +47,11 @@ class HardwareSerial {
   // factory_readable; otherwise, as before, a READ past 70 gets no reply.
   std::array<std::array<uint8_t,16>,254> factory{};
   bool factory_readable=false;
+  // Trace-45 diagnostic models, all off by default: WRITE to 80..95 (optionally
+  // only with Lock 55 = 0), register 41 clamped to factory 85, a WRITE to one
+  // address arming torque, and a bus that goes silent after a WRITE.
+  bool factory_writable=false,lock_gates_factory=false,acc_clamp_from_85=false,silent_after_write=false;
+  int arm_on_write_addr=-1;
   std::deque<Timed> rx;
   ReplyPlan plan;
   int silent_read_id=-1,silent_read_width=-1,silent_reads=0; // selective actual request loss
@@ -100,9 +105,13 @@ class HardwareSerial {
     if(id>=254)return;                                  // broadcast: no reply
     const int address=p[5];
     if(inst==3){                                           // WRITE: applied, then ACK
-      for(size_t i=6;i+1<p.size();++i){const int reg=address+static_cast<int>(i)-6;if(reg<71)regs[id][reg]=p[i];}
+      for(size_t i=6;i+1<p.size();++i){const int reg=address+static_cast<int>(i)-6;if(reg<71)regs[id][reg]=p[i];
+        else if(factory_writable&&reg>=80&&reg<96&&!(lock_gates_factory&&regs[id][55]!=0))factory[id][reg-80]=p[i];}
+      if(acc_clamp_from_85&&address<=41&&address+p.size()-7>41)regs[id][41]=std::min(regs[id][41],factory[id][85-80]);
       if(torque_on_goal&&address<=42&&address+p.size()-7>43)regs[id][40]=1;
+      if(address==arm_on_write_addr)regs[id][40]=1;
       if(!plan.no_ack)schedule(frame(id,{}));
+      if(silent_after_write)plan.silent=true;
     }else if(inst==2&&p.size()==8&&address+p[6]<=71){
       if(id==silent_read_id&&p[6]==silent_read_width&&silent_reads){if(silent_reads>0)--silent_reads;return;}
       schedule(frame(id,std::vector<uint8_t>(regs[id].begin()+address,regs[id].begin()+address+p[6]),plan.status));
