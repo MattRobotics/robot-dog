@@ -106,10 +106,10 @@ async function boot(initialStatus = fx.status_ready) {
     !/VERIFICATO SU HARDWARE|mm\/s|Trascinare/.test(joystick.textContent.replace(q('#joy-state').textContent, '')), 'compact joystick: no badge, no prose');
   // Final dev.6: the guide says the joystick walks SLOW and the presets belong to the mode; no stale 6.5 s.
   assert(/Joystick: cammina sempre con la legge SLOW/.test(q('#simple-diagnostics').textContent) &&
-    /i tre pulsanti 🐢\/🐇 sono i passi per ciclo previsti da quella modalità/.test(q('#simple-diagnostics').textContent) &&
+    /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
     !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
   {
-    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); stride: 🐢 50 / 75 / 🐇 100 mm per cycle.
+    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); one WALK speed selector.
     // Choosing a value sends nothing: only STAND or WALK sends, and the Controller may refuse.
     const h = q('#simple-height'), before = p.calls.filter(c => c.url === '/api/motion/command').length;
     assert(h.type === 'range' && h.min === '50' && h.max === '150' && h.step === '5' && h.value === '150' && q('#simple-height-value').textContent === '150 mm');
@@ -120,12 +120,12 @@ async function boot(initialStatus = fx.status_ready) {
     assert(h.value === '150', 'stepper clamps at 150 mm');
     h.value = '75'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true })); h.dispatchEvent(new p.dom.window.Event('change', { bubbles: true }));
     assert.strictEqual(q('#simple-height-value').textContent, '75 mm');
-    const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-stride"]')];
-    // Preset labels: the selected mode's strides (SLOW without the capabilities table), speed appended.
-    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent.split(' · ')[0]), ['0:🐢 50 mm', '1:75 mm', '2:🐇 100 mm']);
-    assert(radios[1].checked && /WALK · modalità/.test(q('#simple-stride').closest('fieldset').textContent) && /per ciclo/.test(q('#simple-stride').getAttribute('aria-label')) && /non velocità/.test(q('#simple-stride').getAttribute('aria-label')));
-    radios[2].click(); radios[0].click(); radios[1].click(); await settle();
-    assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a value change');
+    // Final dev.6: one speed selector, no stride selector.
+    const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
+    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['SLOW:SLOW 20 mm/s', 'STANDARD:STANDARD 25 mm/s', 'FAST:FAST 32 mm/s']);
+    assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
+    await settle();
+    assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');
     h.value = '150'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true }));
   }
   assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
@@ -373,13 +373,23 @@ async function boot(initialStatus = fx.status_ready) {
   await send('stand150', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/STAND 150 mm/.test(last()));
 
-  // 3. WALK presets of the selected mode (SLOW: 50/75/100 mm per 5 s cycle).
-  for (const [i, mm] of [[0, 50], [1, 75], [2, 100]]) {
-    await refresh(fx.status_ready);
-    q('input[name="simple-stride"][value="' + i + '"]').click();
-    await send('walk' + mm, () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.050, .075, .100][i] / 5.0, vy: 0, yaw_rate: 0 }, 1000);
-    assert(new RegExp('WALK SLOW ' + mm + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last());
-  }
+  // 3. WALK: SLOW (default) walks the SLOW preset 2 (100 mm per 5 s).
+  await refresh(fx.status_ready);
+  await send('walk100', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: .100 / 5.0, vy: 0, yaw_rate: 0 }, 1000);
+  assert(/WALK SLOW 100 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last());
+  // 3b. STANDARD then an immediate WALK: GAIT.SELECT first, WALK only after
+  // its ACCEPTED ACK, with STANDARD's preset 1 (75 mm per 3 s); never before.
+  { await refresh(fx.status_ready); const before = commands().length;
+    device.replies.push(ok(fx.ack_gait_select), ok(fx.ack_walk_accepted));
+    q('input[name="simple-walk-mode"][value="STANDARD"]').click(); q('#simple-walk').click(); await settle();
+    const sent = commands().slice(before).map(c => JSON.parse(c.body));
+    assert.deepStrictEqual(sent.map(b => b.type), ['GAIT.SELECT', 'BASE_VELOCITY'], 'select, then WALK: ' + JSON.stringify(sent.map(b => b.type)));
+    assert.deepStrictEqual(sent[0].params, { gait: 'STANDARD' }); assert.deepStrictEqual(sent[1].params, { vx: .075 / 5.0, vy: 0, yaw_rate: 0 });
+    assert(/WALK STANDARD 75 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last()); sequence += 2;
+    envelopes.push('select_then_walk\t' + commands().at(-2).body, 'select_then_walk_walk\t' + commands().at(-1).body); }
+  // 3c. Back to SLOW for the rest (accepted selection).
+  { const before = commands().length; device.replies.push(ok(fx.ack_gait_select));
+    q('input[name="simple-walk-mode"][value="SLOW"]').click(); await settle(); assert.strictEqual(commands().length, before + 1); sequence += 1; }
   // 4. WALK STOP: zero velocity, available while WALKING.
   await refresh(fx.status_walking);
   assert.strictEqual(q('#simple-state').textContent, 'WALKING');
@@ -622,11 +632,18 @@ async function boot(initialStatus = fx.status_ready) {
   await refresh(fx.status_stopped);
   assert(values().includes('SAFE_OFF13/13 verificato'), values());
   assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
-  // dev.17: WALK after STOP is the ordinary WALK STANDARD preset; the Controller admits it.
+  // dev.17: WALK after STOP is the ordinary WALK preset; the Controller admits it.
   await refresh(fx.status_stopped_on);
-  { const i = Number(q('input[name="simple-stride"]:checked').value);
-    await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.050, .075, .100][i] / 5.0, vy: 0, yaw_rate: 0 }, 1000);
-    assert(new RegExp('WALK SLOW ' + [50, 75, 100][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
+  // Final dev.6: with STOP latched GAIT.SELECT is refused (STOP_LATCHED): no WALK
+  // is sent for the refused mode and the selector returns to the Controller's.
+  { const before = commands().length; device.replies.push(ok(fx.ack_gait_select_latched), ok(fx.ack_gait_select_latched));
+    q('input[name="simple-walk-mode"][value="FAST"]').click(); q('#simple-walk').click(); await settle();
+    const sent = commands().slice(before).map(c => JSON.parse(c.body).type);
+    assert(sent.length >= 1 && sent.every(t => t === 'GAIT.SELECT'), 'refused selection sends no WALK: ' + JSON.stringify(sent)); sequence += sent.length;
+    assert(/WALK non inviato: la modalità FAST non è stata accettata/.test(q('#simple-reason').textContent + ' ' + p.dom.window.document.body.textContent), 'refusal shown');
+    await refresh(fx.status_stopped_on); assert(q('input[name="simple-walk-mode"][value="SLOW"]').checked, 'selector back to the Controller selection'); }
+  await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: .100 / 5.0, vy: 0, yaw_rate: 0 }, 1000);
+  assert(/WALK SLOW 100 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last());
   await refresh(fx.status_stopped);
   // 6. Escape sends the same STOP intent, also while another command is in flight.
   await refresh(fx.status_ready);
