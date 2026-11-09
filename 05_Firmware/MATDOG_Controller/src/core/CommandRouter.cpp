@@ -258,9 +258,11 @@ void CommandRouter::handleLine(String line) {
       unsigned(e.valid),unsigned(e.fault),e.reason,e.phase,simple::name(e.state),(unsigned long long)e.atUs,(unsigned long long)e.nowUs,unsigned(e.energized),(unsigned long)e.releases,(unsigned long)e.missed,
       (unsigned long long)e.maxGapUs,unsigned(e.drive.speed),unsigned(e.drive.acc),(unsigned long long)e.goalSentUs,(unsigned long long)e.settleUs,(unsigned long long)e.deadlineUs,e.lastPolled,
       *e.loadedPhase?e.loadedPhase:"NONE",unsigned(e.loadedMask));
-    Serial.printf("MOTION_DIAG exit_cause refused_by=%u check=%s imu_reason=%s cycles=%.3f nominal_solved=%u steered=%u correction_mrad=%.1f,%.1f wanted_mrad=%.1f,%.1f advance=%.4f,%.4f,%.4f\n",
+    {const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(e.walkMode));
+    Serial.printf("MOTION_DIAG exit_cause refused_by=%u check=%s imu_reason=%s cycles=%.3f nominal_solved=%u steered=%u correction_mrad=%.1f,%.1f wanted_mrad=%.1f,%.1f advance=%.4f,%.4f,%.4f walk_mode=%s period_s=%.3f mode_drive=%u/%u stop_brake_acc=%u\n",
       unsigned(e.refusedBy),e.refusedBy<sizeof(simple::kSafeChecks)/sizeof(*simple::kSafeChecks)?simple::kSafeChecks[e.refusedBy]:"?",e.imuReason,e.cycles,unsigned(e.nominalSolved),unsigned(e.steered),
-      e.roll*1e3,e.pitch*1e3,e.wantedRoll*1e3,e.wantedPitch*1e3,e.advance[0],e.advance[1],e.advance[2]);
+      e.roll*1e3,e.pitch*1e3,e.wantedRoll*1e3,e.wantedPitch*1e3,e.advance[0],e.advance[1],e.advance[2],w.name,w.periodS,unsigned(w.drive.speed),unsigned(w.drive.acc),
+      unsigned(e.drive.acc<simple::kStopBrakeAcc?e.drive.acc:simple::kStopBrakeAcc));}
     if(e.valid)for(unsigned i=0;i<12;++i)joint("exit_j",i,e.commandedRaw[i],e.fb[i],e.atUs);
     return;
   }
@@ -316,7 +318,7 @@ void CommandRouter::handleLine(String line) {
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];
     Serial.println(modules_.service->motionAck(ack,out,sizeof(out))?out:"MOTION=REJECTED REASON=ACK_UNAVAILABLE");return;
   }
-  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP") {
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||upper.startsWith("@MOTION WALK MODE ")) {
     if(upper=="@MOTION STATUS"){
       char* out=usbMotionJson();MotionStatusSnapshot snapshot;bool ok;
       {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
@@ -331,6 +333,7 @@ void CommandRouter::handleLine(String line) {
       c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
     }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=simple::kStrideM[1]/simple::kWalkPeriodS;}
     else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
+    else if(upper.startsWith("@MOTION WALK MODE ")){c.intent=motion::Intent::GAIT_SELECT;snprintf(c.gait,sizeof(c.gait),"%s",upper.c_str()+18);}
     else if(upper=="@MOTION PRONE")c.intent=motion::Intent::LIE_DOWN;
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
   }

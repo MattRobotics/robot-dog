@@ -25,6 +25,7 @@ struct MotionStatusSnapshot {
   unsigned referenceFaultSlot=12;
   simple::State state=simple::State::STOPPED;
   uint8_t imuRefusedBy=0,entrySlot=12;  // dev.5 diagnostics, in the padding after state
+  uint8_t walkModes=0;  // simple::WalkMode: next walk (low nibble), current or last walk (high nibble); last padding byte
   float imuWanted[2]{},imuApplied[2]{};
   uint16_t commandedRaw[12]{};
   uint16_t offMask=0,referenceFaultRaw=0,hotPendingMask=0;

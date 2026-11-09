@@ -103,9 +103,15 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  auto result=[&](const char* r,const char* accepted="COMMAND_ACCEPTED"){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:accepted;
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&c.intent!=motion::Intent::GAIT_SELECT){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
+ // WALK mode (2026-11-09): a volatile choice for the NEXT walk, no actuator
+ // and no active command; a walk in progress, its WALK STOP and a STOP
+ // recovery keep their own mode (SimpleMotion::walk latches it).
+ if(c.intent==motion::Intent::GAIT_SELECT){simple::WalkMode m;if(!simple::parseWalkMode(c.gait,m))return result("WALK_MODE_UNKNOWN");
+   motion_->selectWalkMode(m);const auto st=motion_->state();
+   return result(nullptr,st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
    // Nothing to stop at the PRONE rest: never take over the active command.
    if(motion_->proneRest())return result("NOT_WALKING");
@@ -133,9 +139,18 @@ bool MotionService::ackJson(const motion::MotionAck& a,char* out,size_t cap) con
  return n>0&&static_cast<size_t>(n)<cap;
 }
 bool MotionService::capabilitiesJson(char* out,size_t cap) const {
- const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"nominal_height_mm\":%.0f,\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":%lu,\"ramp_cycles\":%.0f,\"vx_back_max_m_s\":%.5f,\"frontal_band\":%.2f,\"vx_steered_max_m_s\":%.5f},\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"REST_TORQUE_OFF_SUPPORT_UNVERIFIED\",\"automatic_safe_off\":true,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkHeightM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2],simple::kStrideM[2]/simple::kWalkPeriodS,simple::kJoystickLateralM/simple::kJoystickPeriodS,simple::kJoystickYawRad/simple::kJoystickPeriodS,(unsigned long)(simple::kJoystickTimeoutUs/1000),simple::kJoystickRampCycles,
+ const int n=snprintf(out,cap,"{\"version\":1,\"motion_stack\":\"MATDOG_SIMPLE_V1\",\"ready\":%s,\"reason\":\"%s\",\"height\":{\"nominal_min_mm\":0,\"nominal_max_mm\":150,\"workspace_min_mm\":%.0f,\"workspace_max_mm\":150},\"walk\":{\"nominal_height_mm\":%.0f,\"period_s\":%.2f,\"lift_m\":%.3f,\"strides_m\":[%.3f,%.3f,%.3f]},\"commands\":[\"STAND\",\"WALK_STANDARD\",\"GAIT_SELECT\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"],\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":%lu,\"ramp_cycles\":%.0f,\"vx_back_max_m_s\":%.5f,\"frontal_band\":%.2f,\"vx_steered_max_m_s\":%.5f},\"prone\":{\"available\":true,\"reason\":\"IMPLEMENTED_NOT_VALIDATED\",\"terminal\":\"REST_TORQUE_OFF_SUPPORT_UNVERIFIED\",\"automatic_safe_off\":true,\"automatic_recovery\":false},\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}}",boolean(ready_),reason_,simple::kMinStandM*1000,simple::kWalkHeightM*1000,simple::kWalkPeriodS,simple::kWalkLiftM,simple::kStrideM[0],simple::kStrideM[1],simple::kStrideM[2],simple::kStrideM[2]/simple::kWalkPeriodS,simple::kJoystickLateralM/simple::kJoystickPeriodS,simple::kJoystickYawRad/simple::kJoystickPeriodS,(unsigned long)(simple::kJoystickTimeoutUs/1000),simple::kJoystickRampCycles,
                  simple::kJoystickBackM/simple::kWalkPeriodS,simple::kJoystickFrontalBand,simple::kJoystickStrideM/simple::kJoystickPeriodS);
- return n>0&&static_cast<size_t>(n)<cap;
+ if(n<=0||static_cast<size_t>(n)>=cap)return false;
+ // WALK modes (2026-11-09), the Controller's single table (SimpleMotion.cpp):
+ // a GAIT_SELECT chooses the next walk; the joystick walks SLOW.
+ size_t used=static_cast<size_t>(n)-1;  // reopen the object
+ for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
+   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"max_stride_mm\":%.0f,\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s}",
+     i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,simple::kStrideM[w.maxStride]*1e3,simple::kStrideM[w.maxStride]/w.periodS*1e3,w.heightM*1e3,w.duty,
+     unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified));
+   if(k<=0||static_cast<size_t>(k)>=cap-used)return false;used+=k;}
+ return snprintf(out+used,cap-used,"]}")==2;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  if(!motion_)return false;
@@ -165,6 +180,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuRefusedBy=motion_->imuRefusedBy();
+ s.walkModes=static_cast<uint8_t>(static_cast<unsigned>(motion_->selectedWalkMode())|static_cast<unsigned>(motion_->walkMode())<<4);
  {double d=0;s.entrySlot=static_cast<uint8_t>(motion_->entryViolation(esp_timer_get_time(),d));s.entryOutsideMrad=static_cast<int16_t>(std::lround(std::clamp(d*1e3,-32767.,32767.)));}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -248,6 +264,17 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  if(s.state==simple::State::STOPPED&&!strcmp(s.reason,"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&s.entrySlot<12){const auto* unit=actuator::slotServo(s.entrySlot);
    add(",\"entry_violation\":{\"joint\":\"%s\",\"outside_mrad\":%d}",unit?unit->joint:"?",int(s.entryOutsideMrad));}
  // Law velocity of the walk (not measured) and whether a joystick intent holds it.
+ // WALK mode (2026-11-09): selected for the next walk, the one of the current
+ // (or last) walk; the mode table is in the capabilities. servo_read: goal
+ // speed min/max, ACC min/max the 12 servos hold (control read) and the age of
+ // the oldest of those reads (ms); -1 until every servo has been read.
+ {const unsigned selected=s.walkModes&15,current=s.walkModes>>4;int speedMin=-1,speedMax=-1,accMin=-1,accMax=-1;uint64_t oldest=0;
+  for(const auto& f:s.feedback){if(f.goalSpeed<0||f.acc<0){speedMin=speedMax=accMin=accMax=-1;break;}
+    speedMin=speedMin<0?f.goalSpeed:std::min(speedMin,f.goalSpeed);speedMax=std::max(speedMax,f.goalSpeed);
+    accMin=accMin<0?f.acc:std::min(accMin,f.acc);accMax=std::max(accMax,f.acc);oldest=oldest?std::min(oldest,f.controlStampUs):f.controlStampUs;}
+  add(",\"walk_mode\":{\"selected\":\"%s\",\"active\":\"%s\",\"servo_read\":[%d,%d,%d,%d,%lld]}",
+    simple::walkModeSpec(static_cast<simple::WalkMode>(selected)).name,simple::walkModeSpec(static_cast<simple::WalkMode>(current)).name,
+    speedMin,speedMax,accMin,accMax,(long long)(speedMin<0||s.capturedUs<oldest?-1:(long long)((s.capturedUs-oldest)/1000)));}
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
    s.powerReason,(unsigned long)(bmsAge>UINT32_MAX?UINT32_MAX:bmsAge),(unsigned long)s.maxReleaseWorkUs,(unsigned long)s.overrunsTotal,(unsigned long long)s.offVerifiedUs);
