@@ -116,7 +116,10 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   Final dev.6 (same version string, new build): per-mode presets, STANDARD
 //   60/75/90 mm at 3.0 s (30 mm/s, 110 mm, {1800,180}), FAST 60/70/80 mm at
 //   2.5 s (32 mm/s, 105 mm, lift 6 mm, sway 1 mm, {1950,220}); IMU envelopes
-//   kept by the servo response model. Offline candidate.
+//   kept by the servo response model. Technical closure (same version
+//   string, new build): a walk starts only inside its own IMU envelope
+//   (STANDARD recovery fault RCA); dashboard: one speed selector SLOW 20 /
+//   STANDARD 25 / FAST 32 mm/s ordered after GAIT.SELECT. Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;

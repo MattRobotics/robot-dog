@@ -4,7 +4,15 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 final candidate: STANDARD 30 mm/s, FAST 32 mm/s, per-mode presets, servo-model envelopes — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 technical closure: one speed selector, STANDARD recovery fault fixed — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes `4e62b81` (APP `d8ba3f14…`, never flashed, kept as reference). Installed: `1.0.2-dev.4`. Report: [`Dev6_Closure_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Closure_2026-11-09/REPORT.md).
+
+- **Fix (RCA):** after a STOP the recovery's WALK_HOLD could carry a support-fit IMU correction outside the walk's envelope (servo model: −22/−70 mrad against STANDARD −17); the first steps had no IK solution (`WALK_IK_OR_WORKSPACE`, `POINT_SAFE`). The walk now starts only inside its own envelope (`WALK_IMU_SETTLING` while HOLD slews it in). The original model case: 1 fault → 0.
+- **Dashboard:** one selector SLOW 20 / STANDARD 25 / FAST 32 mm/s (presets 2 / 1 / 2 of the Controller table); WALK is sent only after an ACCEPTED `GAIT.SELECT`; a refused selection sends no WALK. No new command.
+- Kinematics, boxes, STOP, drives and envelopes unchanged.
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 final candidate (`4e62b81`, APP `d8ba3f14…`, never flashed): STANDARD 30 mm/s, FAST 32 mm/s, per-mode presets, servo-model envelopes — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the walk-modes build of `5159c7f` (APP `bce9a022…`, never flashed, kept as reference). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_Final_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Final_2026-11-09/REPORT.md).
 
