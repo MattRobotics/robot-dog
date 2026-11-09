@@ -1272,8 +1272,7 @@ static void walkModes(){
   for(WalkMode mode:{WalkMode::STANDARD,WalkMode::FAST}){
     const auto& w=simple::walkModeSpec(mode);Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
     r.m.selectWalkMode(mode);assert(r.m.selectedWalkMode()==mode&&r.m.walkMode()==WalkMode::SLOW);
-    assert(w.maxStride==1&&!std::strcmp(r.m.walk(2,r.p.now),"STRIDE_NOT_IN_WALK_MODE")&&r.m.state()==simple::State::STANDING);
-    assert(!r.m.walk(1,r.p.now));
+    assert(!r.m.walk(2,r.p.now));  // every preset is valid in every mode (its own strideM)
     for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
     assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode&&r.m.period()==w.periodS&&std::abs(r.m.requestedHeightM()-w.heightM)<1e-12);
     const uint64_t start=r.p.now;
@@ -1281,7 +1280,7 @@ static void walkModes(){
     for(unsigned n=0;n<6000;++n){r.tick();assert(r.m.state()==simple::State::WALKING);
       assert(r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc&&r.m.walkMode()==mode);}
     assert(std::abs(r.m.walkCycles()-simple::walkClockS((r.p.now-start)/1e6)/w.periodS)<.02);
-    assert(std::abs(r.m.walkVelocityX()-simple::kStrideM[1]/w.periodS)<1e-12);
+    assert(std::abs(r.m.walkVelocityX()-w.strideM[2]/w.periodS)<1e-12);
     // STOP at eight instants of one cycle (swing and four-contact phases): the
     // arrest is proved at min(ACC, kStopBrakeAcc), the resumed walk keeps the
     // mode of the stopped one whatever is selected.
@@ -1292,7 +1291,7 @@ static void walkModes(){
       assert(r.m.stopVerified());const auto& plan=simple::StopReferenceProbe::stopPlan(r.m);
       assert(plan.duration>0&&r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc);
       r.m.selectWalkMode(k%2?WalkMode::FAST:WalkMode::SLOW);
-      assert(!r.m.walk(1,r.p.now));
+      assert(!r.m.walk(2,r.p.now));
       for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
       assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode);}
     // WALK STOP, then the selected mode for the next walk (height change at HOLD).
@@ -1309,10 +1308,11 @@ static void walkModes(){
     assert(r.m.walkMode()==WalkMode::SLOW&&r.m.period()==simple::kWalkPeriodS&&r.p.drive.acc==simple::kWalkDrive.acc);
     r.m.walkStop();assert(r.reachStand());
     std::printf("walk mode %s: %.0f mm stride, %.2f s, %.0f mm, drive %u/%u, STOP braking ACC %u, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)\n",
-      w.name,simple::kStrideM[w.maxStride]*1e3,w.periodS,w.heightM*1e3,unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(std::min<unsigned>(w.drive.acc,simple::kStopBrakeAcc)));}
+      w.name,w.strideM[2]*1e3,w.periodS,w.heightM*1e3,unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(std::min<unsigned>(w.drive.acc,simple::kStopBrakeAcc)));}
   // SLOW is the dev.4 law bit for bit; the STOP braking rule leaves it and STAND unchanged.
   const auto a=simple::walkGait(2),b=simple::walkGait(2,WalkMode::SLOW);
-  assert(a.duty==simple::kWalkDuty&&b.swingRampEnd==0&&a.swingRamp==b.swingRamp&&a.heightM==b.heightM);
+  assert(a.duty==simple::kWalkDuty&&b.swingRampEnd==0&&a.swingRamp==b.swingRamp&&a.heightM==b.heightM&&a.liftM==simple::kWalkLiftM);
+  for(unsigned i=0;i<3;++i)assert(simple::walkGait(i).advanceXM==simple::kStrideM[i]);
   assert(simple::stopAccelerationRadS2(simple::kWalkDrive)==simple::kWalkDrive.acc*100*simple::kTickRad&&
          simple::stopAccelerationRadS2(simple::kStandDrive)==simple::kStandDrive.acc*100*simple::kTickRad&&
          simple::stopAccelerationRadS2({1850,150})==simple::kStopBrakeAcc*100*simple::kTickRad);
@@ -1346,7 +1346,7 @@ int main(){walkModes();exitCause();longWalk100();proneRest();entryRecovery();tem
   // Velocity is continuous everywhere (C1); acceleration too (C2) except the
   // swinging foot's own lift-off/touchdown with the trapezoidal swing, whose
   // velocity ramps start and end there by design (Gait.h swingRamp).
-  for(unsigned mode=0;mode<3;++mode)for(unsigned stride=0;stride<=simple::walkModeSpec(static_cast<simple::WalkMode>(mode)).maxStride;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
+  for(unsigned mode=0;mode<3;++mode)for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
     const auto g=simple::walkGait(stride,static_cast<simple::WalkMode>(mode));const double rate=1./simple::walkModeSpec(static_cast<simple::WalkMode>(mode)).periodS;
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
