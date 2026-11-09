@@ -108,6 +108,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   with the T2 midpoints (kWalkTilt100 re-derived, held correction on a
 //   refused WALK step); first-exit cause in @MOTION DIAG. Geometry, URDF,
 //   calibration, limits, STOP/SAFE_OFF and drive {1000,50} unchanged.
+//   Walk-modes addendum (same version string, new build): WALK modes SLOW
+//   (the law above, default at boot), STANDARD (75 mm, 3.0 s, {1500,140}) and
+//   FAST (75 mm, 2.5 s, 110 mm, {1900,190}), selected by GAIT.SELECT for the
+//   next walk; StopPlan braking capped at the measured 8 400 step/s^2 (SLOW
+//   and STAND unchanged); joystick SLOW. STANDARD/FAST not hardware qualified.
 //   Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";

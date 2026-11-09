@@ -4,7 +4,17 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 consolidated candidate: one joystick law, WALK100 STOP proof with T2, first-exit cause — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 walk-modes candidate: SLOW / STANDARD / FAST, measured STOP braking, QEMU and servo-response bench — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; it contains the consolidated dev.6 below (APP `05935919…` of `3803960` is kept as historical reference, never flashed). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_WalkModes_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_WalkModes_2026-11-09/REPORT.md).
+
+- **Three WALK modes in one build, one table.** SLOW = WALK STANDARD v2 bit for bit (100 mm, 5.0 s, 20 mm/s, `{1000,50}`, default at boot). STANDARD: 75 mm, 3.0 s, 25 mm/s, `{1500,140}`. FAST: 75 mm, 2.5 s, 30 mm/s, 10 mm lower, `{1900,190}`. Both with duty .825 and an asymmetric swing (`swingRampEnd`). At 100 mm a shorter period leaves almost no IMU pitch-down authority (−2.5 mrad at 4.0 s): the STOP arrest of the swinging front UPPER needs ~0.25 rad at the measured braking. FAST 2.5 s is the fastest period whose STOP proof passes; ~36 mm/s would need ACC-150 braking qualified on the robot.
+- **Selection contract.** `GAIT.SELECT` (dashboard SLOW | STANDARD | FAST, USB `@MOTION WALK MODE`), volatile, for the next walk: a walk, its WALK STOP and its STOP recovery keep their mode; 100 mm refused in STANDARD/FAST (`STRIDE_NOT_IN_WALK_MODE`); joystick SLOW. Capabilities carry the table; status `walk_mode` carries selected, active and the goal speed/ACC read from the servos.
+- **STOP braking.** `StopPlan` assumes min(RAM ACC, 84) = 8 400 step/s² at most: bench QC V6.1 arrival braking p10 (no load, 11.1 V). SLOW and STAND keep their own ACC (unchanged).
+- **IMU envelopes per mode.** STANDARD pitch-down −36.8 mrad (SLOW100 −12.8). FAST is ×0.6 of its search (−14.9 mrad), because under the servo-response model the full polygon met STOP_PLAN.
+- **Bench.** Espressif QEMU ESP32-S3: 9 scenarios bit-identical RAW digests host vs Xtensa; ≈0.34 M instructions per release mean, ≤1.2 M max; libm transcendental ≈2/3 of the deterministic work. Servo response model (`run_servo_plant.sh`). Preemption diagnostic build option (`MATDOG_DIAG_PREEMPTION`, OFF in operational builds).
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 consolidated candidate (`3803960`, APP `05935919…`, never flashed): one joystick law, WALK100 STOP proof with T2, first-exit cause — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**. **Same version string `1.0.2-dev.6`, new source, build and APP**: it supersedes the earlier dev.6 build of `2c53ecf` (APP `eef32e61…`, never flashed). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_Consolidation_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Consolidation_2026-11-09/REPORT.md).
 
