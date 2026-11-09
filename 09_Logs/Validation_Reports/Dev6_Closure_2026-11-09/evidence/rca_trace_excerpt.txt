@@ -1,0 +1,11 @@
+RCA refuse1 phase=11 recover=0 cycles=2.3500 corr=-30.39/-95.51 mrad wanted=-31.45/-98.40
+RCA  j10 q=0.00000 lo=0.87333 hi=2.04915 out_lo=569.33 out_hi=-1335.84 ticks meas=1.44654 cmdRaw=3000
+RCA refuse1 phase=10 recover=0 cycles=0.0553 corr=-22.25/-69.91 mrad wanted=-4.92/-15.22
+RCA  j10 q=0.00000 lo=0.87333 hi=2.04915 out_lo=569.33 out_hi=-1335.84 ticks meas=1.46802 cmdRaw=3023
+RCA site=compensateLevel recover=0
+--
+RCA refuse1 phase=11 recover=0 cycles=2.3500 corr=-30.33/-88.93 mrad wanted=-31.94/-92.17
+RCA  j10 q=0.00000 lo=0.87333 hi=2.04915 out_lo=569.33 out_hi=-1335.84 ticks meas=1.44041 cmdRaw=2995
+RCA refuse1 phase=10 recover=0 cycles=0.0604 corr=-21.34/-62.53 mrad wanted=-5.77/-14.89
+RCA  j10 q=0.00000 lo=0.87333 hi=2.04915 out_lo=569.33 out_hi=-1335.84 ticks meas=1.45575 cmdRaw=3019
+RCA site=compensateLevel recover=0

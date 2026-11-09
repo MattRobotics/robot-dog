@@ -1,0 +1,36 @@
+== host
+PLATFORM host
+SCENARIO WALK100_SLOW_120s      frames= 6468 digest=5b3c56c3c182f493 max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=6615 cost_max=0 cost_mean=0 hist=6615,0,0,0,0,0,0,0
+SCENARIO WALK75_STANDARD_90s    frames= 4964 digest=3a0a51c27a7504a3 max_step=25 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5128 cost_max=0 cost_mean=0 hist=5128,0,0,0,0,0,0,0
+SCENARIO WALK80_FAST_90s        frames= 4981 digest=8c7c67e2395df3c3 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5134 cost_max=0 cost_mean=0 hist=5134,0,0,0,0,0,0,0
+SCENARIO JOYSTICK_HELD_SEQUENCE frames=12744 digest=6044aeac2e1bed43 max_step=42 state=WALKING/WALK_STANDARD reason=WALK_JOYSTICK first_fault=- exit=-/- refused_by=0 releases=13012 cost_max=0 cost_mean=0 hist=13012,0,0,0,0,0,0,0
+SCENARIO STOP_SWING_STANCE_8_of_8 frames= 5360 digest=de42e4e0904364f8 max_step=16 state=STANDING/HOLD reason=STAND_REACHED first_fault=- exit=-/- refused_by=0 releases=6670 cost_max=0 cost_mean=0 hist=6670,0,0,0,0,0,0,0
+SCENARIO IMU_BEYOND_ENVELOPE    frames= 3465 digest=b5a466855d5ae02f max_step=18 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=0 cost_mean=0 hist=3615,0,0,0,0,0,0,0
+SCENARIO FAULT_LATCH_off1_FAULT_STOP_REQUIRED_FAULT_STOP_REQUIRED frames=  978 digest=3adc03ab0c7eaf29 max_step=13 state=FAULT/IDLE reason=SERVO_FEEDBACK_STALE first_fault=SERVO_FEEDBACK_STALE exit=SERVO_FEEDBACK_STALE/WALK_STANDARD refused_by=0 releases=1615 cost_max=0 cost_mean=0 hist=1615,0,0,0,0,0,0,0
+SCENARIO LAG_SAG_WALK100_SLOW   frames= 3485 digest=859c990bdf0156cd max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=0 cost_mean=0 hist=3615,0,0,0,0,0,0,0
+SCENARIO LAG_SAG_WALK80_FAST    frames= 3484 digest=bad868e9ea4798eb max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3634 cost_max=0 cost_mean=0 hist=3634,0,0,0,0,0,0,0
+DONE
+== esp32s3-qemu
+PLATFORM esp32s3-qemu cpu_mhz=80 core=1 task_stack=16384 sim_bytes=14088
+SCENARIO WALK100_SLOW_120s      frames= 6468 digest=5b3c56c3c182f493 max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=6615 cost_max=646790 cost_mean=214413 hist=236,5898,435,45,1,0,0,0
+SCENARIO WALK75_STANDARD_90s    frames= 4964 digest=3a0a51c27a7504a3 max_step=25 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5128 cost_max=646720 cost_mean=233502 hist=236,3512,999,380,1,0,0,0
+SCENARIO WALK80_FAST_90s        frames= 4981 digest=8c7c67e2395df3c3 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5134 cost_max=646762 cost_mean=256672 hist=236,2298,1848,750,2,0,0,0
+SCENARIO JOYSTICK_HELD_SEQUENCE frames=12744 digest=6044aeac2e1bed43 max_step=42 state=WALKING/WALK_STANDARD reason=WALK_JOYSTICK first_fault=- exit=-/- refused_by=0 releases=13012 cost_max=722456 cost_mean=248477 hist=393,10140,1444,841,162,32,0,0
+SCENARIO STOP_SWING_STANCE_8_of_8 frames= 5360 digest=de42e4e0904364f8 max_step=16 state=STANDING/HOLD reason=STAND_REACHED first_fault=- exit=-/- refused_by=0 releases=6670 cost_max=647557 cost_mean=272865 hist=1207,1180,3869,413,1,0,0,0
+SCENARIO IMU_BEYOND_ENVELOPE    frames= 3465 digest=b5a466855d5ae02f max_step=18 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=647500 cost_mean=211224 hist=236,3003,328,47,1,0,0,0
+SCENARIO FAULT_LATCH_off1_FAULT_STOP_REQUIRED_FAULT_STOP_REQUIRED frames=  978 digest=3adc03ab0c7eaf29 max_step=13 state=FAULT/IDLE reason=SERVO_FEEDBACK_STALE first_fault=SERVO_FEEDBACK_STALE exit=SERVO_FEEDBACK_STALE/WALK_STANDARD refused_by=0 releases=1615 cost_max=646798 cost_mean=109894 hist=843,659,106,6,1,0,0,0
+SCENARIO LAG_SAG_WALK100_SLOW   frames= 3485 digest=859c990bdf0156cd max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=646748 cost_mean=220962 hist=337,2614,635,28,1,0,0,0
+SCENARIO LAG_SAG_WALK80_FAST    frames= 3484 digest=bad868e9ea4798eb max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3634 cost_max=779274 cost_mean=254834 hist=356,1370,1292,611,1,4,0,0
+STACK motion_task_min_free_bytes=7320 heap_free_delta=-108
+DONE
+== comparison (frames, digest, max step, state, reason, first fault, exit)
+SAME WALK100_SLOW_120s frames= 6468 digest=5b3c56c3c182f493 max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME WALK75_STANDARD_90s frames= 4964 digest=3a0a51c27a7504a3 max_step=25 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME WALK80_FAST_90s frames= 4981 digest=8c7c67e2395df3c3 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME JOYSTICK_HELD_SEQUENCE frames=12744 digest=6044aeac2e1bed43 max_step=42 state=WALKING/WALK_STANDARD reason=WALK_JOYSTICK first_fault=- exit=-/- refused_by=0
+SAME STOP_SWING_STANCE_8_of_8 frames= 5360 digest=de42e4e0904364f8 max_step=16 state=STANDING/HOLD reason=STAND_REACHED first_fault=- exit=-/-
+SAME IMU_BEYOND_ENVELOPE frames= 3465 digest=b5a466855d5ae02f max_step=18 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME FAULT_LATCH_off1_FAULT_STOP_REQUIRED_FAULT_STOP_REQUIRED frames= 978 digest=3adc03ab0c7eaf29 max_step=13 state=FAULT/IDLE reason=SERVO_FEEDBACK_STALE first_fault=SERVO_FEEDBACK_STALE exit=SERVO_FEEDBACK_STALE/WALK_STANDARD
+SAME LAG_SAG_WALK100_SLOW frames= 3485 digest=859c990bdf0156cd max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME LAG_SAG_WALK80_FAST frames= 3484 digest=bad868e9ea4798eb max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+rc=0

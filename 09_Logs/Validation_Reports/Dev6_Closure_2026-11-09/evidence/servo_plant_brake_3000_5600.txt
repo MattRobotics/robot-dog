@@ -1,0 +1,6 @@
+PLANT SLOW     STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=96.1 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.04 s stop_box_out=0.0 ticks speed_bound=0.0%
+PLANT SLOW     STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=103.2 ticks max_stop_end_offset=2.2 ticks max_stop_settle=2.04 s stop_box_out=0.0 ticks speed_bound=0.0%
+PLANT STANDARD STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=192.4 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.10 s stop_box_out=0.0 ticks speed_bound=0.0%
+PLANT STANDARD STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=215.0 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.10 s stop_box_out=0.0 ticks speed_bound=0.0%
+PLANT FAST     STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=180.6 ticks max_stop_end_offset=2.1 ticks max_stop_settle=2.08 s stop_box_out=0.0 ticks speed_bound=0.0%
+PLANT FAST     STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=202.1 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.08 s stop_box_out=0.0 ticks speed_bound=0.0%
