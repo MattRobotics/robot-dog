@@ -16,7 +16,7 @@ Tutti gli SHA256 sono calcolati sui **byte originali**. Report: [REPORT.md](REPO
 | `README.md` / `INDEX.json` / `MANIFEST_SHA256.txt` | 4.412 / 3.347 / 630 | `6bcc472e…1fc6` / `654b53f0…909b` / `6d1d144d…936f` |
 | `OPERATOR_NOTES.md` (pubblicato in chiaro come [OPERATOR_OBSERVATIONS.md](OPERATOR_OBSERVATIONS.md), identico) | 1.784 | `f8dc8f253a1357c0aa8b6c61c772894a915e0862707b986761064e34f4bd4d7f` |
 
-**Video `1000083730.mp4`: non disponibile.** Non è nel pacchetto ricevuto né sul filesystem dell'ASUS; il manifest e l'indice del pacchetto non ne riportano lo SHA256. Nessun riferimento hash verificabile esiste quindi in questo repository; nessun URL pubblico.
+**Video:** l'originale `1000083730.mp4` non è sull'ASUS e non ha un hash nel pacchetto. Il 09/11 è arrivata una copia ricompressa via WhatsApp, `VID-20261109-WA0000.mp4`: 6.128.555 B, SHA256 `1c75f27b7410824748b6dad3fd9903a139f0d50896a15ee988ff8551525d86ee`, 478×850, 24,94 s. È conservata solo sull'ASUS, non pubblicata (interno di un'abitazione); nessun URL pubblico.
 
 Controllo privacy: JSON senza password, SSID, token, cookie, CSRF o email (`admin_session` è un booleano). Lo screenshot JPEG non contiene EXIF (solo JFIF e profilo ICC) e mostra la dashboard, la barra di stato del telefono e l'indirizzo predefinito dell'AP del robot `192.168.4.1` (rete locale non instradabile).
 

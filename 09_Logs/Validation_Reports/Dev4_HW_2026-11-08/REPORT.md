@@ -61,9 +61,18 @@ Totali boot 2: **0 fault**, 58/58 comandi HTTP 200, lavoro max per release 43,4 
 
 L'escursione laterale è la variazione picco-picco della media delle 4 referenze di contatto nel telaio corpo, calcolata con la cinematica diretta del firmware dai 12 angoli misurati ([`tools/`](tools/)). Con il campionamento a ~0,35 s è un limite inferiore del valore reale. Comando di sway della legge: WALK STANDARD 1,5 mm (3 mm p-p), joystick 14 mm (28 mm p-p): **i valori misurati coincidono con le due leggi.**
 
-### 3.3 Video WALK100 — non disponibile
+### 3.3 Video WALK100 — copia ricompressa ricevuta il 09/11
 
-`1000083730.mp4` (~24,9 s, 1920×1080, dichiarato dal README del pacchetto) **non è stato consegnato all'ASUS**: il pacchetto ricevuto è la versione `NO_VIDEO` e il file non esiste sul filesystem. Il suo SHA256 non è elencato in `MANIFEST_SHA256.txt` né in `INDEX.json`. Analisi visiva di appoggi, falcata, oscillazione e trasferimento del peso: **non eseguita (UNKNOWN)**; nessun link pubblico o URL.
+`1000083730.mp4` (~24,9 s, 1920×1080) **non è arrivato all'ASUS**: il pacchetto ricevuto è la versione `NO_VIDEO` e il manifest non ne riporta lo SHA256. Il 09/11 l'operatore ha inviato **`VID-20261109-WA0000.mp4`**: 6.128.555 B, SHA256 `1c75f27b7410824748b6dad3fd9903a139f0d50896a15ee988ff8551525d86ee`, H.264 478×850 a 60 fps, 1493 fotogrammi, **24,94 s**. È una copia ricompressa via WhatsApp, non l'originale; la durata coincide. È conservata solo sull'ASUS (`~/MATDOG/verification-artifacts/MATDOG_1_0_2_DEV4_GROUND_20261108/video/`) e non pubblicata, perché mostra l'interno di un'abitazione.
+
+**Osservazioni qualitative**, da fotogrammi ogni 2 s e ogni 0,5 s tra 8 e 13 s:
+- andatura a passo strisciante con un solo arto in volo per volta, tre appoggi visibili;
+- corpo a quota costante e visivamente piano, nessun rollio evidente dalla vista frontale (coerente con lo sway di 1,5 mm);
+- nessun inciampo, scivolamento o caduta;
+- sollevamento del piede basso (dell'ordine del centimetro, legge 8 mm);
+- le zampe posteriori finiscono l'appoggio molto indietro, coerente con il passo di 100 mm.
+
+**Non misurabile:** velocità, passo e distanza. La telecamera è a mano e segue il robot, senza riferimento metrico fisso; le piastrelle non bastano senza calibrazione prospettica.
 
 ## 4. Anomalie
 
