@@ -146,8 +146,8 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  // a GAIT_SELECT chooses the next walk; the joystick walks SLOW.
  size_t used=static_cast<size_t>(n)-1;  // reopen the object
  for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
-   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"max_stride_mm\":%.0f,\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s}",
-     i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,simple::kStrideM[w.maxStride]*1e3,simple::kStrideM[w.maxStride]/w.periodS*1e3,w.heightM*1e3,w.duty,
+   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s}",
+     i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,w.strideM[0]*1e3,w.strideM[1]*1e3,w.strideM[2]*1e3,w.strideM[2]/w.periodS*1e3,w.heightM*1e3,w.liftM*1e3,w.duty,
      unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified));
    if(k<=0||static_cast<size_t>(k)>=cap-used)return false;used+=k;}
  return snprintf(out+used,cap-used,"]}")==2;
