@@ -2,6 +2,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <esp_timer.h>
+#ifdef MATDOG_DIAG_PREEMPTION
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
 
 namespace matdog { namespace simple { namespace timing {
 // Controller-owned observations only. No task, UART, allocation, synchronization
@@ -16,6 +20,22 @@ enum Work : unsigned { SOLVES, IK, NEWTON, FK, WORKS };
 // Release work above this budget is an overrun even when no whole period is
 // lost (missed counts only skipped 20 ms slots). Equal to simple::kPeriodUs.
 constexpr uint32_t kBudgetUs=20000;
+#ifdef MATDOG_DIAG_PREEMPTION
+// DIAGNOSTIC BUILD ONLY (walk modes 2026-11-09), never the operational
+// candidate: how long the OTHER tasks of the Motion core ran inside a release.
+// FreeRTOS run-time stats (CONFIG_FREERTOS_GENERATE_RUN_TIME_STATS, esp_timer
+// us) grow a task's counter when it is switched OUT, so the Motion task's own
+// counter cannot measure its CPU time inside a release. The other tasks' sum
+// between release start and end can: the Motion task runs at both instants, so
+// every slice they add there lies inside the release. Tasks without affinity
+// can also run on the other core: they make it an upper bound. Wall minus this
+// is the Motion task's time including the ISRs that interrupted it. Cost: two
+// uxTaskGetSystemState per armed release (scheduler suspended while it reads).
+inline uint32_t otherTasksUs(){static TaskStatus_t task[40];const UBaseType_t n=uxTaskGetSystemState(task,40,nullptr);
+  const TaskHandle_t self=xTaskGetCurrentTaskHandle();const BaseType_t core=xPortGetCoreID();uint32_t sum=0;
+  for(UBaseType_t i=0;i<n;++i)if(task[i].xHandle!=self&&(task[i].xCoreID==core||task[i].xCoreID==tskNO_AFFINITY))sum+=task[i].ulRunTimeCounter;
+  return sum;}
+#endif
 inline uint32_t overrunsTotal=0;  // since boot, never re-armed
 struct Record {
   bool valid=false;
@@ -26,6 +46,9 @@ struct Record {
   uint32_t release=0,missed=0,skipped=0,workUs=0;
   uint32_t us[PARTS]{},previousUs[PARTS]{},externalUs[EXTERNALS]{};
   uint32_t fastReads=0,controlReads=0,frames=0;
+#ifdef MATDOG_DIAG_PREEMPTION
+  uint32_t otherTasksUs=0;  // other tasks of the core inside this release (diagnostic build)
+#endif
   uint32_t work[WORKS]{},previousWork[WORKS]{};
 };
 struct State {
@@ -50,6 +73,9 @@ struct State {
   static constexpr uint32_t kReadBinsUs[3]={2500,4000,6000};
   static constexpr uint32_t kLatenessBinsUs[5]={1000,5000,10000,20000,40000};
   uint32_t workHist[8]{},readHist[4]{},latenessHist[6]{};
+#ifdef MATDOG_DIAG_PREEMPTION
+  uint32_t otherAtStart=0,maxOtherTasksUs=0;
+#endif
 };
 template<unsigned N> inline unsigned bin(const uint32_t (&edges)[N],uint32_t v){unsigned b=0;while(b<N&&v>=edges[b])++b;return b;}
 inline State state{};
@@ -98,6 +124,9 @@ struct Release {
     for(unsigned i=0;i<EXTERNALS;++i){r.externalUs[i]=state.external[i];state.external[i]=0;}
     for(unsigned i=0;i<WORKS;++i)r.previousWork[i]=state.previousWork[i];
     state.start=start;state.partStart=start;state.part=REST;state.active=true;
+#ifdef MATDOG_DIAG_PREEMPTION
+    state.otherAtStart=otherTasksUs();
+#endif
   }
   ~Release(){
     const uint64_t end=esp_timer_get_time();
@@ -106,6 +135,9 @@ struct Release {
     if(state.active){switchPart(REST);state.active=false;auto& r=state.working;
       // The same endpoint closes the partition: sum(us)==workUs exactly.
       r.workUs=static_cast<uint32_t>(state.partStart-start);
+#ifdef MATDOG_DIAG_PREEMPTION
+      r.otherTasksUs=otherTasksUs()-state.otherAtStart;state.maxOtherTasksUs=std::max(state.maxOtherTasksUs,r.otherTasksUs);
+#endif
       for(unsigned i=0;i<PARTS;++i){state.previous[i]=r.us[i];state.sectionMax[i]=std::max(state.sectionMax[i],r.us[i]);}
       ++state.workHist[bin(State::kWorkBinsUs,r.workUs)];++state.readHist[bin(State::kReadBinsUs,r.us[READ])];
       ++state.latenessHist[bin(State::kLatenessBinsUs,static_cast<uint32_t>(std::min<uint64_t>(r.latenessUs,UINT32_MAX)))];

@@ -279,6 +279,9 @@ void CommandRouter::handleLine(String line) {
       for(unsigned k=0;k<simple::timing::WORKS;++k)Serial.printf(" %s=%lu previous_%s=%lu",works[k],(unsigned long)r.work[k],works[k],(unsigned long)r.previousWork[k]);Serial.println();
     }
     Serial.printf("MOTION_TIMING totals max_visit_gap_us=%llu max_outside_visit_us=%llu",(unsigned long long)t.maxVisitGap,(unsigned long long)t.maxOutside);
+#ifdef MATDOG_DIAG_PREEMPTION
+    Serial.printf(" diag_preemption=1 max_other_tasks_us=%lu max_work_other_tasks_us=%lu first_miss_other_tasks_us=%lu",(unsigned long)t.maxOtherTasksUs,(unsigned long)t.maximum.otherTasksUs,(unsigned long)t.firstMiss.otherTasksUs);
+#endif
     for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_max_us=%lu",k,(unsigned long)t.externalMax[k]);
     for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();
     // Distributions of the armed command's releases: work (<5,<10,<15,<20,<25,<30,<40,>=40 ms), READ section (<2.5,<4,<6,>=6 ms), lateness (<1,<5,<10,<20,<40,>=40 ms).
