@@ -1,0 +1,12 @@
+PLATFORM esp32s3-qemu cpu_mhz=80 core=1 task_stack=16384 sim_bytes=14088
+SCENARIO WALK100_SLOW_120s      frames= 6468 digest=5b3c56c3c182f493 max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=6615 cost_max=646784 cost_mean=214412 hist=236,5898,434,46,1,0,0,0
+SCENARIO WALK75_STANDARD_90s    frames= 4951 digest=91669965469e2d27 max_step=24 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5115 cost_max=646742 cost_mean=226418 hist=236,3901,731,246,1,0,0,0
+SCENARIO WALK75_FAST_90s        frames= 4966 digest=5285e8ced0c0f511 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=5128 cost_max=646784 cost_mean=239337 hist=236,2713,1795,383,1,0,0,0
+SCENARIO JOYSTICK_HELD_SEQUENCE frames=12744 digest=6044aeac2e1bed43 max_step=42 state=WALKING/WALK_STANDARD reason=WALK_JOYSTICK first_fault=- exit=-/- refused_by=0 releases=13012 cost_max=722432 cost_mean=248472 hist=393,10138,1445,842,162,32,0,0
+SCENARIO STOP_SWING_STANCE_8_of_8 frames= 5360 digest=de42e4e0904364f8 max_step=16 state=STANDING/HOLD reason=STAND_REACHED first_fault=- exit=-/- refused_by=0 releases=6670 cost_max=646756 cost_mean=272859 hist=1207,1179,3870,413,1,0,0,0
+SCENARIO IMU_BEYOND_ENVELOPE    frames= 3465 digest=b5a466855d5ae02f max_step=18 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=646839 cost_mean=211220 hist=236,3003,328,47,1,0,0,0
+SCENARIO FAULT_LATCH_off1_FAULT_STOP_REQUIRED_FAULT_STOP_REQUIRED frames=  978 digest=3adc03ab0c7eaf29 max_step=13 state=FAULT/IDLE reason=SERVO_FEEDBACK_STALE first_fault=SERVO_FEEDBACK_STALE exit=SERVO_FEEDBACK_STALE/WALK_STANDARD refused_by=0 releases=1615 cost_max=646805 cost_mean=109891 hist=843,659,106,6,1,0,0,0
+SCENARIO LAG_SAG_WALK100_SLOW   frames= 3485 digest=859c990bdf0156cd max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3615 cost_max=646770 cost_mean=220954 hist=337,2613,636,28,1,0,0,0
+SCENARIO LAG_SAG_WALK75_FAST    frames= 3478 digest=23fe2f3ed663b960 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/- refused_by=0 releases=3628 cost_max=646734 cost_mean=252204 hist=350,1415,1279,583,1,0,0,0
+STACK motion_task_min_free_bytes=7288 heap_free_delta=-108
+DONE

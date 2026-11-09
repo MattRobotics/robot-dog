@@ -1,0 +1,5 @@
+final REPRO R1 jitter-forward: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm stops=0 faults=0 state=WALKING
+final REPRO R2 jitter-after-steer: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm vy=0.00 mm/s stops=0 faults=0
+final REPRO R3 law-change: fwd vx=20.00; diag stops=0 vy=2.80; back-to-fwd stops=0 vx=20.00 sway=1.5 mm (demand 20.00 mm/s) faults=0
+final REPRO R4 long WALK100: releases=8000 cycles=31.49 state=WALKING reason=WALK_STANDARD
+rc=0

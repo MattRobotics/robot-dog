@@ -1,0 +1,578 @@
+# Mode exploration (walk_support_check / walk_tilt_envelope_check what-ifs, proof ACC as stated; 2026-11-09)
+## sweep1
+stride 75 T 2.5 v 30.0 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.85 hipTicks 9.3 vmax 2.307 amax 23.89 | stop0 stop=0/0/0/2721 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 1.50 hipTicks 4.6 vmax 1.961 amax 23.72 | stop0 stop=0/0/0/1926 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 0.77 hipTicks 9.3 vmax 1.963 amax 20.95 | stop0 stop=0/0/0/171 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.37 hipTicks 9.3 vmax 1.982 amax 39.92 | stop0 stop=0/0/0/978 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.37 hipTicks 9.3 vmax 1.982 amax 39.92 | stop0 stop=0/0/0/2017 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 0.77 hipTicks 9.3 vmax 1.963 amax 20.95 | stop0 stop=0/0/0/1491 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.27 hipTicks 9.3 vmax 2.285 amax 23.30 | stop0 stop=0/0/0/1678 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 1.50 hipTicks 4.6 vmax 1.961 amax 23.72 | stop0 stop=0/0/0/4710 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.27 hipTicks 9.3 vmax 2.285 amax 23.30 | stop0 stop=0/0/0/297 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.85 hipTicks 9.3 vmax 2.307 amax 23.89 | stop0 stop=0/0/0/529 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.10 hipTicks 4.6 vmax 1.980 amax 41.52 | stop0 stop=0/0/0/2392 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.10 hipTicks 4.6 vmax 1.980 amax 41.52 | stop0 stop=0/0/0/5179 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.00 hipTicks 4.6 vmax 2.283 amax 23.32 | stop0 stop=0/0/0/5372 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.58 hipTicks 4.6 vmax 2.304 amax 23.90 | stop0 stop=0/0/0/3079 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.00 hipTicks 4.6 vmax 2.283 amax 23.32 | stop0 stop=0/0/0/1999 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.13 hipTicks 9.3 vmax 1.645 amax 14.55 | stop0 stop=0/0/0/670 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.58 hipTicks 4.6 vmax 2.304 amax 23.90 | stop0 stop=0/0/0/6083 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 1.86 hipTicks 4.6 vmax 1.643 amax 16.47 | stop0 stop=0/0/0/1422 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.73 hipTicks 9.3 vmax 1.661 amax 27.72 | stop0 stop=0/0/0/1531 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.13 hipTicks 9.3 vmax 1.645 amax 14.55 | stop0 stop=0/0/0/8 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 1.86 hipTicks 4.6 vmax 1.643 amax 16.47 | stop0 stop=0/0/0/3950 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.73 hipTicks 9.3 vmax 1.661 amax 27.72 | stop0 stop=0/0/0/644 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.46 hipTicks 4.6 vmax 1.659 amax 28.83 | stop0 stop=0/0/0/4632 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.45 hipTicks 9.3 vmax 1.911 amax 16.18 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3 v 25.0 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.46 hipTicks 4.6 vmax 1.659 amax 28.83 | stop0 stop=0/0/0/1946 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 3.02 hipTicks 9.3 vmax 1.929 amax 16.59 | stop0 stop=0/0/0/20 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.45 hipTicks 9.3 vmax 1.911 amax 16.18 | stop0 stop=0/0/0/623 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 3.02 hipTicks 9.3 vmax 1.929 amax 16.59 | stop0 stop=0/0/0/1341 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.18 hipTicks 4.6 vmax 1.909 amax 16.19 | stop0 stop=0/0/0/4143 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.18 hipTicks 4.6 vmax 1.909 amax 16.19 | stop0 stop=0/0/0/743 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.76 hipTicks 4.6 vmax 1.927 amax 16.60 | stop0 stop=0/0/0/5471 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.76 hipTicks 4.6 vmax 1.927 amax 16.60 | stop0 stop=0/0/0/1561 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.38 hipTicks 9.3 vmax 1.407 amax 10.69 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.96 hipTicks 9.3 vmax 1.421 amax 20.37 | stop0 stop=0/0/0/1026 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.38 hipTicks 9.3 vmax 1.407 amax 10.69 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.11 hipTicks 4.6 vmax 1.406 amax 12.10 | stop0 stop=0/0/0/3319 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.96 hipTicks 9.3 vmax 1.421 amax 20.37 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.70 hipTicks 4.6 vmax 1.419 amax 21.18 | stop0 stop=0/0/0/4001 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.70 hipTicks 4.6 vmax 1.419 amax 21.18 | stop0 stop=0/0/0/1478 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.11 hipTicks 4.6 vmax 1.406 amax 12.10 | stop0 stop=0/0/0/577 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.57 hipTicks 9.3 vmax 1.637 amax 11.90 | stop0 stop=0/0/0/77 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.57 hipTicks 9.3 vmax 1.637 amax 11.90 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 3.15 hipTicks 9.3 vmax 1.652 amax 12.19 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 3.15 hipTicks 9.3 vmax 1.652 amax 12.19 | stop0 stop=0/0/0/353 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.31 hipTicks 4.6 vmax 1.635 amax 11.90 | stop0 stop=0/0/0/397 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.31 hipTicks 4.6 vmax 1.635 amax 11.90 | stop0 stop=0/0/0/2799 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.88 hipTicks 4.6 vmax 1.650 amax 12.20 | stop0 stop=0/0/0/676 FAIL 
+stride 75 T 4 v 18.8 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.48 hipTicks 9.3 vmax 1.230 amax 8.18 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.48 hipTicks 9.3 vmax 1.230 amax 8.18 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 3.06 hipTicks 9.3 vmax 1.241 amax 15.59 | stop0 stop=0/0/0/807 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.88 hipTicks 4.6 vmax 1.650 amax 12.20 | stop0 stop=0/0/0/4446 FAIL 
+stride 75 T 4 v 18.8 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 3.06 hipTicks 9.3 vmax 1.241 amax 15.59 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.67 hipTicks 9.3 vmax 1.431 amax 9.11 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.22 hipTicks 4.6 vmax 1.228 amax 9.27 | stop0 stop=0/0/0/281 FAIL 
+stride 75 T 4 v 18.8 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.79 hipTicks 4.6 vmax 1.240 amax 16.22 | stop0 stop=0/0/0/1098 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 3.24 hipTicks 9.3 vmax 1.444 amax 9.33 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.22 hipTicks 4.6 vmax 1.228 amax 9.27 | stop0 stop=0/0/0/2735 FAIL 
+stride 75 T 4 v 18.8 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.79 hipTicks 4.6 vmax 1.240 amax 16.22 | stop0 stop=0/0/0/3628 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.67 hipTicks 9.3 vmax 1.431 amax 9.11 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 3.24 hipTicks 9.3 vmax 1.444 amax 9.33 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 2.5 v 40.0 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.12 capture 0.24 hipTicks 9.3 vmax 2.539 amax 23.01 | stop0 stop=0/0/0/4278 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.12 capture 0.24 hipTicks 9.3 vmax 2.539 amax 23.01 | stop0 stop=0/0/0/1284 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.40 hipTicks 4.6 vmax 1.429 amax 9.11 | stop0 stop=0/0/0/25 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.98 hipTicks 4.6 vmax 1.443 amax 9.34 | stop0 stop=0/0/0/2909 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.40 hipTicks 4.6 vmax 1.429 amax 9.11 | stop0 stop=0/0/0/2096 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 1.87 hipTicks 9.3 vmax 2.564 amax 41.81 | stop0 stop=0/0/0/2292 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.85 capture 0.97 hipTicks 4.6 vmax 2.536 amax 25.95 | stop0 stop=0/0/0/3799 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 1.87 hipTicks 9.3 vmax 2.564 amax 41.81 | stop0 stop=0/0/0/4831 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.85 capture 0.97 hipTicks 4.6 vmax 2.536 amax 25.95 | stop0 stop=0/0/0/7399 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.98 hipTicks 4.6 vmax 1.443 amax 9.34 | stop0 stop=0/0/0/199 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 0.92 hipTicks 9.3 vmax 2.958 amax 30.27 | stop0 stop=0/0/0/2114 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.54 hipTicks 9.3 vmax 2.987 amax 31.13 | stop0 stop=0/0/0/2545 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 2.59 hipTicks 4.6 vmax 2.562 amax 45.11 | stop0 stop=0/0/0/7797 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 0.92 hipTicks 9.3 vmax 2.958 amax 30.27 | stop0 stop=0/0/0/4425 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 2.59 hipTicks 4.6 vmax 2.562 amax 45.11 | stop0 stop=0/0/0/4449 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.26 hipTicks 4.6 vmax 2.983 amax 31.16 | stop0 stop=0/0/0/8649 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.54 hipTicks 9.3 vmax 2.987 amax 31.13 | stop0 stop=0/0/0/5494 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.12 capture 0.72 hipTicks 9.3 vmax 2.128 amax 15.98 | stop0 stop=0/0/0/772 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 1.64 hipTicks 4.6 vmax 2.954 amax 30.30 | stop0 stop=0/0/0/8180 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.26 hipTicks 4.6 vmax 2.983 amax 31.16 | stop0 stop=0/0/0/5340 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 1.64 hipTicks 4.6 vmax 2.954 amax 30.30 | stop0 stop=0/0/0/4499 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.12 capture 0.72 hipTicks 9.3 vmax 2.128 amax 15.98 | stop0 stop=0/0/0/2503 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.35 hipTicks 9.3 vmax 2.148 amax 29.04 | stop0 stop=0/0/0/1948 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.35 hipTicks 9.3 vmax 2.148 amax 29.04 | stop0 stop=0/0/0/3457 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.07 hipTicks 4.6 vmax 2.146 amax 31.33 | stop0 stop=0/0/0/4123 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.07 hipTicks 4.6 vmax 2.146 amax 31.33 | stop0 stop=0/0/0/7226 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.85 capture 1.45 hipTicks 4.6 vmax 2.125 amax 18.02 | stop0 stop=0/0/0/6531 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.85 capture 1.45 hipTicks 4.6 vmax 2.125 amax 18.02 | stop0 stop=0/0/0/3136 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.18 hipTicks 9.3 vmax 2.475 amax 21.03 | stop0 stop=0/0/0/3368 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.78 hipTicks 9.3 vmax 2.499 amax 21.63 | stop0 stop=0/0/0/4232 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.78 hipTicks 9.3 vmax 2.499 amax 21.63 | stop0 stop=0/0/0/1476 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 1.92 hipTicks 4.6 vmax 2.472 amax 21.04 | stop0 stop=0/0/0/2995 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.18 hipTicks 9.3 vmax 2.475 amax 21.03 | stop0 stop=0/0/0/1162 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 1.92 hipTicks 4.6 vmax 2.472 amax 21.04 | stop0 stop=0/0/0/7293 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.51 hipTicks 4.6 vmax 2.496 amax 21.65 | stop0 stop=0/0/0/8252 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.12 capture 1.07 hipTicks 9.3 vmax 1.820 amax 11.74 | stop0 stop=0/0/0/1499 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.69 hipTicks 9.3 vmax 1.838 amax 21.33 | stop0 stop=0/0/0/947 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.12 capture 1.07 hipTicks 9.3 vmax 1.820 amax 11.74 | stop0 stop=0/0/0/71 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.51 hipTicks 4.6 vmax 2.496 amax 21.65 | stop0 stop=0/0/0/4194 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.85 capture 1.79 hipTicks 4.6 vmax 1.818 amax 13.24 | stop0 stop=0/0/0/1576 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.85 capture 1.79 hipTicks 4.6 vmax 1.818 amax 13.24 | stop0 stop=0/0/0/6024 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.35 hipTicks 9.3 vmax 2.119 amax 15.45 | stop0 stop=0/0/0/1954 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.41 hipTicks 4.6 vmax 1.836 amax 23.01 | stop0 stop=0/0/0/3064 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.69 hipTicks 9.3 vmax 1.838 amax 21.33 | stop0 stop=0/0/0/2752 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.41 hipTicks 4.6 vmax 1.836 amax 23.01 | stop0 stop=0/0/0/6950 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.35 hipTicks 9.3 vmax 2.119 amax 15.45 | stop0 stop=0/0/0/992 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.95 hipTicks 9.3 vmax 2.140 amax 15.89 | stop0 stop=0/0/0/2347 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.09 hipTicks 4.6 vmax 2.117 amax 15.46 | stop0 stop=0/0/0/5931 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 1.5 swayX 3 proofAcc 50 | static 2.12 capture 1.23 hipTicks 9.3 vmax 1.590 amax 8.99 | stop0 stop=0/0/0/784 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.95 hipTicks 9.3 vmax 2.140 amax 15.89 | stop0 stop=0/0/0/1484 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.68 hipTicks 4.6 vmax 2.138 amax 15.91 | stop0 stop=0/0/0/3406 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 2.82 hipTicks 9.3 vmax 1.606 amax 16.33 | stop0 stop=0/0/0/54 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.09 hipTicks 4.6 vmax 2.117 amax 15.46 | stop0 stop=0/0/0/2297 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 1.5 swayX 3 proofAcc 84 | static 2.12 capture 1.23 hipTicks 9.3 vmax 1.590 amax 8.99 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .80 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 2.82 hipTicks 9.3 vmax 1.606 amax 16.33 | stop0 stop=0/0/0/2344 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 2.5 swayX 3 proofAcc 84 | static 2.85 capture 1.97 hipTicks 4.6 vmax 1.588 amax 10.14 | stop0 stop=0/0/0/830 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.68 hipTicks 4.6 vmax 2.138 amax 15.91 | stop0 stop=0/0/0/7378 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 2.5 swayX 3 proofAcc 50 | static 2.85 capture 1.97 hipTicks 4.6 vmax 1.588 amax 10.14 | stop0 stop=0/0/0/5068 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.55 hipTicks 4.6 vmax 1.604 amax 17.62 | stop0 stop=0/0/0/6655 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.55 hipTicks 4.6 vmax 1.604 amax 17.62 | stop0 stop=0/0/0/1856 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 1.5 swayX 3 proofAcc 84 | static 2.13 capture 1.48 hipTicks 9.3 vmax 1.853 amax 11.83 | stop0 stop=0/0/0/301 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 1.5 swayX 6 proofAcc 50 | static 3.66 capture 3.07 hipTicks 9.3 vmax 1.871 amax 12.17 | stop0 stop=0/0/0/1913 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 1.5 swayX 3 proofAcc 50 | static 2.13 capture 1.48 hipTicks 9.3 vmax 1.853 amax 11.83 | stop0 stop=0/0/0/1475 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 2.5 swayX 3 proofAcc 84 | static 2.88 capture 2.21 hipTicks 4.6 vmax 1.850 amax 11.84 | stop0 stop=0/0/0/1080 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 1.5 swayX 6 proofAcc 84 | static 3.66 capture 3.07 hipTicks 9.3 vmax 1.871 amax 12.17 | stop0 stop=0/0/0/1283 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 2.5 swayX 3 proofAcc 50 | static 2.88 capture 2.21 hipTicks 4.6 vmax 1.850 amax 11.84 | stop0 stop=0/0/0/4996 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 2.5 swayX 6 proofAcc 50 | static 4.41 capture 3.80 hipTicks 4.6 vmax 1.869 amax 12.18 | stop0 stop=0/0/0/6479 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayY 2.5 swayX 6 proofAcc 84 | static 4.41 capture 3.80 hipTicks 4.6 vmax 1.869 amax 12.18 | stop0 stop=0/0/0/2313 FAIL 
+## sweep2
+stride 75 T 2 v 37.5 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.24 stopZmp -9.10 vmax 2.453 amax 32.93 | stop0 stop=0/0/0/718 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 1.84 stopZmp -7.48 vmax 2.528 amax 62.37 | stop0 stop=0/0/0/1442 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 1.84 stopZmp -7.48 vmax 2.550 amax 62.37 | stop0 stop=0/0/0/1250 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.74 stopZmp -8.59 vmax 2.837 amax 43.21 | stop0 stop=0/0/0/987 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 1.84 stopZmp -3.39 vmax 2.550 amax 62.37 | stop0 stop=0/0/0/3126 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 1.84 stopZmp -3.39 vmax 2.528 amax 62.37 | stop0 stop=0/0/0/3039 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.24 stopZmp -4.99 vmax 2.471 amax 38.63 | stop0 stop=0/0/0/2594 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.24 stopZmp -4.99 vmax 2.453 amax 32.93 | stop0 stop=0/0/0/2561 FAIL 
+stride 75 T 2 v 37.5 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.24 stopZmp -9.10 vmax 2.471 amax 38.63 | stop0 stop=0/0/0/721 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.74 stopZmp -4.49 vmax 2.876 amax 50.74 | stop0 stop=0/0/0/2980 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.74 stopZmp -8.59 vmax 2.876 amax 50.74 | stop0 stop=0/0/0/829 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.74 stopZmp -4.49 vmax 2.837 amax 43.21 | stop0 stop=0/0/0/3435 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.34 stopZmp -2.88 vmax 2.924 amax 44.42 | stop0 stop=0/0/0/4087 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.34 stopZmp -2.88 vmax 2.968 amax 52.30 | stop0 stop=0/0/0/3737 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.34 stopZmp -6.98 vmax 2.968 amax 52.30 | stop0 stop=0/0/0/1835 FAIL 
+stride 75 T 2 v 37.5 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.34 stopZmp -6.98 vmax 2.924 amax 44.42 | stop0 stop=0/0/0/1893 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.53 stopZmp -6.05 vmax 2.181 amax 26.05 | stop0 stop=0/0/0/2148 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.13 stopZmp -2.60 vmax 2.247 amax 49.28 | stop0 stop=0/0/0/2646 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.13 stopZmp -2.60 vmax 2.267 amax 49.28 | stop0 stop=0/0/0/2586 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.13 stopZmp -6.15 vmax 2.247 amax 49.28 | stop0 stop=0/0/0/978 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.53 stopZmp -7.76 vmax 2.181 amax 26.05 | stop0 stop=0/0/0/394 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.13 stopZmp -6.15 vmax 2.267 amax 49.28 | stop0 stop=0/0/0/978 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.53 stopZmp -6.05 vmax 2.197 amax 30.52 | stop0 stop=0/0/0/1858 FAIL 
+stride 75 T 2.25 v 33.3 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.53 stopZmp -7.76 vmax 2.197 amax 30.52 | stop0 stop=0/0/0/394 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.03 stopZmp -7.26 vmax 2.533 amax 34.19 | stop0 stop=0/0/0/351 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.03 stopZmp -3.70 vmax 2.533 amax 34.19 | stop0 stop=0/0/0/2081 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.03 stopZmp -3.70 vmax 2.556 amax 40.09 | stop0 stop=0/0/0/2164 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.03 stopZmp -7.26 vmax 2.556 amax 40.09 | stop0 stop=0/0/0/232 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.63 stopZmp -5.65 vmax 2.611 amax 35.16 | stop0 stop=0/0/0/935 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.63 stopZmp -5.65 vmax 2.639 amax 41.33 | stop0 stop=0/0/0/639 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.77 stopZmp -6.53 vmax 1.963 amax 21.09 | stop0 stop=0/0/0/1355 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.77 stopZmp -6.70 vmax 1.977 amax 24.71 | stop0 stop=0/0/0/171 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.63 stopZmp -2.10 vmax 2.639 amax 41.33 | stop0 stop=0/0/0/3288 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.77 stopZmp -6.70 vmax 1.963 amax 21.09 | stop0 stop=0/0/0/171 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.63 stopZmp -2.10 vmax 2.611 amax 35.16 | stop0 stop=0/0/0/3234 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.77 stopZmp -6.53 vmax 1.977 amax 24.71 | stop0 stop=0/0/0/1229 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.37 stopZmp -3.51 vmax 2.022 amax 39.92 | stop0 stop=0/0/0/2091 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.37 stopZmp -5.08 vmax 2.040 amax 39.92 | stop0 stop=0/0/0/919 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.37 stopZmp -5.08 vmax 2.022 amax 39.92 | stop0 stop=0/0/0/919 FAIL 
+stride 75 T 2.5 v 30.0 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.37 stopZmp -3.51 vmax 2.040 amax 39.92 | stop0 stop=0/0/0/1718 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.27 stopZmp -6.19 vmax 2.301 amax 32.47 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.85 stopZmp -2.99 vmax 2.339 amax 28.46 | stop0 stop=0/0/0/2663 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.27 stopZmp -6.11 vmax 2.270 amax 27.68 | stop0 stop=0/0/0/1560 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.27 stopZmp -6.19 vmax 2.270 amax 27.68 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.27 stopZmp -6.03 vmax 2.301 amax 32.47 | stop0 stop=0/0/0/1394 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.85 stopZmp -4.58 vmax 2.339 amax 28.46 | stop0 stop=0/0/0/134 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.85 stopZmp -2.99 vmax 2.375 amax 33.48 | stop0 stop=0/0/0/2671 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.85 stopZmp -4.58 vmax 2.375 amax 33.48 | stop0 stop=0/0/0/24 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.13 stopZmp -5.03 vmax 1.636 amax 14.65 | stop0 stop=0/0/0/614 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.13 stopZmp -5.10 vmax 1.636 amax 14.65 | stop0 stop=0/0/0/8 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.13 stopZmp -5.03 vmax 1.647 amax 17.17 | stop0 stop=0/0/0/614 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.73 stopZmp -3.49 vmax 1.685 amax 27.72 | stop0 stop=0/0/0/644 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.73 stopZmp -3.49 vmax 1.700 amax 27.72 | stop0 stop=0/0/0/644 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.13 stopZmp -5.10 vmax 1.647 amax 17.17 | stop0 stop=0/0/0/8 FAIL 
+stride 75 T 3 v 25.0 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.73 stopZmp -3.42 vmax 1.685 amax 27.72 | stop0 stop=0/0/0/1217 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.45 stopZmp -4.52 vmax 1.917 amax 22.55 | stop0 stop=0/0/0/206 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.45 stopZmp -4.52 vmax 1.891 amax 19.23 | stop0 stop=0/0/0/195 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.45 stopZmp -4.59 vmax 1.917 amax 22.55 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3 v 25.0 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.73 stopZmp -3.42 vmax 1.700 amax 27.72 | stop0 stop=0/0/0/1217 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.45 stopZmp -4.59 vmax 1.891 amax 19.23 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3 v 25.0 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 3.02 stopZmp -2.92 vmax 1.949 amax 19.77 | stop0 stop=0/0/0/1217 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 3.02 stopZmp -2.92 vmax 1.979 amax 23.25 | stop0 stop=0/0/0/875 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 3.02 stopZmp -2.98 vmax 1.949 amax 19.77 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.38 stopZmp -3.95 vmax 1.402 amax 10.77 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3 v 25.0 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 3.02 stopZmp -2.98 vmax 1.979 amax 23.25 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.38 stopZmp -3.95 vmax 1.402 amax 10.77 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.38 stopZmp -3.95 vmax 1.412 amax 12.61 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.96 stopZmp -2.34 vmax 1.445 amax 20.37 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.38 stopZmp -3.95 vmax 1.412 amax 12.61 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.96 stopZmp -2.34 vmax 1.457 amax 20.37 | stop0 stop=0/0/0/1026 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.96 stopZmp -2.34 vmax 1.445 amax 20.37 | stop0 stop=0/0/0/1026 FAIL 
+stride 75 T 3.5 v 21.4 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.96 stopZmp -2.34 vmax 1.457 amax 20.37 | stop0 stop=0/0/0/40 FAIL 
+stride 75 T 3.5 v 21.4 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.57 stopZmp -3.45 vmax 1.625 amax 14.13 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.57 stopZmp -3.45 vmax 1.643 amax 16.57 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 3.15 stopZmp -1.84 vmax 1.675 amax 14.53 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.57 stopZmp -3.45 vmax 1.625 amax 14.13 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 3.15 stopZmp -1.84 vmax 1.675 amax 14.53 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 3.15 stopZmp -1.84 vmax 1.696 amax 17.08 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.57 stopZmp -3.45 vmax 1.643 amax 16.57 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 3.5 v 21.4 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 3.15 stopZmp -1.84 vmax 1.696 amax 17.08 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.48 stopZmp -3.09 vmax 1.236 amax 9.66 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.48 stopZmp -3.09 vmax 1.227 amax 8.24 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.48 stopZmp -3.09 vmax 1.236 amax 9.66 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.48 stopZmp -3.09 vmax 1.227 amax 8.24 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 3.06 stopZmp -1.49 vmax 1.264 amax 15.59 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.67 stopZmp -2.59 vmax 1.438 amax 12.68 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 3.06 stopZmp -1.49 vmax 1.275 amax 15.59 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 3.06 stopZmp -1.49 vmax 1.275 amax 15.59 | stop0 stop=0/0/0/807 FAIL 
+stride 75 T 4 v 18.8 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 3.06 stopZmp -1.49 vmax 1.264 amax 15.59 | stop0 stop=0/0/0/807 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.67 stopZmp -2.59 vmax 1.426 amax 10.82 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.67 stopZmp -2.59 vmax 1.426 amax 10.82 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.67 stopZmp -2.59 vmax 1.438 amax 12.68 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 3.24 stopZmp -0.99 vmax 1.469 amax 11.12 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 2 v 50.0 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture -0.48 stopZmp -5.70 vmax 3.202 amax 43.90 | stop0 stop=0/0/0/5104 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 3.24 stopZmp -0.99 vmax 1.469 amax 11.12 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 4 v 18.8 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 3.24 stopZmp -0.99 vmax 1.484 amax 13.08 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 2 v 50.0 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 1.14 stopZmp -4.10 vmax 3.304 amax 65.33 | stop0 stop=0/0/0/5626 FAIL 
+stride 75 T 4 v 18.8 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 3.24 stopZmp -0.99 vmax 1.484 amax 13.08 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 2 v 50.0 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 1.14 stopZmp -4.10 vmax 3.403 amax 65.33 | stop0 stop=0/0/0/5629 FAIL 
+stride 100 T 2 v 50.0 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture -0.48 stopZmp -10.63 vmax 3.292 amax 52.67 | stop0 stop=0/0/0/2671 FAIL 
+stride 100 T 2 v 50.0 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture -0.48 stopZmp -10.63 vmax 3.202 amax 43.90 | stop0 stop=0/0/0/2714 FAIL 
+stride 100 T 2 v 50.0 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture -0.48 stopZmp -5.70 vmax 3.292 amax 52.67 | stop0 stop=0/0/0/5136 FAIL 
+stride 100 T 2 v 50.0 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 1.14 stopZmp -10.77 vmax 3.403 amax 65.33 | stop0 stop=0/0/0/3305 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.20 stopZmp -5.47 vmax 3.702 amax 57.79 | stop0 stop=0/0/0/5453 FAIL 
+stride 100 T 2 v 50.0 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 1.14 stopZmp -10.77 vmax 3.304 amax 65.33 | stop0 stop=0/0/0/3308 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.20 stopZmp -9.92 vmax 3.846 amax 69.42 | stop0 stop=0/0/0/3042 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.20 stopZmp -5.47 vmax 3.846 amax 69.42 | stop0 stop=0/0/0/5417 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 1.82 stopZmp -3.87 vmax 3.975 amax 71.74 | stop0 stop=0/0/0/6210 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 1.82 stopZmp -3.87 vmax 3.821 amax 59.58 | stop0 stop=0/0/0/6256 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.20 stopZmp -9.92 vmax 3.702 amax 57.79 | stop0 stop=0/0/0/3278 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture -0.08 stopZmp -11.19 vmax 2.846 amax 34.69 | stop0 stop=0/0/0/2084 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 1.82 stopZmp -10.51 vmax 3.975 amax 71.74 | stop0 stop=0/0/0/3807 FAIL 
+stride 100 T 2 v 50.0 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 1.82 stopZmp -10.51 vmax 3.821 amax 59.58 | stop0 stop=0/0/0/4079 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture -0.08 stopZmp -4.96 vmax 2.926 amax 41.62 | stop0 stop=0/0/0/4448 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture -0.08 stopZmp -11.19 vmax 2.926 amax 41.62 | stop0 stop=0/0/0/2178 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture -0.08 stopZmp -4.96 vmax 2.846 amax 34.69 | stop0 stop=0/0/0/4818 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 1.54 stopZmp -4.25 vmax 2.937 amax 51.62 | stop0 stop=0/0/0/5337 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 1.54 stopZmp -4.19 vmax 3.024 amax 51.62 | stop0 stop=0/0/0/4976 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 1.54 stopZmp -9.55 vmax 2.937 amax 51.62 | stop0 stop=0/0/0/2934 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.60 stopZmp -4.77 vmax 3.316 amax 45.66 | stop0 stop=0/0/0/4871 FAIL 
+stride 100 T 2.25 v 44.4 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 1.54 stopZmp -9.55 vmax 3.024 amax 51.62 | stop0 stop=0/0/0/3112 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.60 stopZmp -4.77 vmax 3.419 amax 54.85 | stop0 stop=0/0/0/4912 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.22 stopZmp -4.00 vmax 3.533 amax 56.67 | stop0 stop=0/0/0/5927 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.60 stopZmp -10.50 vmax 3.316 amax 45.66 | stop0 stop=0/0/0/2392 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.22 stopZmp -4.06 vmax 3.423 amax 47.09 | stop0 stop=0/0/0/5912 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.22 stopZmp -8.87 vmax 3.423 amax 47.09 | stop0 stop=0/0/0/2987 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture 0.24 stopZmp -5.42 vmax 2.561 amax 28.09 | stop0 stop=0/0/0/3857 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.22 stopZmp -8.87 vmax 3.533 amax 56.67 | stop0 stop=0/0/0/2937 FAIL 
+stride 100 T 2.25 v 44.4 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.60 stopZmp -10.50 vmax 3.419 amax 54.85 | stop0 stop=0/0/0/2209 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture 0.24 stopZmp -9.76 vmax 2.634 amax 33.71 | stop0 stop=0/0/0/1205 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 1.87 stopZmp -3.68 vmax 2.722 amax 41.81 | stop0 stop=0/0/0/4477 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture 0.24 stopZmp -9.76 vmax 2.561 amax 28.09 | stop0 stop=0/0/0/1410 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture 0.24 stopZmp -5.42 vmax 2.634 amax 33.71 | stop0 stop=0/0/0/3695 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 1.87 stopZmp -8.12 vmax 2.644 amax 41.81 | stop0 stop=0/0/0/2576 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 1.87 stopZmp -3.79 vmax 2.644 amax 41.81 | stop0 stop=0/0/0/4569 FAIL 
+stride 100 T 2.5 v 40.0 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 1.87 stopZmp -8.12 vmax 2.722 amax 41.81 | stop0 stop=0/0/0/2613 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 0.92 stopZmp -9.07 vmax 3.077 amax 44.42 | stop0 stop=0/0/0/1973 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 0.92 stopZmp -4.74 vmax 2.961 amax 36.99 | stop0 stop=0/0/0/4492 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 0.92 stopZmp -9.07 vmax 2.961 amax 36.99 | stop0 stop=0/0/0/1861 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 0.92 stopZmp -4.74 vmax 3.077 amax 44.42 | stop0 stop=0/0/0/4243 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.54 stopZmp -3.11 vmax 3.057 amax 38.13 | stop0 stop=0/0/0/5563 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.54 stopZmp -7.44 vmax 3.057 amax 38.13 | stop0 stop=0/0/0/2431 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.54 stopZmp -3.11 vmax 3.180 amax 45.89 | stop0 stop=0/0/0/5427 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture 0.72 stopZmp -4.09 vmax 2.134 amax 19.52 | stop0 stop=0/0/0/2586 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture 0.72 stopZmp -4.09 vmax 2.195 amax 23.41 | stop0 stop=0/0/0/2630 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture 0.72 stopZmp -7.70 vmax 2.134 amax 19.52 | stop0 stop=0/0/0/142 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture 0.72 stopZmp -7.70 vmax 2.195 amax 23.41 | stop0 stop=0/0/0/28 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.54 stopZmp -7.44 vmax 3.180 amax 45.89 | stop0 stop=0/0/0/2585 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.35 stopZmp -2.46 vmax 2.268 amax 29.04 | stop0 stop=0/0/0/3900 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.35 stopZmp -6.06 vmax 2.203 amax 29.04 | stop0 stop=0/0/0/1634 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.35 stopZmp -6.06 vmax 2.268 amax 29.04 | stop0 stop=0/0/0/1255 FAIL 
+stride 100 T 3 v 33.3 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.35 stopZmp -2.46 vmax 2.203 amax 29.04 | stop0 stop=0/0/0/3686 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.18 stopZmp -3.41 vmax 2.476 amax 25.68 | stop0 stop=0/0/0/2845 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.18 stopZmp -3.41 vmax 2.564 amax 30.83 | stop0 stop=0/0/0/2783 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.18 stopZmp -7.02 vmax 2.476 amax 25.68 | stop0 stop=0/0/0/1152 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.18 stopZmp -7.02 vmax 2.564 amax 30.83 | stop0 stop=0/0/0/937 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.78 stopZmp -1.78 vmax 2.650 amax 31.87 | stop0 stop=0/0/0/3845 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.78 stopZmp -1.78 vmax 2.556 amax 26.48 | stop0 stop=0/0/0/3762 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.78 stopZmp -5.38 vmax 2.556 amax 26.48 | stop0 stop=0/0/0/1769 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture 1.07 stopZmp -5.57 vmax 1.830 amax 14.34 | stop0 stop=0/0/0/1079 FAIL 
+stride 100 T 3 v 33.3 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.78 stopZmp -5.38 vmax 2.650 amax 31.87 | stop0 stop=0/0/0/1778 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture 1.07 stopZmp -6.15 vmax 1.881 amax 17.20 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.5 v 28.6 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture 1.07 stopZmp -5.57 vmax 1.881 amax 17.20 | stop0 stop=0/0/0/482 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.69 stopZmp -4.36 vmax 1.888 amax 21.33 | stop0 stop=0/0/0/2786 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.69 stopZmp -4.52 vmax 1.888 amax 21.33 | stop0 stop=0/0/0/311 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture 1.07 stopZmp -6.15 vmax 1.830 amax 14.34 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.5 v 28.6 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.69 stopZmp -4.36 vmax 1.944 amax 21.33 | stop0 stop=0/0/0/2632 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.69 stopZmp -4.52 vmax 1.944 amax 21.33 | stop0 stop=0/0/0/215 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.35 stopZmp -5.07 vmax 2.129 amax 18.87 | stop0 stop=0/0/0/2080 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.35 stopZmp -5.47 vmax 2.129 amax 18.87 | stop0 stop=0/0/0/281 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.35 stopZmp -5.08 vmax 2.198 amax 22.67 | stop0 stop=0/0/0/2154 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.95 stopZmp -3.84 vmax 2.197 amax 19.46 | stop0 stop=0/0/0/1348 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.95 stopZmp -3.68 vmax 2.271 amax 23.43 | stop0 stop=0/0/0/2870 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.95 stopZmp -3.68 vmax 2.197 amax 19.46 | stop0 stop=0/0/0/2627 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.35 stopZmp -5.47 vmax 2.198 amax 22.67 | stop0 stop=0/0/0/13 FAIL 
+stride 100 T 3.5 v 28.6 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.95 stopZmp -3.84 vmax 2.271 amax 23.43 | stop0 stop=0/0/0/1011 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayX 3 proofAcc 50 ra .25 re .45 | static 2.12 capture 1.23 stopZmp -4.92 vmax 1.601 amax 10.97 | stop0 stop=0/0/0/33 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayX 3 proofAcc 50 ra .20 re .55 | static 2.12 capture 1.23 stopZmp -4.92 vmax 1.646 amax 13.17 | stop0 stop=0/0/0/24 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayX 3 proofAcc 84 ra .20 re .55 | static 2.12 capture 1.23 stopZmp -4.99 vmax 1.646 amax 13.17 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .80 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 2.82 stopZmp -3.29 vmax 1.652 amax 16.33 | stop0 stop=0/0/0/1707 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayX 3 proofAcc 50 ra .25 re .45 | static 2.13 capture 1.48 stopZmp -4.24 vmax 1.867 amax 14.45 | stop0 stop=0/0/0/1229 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 2.82 stopZmp -3.36 vmax 1.701 amax 16.33 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .80 swayX 3 proofAcc 84 ra .25 re .45 | static 2.12 capture 1.23 stopZmp -4.99 vmax 1.601 amax 10.97 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .80 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 2.82 stopZmp -3.22 vmax 1.701 amax 16.33 | stop0 stop=0/0/0/1197 FAIL 
+stride 100 T 4 v 25.0 duty .80 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 2.82 stopZmp -3.36 vmax 1.652 amax 16.33 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .825 swayX 3 proofAcc 50 ra .20 re .55 | static 2.13 capture 1.48 stopZmp -4.24 vmax 1.923 amax 17.36 | stop0 stop=0/0/0/734 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayX 3 proofAcc 84 ra .25 re .45 | static 2.13 capture 1.48 stopZmp -4.31 vmax 1.867 amax 14.45 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .825 swayX 3 proofAcc 84 ra .20 re .55 | static 2.13 capture 1.48 stopZmp -4.31 vmax 1.923 amax 17.36 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 4 v 25.0 duty .825 swayX 6 proofAcc 50 ra .25 re .45 | static 3.66 capture 3.07 stopZmp -2.61 vmax 1.927 amax 14.90 | stop0 stop=0/0/0/2164 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayX 6 proofAcc 50 ra .20 re .55 | static 3.66 capture 3.07 stopZmp -2.61 vmax 1.988 amax 17.93 | stop0 stop=0/0/0/2130 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayX 6 proofAcc 84 ra .25 re .45 | static 3.66 capture 3.07 stopZmp -2.68 vmax 1.927 amax 14.90 | stop0 stop=0/0/0/645 FAIL 
+stride 100 T 4 v 25.0 duty .825 swayX 6 proofAcc 84 ra .20 re .55 | static 3.66 capture 3.07 stopZmp -2.68 vmax 1.988 amax 17.93 | stop0 stop=0/0/0/389 FAIL 
+## sweep3
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 11 | static 2.69 zmp 2.51 capture 1.83 vmax 2.340 amax 28.71 box HIP 9.5 UPPER 51.0 LOWER 91.0 | stop0 stop=0/0/0/323 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 3.03 zmp 3.11 capture 2.46 vmax 2.258 amax 27.17 box HIP 8.7 UPPER 104.1 LOWER 216.5 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 15 | static 1.03 zmp 0.83 capture 0.16 vmax 2.367 amax 28.55 box HIP 9.0 UPPER 121.8 LOWER 155.9 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 11 | static 2.90 zmp 2.73 capture 2.06 vmax 2.304 amax 28.07 box HIP 9.3 UPPER 75.8 LOWER 134.7 | stop0 stop=0/0/0/24 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 15 | static 1.20 zmp 1.00 capture 0.35 vmax 2.345 amax 28.11 box HIP 8.7 UPPER 90.3 LOWER 195.9 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 19 | static -1.02 zmp -1.32 capture -1.99 vmax 2.458 amax 29.58 box HIP 9.0 UPPER 110.2 LOWER 134.1 | stop0 stop=0/0/0/79 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 11 | static 3.08 zmp 2.93 capture 2.27 vmax 2.277 amax 27.56 box HIP 9.0 UPPER 99.0 LOWER 176.5 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 15 | static 0.65 zmp 0.43 capture -0.31 vmax 2.438 amax 29.84 box HIP 9.5 UPPER 73.0 LOWER 69.9 | stop0 stop=0/0/0/46 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 15 | static 0.85 zmp 0.64 capture -0.06 vmax 2.397 amax 29.12 box HIP 9.3 UPPER 98.1 LOWER 113.9 | stop0 stop=0/0/0/0 PASS 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 19 | static -1.21 zmp -1.51 capture -2.21 vmax 2.493 amax 30.22 box HIP 9.3 UPPER 120.0 LOWER 92.0 | stop0 stop=0/0/0/128 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 19 | static -1.41 zmp -1.72 capture -2.45 vmax 2.539 amax 31.03 box HIP 9.5 UPPER 94.4 LOWER 47.6 | stop0 stop=0/0/0/196 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 19 | static -0.86 zmp -1.15 capture -1.79 vmax 2.432 amax 29.08 box HIP 8.7 UPPER 77.4 LOWER 174.3 | stop0 stop=0/0/0/29 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 115 com 19 | static -0.25 zmp -0.51 capture -1.18 vmax 2.493 amax 29.98 box HIP 9.0 UPPER 106.1 LOWER 125.7 | stop0 stop=0/0/0/223 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 110 com 19 | static -0.09 zmp -0.34 capture -0.98 vmax 2.465 amax 29.45 box HIP 8.7 UPPER 73.1 LOWER 165.9 | stop0 stop=0/0/0/200 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 115 com 15 | static 1.80 zmp 1.63 capture 0.95 vmax 2.401 amax 28.94 box HIP 9.0 UPPER 113.3 LOWER 147.9 | stop0 stop=0/0/0/56 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 19 | static -1.63 zmp -1.95 capture -2.71 vmax 2.597 amax 32.06 box HIP 9.7 UPPER 67.3 LOWER 0.7 | stop0 stop=0/0/0/1441 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 11 | static 2.46 zmp 2.26 capture 1.56 vmax 2.387 amax 29.51 box HIP 9.7 UPPER 24.6 LOWER 44.9 | stop0 stop=0/0/0/945 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 115 com 11 | static 3.85 zmp 3.70 capture 3.06 vmax 2.311 amax 27.93 box HIP 9.0 UPPER 90.4 LOWER 168.9 | stop0 stop=0/0/0/93 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 120 com 15 | static 1.62 zmp 1.44 capture 0.74 vmax 2.433 amax 29.53 box HIP 9.3 UPPER 89.8 LOWER 105.9 | stop0 stop=0/0/0/44 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 110 com 15 | static 1.97 zmp 1.80 capture 1.14 vmax 2.377 amax 28.47 box HIP 8.7 UPPER 85.7 LOWER 187.9 | stop0 stop=0/0/0/140 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 15 | static 0.42 zmp 0.20 capture -0.57 vmax 2.491 amax 30.75 box HIP 9.7 UPPER 46.2 LOWER 23.4 | stop0 stop=0/0/0/562 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 120 com 19 | static -0.43 zmp -0.70 capture -1.40 vmax 2.529 amax 30.65 box HIP 9.3 UPPER 111.8 LOWER 83.4 | stop0 stop=0/0/0/231 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 120 com 11 | static 3.66 zmp 3.50 capture 2.85 vmax 2.339 amax 28.46 box HIP 9.3 UPPER 67.3 LOWER 127.1 | stop0 stop=0/0/0/134 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.82 zmp 3.88 capture 3.25 vmax 2.291 amax 27.52 box HIP 8.7 UPPER 99.2 LOWER 208.9 | stop0 stop=0/0/0/170 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 125 com 11 | static 3.45 zmp 3.27 capture 2.62 vmax 2.377 amax 29.12 box HIP 9.5 UPPER 42.7 LOWER 83.2 | stop0 stop=0/0/0/556 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 125 com 15 | static 1.41 zmp 1.23 capture 0.49 vmax 2.475 amax 30.28 box HIP 9.5 UPPER 64.8 LOWER 61.7 | stop0 stop=0/0/0/183 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 110 com 19 | static -1.64 zmp -2.07 capture -2.83 vmax 2.677 amax 35.46 box HIP 8.7 UPPER 81.6 LOWER 182.5 | stop0 stop=0/0/0/291 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 130 com 15 | static 1.19 zmp 0.99 capture 0.23 vmax 2.530 amax 31.23 box HIP 9.7 UPPER 38.1 LOWER 15.1 | stop0 stop=0/0/0/1543 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 130 com 11 | static 3.23 zmp 3.03 capture 2.36 vmax 2.426 amax 29.96 box HIP 9.7 UPPER 16.3 LOWER 37.0 | stop0 stop=0/0/0/1172 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 125 com 19 | static -0.64 zmp -0.91 capture -1.64 vmax 2.577 amax 31.50 box HIP 9.5 UPPER 86.4 LOWER 38.9 | stop0 stop=0/0/0/343 FAIL 
+stride 75 T 2.5 v 30.0 duty .825 swayX 6 ra .25 re .45 h 130 com 19 | static -0.86 zmp -1.14 capture -1.91 vmax 2.639 amax 32.57 box HIP 9.7 UPPER 59.4 LOWER -8.2 | stop0 stop=0/0/191/1577 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.23 zmp 2.29 capture 1.47 vmax 2.484 amax 33.12 box HIP 8.7 UPPER 108.8 LOWER 223.9 | stop0 stop=0/0/0/78 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 115 com 11 | static 2.31 zmp 2.11 capture 1.26 vmax 2.504 amax 33.59 box HIP 9.0 UPPER 107.6 LOWER 184.0 | stop0 stop=0/0/0/153 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 110 com 15 | static 0.43 zmp 0.11 capture -0.67 vmax 2.580 amax 34.27 box HIP 8.7 UPPER 94.8 LOWER 203.8 | stop0 stop=0/0/0/207 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 115 com 15 | static 0.26 zmp -0.06 capture -0.88 vmax 2.604 amax 34.81 box HIP 9.0 UPPER 126.9 LOWER 163.7 | stop0 stop=0/0/0/218 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 115 com 19 | static -1.80 zmp -2.25 capture -3.03 vmax 2.705 amax 36.07 box HIP 9.0 UPPER 114.2 LOWER 142.4 | stop0 stop=0/0/0/315 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 120 com 15 | static 0.08 zmp -0.25 capture -1.10 vmax 2.637 amax 35.48 box HIP 9.3 UPPER 106.3 LOWER 121.9 | stop0 stop=0/0/0/269 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 120 com 19 | static -1.98 zmp -2.44 capture -3.25 vmax 2.742 amax 36.83 box HIP 9.3 UPPER 128.0 LOWER 100.4 | stop0 stop=0/0/0/341 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 120 com 11 | static 2.13 zmp 1.92 capture 1.03 vmax 2.533 amax 34.19 box HIP 9.3 UPPER 84.2 LOWER 142.2 | stop0 stop=0/0/0/351 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 125 com 15 | static -0.12 zmp -0.47 capture -1.35 vmax 2.681 amax 36.34 box HIP 9.5 UPPER 81.1 LOWER 77.9 | stop0 stop=0/0/0/459 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 130 com 15 | static -0.35 zmp -0.70 capture -1.62 vmax 2.738 amax 37.41 box HIP 9.7 UPPER 54.2 LOWER 31.6 | stop0 stop=0/0/0/947 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 130 com 19 | static -2.40 zmp -2.89 capture -3.76 vmax 2.856 amax 38.98 box HIP 9.7 UPPER 75.1 LOWER 9.4 | stop0 stop=0/0/0/1055 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 110 com 15 | static 1.20 zmp 0.93 capture 0.13 vmax 2.616 amax 34.71 box HIP 8.7 UPPER 90.3 LOWER 195.9 | stop0 stop=0/0/0/428 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 3.02 zmp 3.08 capture 2.27 vmax 2.520 amax 33.55 box HIP 8.7 UPPER 104.0 LOWER 216.5 | stop0 stop=0/0/0/354 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 125 com 19 | static -2.18 zmp -2.65 capture -3.49 vmax 2.792 amax 37.78 box HIP 9.5 UPPER 102.4 LOWER 56.1 | stop0 stop=0/0/0/421 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 125 com 11 | static 1.92 zmp 1.70 capture 0.79 vmax 2.572 amax 34.96 box HIP 9.5 UPPER 59.3 LOWER 98.5 | stop0 stop=0/0/0/743 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 130 com 11 | static 1.70 zmp 1.45 capture 0.52 vmax 2.624 amax 35.92 box HIP 9.7 UPPER 32.7 LOWER 52.6 | stop0 stop=0/0/0/1128 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 110 com 19 | static -0.86 zmp -1.25 capture -2.02 vmax 2.713 amax 35.92 box HIP 8.7 UPPER 77.4 LOWER 174.3 | stop0 stop=0/0/0/507 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 115 com 11 | static 3.08 zmp 2.90 capture 2.06 vmax 2.541 amax 34.04 box HIP 9.0 UPPER 99.0 LOWER 176.5 | stop0 stop=0/0/0/352 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 115 com 19 | static -1.02 zmp -1.43 capture -2.22 vmax 2.743 amax 36.55 box HIP 9.0 UPPER 110.2 LOWER 134.1 | stop0 stop=0/0/0/407 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 120 com 11 | static 2.90 zmp 2.69 capture 1.83 vmax 2.572 amax 34.67 box HIP 9.3 UPPER 75.8 LOWER 134.7 | stop0 stop=0/0/0/547 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 115 com 15 | static 1.03 zmp 0.76 capture -0.08 vmax 2.641 amax 35.27 box HIP 9.0 UPPER 121.8 LOWER 155.9 | stop0 stop=0/0/0/309 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 125 com 15 | static 0.65 zmp 0.35 capture -0.55 vmax 2.722 amax 36.87 box HIP 9.5 UPPER 73.0 LOWER 69.9 | stop0 stop=0/0/0/638 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 120 com 19 | static -1.21 zmp -1.62 capture -2.44 vmax 2.783 amax 37.35 box HIP 9.3 UPPER 120.0 LOWER 92.0 | stop0 stop=0/0/0/423 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 125 com 11 | static 2.69 zmp 2.46 capture 1.59 vmax 2.613 amax 35.47 box HIP 9.5 UPPER 51.0 LOWER 91.0 | stop0 stop=0/0/0/910 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 120 com 15 | static 0.85 zmp 0.56 capture -0.30 vmax 2.676 amax 35.98 box HIP 9.3 UPPER 98.1 LOWER 113.9 | stop0 stop=0/0/0/349 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 130 com 15 | static 0.42 zmp 0.12 capture -0.82 vmax 2.782 amax 37.99 box HIP 9.7 UPPER 46.2 LOWER 23.4 | stop0 stop=0/0/0/1338 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 125 com 19 | static -1.41 zmp -1.83 capture -2.69 vmax 2.835 amax 38.34 box HIP 9.5 UPPER 94.4 LOWER 47.6 | stop0 stop=0/0/0/522 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 130 com 11 | static 2.46 zmp 2.21 capture 1.31 vmax 2.666 amax 36.47 box HIP 9.7 UPPER 24.6 LOWER 44.9 | stop0 stop=0/0/0/1275 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 130 com 19 | static -1.63 zmp -2.07 capture -2.96 vmax 2.901 amax 39.59 box HIP 9.7 UPPER 67.3 LOWER 0.7 | stop0 stop=0/0/0/2066 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.81 zmp 2.88 capture 2.30 vmax 1.823 amax 16.57 box HIP 8.7 UPPER 65.3 LOWER 167.5 | stop0 stop=0/0/0/69 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 110 com 15 | static 1.16 zmp 1.12 capture 0.14 vmax 1.895 amax 16.85 box HIP 8.7 UPPER 60.8 LOWER 144.5 | stop0 stop=0/0/0/78 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 115 com 11 | static 2.97 zmp 3.02 capture 2.11 vmax 1.837 amax 16.30 box HIP 9.0 UPPER 44.5 LOWER 127.3 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 120 com 15 | static 0.79 zmp 0.77 capture -0.29 vmax 1.938 amax 17.17 box HIP 9.3 UPPER 45.5 LOWER 61.5 | stop0 stop=0/0/0/6 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 110 com 19 | static -0.98 zmp -0.97 capture -2.04 vmax 1.969 amax 17.58 box HIP 8.7 UPPER 49.9 LOWER 120.3 | stop0 stop=0/0/0/123 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 120 com 11 | static 2.90 zmp 2.83 capture 1.88 vmax 1.859 amax 16.39 box HIP 9.3 UPPER 22.2 LOWER 85.1 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 115 com 15 | static 0.99 zmp 0.96 capture -0.06 vmax 1.913 amax 16.97 box HIP 9.0 UPPER 68.1 LOWER 104.1 | stop0 stop=0/0/0/14 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 120 com 19 | static -1.34 zmp -1.32 capture -2.46 vmax 2.020 amax 18.00 box HIP 9.3 UPPER 68.3 LOWER 36.7 | stop0 stop=0/0/0/67 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 115 com 19 | static -1.15 zmp -1.14 capture -2.24 vmax 1.991 amax 17.75 box HIP 9.0 UPPER 83.8 LOWER 79.6 | stop0 stop=0/0/0/42 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 125 com 15 | static 0.58 zmp 0.56 capture -0.53 vmax 1.972 amax 17.47 box HIP 9.5 UPPER 21.2 LOWER 16.6 | stop0 stop=0/0/0/440 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 125 com 19 | static -1.55 zmp -1.52 capture -2.71 vmax 2.059 amax 18.36 box HIP 9.5 UPPER 43.7 LOWER -8.8 | stop0 stop=0/0/233/1118 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 125 com 11 | static 2.69 zmp 2.62 capture 1.63 vmax 1.888 amax 16.63 box HIP 9.5 UPPER -1.8 LOWER 40.6 | stop0 stop=0/0/165/1156 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 130 com 11 | static 2.46 zmp 2.38 capture 1.36 vmax 1.927 amax 16.97 box HIP 9.7 UPPER -27.7 LOWER -6.5 | stop0 stop=0/0/866/1719 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.96 zmp 3.05 capture 2.50 vmax 2.230 amax 20.42 box HIP 8.7 UPPER 58.5 LOWER 160.9 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 15 | static 1.20 zmp 1.12 capture 0.37 vmax 2.319 amax 21.19 box HIP 8.7 UPPER 63.0 LOWER 137.5 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 130 com 15 | static 0.34 zmp 0.34 capture -0.80 vmax 2.016 amax 17.88 box HIP 9.7 UPPER -4.9 LOWER -31.1 | stop0 stop=0/0/1011/1613 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 11 | static 3.08 zmp 3.00 capture 2.31 vmax 2.248 amax 20.75 box HIP 9.0 UPPER 37.8 LOWER 120.7 | stop0 stop=0/0/0/202 FAIL 
+stride 100 T 3.5 v 28.6 duty .80 swayX 4.5 ra .25 re .45 h 130 com 19 | static -1.78 zmp -1.75 capture -2.97 vmax 2.109 amax 18.85 box HIP 9.7 UPPER 17.4 LOWER -57.2 | stop0 stop=0/0/986/563 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 15 | static 1.03 zmp 0.95 capture 0.18 vmax 2.341 amax 21.57 box HIP 9.0 UPPER 61.6 LOWER 97.1 | stop0 stop=0/0/0/0 PASS 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 115 com 19 | static -1.02 zmp -1.11 capture -1.96 vmax 2.436 amax 22.45 box HIP 9.0 UPPER 85.0 LOWER 72.3 | stop0 stop=0/0/0/29 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 19 | static -0.86 zmp -0.94 capture -1.77 vmax 2.409 amax 22.00 box HIP 8.7 UPPER 51.9 LOWER 113.0 | stop0 stop=0/0/0/8 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 11 | static 2.90 zmp 2.80 capture 2.10 vmax 2.275 amax 21.17 box HIP 9.3 UPPER 15.6 LOWER 78.3 | stop0 stop=0/0/0/1047 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 15 | static 0.85 zmp 0.75 capture -0.03 vmax 2.372 amax 22.06 box HIP 9.3 UPPER 39.0 LOWER 54.4 | stop0 stop=0/0/0/99 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 15 | static 0.65 zmp 0.54 capture -0.26 vmax 2.414 amax 22.68 box HIP 9.5 UPPER 14.8 LOWER 9.4 | stop0 stop=0/0/0/1093 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 120 com 19 | static -1.21 zmp -1.30 capture -2.16 vmax 2.472 amax 23.01 box HIP 9.3 UPPER 62.0 LOWER 29.2 | stop0 stop=0/0/0/109 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 11 | static 2.69 zmp 2.58 capture 1.87 vmax 2.311 amax 21.72 box HIP 9.5 UPPER -8.3 LOWER 33.7 | stop0 stop=0/0/345/1266 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 125 com 19 | static -1.41 zmp -1.51 capture -2.39 vmax 2.520 amax 23.73 box HIP 9.5 UPPER 37.5 LOWER -16.4 | stop0 stop=0/0/406/1221 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 11 | static 2.46 zmp 2.35 capture 1.61 vmax 2.359 amax 22.41 box HIP 9.7 UPPER -34.2 LOWER -13.5 | stop0 stop=0/0/1077/1854 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 19 | static -1.63 zmp -1.74 capture -2.64 vmax 2.583 amax 24.64 box HIP 9.7 UPPER 11.2 LOWER -65.1 | stop0 stop=0/0/1073/1844 FAIL 
+stride 100 T 3.33 v 30.0 duty .825 swayX 4.5 ra .25 re .45 h 130 com 15 | static 0.42 zmp 0.31 capture -0.51 vmax 2.468 amax 23.48 box HIP 9.7 UPPER -11.2 LOWER -38.6 | stop0 stop=0/0/1200/1894 FAIL 
+## sweep4
+stride 100 T 2.75 v 36.4 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.18 zmp 2.28 capture 1.49 vmax 2.660 amax 29.52 box HIP 8.7 UPPER 67.6 LOWER 169.4 | stop0 stop=0/0/0/1001 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.78 zmp 3.86 capture 3.08 vmax 2.740 amax 30.36 box HIP 8.7 UPPER 49.4 LOWER 152.3 | stop0 stop=0/0/0/1471 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.73 zmp 2.83 capture 2.63 vmax 2.775 amax 29.30 box HIP 8.1 UPPER 10.1 LOWER 236.1 | stop0 stop=0/0/0/1052 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.85 zmp 2.95 capture 2.46 vmax 2.689 amax 29.57 box HIP 8.4 UPPER 42.4 LOWER 199.3 | stop0 stop=0/0/0/1056 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 3 ra .25 re .45 h 105 com 11 | static 2.05 zmp 2.15 capture 1.66 vmax 2.674 amax 29.18 box HIP 8.4 UPPER 44.5 LOWER 207.8 | stop0 stop=0/0/0/911 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 3 ra .25 re .45 h 100 com 11 | static 1.91 zmp 2.01 capture 1.93 vmax 2.533 amax 24.31 box HIP 8.1 UPPER 12.2 LOWER 244.5 | stop0 stop=0/0/0/260 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.98 zmp 3.08 capture 2.29 vmax 2.699 amax 29.94 box HIP 8.7 UPPER 58.5 LOWER 160.9 | stop0 stop=0/0/0/1169 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 6 ra .25 re .45 h 105 com 11 | static 3.64 zmp 3.73 capture 3.26 vmax 2.725 amax 29.97 box HIP 8.4 UPPER 38.1 LOWER 190.7 | stop0 stop=0/0/0/1426 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 6 ra .25 re .45 h 100 com 11 | static 3.53 zmp 3.61 capture 3.43 vmax 2.788 amax 29.68 box HIP 8.1 UPPER 5.6 LOWER 227.5 | stop0 stop=0/0/0/1428 FAIL 
+stride 100 T 2.75 v 36.4 duty .825 swayX 3 ra .25 re .45 h 100 com 11 | static 1.94 zmp 2.03 capture 1.82 vmax 2.761 amax 28.93 box HIP 8.1 UPPER 12.2 LOWER 244.5 | stop0 stop=0/0/0/880 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.16 zmp 2.27 capture 1.59 vmax 2.429 amax 24.81 box HIP 8.7 UPPER 67.6 LOWER 169.4 | stop0 stop=0/0/0/226 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 3 ra .25 re .45 h 105 com 11 | static 2.02 zmp 2.13 capture 1.77 vmax 2.453 amax 24.52 box HIP 8.4 UPPER 44.5 LOWER 207.8 | stop0 stop=0/0/0/178 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.71 zmp 2.81 capture 2.73 vmax 2.546 amax 24.62 box HIP 8.1 UPPER 10.1 LOWER 236.1 | stop0 stop=0/0/0/357 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 6 ra .25 re .45 h 100 com 11 | static 3.51 zmp 3.61 capture 3.53 vmax 2.559 amax 24.94 box HIP 8.1 UPPER 5.6 LOWER 227.5 | stop0 stop=0/0/0/581 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.95 zmp 3.06 capture 2.39 vmax 2.466 amax 25.15 box HIP 8.7 UPPER 58.5 LOWER 160.9 | stop0 stop=0/0/0/451 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.75 zmp 3.85 capture 3.19 vmax 2.502 amax 25.51 box HIP 8.7 UPPER 49.4 LOWER 152.3 | stop0 stop=0/0/0/734 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.82 zmp 2.93 capture 2.57 vmax 2.467 amax 24.85 box HIP 8.4 UPPER 42.4 LOWER 199.3 | stop0 stop=0/0/0/357 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 3 ra .25 re .45 h 100 com 11 | static 1.73 zmp 1.86 capture 1.53 vmax 2.182 amax 18.49 box HIP 8.1 UPPER 12.0 LOWER 251.0 | stop0 stop=0/0/0/211 FAIL 
+stride 100 T 3.0 v 33.3 duty .825 swayX 6 ra .25 re .45 h 105 com 11 | static 3.62 zmp 3.72 capture 3.37 vmax 2.488 amax 25.18 box HIP 8.4 UPPER 38.1 LOWER 190.7 | stop0 stop=0/0/0/585 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 3 ra .25 re .45 h 110 com 11 | static 1.98 zmp 2.11 capture 1.16 vmax 2.095 amax 18.86 box HIP 8.7 UPPER 74.4 LOWER 175.9 | stop0 stop=0/0/0/151 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 3 ra .25 re .45 h 105 com 11 | static 1.85 zmp 1.98 capture 1.35 vmax 2.113 amax 18.64 box HIP 8.4 UPPER 44.3 LOWER 214.2 | stop0 stop=0/0/0/183 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.53 zmp 2.66 capture 2.34 vmax 2.194 amax 23.49 box HIP 8.1 UPPER 7.5 LOWER 242.6 | stop0 stop=0/0/0/710 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.78 zmp 2.91 capture 1.98 vmax 2.126 amax 22.56 box HIP 8.7 UPPER 65.3 LOWER 167.5 | stop0 stop=0/0/0/573 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.65 zmp 2.78 capture 2.17 vmax 2.125 amax 22.99 box HIP 8.4 UPPER 39.9 LOWER 205.9 | stop0 stop=0/0/0/621 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 6 ra .25 re .45 h 100 com 11 | static 3.34 zmp 3.46 capture 3.16 vmax 2.205 amax 30.93 box HIP 8.1 UPPER 2.8 LOWER 234.1 | stop0 stop=0/0/0/1077 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 ra .25 re .45 h 100 com 11 | static 1.93 zmp 2.06 capture 1.70 vmax 3.033 amax 35.00 box HIP 8.1 UPPER 12.2 LOWER 244.5 | stop0 stop=0/0/0/1439 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 6 ra .25 re .45 h 105 com 11 | static 3.45 zmp 3.58 capture 2.98 vmax 2.147 amax 30.27 box HIP 8.4 UPPER 35.4 LOWER 197.4 | stop0 stop=0/0/0/1000 FAIL 
+stride 100 T 3.0 v 33.3 duty .80 swayX 6 ra .25 re .45 h 110 com 11 | static 3.58 zmp 3.71 capture 2.79 vmax 2.158 amax 29.69 box HIP 8.7 UPPER 56.2 LOWER 159.0 | stop0 stop=0/0/0/923 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.73 zmp 2.84 capture 2.50 vmax 3.049 amax 35.45 box HIP 8.1 UPPER 10.1 LOWER 236.1 | stop0 stop=0/0/0/1755 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 ra .25 re .45 h 105 com 11 | static 2.04 zmp 2.18 capture 1.54 vmax 2.938 amax 35.31 box HIP 8.4 UPPER 44.5 LOWER 207.8 | stop0 stop=0/0/0/1458 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 ra .25 re .45 h 100 com 11 | static 3.53 zmp 3.62 capture 3.31 vmax 3.063 amax 35.91 box HIP 8.1 UPPER 5.6 LOWER 227.5 | stop0 stop=0/0/0/2225 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.84 zmp 2.96 capture 2.34 vmax 2.954 amax 35.78 box HIP 8.4 UPPER 42.4 LOWER 199.3 | stop0 stop=0/0/0/1629 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 2.97 zmp 3.09 capture 2.16 vmax 2.952 amax 36.22 box HIP 8.7 UPPER 58.5 LOWER 160.9 | stop0 stop=0/0/0/1698 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.18 zmp 2.32 capture 1.36 vmax 2.909 amax 35.72 box HIP 8.7 UPPER 67.6 LOWER 169.4 | stop0 stop=0/0/0/1527 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.77 zmp 3.87 capture 2.96 vmax 2.996 amax 36.73 box HIP 8.7 UPPER 49.4 LOWER 152.3 | stop0 stop=0/0/0/2103 FAIL 
+stride 100 T 2.5 v 40.0 duty .825 swayX 6 ra .25 re .45 h 105 com 11 | static 3.64 zmp 3.74 capture 3.14 vmax 2.981 amax 36.26 box HIP 8.4 UPPER 38.1 LOWER 190.7 | stop0 stop=0/0/0/2045 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.26 zmp 2.21 capture 1.18 vmax 2.783 amax 41.87 box HIP 8.7 UPPER 108.8 LOWER 223.9 | stop0 stop=0/0/0/921 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 3 ra .25 re .45 h 105 com 11 | static 2.12 zmp 2.23 capture 1.38 vmax 2.769 amax 41.43 box HIP 8.4 UPPER 77.6 LOWER 262.3 | stop0 stop=0/0/0/928 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 3 ra .25 re .45 h 100 com 11 | static 2.01 zmp 2.11 capture 1.55 vmax 2.847 amax 41.11 box HIP 8.1 UPPER 46.6 LOWER 299.2 | stop0 stop=0/0/0/997 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.92 zmp 3.01 capture 2.18 vmax 2.808 amax 41.94 box HIP 8.4 UPPER 72.7 LOWER 254.8 | stop0 stop=0/0/0/1473 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 6 ra .25 re .45 h 100 com 11 | static 3.60 zmp 3.67 capture 3.16 vmax 2.876 amax 42.10 box HIP 8.1 UPPER 36.2 LOWER 284.0 | stop0 stop=0/0/0/1991 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 3.05 zmp 3.03 capture 1.98 vmax 2.823 amax 42.41 box HIP 8.7 UPPER 104.1 LOWER 216.5 | stop0 stop=0/0/0/1431 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.80 zmp 2.89 capture 2.36 vmax 2.862 amax 41.60 box HIP 8.1 UPPER 41.5 LOWER 291.7 | stop0 stop=0/0/0/1574 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 100 com 11 | static 1.98 zmp 2.10 capture 1.83 vmax 2.534 amax 32.50 box HIP 8.1 UPPER 46.6 LOWER 299.2 | stop0 stop=0/0/0/287 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 105 com 11 | static 2.10 zmp 2.22 capture 1.66 vmax 2.471 amax 32.76 box HIP 8.4 UPPER 77.6 LOWER 262.3 | stop0 stop=0/0/0/167 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 6 ra .25 re .45 h 105 com 11 | static 3.71 zmp 3.79 capture 2.98 vmax 2.847 amax 42.46 box HIP 8.4 UPPER 67.6 LOWER 247.2 | stop0 stop=0/0/0/1921 FAIL 
+stride 75 T 2.0 v 37.5 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.84 zmp 3.80 capture 2.79 vmax 2.863 amax 42.96 box HIP 8.7 UPPER 99.2 LOWER 208.9 | stop0 stop=0/0/0/1896 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 3 ra .25 re .45 h 110 com 11 | static 2.23 zmp 2.29 capture 1.47 vmax 2.484 amax 33.12 box HIP 8.7 UPPER 108.8 LOWER 223.9 | stop0 stop=0/0/0/78 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 100 com 11 | static 2.77 zmp 2.88 capture 2.64 vmax 2.547 amax 32.89 box HIP 8.1 UPPER 41.5 LOWER 291.7 | stop0 stop=0/0/0/765 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 105 com 11 | static 2.89 zmp 3.00 capture 2.46 vmax 2.506 amax 33.17 box HIP 8.4 UPPER 72.7 LOWER 254.8 | stop0 stop=0/0/0/576 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 4.5 ra .25 re .45 h 110 com 11 | static 3.02 zmp 3.08 capture 2.27 vmax 2.520 amax 33.55 box HIP 8.7 UPPER 104.0 LOWER 216.5 | stop0 stop=0/0/0/354 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 ra .25 re .45 h 100 com 11 | static 3.57 zmp 3.66 capture 3.44 vmax 2.560 amax 33.29 box HIP 8.1 UPPER 36.2 LOWER 284.0 | stop0 stop=0/0/0/1250 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 ra .25 re .45 h 105 com 11 | static 3.68 zmp 3.78 capture 3.26 vmax 2.541 amax 33.58 box HIP 8.4 UPPER 67.6 LOWER 247.2 | stop0 stop=0/0/0/1063 FAIL 
+stride 75 T 2.25 v 33.3 duty .825 swayX 6 ra .25 re .45 h 110 com 11 | static 3.81 zmp 3.85 capture 3.07 vmax 2.556 amax 33.98 box HIP 8.7 UPPER 99.1 LOWER 208.9 | stop0 stop=0/0/0/865 FAIL 
+## sweep5
+100 3.333333 v=30.0 d=.825 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.18 1.72 2.223 18.24 6.19 67.7 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.825 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.32 2.214 18.94 5.81 24.5 | stop=0/0/0/732 FAIL 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.18 1.72 2.252 20.65 6.19 67.5 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.825 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.53 2.195 18.55 5.99 46.9 | stop=0/0/0/104 FAIL 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.32 2.292 21.37 5.81 24.3 | stop=0/0/0/354 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.11 2.272 21.13 8.00 15.6 | stop=0/0/0/1045 FAIL 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.53 2.268 20.96 5.99 46.6 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.97 2.52 2.228 20.38 8.14 58.5 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.18 1.72 2.195 20.09 6.19 67.6 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.32 2.237 20.81 5.81 24.5 | stop=0/0/0/561 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.33 2.246 20.71 7.98 37.8 | stop=0/0/0/203 FAIL 
+100 3.333333 v=30.0 d=.825 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.53 2.212 20.41 5.99 46.8 | stop=0/0/0/25 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.33 2.230 18.81 7.98 37.9 | stop=0/0/0/325 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.11 2.251 19.22 8.00 15.7 | stop=0/0/0/1135 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.97 2.52 2.237 18.49 8.14 58.6 | stop=0/0/0/27 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.33 2.303 21.27 7.98 37.7 | stop=0/0/0/42 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.97 2.52 2.287 20.94 8.14 58.4 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.78 2.637 27.98 5.75 40.0 | stop=0/0/0/1330 FAIL 
+100 3.333333 v=30.0 d=.825 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.11 2.329 21.70 8.00 15.5 | stop=0/0/0/839 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 1.98 2.642 24.99 5.92 60.8 | stop=0/0/0/1201 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.57 2.631 25.97 5.59 17.9 | stop=0/0/0/1745 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 1.98 2.617 27.54 5.92 60.8 | stop=0/0/0/1048 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.57 2.667 28.54 5.59 17.8 | stop=0/0/0/1715 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.78 2.609 25.42 5.75 40.1 | stop=0/0/0/1438 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.57 2.732 29.31 5.59 17.7 | stop=0/0/0/1761 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 1.98 2.684 28.31 5.92 60.7 | stop=0/0/0/941 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.78 2.658 25.33 6.53 51.7 | stop=0/0/0/1376 FAIL 
+100 3.333333 v=30.0 d=.85 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.78 2.703 28.74 5.75 39.9 | stop=0/0/0/1236 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.58 2.678 28.39 6.33 31.1 | stop=0/0/0/1525 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.78 2.656 27.93 6.53 51.6 | stop=0/0/0/1243 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.37 2.710 28.99 6.16 9.0 | stop=0/0/0/1942 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.58 2.746 29.17 6.33 30.9 | stop=0/0/0/1528 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.37 2.675 26.36 6.16 9.0 | stop=0/0/0/1947 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.78 2.725 28.71 6.53 51.5 | stop=0/0/0/1218 FAIL 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.58 2.650 25.78 6.33 31.1 | stop=0/0/0/1600 FAIL 
+75 2.5 v=30.0 d=.825 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.48 2.243 25.05 10.22 107.6 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.48 2.244 27.20 10.22 107.6 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.27 2.270 27.68 9.93 84.2 | stop=0/0/0/0 PASS 
+100 3.333333 v=30.0 d=.85 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.37 2.776 29.77 6.16 8.8 | stop=0/0/0/2052 FAIL 
+75 2.5 v=30.0 d=.825 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.27 2.264 25.54 9.93 84.2 | stop=0/0/0/17 FAIL 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.24 1.67 2.226 26.82 10.53 108.8 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.24 1.67 2.280 27.45 10.53 108.8 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.24 1.67 2.229 24.66 10.53 108.8 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.48 2.297 27.83 10.22 107.5 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.03 2.46 2.258 27.17 14.03 104.1 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.27 2.322 28.31 9.93 84.1 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.03 2.46 2.262 24.97 14.03 104.1 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.06 2.304 28.07 13.49 75.8 | stop=0/0/0/24 FAIL 
+75 2.5 v=30.0 d=.825 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.27 2.277 25.37 13.74 99.0 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.27 2.277 27.56 13.74 99.0 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.03 2.46 2.314 27.81 14.03 104.1 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.06 2.358 28.71 13.49 75.7 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.825 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.06 2.299 25.88 13.49 75.8 | stop=0/0/0/97 FAIL 
+75 2.5 v=30.0 d=.825 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.27 2.332 28.21 13.74 98.9 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.67 2.669 37.20 10.22 102.7 | stop=0/0/0/626 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.33 1.86 2.648 36.67 10.53 109.0 | stop=0/0/0/524 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.33 1.86 2.633 33.69 10.53 108.8 | stop=0/0/0/623 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.46 2.700 37.87 9.93 79.4 | stop=0/0/0/811 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.46 2.677 34.91 9.93 79.4 | stop=0/0/0/895 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.67 2.651 34.23 10.22 102.7 | stop=0/0/0/739 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.67 2.732 38.08 10.22 102.6 | stop=0/0/0/473 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.12 2.65 2.686 37.15 11.61 106.1 | stop=0/0/0/621 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.33 1.86 2.712 37.55 10.53 109.0 | stop=0/0/0/431 FAIL 
+75 2.5 v=30.0 d=.85 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.46 2.762 38.75 9.93 79.3 | stop=0/0/0/776 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.25 2.741 38.40 10.94 70.9 | stop=0/0/0/959 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.46 2.709 37.70 11.26 94.1 | stop=0/0/0/774 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.12 2.65 2.672 34.10 11.61 106.1 | stop=0/0/0/754 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.46 2.691 34.67 11.26 94.1 | stop=0/0/0/853 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.25 2.719 35.37 10.94 71.0 | stop=0/0/0/1011 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.46 2.774 38.60 11.26 94.0 | stop=0/0/0/633 FAIL 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.12 2.65 2.752 38.05 11.61 106.1 | stop=0/0/0/545 FAIL 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.59 2.042 17.49 5.48 46.8 | stop=0/0/0/0 PASS 
+75 2.5 v=30.0 d=.85 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.25 2.805 39.30 10.94 70.9 | stop=0/0/0/970 FAIL 
+100 3.6 v=27.8 d=.825 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.16 1.78 2.053 15.64 5.67 67.7 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.16 1.78 2.027 17.22 5.67 67.6 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.38 2.065 17.83 5.32 24.5 | stop=0/0/0/150 FAIL 
+100 3.6 v=27.8 d=.825 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.59 2.027 15.90 5.48 46.9 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.38 2.044 16.24 5.32 24.5 | stop=0/0/0/247 FAIL 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.59 2.093 17.97 5.48 46.6 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.16 1.78 2.079 17.70 5.67 67.5 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.38 2.115 18.32 5.32 24.3 | stop=0/0/0/42 FAIL 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.39 2.074 17.74 6.84 37.8 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.18 2.098 18.11 6.86 15.6 | stop=0/0/0/561 FAIL 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.95 2.58 2.058 17.46 6.98 58.5 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.39 2.059 16.13 6.84 37.9 | stop=0/0/0/8 FAIL 
+100 3.6 v=27.8 d=.825 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.18 2.078 16.48 6.86 15.7 | stop=0/0/0/654 FAIL 
+100 3.6 v=27.8 d=.825 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.95 2.58 2.067 15.85 6.98 58.6 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.95 2.58 2.111 17.95 6.98 58.4 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.18 2.149 18.60 6.86 15.5 | stop=0/0/0/381 FAIL 
+100 3.6 v=27.8 d=.825 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.39 2.126 18.24 6.84 37.7 | stop=0/0/0/0 PASS 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.85 2.442 23.99 4.93 40.1 | stop=0/0/0/728 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.64 2.469 24.47 4.79 17.8 | stop=0/0/0/1385 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 2.04 2.435 21.42 5.08 60.9 | stop=0/0/0/473 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 2.04 2.423 23.61 5.08 60.8 | stop=0/0/0/245 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.85 2.407 21.79 4.93 40.1 | stop=0/0/0/859 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.64 2.429 22.26 4.79 17.9 | stop=0/0/0/1402 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 2.27 2.04 2.485 24.26 5.08 60.7 | stop=0/0/0/178 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 2.31 1.85 2.503 24.64 4.93 39.9 | stop=0/0/0/593 FAIL 
+100 3.6 v=27.8 d=.85 x=3 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.13 1.64 2.530 25.12 4.79 17.7 | stop=0/0/0/1406 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.84 2.459 23.95 5.60 51.7 | stop=0/0/0/539 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.65 2.480 24.34 5.43 31.1 | stop=0/0/0/1104 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.43 2.509 24.85 5.28 9.0 | stop=0/0/0/1719 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.30/.45 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.43 2.468 22.59 5.28 9.0 | stop=0/0/0/1739 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.30/.45 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.84 2.450 21.70 5.60 51.7 | stop=0/0/0/743 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.30/.45 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.65 2.445 22.10 5.43 31.1 | stop=0/0/0/1149 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.50 h=110 | static cap vmax amax stanceV stanceA hip upper: 3.06 2.84 2.523 24.61 5.60 51.5 | stop=0/0/0/372 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.50 h=115 | static cap vmax amax stanceV stanceA hip upper: 3.08 2.65 2.542 25.00 5.43 30.9 | stop=0/0/0/989 FAIL 
+100 3.6 v=27.8 d=.85 x=4.5 r=.25/.50 h=120 | static cap vmax amax stanceV stanceA hip upper: 2.90 2.43 2.571 25.51 5.28 8.8 | stop=0/0/0/1793 FAIL 

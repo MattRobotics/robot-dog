@@ -1,0 +1,4 @@
+1:walk mode STANDARD: 75 mm stride, 3.00 s, 120 mm, drive 1500/140, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+2:walk mode FAST: 75 mm stride, 2.50 s, 110 mm, drive 1900/190, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+102:PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION
+rc=0

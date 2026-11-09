@@ -1,0 +1,7 @@
+phase  2 goalSpeed  300 acc  20 (cmd 2000 t/s2) n= 21 peak med    350 [350..550]  accel med    2500 p10    1079  decel med    2459 p10     671 volt 111.0
+phase  6 goalSpeed    0 acc  50 (cmd 5000 t/s2) n= 26 peak med   3000 [1550..3250]  accel med    4918 p10    4795  decel med    9231 p10    8397 volt 111.0
+phase  7 goalSpeed    0 acc  50 (cmd 5000 t/s2) n= 26 peak med   3025 [1550..3400]  accel med    5023 p10    4904  decel med    9004 p10    8462 volt 111.0
+phase  8 goalSpeed    0 acc  50 (cmd 5000 t/s2) n=262 peak med    350 [350..400]  accel med    6251 p10    4999  decel med    4839 p10    3658 volt 111.0
+phase 10 goalSpeed  600 acc  25 (cmd 2500 t/s2) n=208 peak med    650 [600..850]  accel med    2500 p10    2143  decel med    2749 p10    2475 volt 111.0
+phase 10 goalSpeed  600 acc  30 (cmd 3000 t/s2) n=234 peak med    650 [600..800]  accel med    2917 p10    2500  decel med    3437 p10    2778 volt 111.0
+phase 11 goalSpeed  600 acc  25 (cmd 2500 t/s2) n=409 peak med    650 [600..850]  accel med    2500 p10    2143  decel med    2750 p10    2475 volt 111.0

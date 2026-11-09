@@ -1,0 +1,11 @@
+== comparison (frames, digest, max step, state, reason, first fault, exit)
+SAME WALK100_SLOW_120s frames= 6468 digest=5b3c56c3c182f493 max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME WALK75_STANDARD_90s frames= 4951 digest=91669965469e2d27 max_step=24 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME WALK75_FAST_90s frames= 4966 digest=5285e8ced0c0f511 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME JOYSTICK_HELD_SEQUENCE frames=12744 digest=6044aeac2e1bed43 max_step=42 state=WALKING/WALK_STANDARD reason=WALK_JOYSTICK first_fault=- exit=-/- refused_by=0
+SAME STOP_SWING_STANCE_8_of_8 frames= 5360 digest=de42e4e0904364f8 max_step=16 state=STANDING/HOLD reason=STAND_REACHED first_fault=- exit=-/-
+SAME IMU_BEYOND_ENVELOPE frames= 3465 digest=b5a466855d5ae02f max_step=18 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME FAULT_LATCH_off1_FAULT_STOP_REQUIRED_FAULT_STOP_REQUIRED frames= 978 digest=3adc03ab0c7eaf29 max_step=13 state=FAULT/IDLE reason=SERVO_FEEDBACK_STALE first_fault=SERVO_FEEDBACK_STALE exit=SERVO_FEEDBACK_STALE/WALK_STANDARD
+SAME LAG_SAG_WALK100_SLOW frames= 3485 digest=859c990bdf0156cd max_step=17 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+SAME LAG_SAG_WALK75_FAST frames= 3478 digest=23fe2f3ed663b960 max_step=31 state=WALKING/WALK_STANDARD reason=WALK_STANDARD first_fault=- exit=-/-
+rc=0

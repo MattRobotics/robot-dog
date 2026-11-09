@@ -1,0 +1,3 @@
+208:USB_FRAMING_MUTATIONS = PASS (both historical defects detected)
+314:MOTION_HTTP_TRANSPORT = PASS (97 production-handler/security/service checks; HTTPD/socket/mailbox/driver facts are doubles)
+360:HOST_TESTS = PASS (current owners and motion source gate; motion execution suites DEFERRED)
