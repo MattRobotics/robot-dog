@@ -4,7 +4,16 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 trace-44 fix: ServoBus admits the STANDARD/FAST drives — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 ACC diagnostic: read-only registers 40/41/85/86 in @SERVO READ — 2026-11-09
+
+> Diagnostic candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `dd76fad` (APP `5fac0a11…`, trace 45 fault), which stays the reference and rollback-ready. Source `ca71051`. Hardware session plan: `MATDOG_1_0_2_DEV6_ACCDIAG_HW_20261109`.
+
+- **Why (hardware trace 45):** WALK STANDARD wrote ACC 180; register 41 read back 50 on 12/12 servos and the exact readback faulted `SERVO_TORQUE_OR_GOAL_LOST` (SAFE_OFF worked). Hypothesis to test on the installed units: factory register 85 (LeRobot/rustypot `Maximum_Acceleration`, not in Feetech's SDK) holds that ceiling.
+- **Change:** the existing MAINTENANCE/idle-gated `@SERVO READ <id>` also reads 40 (TorqueEnable), 41 (ACC), 85 and 86 (Acceleration_Multiplier) as four separate 1-byte reads through `readProfileRegister()`; 41/85/86 only after 40 read VALID 0. Each prints `SERVO_ACC … status=VALID|READ_FAILED|NOT_READ… value=<-1 if not VALID> validity=… rx=<raw reply>`, plus one `SERVO_ACC_SUMMARY` line. `readProfileRegister()` takes an optional `ReadCapture`: the same validated read (ID, length, status, checksum, deadline, BusGuard) with a copy of the reply.
+- **Unchanged:** no servo write of any kind; Motion, STOP, SAFE_OFF, drive table, readback, NVS, calibration and geometry untouched; no read in the 50 Hz Motion cycle.
+- **Tests:** real ServoBus (captured == uncaptured for value and wire bytes; missing/error/corrupt/foreign replies fail without a value); real router (1-byte reads only, torque-OFF gate, READ_FAILED as -1, refused outside MAINTENANCE).
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 trace-44 fix (`dd76fad`, APP `5fac0a11…`, installed 09/11/2026 19:05Z, trace 45 fault): ServoBus admits the STANDARD/FAST drives — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `70abcff` (APP `67d55e1a…`, kept as reference and installed until the next flash). Report: [`Dev6_SyncWriteFix_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_SyncWriteFix_2026-11-09/REPORT.md); RCA in `MATDOG_1_0_2_DEV6_INCIDENT_SYNCWRITE_20261109T175118Z`.
 

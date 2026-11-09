@@ -124,7 +124,10 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   the ServoBus drive gate refused {1800,180}. Trace-44 fix (same version
 //   string, new build): the gate admits the STANDARD/FAST pairs {1800,180} and
 //   {1950,220} too; WALK speed selector readable in the narrow cockpit.
-//   Offline candidate.
+//   Installed 09/11 (dd76fad); trace 45: ACC 180 written, 50 stored in
+//   register 41. ACC diagnostic (same version string, new build): the
+//   MAINTENANCE/idle-gated @SERVO READ also prints registers 40, 41, 85 and
+//   86, read-only, as separate 1-byte reads. Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
