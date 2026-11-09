@@ -13,7 +13,18 @@
 //    differences) inside the same polygon;
 //  - peak joint speed/acceleration from the law's clock jets on every segment,
 //    against the ST3215 RAM drive kWalkDrive;
-//  - the smallest margin of each joint to the WALK box kHeight.
+//  - the smallest margin of each joint to the WALK box kHeight;
+//  - STOP ZMP margin (walk modes 2026-11-09): at every sample the StopPlan
+//    arrest of the exact joint rates (common duration, shortest 20 ms multiple
+//    with peak 1.5|v|/t <= the proof acceleration, --proof-acc in ACC units)
+//    decelerates the body along the same normalized profile, so the cart-table
+//    ZMP moves by (z/g) 1.5 v_body/t in the direction of travel; its margin is
+//    taken in the stance polygon frozen at the STOP (swing feet stay in the air).
+//    A short arrest makes it a transient (edge-lift) indicator, not a fall;
+//  - STOP capture-point margin: COM + v sqrt(z/g) of the body velocity at the
+//    STOP instant inside the same frozen polygon. The linear inverted pendulum
+//    brought to rest by its contacts does not tip over an edge while this
+//    point stays inside, however short the arrest (rigid contacts, no slip).
 // Rigid flat ground, ideal tracking, no contact compliance, friction or
 // dynamic stability model; a positive margin is a static model margin, not a
 // hardware qualification. The STOP proof and the IMU envelope are checked by
@@ -63,19 +74,24 @@ double inside(std::vector<Vector3> pts,double x,double y){
 struct Sample{double c,rate,accel;};
 }
 int main(int argc,char** argv){
-  unsigned stride=2;
-  for(int i=1;i+1<argc;i+=2)if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);
-  if(stride>2)return 2;
-  GaitParameters g=simple::walkGait(stride);double period=simple::kWalkPeriodS,comDx=0,comDy=0,reverse=0;
+  unsigned stride=2,modeIndex=0;  // --mode 0|1|2: SLOW, STANDARD, FAST (SimpleMotion.h WalkModeSpec)
+  for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);if(!std::strcmp(argv[i],"--mode"))modeIndex=std::atoi(argv[i+1]);}
+  if(stride>2||modeIndex>2)return 2;
+  const auto mode=static_cast<simple::WalkMode>(modeIndex);const auto& spec=simple::walkModeSpec(mode);
+  GaitParameters g=simple::walkGait(stride,mode);double period=spec.periodS,comDx=0,comDy=0,reverse=0,height=spec.heightM,proofAcc=-1,driveSpeed=spec.drive.speed,driveAcc=spec.drive.acc;
   struct Opt{const char* name;double* value;double scale;};
   const Opt opts[]={{"--period",&period,1},{"--duty",&g.duty,1},{"--lift-mm",&g.liftM,1e-3},{"--swayx-mm",&g.swayXM,1e-3},{"--swayy-mm",&g.swayYM,1e-3},
-    {"--com-mm",&g.comShiftXM,1e-3},{"--com-error-x-mm",&comDx,1e-3},{"--com-error-y-mm",&comDy,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3},{"--reverse",&reverse,1}};
-  for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;bool known=false;
+    {"--com-mm",&g.comShiftXM,1e-3},{"--com-error-x-mm",&comDx,1e-3},{"--com-error-y-mm",&comDy,1e-3},{"--ramp",&g.swingRamp,1},{"--ramp-end",&g.swingRampEnd,1},{"--settle",&g.settleCycles,1},{"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3},{"--reverse",&reverse,1},
+    {"--height-mm",&height,1e-3},{"--proof-acc",&proofAcc,1},{"--drive-speed",&driveSpeed,1},{"--drive-acc",&driveAcc,1}};
+  for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride")||!std::strcmp(argv[i],"--mode"))continue;bool known=false;
     for(const auto& o:opts)if(!std::strcmp(argv[i],o.name)){*o.value=std::atof(argv[i+1])*o.scale;known=true;}if(!known)return 2;}
   if(reverse!=0){g.reverse=true;g.advanceXM=-std::abs(g.advanceXM);}  // backward: time reverse, negative advance (steerGait)
+  g.heightM=simple::baseLinkHeightFromNominalM(height);
   if(!validGaitParameters(g))return 2;
+  const double aProof=proofAcc>0?proofAcc*100*simple::kTickRad:simple::stopAccelerationRadS2({static_cast<uint16_t>(driveSpeed),static_cast<uint8_t>(driveAcc)});
+  if(proofAcc<=0)proofAcc=aProof/(100*simple::kTickRad);double stopZmp=1e9,stopDecel=0,stopT=0,capture=1e9,captureC=0,stanceV=0,stanceA=0,stanceArrest=0;
   const auto& box=simple::kWalkBox;const double dt=.005,gravity=9.80665;
-  const double vDrive=simple::kWalkDrive.speed*simple::kTickRad,aDrive=simple::kWalkDrive.acc*100*simple::kTickRad,settle=gaitSettleCycles(g);
+  const double vDrive=driveSpeed*simple::kTickRad,aDrive=driveAcc*100*simple::kTickRad,settle=gaitSettleCycles(g);
   double support=1e9,supportC=0,zmp=1e9,vmax=0,amax=0,margin[12];int vJ=0,aJ=0;unsigned fails=0;for(double& m:margin)m=1e9;
   double phaseMin[3]={1e9,1e9,1e9};  // start ramp, steady cycles, WALK STOP segments
   auto run=[&](const std::vector<Sample>& seg,double terminal){
@@ -83,12 +99,21 @@ int main(int argc,char** argv){
     for(const auto& smp:seg){
       const auto s=gaitCartesian(g,smp.c,smp.rate,smp.accel,terminal);const auto f=solveGait(g,s,have?&prev:nullptr,true);
       if(!f.target.valid){++fails;have=false;cx.push_back(NAN);cy.push_back(NAN);cz.push_back(NAN);polygons.emplace_back();continue;}
+      double vj=0;for(unsigned l=0;l<4;++l)vj=std::fmax(vj,std::fmax(std::abs(f.velocityRadS[l].hip),std::fmax(std::abs(f.velocityRadS[l].upper),std::abs(f.velocityRadS[l].lower))));
+      const double tStop=std::fmax(.04,std::ceil(1.5*vj/aProof/.02-1e-9)*.02);
+      // Loaded joints in that arrest: peak deceleration 1.5 |v|/t of the stance legs.
+      for(unsigned l=0;l<4;++l)if(s.phases[l].stance)stanceArrest=std::fmax(stanceArrest,1.5*std::fmax(std::abs(f.velocityRadS[l].hip),std::fmax(std::abs(f.velocityRadS[l].upper),std::abs(f.velocityRadS[l].lower)))/tStop);
       for(unsigned l=0;l<4;++l){const double v[3]={f.velocityRadS[l].hip,f.velocityRadS[l].upper,f.velocityRadS[l].lower},a[3]={f.accelerationRadS2[l].hip,f.accelerationRadS2[l].upper,f.accelerationRadS2[l].lower};
-        for(unsigned k=0;k<3;++k){if(std::abs(v[k])>vmax){vmax=std::abs(v[k]);vJ=l*3+k;}if(std::abs(a[k])>amax){amax=std::abs(a[k]);aJ=l*3+k;}}}
+        for(unsigned k=0;k<3;++k){if(std::abs(v[k])>vmax){vmax=std::abs(v[k]);vJ=l*3+k;}if(std::abs(a[k])>amax){amax=std::abs(a[k]);aJ=l*3+k;}
+          if(s.phases[l].stance){stanceV=std::fmax(stanceV,std::abs(v[k]));stanceA=std::fmax(stanceA,std::abs(a[k]));}}}
       for(unsigned i=0;i<12;++i){const double q=jointSlot(f.target,i);margin[i]=std::fmin(margin[i],std::fmin(q-box.lo[i],box.hi[i]-q));}
       double cb[3];com(f.target,cb);cb[0]+=comDx;cb[1]+=comDy;const auto& t=s.body.translationM;const auto& r=s.body.rotation;
       const double w[3]={t.x+r[0][0]*cb[0]+r[0][1]*cb[1]+r[0][2]*cb[2],t.y+r[1][0]*cb[0]+r[1][1]*cb[1]+r[1][2]*cb[2],t.z+r[2][0]*cb[0]+r[2][1]*cb[1]+r[2][2]*cb[2]};
       std::vector<Vector3> pts;for(unsigned l=0;l<4;++l)if(s.phases[l].stance)pts.push_back(s.feet[l]);
+      if(pts.size()>=3){const double k=w[2]/gravity*1.5/tStop,bv=std::hypot(s.bodyVelocity.x,s.bodyVelocity.y);
+        stopZmp=std::fmin(stopZmp,inside(pts,w[0]+k*s.bodyVelocity.x,w[1]+k*s.bodyVelocity.y));
+        const double tc=std::sqrt(w[2]/gravity),cp=inside(pts,w[0]+tc*s.bodyVelocity.x,w[1]+tc*s.bodyVelocity.y);if(cp<capture){capture=cp;captureC=smp.c;}
+        if(1.5*bv/tStop>stopDecel){stopDecel=1.5*bv/tStop;stopT=tStop;}}
       if(pts.size()>=3){const double m=inside(pts,w[0],w[1]);if(m<support){support=m;supportC=smp.c;}
         double& pm=phaseMin[terminal>=0?2:smp.c<g.startCycles+.25?0:1];pm=std::fmin(pm,m);}
       cx.push_back(w[0]);cy.push_back(w[1]);cz.push_back(w[2]);polygons.push_back(pts);prev=f;have=true;}
@@ -104,11 +129,11 @@ int main(int argc,char** argv){
     for(double c=std::fmax(0.,terminal-g.stopCycles-.3);c<=terminal+settle+1e-12;c+=dt/period)s.push_back({std::fmin(c,terminal+settle),1/period,0});run(s,terminal);}
   double hip=1e9,upper=1e9,lower=1e9;
   for(unsigned i=0;i<12;++i)(i%3==0?hip:i%3==1?upper:lower)=std::fmin(i%3==0?hip:i%3==1?upper:lower,margin[i]);
-  const bool pass=!fails&&support>0&&zmp>0&&vmax<vDrive&&amax<aDrive&&hip>0&&upper>0&&lower>0;
-  std::printf("stride=%.0f period=%.2f v=%.2f mm/s duty=%.3f com=%.1f swayx/y=%.1f/%.1f ramp=%.2f settle=%.2f | solve fails=%u | static support min %.2f mm (c%.3f) | ZMP min %.2f mm | "
-              "start/steady/stop %.2f/%.2f/%.2f mm | joint vmax %.3f rad/s %s (drive %.3f) amax %.2f rad/s2 %s (drive %.2f) | box margin ticks HIP %.1f UPPER %.1f LOWER %.1f | %s\n",
-    g.advanceXM*1000,period,g.advanceXM/period*1000,g.duty,g.comShiftXM*1000,g.swayXM*1000,g.swayYM*1000,g.swingRamp,settle,fails,support*1000,supportC,zmp*1000,
+  const bool pass=!fails&&support>0&&zmp>0&&capture>0&&vmax<vDrive&&amax<aDrive&&hip>0&&upper>0&&lower>0;
+  std::printf("mode=%s stride=%.0f period=%.2f v=%.2f mm/s height=%.0f duty=%.3f com=%.1f swayx/y=%.1f/%.1f ramp=%.2f/%.2f settle=%.2f | solve fails=%u | static support min %.2f mm (c%.3f) | ZMP min %.2f mm | STOP capture min %.2f mm (c%.3f) | STOP ZMP min %.2f mm (proof acc %.0f, peak body decel %.3f m/s2, arrest %.2f s) | "
+              "start/steady/stop %.2f/%.2f/%.2f mm | joint vmax %.3f rad/s %s (drive %.3f) amax %.2f rad/s2 %s (drive %.2f) stance (loaded) vmax %.3f amax %.2f arrest %.2f rad/s2 | box margin ticks HIP %.1f UPPER %.1f LOWER %.1f | %s\n",
+    spec.name,g.advanceXM*1000,period,g.advanceXM/period*1000,height*1000,g.duty,g.comShiftXM*1000,g.swayXM*1000,g.swayYM*1000,g.swingRamp,g.swingRampEnd,settle,fails,support*1000,supportC,zmp*1000,capture*1000,captureC,stopZmp*1000,proofAcc,stopDecel,stopT,
     phaseMin[0]*1000,phaseMin[1]*1000,phaseMin[2]*1000,
-    vmax,kJoint[vJ],vDrive,amax,kJoint[aJ],aDrive,hip/simple::kTickRad,upper/simple::kTickRad,lower/simple::kTickRad,pass?"PASS(static model only)":"FAIL");
+    vmax,kJoint[vJ],vDrive,amax,kJoint[aJ],aDrive,stanceV,stanceA,stanceArrest,hip/simple::kTickRad,upper/simple::kTickRad,lower/simple::kTickRad,pass?"PASS(static model only)":"FAIL");
   return pass?0:1;
 }
