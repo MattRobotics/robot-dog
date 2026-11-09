@@ -122,20 +122,22 @@ inline constexpr const char* kSafeChecks[]={"","POINT_SAFE","RAW_CONVERSION","RA
 struct TiltVertex { double roll,pitch; };
 constexpr TiltVertex kWalkTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019071,0.046042},{0.000000,0.066738},{-0.019000,0.045870},{-0.019700,0.019700},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.017392,-0.041987},{-0.000000,-0.081773},{0.017392,-0.041987},{0.018313,-0.018313},{0.018722,-0.007755}};
 constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.012877,0.031088},{0.000000,0.036669},{-0.012877,0.031088},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.013430,-0.005563},{-0.008320,-0.008320},{-0.004336,-0.010468},{-0.000000,-0.012794},{0.004336,-0.010468},{0.008320,-0.008320},{0.013430,-0.005563}};
-// STANDARD and FAST (walk modes 2026-11-09): the same search on their own law,
-// drive and STOP braking (walk_tilt_envelope_check --mode 1|2 --stride 1
-// --search 16 --phases 8); both serve the 50 and 75 mm strides. STANDARD:
-// pitch-down -36.8 mrad, pitch-up +63.5, roll +-19 (SLOW100 -12.8, SLOW75
-// -81.8). FAST: the search (pitch-down -24.8, up +58.4, roll +-18) x0.6, i.e.
-// -14.9 / +35.1 / +-11: with the servo response model (run_servo_plant.sh,
-// ACC capability above the bench-measured 50 unknown, drawn 6 000-15 000
-// step/s^2) FAST tracks up to ~140 ticks late, the support fit on the lagging
-// stance legs asks up to +50 mrad, the correction saturates on the envelope
-// and the full polygon met STOP_PLAN at a thin phase (c .63) in 5-6 of 6 seeds
-// even with the IMU at -10 mrad; x0.6 left none (WALK, 8 STOP + resume, IMU at
-// 0.9 of the vertex; 11.1 and 9.6 V). STANDARD passed at its full polygon.
-constexpr TiltVertex kStandardTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019048,0.045985},{0.000000,0.063470},{-0.018988,0.045841},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.012770,-0.030829},{-0.000000,-0.036762},{0.012770,-0.030829},{0.018313,-0.018313},{0.018722,-0.007755}};
-constexpr TiltVertex kFastTilt75[]={{0.010963,0.000000},{0.011147,0.004617},{0.011397,0.011397},{0.011064,0.026711},{0.000000,0.035056},{-0.011035,0.026642},{-0.011410,0.011410},{-0.011147,0.004617},{-0.010963,0.000000},{-0.010784,-0.004467},{-0.010526,-0.010526},{-0.005632,-0.013597},{-0.000000,-0.014867},{0.005632,-0.013597},{0.010526,-0.010526},{0.010784,-0.004467}};
+// STANDARD and FAST (walk modes final, 2026-11-09): one envelope per mode for
+// its three presets. The geometric search (walk_tilt_envelope_check --mode 1|2
+// --stride 2 --search 16 --phases 8: STANDARD pitch-down -34.3, up +41.2, roll
+// +-18 mrad; FAST -52.7 / +41.3 / +-18) is not the runtime limit: with the
+// servo response model (run_servo_plant.sh: profile, latency, sag, ACC
+// capability above the bench-measured 50 drawn 6 000-15 000 step/s^2 times
+// load and voltage) the lagging stance legs make the support fit ask up to
+// -94 mrad after a STOP recovery, and the full polygons met STOP_PLAN with the
+// IMU at 0.9 of the pitch-down vertex (6/6 seeds) and POINT_SAFE at the
+// recovery start. Scaled down until none was left (6 seeds, WALK 90 s, 8 STOP
+// + recovery, IMU at the vertex; 11.1 and 9.6 V): STANDARD x0.5 (x0.65: one
+// POINT_SAFE), FAST x0.65. Each envelope rechecked on every preset (--stride
+// 0|1|2): PASS. STANDARD -17.1 / +20.6 / +-9.1, FAST -34.2 / +26.8 / +-11.8
+// mrad (SLOW100 -12.8; dev.4 on the ground asked -15 to -18 in WALK100).
+constexpr TiltVertex kStandardTilt[16]={{0.009136,0.000000},{0.009274,0.003841},{0.009478,0.009478},{0.008380,0.020231},{0.000000,0.020591},{-0.008380,0.020231},{-0.009498,0.009498},{-0.009289,0.003847},{-0.009136,0.000000},{-0.008987,-0.003723},{-0.008771,-0.008771},{-0.006111,-0.014753},{-0.000000,-0.017136},{0.006111,-0.014753},{0.008771,-0.008771},{0.008987,-0.003723}};
+constexpr TiltVertex kFastTilt[16]={{0.011837,0.000000},{0.012562,0.005203},{0.013663,0.013663},{0.011042,0.026656},{0.000000,0.026850},{-0.011042,0.026656},{-0.013663,0.013663},{-0.012562,0.005203},{-0.011837,0.000000},{-0.011122,-0.004607},{-0.010201,-0.010201},{-0.008215,-0.019833},{-0.000000,-0.034234},{0.008215,-0.019833},{0.010201,-0.010201},{0.011122,-0.004607}};
 // Steered IMU envelope (heading frame): inner convex envelope of kSteer, gen-1
 // RAW, the tread fillet up to kEdgeContactMaxTiltRad and STOP over the steered
 // phase set (offline rays, run_joystick_envelope.sh). Shared with the gate.
@@ -188,36 +190,43 @@ constexpr Drive kStandDrive{480,13}, kWalkDrive{1000,50}, kCalibrationDrive{160,
 constexpr uint8_t kStopBrakeAcc=84;
 inline double stopSpeedRadS(Drive d){return d.speed*kTickRad;}
 inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:kStopBrakeAcc)*100*kTickRad;}
-// WALK modes (2026-11-09): the one WALK STANDARD v2 law at three time scales,
-// chosen for the NEXT walk (selectWalkMode, volatile, SLOW at boot). SLOW is the
-// law qualified on dev.4, bit for bit. STANDARD and FAST shorten the period with
-// duty .825 (the four-contact window 50 % longer than .80 for the sway), an
-// asymmetric swing (Gait.h swingRampEnd .45: a slower touchdown, where the
-// front UPPER meets its kHeight bound) and a 75 mm top stride; FAST walks 10 mm
-// lower (front UPPER room). Why not 100 mm faster: the STOP arrest of the front
-// UPPER at the measured braking (kStopBrakeAcc) runs 0.75 v^2/a, ~0.25 rad at
-// 2 rad/s. At 100 mm a 4.0 s or 3.33 s period passes at zero tilt but leaves
-// -2.5/-3.0 mrad of IMU pitch-down and +-5/8 mrad of roll (envelope search);
-// at 75 mm the same speeds keep the pitch envelope of SLOW75 or more. Offline
-// (walk_support_check / walk_tilt_envelope_check --mode; rigid ground, URDF COM,
-// ideal tracking), top stride:
-//                          SLOW 100 mm  STANDARD 75 mm  FAST 75 mm
-//   period, speed          5.0 s 20     3.0 s 25        2.5 s 30 mm/s
-//   swing joint peak       1.275 5.81   1.826 16.67     2.312 23.22 rad/s, rad/s^2
-//   stance (loaded) peak   0.61 5.81    0.68 6.90       0.85 10.53
-//   static support         2.12         2.13            2.24 mm
-//   STOP capture point     1.41         1.45            1.67 mm
+// WALK modes (final dev.6, 2026-11-09): the one WALK STANDARD v2 law at three
+// time scales, chosen for the NEXT walk (selectWalkMode, volatile, SLOW at
+// boot). SLOW is the law qualified on dev.4, bit for bit. Each mode has its
+// own three presets (strideM; the WALK command carries the preset index), so
+// no preset is refused. STANDARD and FAST: duty .825, asymmetric swing
+// (swingRampEnd .55: slower touchdown, where the front UPPER meets kHeight),
+// lower walk heights. Search (walk_support_check / walk_tilt_envelope_check
+// what-ifs, ~1 950 configurations: stride 75-120 mm, height 100-120 mm, duty
+// .80-.85, COM shift 11-17 mm, ramps, lift 6/8 mm, lateral sway 1-2 mm):
+// - the STOP proof at the measured braking (kStopBrakeAcc) binds on the
+//   front UPPER at swing end and, above ~34 mm/s, on the HIP dragged through
+//   the common arrest duration set by the fast swing UPPER (0.30 s);
+// - the STOP capture point falls with the speed: ~0 mm at 40 mm/s, <= 1.1 mm
+//   at 34-36 mm/s in every configuration that passes the STOP proof;
+// - lower heights give pitch authority but take HIP room (sag) and support.
+// Chosen with: STOP proof at kStopBrakeAcc, capture point and static support
+// not below SLOW (1.41 / 1.7 mm), HIP >= 8.7 ticks, envelopes kept by the
+// servo model. 40 mm/s is not reachable under these conditions; 32 mm/s is.
+// Offline (rigid ground, URDF COM, ideal tracking), top preset:
+//                          SLOW 100 mm  STANDARD 90 mm  FAST 80 mm
+//   period, speed          5.0 s 20     3.0 s 30        2.5 s 32 mm/s
+//   height, lift, sway y   120 8 1.5    110 8 1.5       105 6 1.0 mm
+//   swing joint peak       1.275 5.81   2.207 21.0      2.350 26.4 rad/s, rad/s^2
+//   stance (loaded) peak   0.61 5.81    0.77 7.31       0.87 10.8
+//   static support         2.12         2.18            1.71 mm
+//   STOP capture point     1.41         1.69            1.41 mm
+//   kHeight margin HIP     9.3          8.7             11.1 ticks
 // RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
-// keeps {1000,50}. FAST 2.5 s at 75 mm is the fastest the STOP proof passes at
-// the measured braking (2.25 s fails); qualified ACC 150 braking would admit
-// ~36 mm/s (100 mm, 2.75 s, offline). The joystick always walks SLOW (its
-// steered envelopes are certified for that law only).
+// keeps {1000,50}. The joystick always walks SLOW (its steered envelopes are
+// certified for that law only).
 // STANDARD and FAST: IMPLEMENTED, NOT HARDWARE QUALIFIED.
 using TiltPolygon=TiltVertex[16];
 struct WalkModeSpec {
   const char* name; double periodS,duty,heightM,swayXM,swingRamp,swingRampEnd; Drive drive;
-  unsigned maxStride;                   // kStrideM index; a longer WALK preset is refused
-  const TiltPolygon *tilt75,*tilt100;  // strides 50/75 and 100 (null above maxStride)
+  double strideM[3];                       // the three WALK presets of this mode (index 2: top speed)
+  double liftM,swayYM;
+  const TiltPolygon *tiltShort,*tiltTop;  // IMU envelope of presets 0-1 and of preset 2
   bool hardwareQualified;
 };
 const WalkModeSpec& walkModeSpec(WalkMode);

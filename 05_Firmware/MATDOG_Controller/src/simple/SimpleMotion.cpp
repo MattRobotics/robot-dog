@@ -86,9 +86,9 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
 // SLOW is the WALK STANDARD v2 constants above; STANDARD and FAST: SimpleMotion.h.
 // Envelopes: walk_tilt_envelope_check --mode N --stride 1|2 --search 16.
 constexpr WalkModeSpec kWalkModes[]={
-  {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,2,&kWalkTilt75,&kWalkTilt100,true},
-  {"STANDARD",3.0,.825,kWalkHeightM,kWalkSwayXM,.35,.45,{1500,140},1,&kStandardTilt75,nullptr,false},
-  {"FAST",2.5,.825,.110,kWalkSwayXM,.35,.45,{1900,190},1,&kFastTilt75,nullptr,false}};
+  {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
+  {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,kWalkSwayYM,&kStandardTilt,&kStandardTilt,false},
+  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.006,.0010,&kFastTilt,&kFastTilt,false}};
 const WalkModeSpec& walkModeSpec(WalkMode m){return kWalkModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
 bool parseWalkMode(const char* name,WalkMode& m){
   for(unsigned i=0;i<3;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
@@ -96,8 +96,8 @@ bool parseWalkMode(const char* name,WalkMode& m){
 }
 GaitParameters walkGait(unsigned stride,WalkMode mode){
   const auto& w=walkModeSpec(mode);
-  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(w.heightM);g.liftM=kWalkLiftM;g.duty=w.duty;g.advanceXM=kStrideM[stride];
-  g.swayXM=w.swayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(w.heightM);g.liftM=w.liftM;g.duty=w.duty;g.advanceXM=w.strideM[stride<3?stride:2];
+  g.swayXM=w.swayXM;g.swayYM=w.swayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
   g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;return g;
 }
 GaitParameters steerGait(const double goal[3]){
@@ -578,7 +578,6 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   // walk. The selected WALK mode is latched here (its height is this stand's);
   // after a STOP the resumed walk keeps the mode of the stopped one.
   const WalkMode mode=stopActive_?walkMode_:selectedMode_;
-  if(stride>walkModeSpec(mode).maxStride)return "STRIDE_NOT_IN_WALK_MODE";
   const char* r=stand(walkModeSpec(mode).heightM,now);if(r)return r;
   requestedStride_=stride;joystick_=false;walkRequested_=true;pendingMode_=mode;
   // A resumed WALK STOP finishes with its own gait and tilt envelope; the
@@ -1006,7 +1005,7 @@ bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) c
   // may have turned; identity heading keeps roll/pitch bit for bit). A steered
   // walk whose lateral, yaw and sway are retired for a fore/aft demand already
   // limits to it: the applied correction slews inside, then the regime hands over.
-  if(!steeredEnvelope()){const auto& mode=walkModeSpec(walkMode_);const auto& poly=stride_==2&&mode.tilt100?*mode.tilt100:*mode.tilt75;  // walk() bounds the stride to the mode
+  if(!steeredEnvelope()){const auto& mode=walkModeSpec(walkMode_);const auto& poly=stride_==2?*mode.tiltTop:*mode.tiltShort;
     if(c==1&&s==0)return projectWalkTilt(poly,roll,pitch);
     double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(poly,rb,pb);
     if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;}
