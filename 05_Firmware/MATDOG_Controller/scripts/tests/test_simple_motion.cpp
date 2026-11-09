@@ -1317,6 +1317,22 @@ static void walkModes(){
          simple::stopAccelerationRadS2(simple::kStandDrive)==simple::kStandDrive.acc*100*simple::kTickRad&&
          simple::stopAccelerationRadS2({1850,150})==simple::kStopBrakeAcc*100*simple::kTickRad);
   simple::WalkMode m;assert(simple::parseWalkMode("FAST",m)&&m==WalkMode::FAST&&!simple::parseWalkMode("fast",m)&&!simple::parseWalkMode("TROT",m));
+  // Final dev.6 RCA: whatever correction HOLD carries at the WALK height
+  // (here a 30 mrad board roll during a STOP recovery; STANDARD roll limit ~9
+  // mrad), the walk starts only inside its own envelope (WALK_IMU_SETTLING
+  // while the slew brings it in) and runs without fault.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(WalkMode::STANDARD);assert(!r.m.walk(1,r.p.now));
+   for(unsigned n=0;n<2500;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::WALKING);
+   const double hr=.015;r.in.quaternion[0]=std::cos(hr);r.in.quaternion[1]=std::sin(hr);r.in.quaternion[2]=r.in.quaternion[3]=0;
+   r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}assert(r.m.stopVerified());
+   assert(!r.m.walk(1,r.p.now));bool settling=false;double maxHeld=0;
+   for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);settling|=!std::strcmp(r.m.reason(),"WALK_IMU_SETTLING");
+     maxHeld=std::fmax(maxHeld,std::abs(simple::StopReferenceProbe::roll(r.m)));}
+   const double cr=simple::StopReferenceProbe::roll(r.m),cp=simple::StopReferenceProbe::pitch(r.m);
+   double rmax=0,pmin=0,pmax=0;for(const auto& v:simple::kStandardTilt){rmax=std::fmax(rmax,std::abs(v.roll));pmin=std::fmin(pmin,v.pitch);pmax=std::fmax(pmax,v.pitch);}
+   assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==WalkMode::STANDARD&&std::abs(cr)<=rmax+1e-9&&cp>=pmin-1e-9&&cp<=pmax+1e-9);  // inside the envelope's bounding box
+   for(unsigned n=0;n<1500;++n){r.tick();assert(r.m.state()==simple::State::WALKING);}
+   std::printf("walk recovery from a 30 mrad board roll: held up to %.1f mrad, WALK_IMU_SETTLING %s, STANDARD starts at %.1f/%.1f mrad inside its envelope, 1500 releases without fault PASS (software only)\n",maxHeld*1e3,settling?"seen":"not needed",cr*1e3,cp*1e3);}
 }
 // dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
 // law, applied/wanted IMU correction, the release's compensationSafe check):

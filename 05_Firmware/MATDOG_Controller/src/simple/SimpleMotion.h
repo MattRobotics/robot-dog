@@ -478,6 +478,7 @@ class SimpleMotion {
   // limitWalkTilt and the offline envelope gate.
   bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM); }
   bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
+  const TiltPolygon& pendingWalkTilt() const;  // fore/aft envelope of the walk startWalk would start
   const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
   void serviceOff();
   bool serviceStop();

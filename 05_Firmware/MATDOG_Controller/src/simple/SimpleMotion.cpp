@@ -934,6 +934,15 @@ void SimpleMotion::startWalk(uint64_t now){
   // that mode's height (the stand of the same command); otherwise no walk.
   const WalkMode mode=joystick_?WalkMode::SLOW:pendingMode_;
   if(std::abs(requestedHeight_-walkModeSpec(mode).heightM)>1e-9){walkRequested_=joystick_=false;reason_="WALK_MODE_HEIGHT_MISMATCH";return;}
+  // The walk starts from the correction HOLD carries only inside its own
+  // fore/aft envelope (final dev.6 RCA): the walk-mode envelopes certify that
+  // region; a correction accepted at the WALK height outside it (WALK_HOLD and
+  // HOLD do not bound it; servo model: -22/-70 mrad after a STOP recovery,
+  // STANDARD envelope -17 mrad) left the first WALK steps without an IK solution
+  // (WALK_IK_OR_WORKSPACE, refused_by POINT_SAFE). HOLD bounds the wanted
+  // correction to that envelope while the walk is pending and retries the
+  // start each release, after the existing slew has brought it inside.
+  {double r=rollCorrection_,p=pitchCorrection_;if(projectWalkTilt(pendingWalkTilt(),r,p)){reason_="WALK_IMU_SETTLING";return;}}
   walkMode_=mode;
   if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_,walkMode_);}
   else{
@@ -999,6 +1008,11 @@ bool SimpleMotion::regimeHandover(bool toSteered) const {
   const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;
   double rb=c*r+s*p,pb=-s*r+c*p;
   return toSteered?!projectWalkTilt(kSteerTilt,rb,pb):!projectWalkTilt(kWalkTilt100,rb,pb);
+}
+const TiltPolygon& SimpleMotion::pendingWalkTilt() const {
+  // The joystick starts in the SLOW fore/aft regime (kWalkTilt100, inside kSteerTilt).
+  if(joystick_)return *walkModeSpec(WalkMode::SLOW).tiltTop;
+  const auto& m=walkModeSpec(pendingMode_);return requestedStride_==2?*m.tiltTop:*m.tiltShort;
 }
 bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) const {
   // Fore/aft regime: its envelope, also in the heading frame (a joystick walk
@@ -1153,9 +1167,13 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   imuLimited_=!fitted;imuReason_=fitted?"OK":up.x==0&&up.y==0&&up.z==0?"IMU_STALE":"SUPPORT_FIT";
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
   if(walk&&limitWalkTilt(wantedRoll,wantedPitch,f.cartesian.body.rotation[0][0],f.cartesian.body.rotation[1][0])){imuLimited_=true;imuReason_="ENVELOPE";}
+  else if(phase_==Phase::HOLD&&walkRequested_&&projectWalkTilt(pendingWalkTilt(),wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
   imuWanted_[0]=wantedRoll;imuWanted_[1]=wantedPitch;
   const double slew=slewStep(now,afterLight?std::min<uint64_t>(kPeriodUs,sinceIssuedUs):kImuSlewMaxDtUs);
-  auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
+  // No 1 mrad dead band while a walk waits for its envelope: it would park the
+  // correction up to 1 mrad outside and hold the start (WALK_IMU_SETTLING).
+  const bool exact=unwind||(phase_==Phase::HOLD&&walkRequested_);
+  auto step=[&](double old,double wanted){return !exact&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
   double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
   if(walk){const double dr=wantedRoll-rollCorrection_,dp=wantedPitch-pitchCorrection_;
     const double distance=std::fmax(std::abs(dr),std::abs(dp)),fraction=distance>.001?std::fmin(1.,slew/distance):0;
@@ -1598,6 +1616,7 @@ void SimpleMotion::update(uint64_t now){
     // changes. Do not solve the same nominal IK and differential every 20 ms.
     auto f=holdNominal_;
     if(f.target.valid){compensate(f,now);send(f.target,kStandDrive,now);}
+    if(walkRequested_&&phase_==Phase::HOLD&&!offPending_&&!stop_.load())startWalk(now);  // a start held by WALK_IMU_SETTLING
   }
 }
 } }
