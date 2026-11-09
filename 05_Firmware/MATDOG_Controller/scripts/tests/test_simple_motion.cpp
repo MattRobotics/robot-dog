@@ -1263,6 +1263,61 @@ static void longWalk100(){
     assert(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>31);r.m.walkStop();assert(r.reachStand());}
   std::puts("long walk: JOYSTICK 100 mm, WALK STANDARD 100 and 75, 8000 releases (160 s) each without fault PASS (software only)");
 }
+// Walk modes (2026-11-09): the selection is latched by walk() and never
+// changes a walk in progress, its WALK STOP or its STOP recovery; each walk
+// runs its mode's period, height and RAM drive; STOP brakes at most at
+// kStopBrakeAcc; the joystick walks SLOW. Ideal tracking (scripted port).
+static void walkModes(){
+  using simple::WalkMode;
+  for(WalkMode mode:{WalkMode::STANDARD,WalkMode::FAST}){
+    const auto& w=simple::walkModeSpec(mode);Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    r.m.selectWalkMode(mode);assert(r.m.selectedWalkMode()==mode&&r.m.walkMode()==WalkMode::SLOW);
+    assert(w.maxStride==1&&!std::strcmp(r.m.walk(2,r.p.now),"STRIDE_NOT_IN_WALK_MODE")&&r.m.state()==simple::State::STANDING);
+    assert(!r.m.walk(1,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode&&r.m.period()==w.periodS&&std::abs(r.m.requestedHeightM()-w.heightM)<1e-12);
+    const uint64_t start=r.p.now;
+    r.m.selectWalkMode(WalkMode::SLOW);  // the next walk only
+    for(unsigned n=0;n<6000;++n){r.tick();assert(r.m.state()==simple::State::WALKING);
+      assert(r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc&&r.m.walkMode()==mode);}
+    assert(std::abs(r.m.walkCycles()-simple::walkClockS((r.p.now-start)/1e6)/w.periodS)<.02);
+    assert(std::abs(r.m.walkVelocityX()-simple::kStrideM[1]/w.periodS)<1e-12);
+    // STOP at eight instants of one cycle (swing and four-contact phases): the
+    // arrest is proved at min(ACC, kStopBrakeAcc), the resumed walk keeps the
+    // mode of the stopped one whatever is selected.
+    const unsigned cycleReleases=static_cast<unsigned>(w.periodS/.02);
+    for(unsigned k=0;k<8;++k){
+      for(unsigned n=0;n<cycleReleases/8+3;++n)r.tick();
+      r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.stopVerified());const auto& plan=simple::StopReferenceProbe::stopPlan(r.m);
+      assert(plan.duration>0&&r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc);
+      r.m.selectWalkMode(k%2?WalkMode::FAST:WalkMode::SLOW);
+      assert(!r.m.walk(1,r.p.now));
+      for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode);}
+    // WALK STOP, then the selected mode for the next walk (height change at HOLD).
+    r.m.selectWalkMode(mode==WalkMode::FAST?WalkMode::STANDARD:WalkMode::FAST);r.m.walkStop();assert(r.reachStand());
+    const auto next=r.m.selectedWalkMode();assert(!r.m.walk(1,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.walkMode()==next&&std::abs(r.m.requestedHeightM()-simple::walkModeSpec(next).heightM)<1e-12);
+    for(unsigned n=0;n<2000;++n){r.tick();assert(r.m.state()==simple::State::WALKING);}
+    r.m.walkStop();assert(r.reachStand());
+    // The joystick walks SLOW whatever is selected.
+    assert(!r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    for(unsigned n=0;n<24;++n){if(n%12==0)r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now);r.tick();}  // first WALK frames
+    assert(r.m.walkMode()==WalkMode::SLOW&&r.m.period()==simple::kWalkPeriodS&&r.p.drive.acc==simple::kWalkDrive.acc);
+    r.m.walkStop();assert(r.reachStand());
+    std::printf("walk mode %s: %.0f mm stride, %.2f s, %.0f mm, drive %u/%u, STOP braking ACC %u, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)\n",
+      w.name,simple::kStrideM[w.maxStride]*1e3,w.periodS,w.heightM*1e3,unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(std::min<unsigned>(w.drive.acc,simple::kStopBrakeAcc)));}
+  // SLOW is the dev.4 law bit for bit; the STOP braking rule leaves it and STAND unchanged.
+  const auto a=simple::walkGait(2),b=simple::walkGait(2,WalkMode::SLOW);
+  assert(a.duty==simple::kWalkDuty&&b.swingRampEnd==0&&a.swingRamp==b.swingRamp&&a.heightM==b.heightM);
+  assert(simple::stopAccelerationRadS2(simple::kWalkDrive)==simple::kWalkDrive.acc*100*simple::kTickRad&&
+         simple::stopAccelerationRadS2(simple::kStandDrive)==simple::kStandDrive.acc*100*simple::kTickRad&&
+         simple::stopAccelerationRadS2({1850,150})==simple::kStopBrakeAcc*100*simple::kTickRad);
+  simple::WalkMode m;assert(simple::parseWalkMode("FAST",m)&&m==WalkMode::FAST&&!simple::parseWalkMode("fast",m)&&!simple::parseWalkMode("TROT",m));
+}
 // dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
 // law, applied/wanted IMU correction, the release's compensationSafe check):
 // enterOff resets the correction right after, a later STOP keeps the record.
@@ -1276,7 +1331,7 @@ static void exitCause(){
          e.refusedBy==0&&e.advance[0]==simple::kStrideM[2]&&!e.steered&&simple::StopReferenceProbe::pitch(r.m)==0);
   std::printf("exit cause: WALK fault at cycle %.3f keeps correction %.1f/%.1f mrad, refused_by %u, law %.0f mm fore/aft after STOP PASS (software only)\n",e.cycles,e.roll*1e3,e.pitch*1e3,unsigned(e.refusedBy),e.advance[0]*1e3);
 }
-int main(){exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+int main(){walkModes();exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
@@ -1291,14 +1346,14 @@ int main(){exitCause();longWalk100();proneRest();entryRecovery();temperatureChec
   // Velocity is continuous everywhere (C1); acceleration too (C2) except the
   // swinging foot's own lift-off/touchdown with the trapezoidal swing, whose
   // velocity ramps start and end there by design (Gait.h swingRamp).
-  for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
-    const auto g=simple::walkGait(stride);
+  for(unsigned mode=0;mode<3;++mode)for(unsigned stride=0;stride<=simple::walkModeSpec(static_cast<simple::WalkMode>(mode)).maxStride;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
+    const auto g=simple::walkGait(stride,static_cast<simple::WalkMode>(mode));const double rate=1./simple::walkModeSpec(static_cast<simple::WalkMode>(mode)).periodS;
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
       const double c=base+event;if(c<=1e-6||c>=terminal+w-1e-6)continue;
       const double term=c>stop?terminal:-1;
-      auto a=motion::solveGait(g,motion::gaitCartesian(g,c-1e-7,1./simple::kWalkPeriodS,0,term));
-      auto b=motion::solveGait(g,motion::gaitCartesian(g,c+1e-7,1./simple::kWalkPeriodS,0,term));
+      auto a=motion::solveGait(g,motion::gaitCartesian(g,c-1e-7,rate,0,term));
+      auto b=motion::solveGait(g,motion::gaitCartesian(g,c+1e-7,rate,0,term));
       const auto native=motion::solveGait(g,b.cartesian,nullptr,false);
       assert(native.status==b.status&&native.target.valid==b.target.valid);
       for(unsigned l=0;l<4;++l)assert(native.condition[l]==b.condition[l]);
@@ -1313,7 +1368,7 @@ int main(){exitCause();longWalk100();proneRest();entryRecovery();temperatureChec
       for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(a.target,i)-motion::jointSlot(b.target,i))<1e-5);
     }
     // Rest at both ends: zero joint velocity/acceleration in the gait clock.
-    for(double c : {0.,terminal+w}){auto f=motion::solveGait(g,motion::gaitCartesian(g,c,1./simple::kWalkPeriodS,0,c>0?terminal:-1));assert(f.target.valid);
+    for(double c : {0.,terminal+w}){auto f=motion::solveGait(g,motion::gaitCartesian(g,c,rate,0,c>0?terminal:-1));assert(f.target.valid);
       for(unsigned l=0;l<4;++l){const auto v=f.velocityRadS[l],a=f.accelerationRadS2[l];
         assert(std::abs(v.hip)+std::abs(v.upper)+std::abs(v.lower)<1e-9&&std::abs(a.hip)+std::abs(a.upper)+std::abs(a.lower)<1e-9);}}
   }
