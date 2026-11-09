@@ -122,11 +122,19 @@ constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontal
 // roll/pitch BODY-in-support radians, not independent
 // rectangular limits or a claim of physical contact. kWalkTilt75 serves the
 // 50 and 75 mm strides, kWalkTilt100 the 100 mm stride.
+// dev.6 consolidation: the check now also proves the STOP secants of the T2
+// chord-midpoint references and 8 sub-period phases of the release grid. The
+// old kWalkTilt100 failed it (swing-end UPPER, c .464/.968: midpoint->exact
+// secant one tick faster, arrest 1.4 ticks outside kHeight), the rig's long
+// WALK100 faulted WALK_IK_OR_WORKSPACE/STOP_PLAN at cycle 19.5, and dev.4 on
+// the ground walked WALK100 with the correction on that pitch-down boundary.
+// kWalkTilt100 re-derived (pitch-down -18.7 -> -12.8 mrad, pitch-up 38.1 ->
+// 36.7); kWalkTilt75 passes unchanged.
 // compensationSafe refusal codes (imuRefusedBy), in check order.
 inline constexpr const char* kSafeChecks[]={"","POINT_SAFE","RAW_CONVERSION","RAW_BOX","LOAD_LIMIT","LOAD_BOX","LOAD_POINT","STOP_CLOCK","STOP_RATE","STOP_PLAN"};
 struct TiltVertex { double roll,pitch; };
 constexpr TiltVertex kWalkTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019071,0.046042},{0.000000,0.066738},{-0.019000,0.045870},{-0.019700,0.019700},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.017392,-0.041987},{-0.000000,-0.081773},{0.017392,-0.041987},{0.018313,-0.018313},{0.018722,-0.007755}};
-constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.013234,0.031951},{0.000000,0.038069},{-0.013234,0.031951},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018693,-0.007743},{-0.012106,-0.012106},{-0.006313,-0.015242},{-0.000000,-0.018660},{0.006325,-0.015271},{0.012106,-0.012106},{0.018693,-0.007743}};
+constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.012877,0.031088},{0.000000,0.036669},{-0.012877,0.031088},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.013430,-0.005563},{-0.008320,-0.008320},{-0.004336,-0.010468},{-0.000000,-0.012794},{0.004336,-0.010468},{0.008320,-0.008320},{0.013430,-0.005563}};
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
 // by at most kImuSlewMaxDtUs: no catch-up step after a pause.

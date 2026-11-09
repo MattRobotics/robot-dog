@@ -37,6 +37,8 @@ const double kHi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2
 const char* kJoint[12]={"LF_HIP","LF_UPPER","LF_LOWER","RF_HIP","RF_UPPER","RF_LOWER","RH_HIP","RH_UPPER","RH_LOWER","LH_HIP","LH_UPPER","LH_LOWER"};
 using V=simple::TiltVertex;
 constexpr double kRuntimeMargin=.85;
+unsigned gPhases=8;  // --phases N: release-grid offsets per period (1 = the pre-dev.6 single grid)
+unsigned gT2=1;      // --t2 0: exact references only (the pre-dev.6 check)
 bool contains(const simple::collision::Box& b,const JointTargetFrame& q){for(unsigned i=0;i<12;++i)if(!(jointSlot(q,i)>=b.lo[i]&&jointSlot(q,i)<=b.hi[i]))return false;return true;}
 bool limits(const JointTargetFrame& q){for(unsigned i=0;i<12;++i){const double v=jointSlot(q,i);if(!std::isfinite(v)||v<kLo[i]||v>kHi[i])return false;}return true;}
 double marginTicks(const simple::collision::Box& b,const JointTargetFrame& q){double m=1e9;for(unsigned i=0;i<12;++i)m=std::fmin(m,std::fmin(jointSlot(q,i)-b.lo[i],b.hi[i]-jointSlot(q,i)));return m/simple::kTickRad;}
@@ -71,8 +73,14 @@ std::vector<std::vector<Sample>> segments(const Law& L){
   // the ramp decelerates from stopCycle = startCycles, SimpleMotion::walkStop)
   // through the first steady cycle: steady clock from before the decel cycle to
   // the end of recentring.
-  for(double q=0;q<1.5;q+=.25){const double stopCycle=g.startCycles+q,terminal=stopCycle+g.stopCycles;
-    std::vector<Sample> s;for(double c=std::fmax(0.,terminal-g.stopCycles-.3);c<=terminal+settle+1e-12;c+=.02/L.period)s.push_back({std::fmin(c,terminal+settle),1/L.period,0,terminal});out.push_back(s);}
+  // Each at gPhases offsets of the release grid inside one period (dev.6
+  // consolidation: the start ease, late releases and a joystick start put the
+  // firmware grid at any sub-period phase of the gait clock; the swing-end RAW
+  // secant of WALK100 depends on it by one tick).
+  for(unsigned k=0;k<gPhases;++k){const double o=k*.02/L.period/gPhases;
+    if(k){std::vector<Sample> s;for(double c=g.startCycles+1+o;c<g.startCycles+2+o;c+=.02/L.period)s.push_back({c,1/L.period,0,-1});out.push_back(s);}
+    for(double q=0;q<1.5;q+=.25){const double stopCycle=g.startCycles+q,terminal=stopCycle+g.stopCycles;
+      std::vector<Sample> s;for(double c=std::fmax(0.,terminal-g.stopCycles-.3)+o;c<=terminal+settle+1e-12;c+=.02/L.period)s.push_back({std::fmin(c,terminal+settle),1/L.period,0,terminal});out.push_back(s);}}
   return out;
 }
 struct Stats{unsigned samples=0,checks=0,failIk=0,failBox=0,failStop=0,failNominal=0;double minBox=1e9,minBoxNominal=1e9,maxStepNom=0,maxStepComp=0,vmax=0,amax=0,ayMax=0,axMax=0,azMax=0;
@@ -81,7 +89,7 @@ struct Stats{unsigned samples=0,checks=0,failIk=0,failBox=0,failStop=0,failNomin
 bool run(const Law& L,const std::vector<V>& rays,Stats& st,bool jets){
   const auto& box=simple::kWalkBox;
   for(const auto& seg:segments(L)){
-    LocomotionFrame prev;bool have=false;std::vector<JointTargetFrame> prevRay(rays.size()),prevExact(rays.size());std::vector<bool> prevRayValid(rays.size(),false);
+    LocomotionFrame prev;bool have=false;std::vector<JointTargetFrame> prevRay(rays.size()),prevExact(rays.size()),prev2Exact(rays.size());std::vector<bool> prevRayValid(rays.size(),false),prev2Valid(rays.size(),false);
     for(const auto& smp:seg){
       auto f=solveGait(L.g,gaitCartesian(L.g,smp.cycles,0,0,smp.terminal),have?&prev:nullptr,false);
       if(!f.target.valid){++st.failNominal;have=false;continue;}
@@ -92,28 +100,41 @@ bool run(const Law& L,const std::vector<V>& rays,Stats& st,bool jets){
           st.ayMax=std::fmax(st.ayMax,std::abs(j.cartesian.bodyAcceleration.y));st.axMax=std::fmax(st.axMax,std::abs(j.cartesian.bodyAcceleration.x));st.azMax=std::fmax(st.azMax,std::abs(j.cartesian.bodyAcceleration.z));}}
       if(have)for(unsigned i=0;i<12;++i)st.maxStepNom=std::fmax(st.maxStepNom,std::abs(jointSlot(f.target,i)-jointSlot(prev.target,i))/simple::kTickRad);
       for(size_t r=0;r<rays.size();++r){++st.checks;JointTargetFrame q;
-        if(!compensated(f,rays[r].roll,rays[r].pitch,q)){++st.failIk;prevRayValid[r]=false;continue;}
+        if(!compensated(f,rays[r].roll,rays[r].pitch,q)){++st.failIk;prevRayValid[r]=prev2Valid[r]=false;continue;}
         const auto d=rounded(q);
         if(!limits(q)||!contains(box,q)||!limits(d)||!contains(box,d)){
           if(!st.failBox++){const int w=worstJoint(box,d);std::snprintf(st.firstBox,sizeof st.firstBox,"%s %.4f rad in [%.4f, %.4f] at c%.3f ray (%.4f, %.4f)",kJoint[w],jointSlot(d,w),box.lo[w],box.hi[w],smp.cycles,rays[r].roll,rays[r].pitch);}
-          prevRayValid[r]=false;continue;}
+          prevRayValid[r]=prev2Valid[r]=false;continue;}
         st.minBox=std::fmin(st.minBox,marginTicks(box,d));
-        if(prevRayValid[r]){simple::StopPlan plan;double pos[12],vel[12],acc[12]{},lo[12],hi[12];
-          // The firmware reads this secant from RAW references sampled on its own
-          // release clock, at any phase of the quantization: a reference moving
-          // by dq in a period can show ceil(|dq|/tick) ticks. Prove the STOP with
-          // that worst case of the unrounded motion, not this grid's own rounding.
-          for(unsigned i=0;i<12;++i){pos[i]=jointSlot(d,i);const double dq=jointSlot(q,i)-jointSlot(prevExact[r],i);
-            vel[i]=std::clamp(std::copysign(std::ceil(std::abs(dq)/simple::kTickRad-1e-9),dq)*simple::kTickRad/.02,-L.vmaxDrive,L.vmaxDrive);lo[i]=std::fmax(box.lo[i],kLo[i]);hi[i]=std::fmin(box.hi[i],kHi[i]);
-            st.maxStepComp=std::fmax(st.maxStepComp,std::abs(jointSlot(d,i)-jointSlot(prevRay[r],i))/simple::kTickRad);}
+        // The firmware reads the STOP secant from RAW references sampled on its
+        // own release clock, at any phase of the quantization: a reference
+        // moving by dq in a period can show ceil(|dq|/tick) ticks. Prove the
+        // STOP with that worst case of the unrounded motion, not this grid's own
+        // rounding. pos: the unrounded reference (rounded to the nearest tick).
+        auto prove=[&](const double* exact,const double* dq,const char* kind){simple::StopPlan plan;double pos[12],vel[12],acc[12]{},lo[12],hi[12];
+          for(unsigned i=0;i<12;++i){pos[i]=std::lround(exact[i]/simple::kTickRad)*simple::kTickRad;
+            vel[i]=std::clamp(std::copysign(std::ceil(std::abs(dq[i])/simple::kTickRad-1e-9),dq[i])*simple::kTickRad/.02,-L.vmaxDrive,L.vmaxDrive);lo[i]=std::fmax(box.lo[i],kLo[i]);hi[i]=std::fmin(box.hi[i],kHi[i]);}
           if(!plan.build(pos,vel,acc,lo,hi,L.vmaxDrive,L.amaxDrive)&&!st.failStop++){
             // Attribution: the common duration set by the fastest joint, and the
             // joint whose stop end point (q + t v/2) leaves the box first.
             int w=0;double vm=0;for(unsigned i=0;i<12;++i)if(std::abs(vel[i])>vm){vm=std::abs(vel[i]);w=i;}
             const double t=std::fmax(.04,std::ceil(1.5*vm/L.amaxDrive/.02)*.02);int e=0;double worst=1e9;
             for(unsigned i=0;i<12;++i){const double end=pos[i]+t*vel[i]/2,room=std::fmin(end-lo[i],hi[i]-end);if(room<worst){worst=room;e=i;}}
-            std::snprintf(st.firstStop,sizeof st.firstStop,"fastest %s %.3f rad/s sets %.2f s; %s ends %.1f ticks from the box (v %.3f rad/s), at c%.3f ray (%.4f, %.4f)",kJoint[w],vel[w],t,kJoint[e],worst/simple::kTickRad,vel[e],smp.cycles,rays[r].roll,rays[r].pitch);}}
-        prevRay[r]=d;prevExact[r]=q;prevRayValid[r]=true;}
+            std::snprintf(st.firstStop,sizeof st.firstStop,"%s: fastest %s %.3f rad/s sets %.2f s; %s ends %.1f ticks from the box (v %.3f rad/s), at c%.3f ray (%.4f, %.4f)",kind,kJoint[w],vel[w],t,kJoint[e],worst/simple::kTickRad,vel[e],smp.cycles,rays[r].roll,rays[r].pitch);}};
+        if(prevRayValid[r]){double exact[12],dq[12];
+          for(unsigned i=0;i<12;++i){exact[i]=jointSlot(q,i);dq[i]=jointSlot(q,i)-jointSlot(prevExact[r],i);
+            st.maxStepComp=std::fmax(st.maxStepComp,std::abs(jointSlot(d,i)-jointSlot(prevRay[r],i))/simple::kTickRad);}
+          prove(exact,dq,"exact");}
+        // T2 look-ahead (SimpleMotion::nominalRelease): every other release sends
+        // the joint-space chord midpoint of the exact solutions one period either
+        // side. Both STOP secants that touch it span half the 40 ms chord: from
+        // the midpoint to the next exact reference, and from the previous exact
+        // one to the midpoint. On a decelerating swing the chord lies outside
+        // the curve: the rig's WALK100 STOP_PLAN refusal (dev.6 consolidation).
+        if(gT2&&prevRayValid[r]&&prev2Valid[r]){double mid[12],exact[12],dq[12];
+          for(unsigned i=0;i<12;++i){exact[i]=jointSlot(q,i);mid[i]=.5*(jointSlot(q,i)+jointSlot(prev2Exact[r],i));dq[i]=exact[i]-mid[i];}
+          prove(exact,dq,"T2 exact after midpoint");prove(mid,dq,"T2 midpoint");}
+        prev2Exact[r]=prevExact[r];prev2Valid[r]=prevRayValid[r];prevRay[r]=d;prevExact[r]=q;prevRayValid[r]=true;}
       prev=f;have=true;}
   }
   return !st.failNominal&&!st.failIk&&!st.failBox&&!st.failStop;
@@ -132,7 +153,7 @@ int main(int argc,char** argv){
     {"--swayx-mm",&g.swayXM,1e-3},{"--swayy-mm",&g.swayYM,1e-3},{"--com-mm",&g.comShiftXM,1e-3},{"--ramp",&g.swingRamp,1},{"--settle",&g.settleCycles,1},
     {"--start",&g.startCycles,1},{"--stop",&g.stopCycles,1},{"--stride-mm",&g.advanceXM,1e-3},{"--reverse",&reverse,1}};
   std::vector<V> single;
-  for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;if(!std::strcmp(argv[i],"--search")){search=std::atoi(argv[i+1]);continue;}
+  for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))continue;if(!std::strcmp(argv[i],"--phases")){gPhases=std::max(1,std::atoi(argv[i+1]));continue;}if(!std::strcmp(argv[i],"--t2")){gT2=std::atoi(argv[i+1])!=0;continue;}if(!std::strcmp(argv[i],"--search")){search=std::atoi(argv[i+1]);continue;}
     if(!std::strcmp(argv[i],"--ray")){V v{};if(std::sscanf(argv[i+1],"%lf,%lf",&v.roll,&v.pitch)!=2)return 2;single.push_back(v);continue;}
     bool known=false;for(const auto& o:opts)if(!std::strcmp(argv[i],o.name)){*o.value=std::atof(argv[i+1])*o.scale;known=true;}if(!known)return 2;}
   if(reverse!=0){g.reverse=true;g.advanceXM=-std::abs(g.advanceXM);}  // backward: time reverse, negative advance (steerGait)

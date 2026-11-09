@@ -1233,7 +1233,21 @@ static void entryRecovery(){
     std::printf("refusal diagnostics: HOLD 150 under 0.2 rad of board roll, WORKSPACE refused_by %s\n",simple::kSafeChecks[r.m.imuRefusedBy()]);}
   std::puts("ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged");
 }
-int main(){proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+// dev.6 consolidation: WALK STANDARD 100 and the fore/aft joystick at 100 mm
+// faulted WALK_IK_OR_WORKSPACE (refused_by STOP_PLAN) at release 4993, cycle
+// 19.46, of a long walk on this rig (dev.4..dev.6): the T2 chord-midpoint
+// reference at the swing end made the STOP secant one tick faster than the
+// old kWalkTilt100 had been proved for (the level correction on its
+// pitch-down boundary, as on the dev.4 ground WALK100). 160 s of each walk.
+static void longWalk100(){
+  const double vx=simple::kStrideM[2]/simple::kWalkPeriodS;
+  for(int mode=0;mode<3;++mode){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    if(mode)assert(!r.m.walk(mode==1?2:1,r.p.now));
+    for(unsigned n=0;n<8000;++n){if(!mode&&n%12==0)assert(!r.m.drive(vx,0,0,r.p.now));r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>31);r.m.walkStop();assert(r.reachStand());}
+  std::puts("long walk: JOYSTICK 100 mm, WALK STANDARD 100 and 75, 8000 releases (160 s) each without fault PASS (software only)");
+}
+int main(){longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
