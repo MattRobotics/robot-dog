@@ -86,7 +86,7 @@ inline void run(Sim& s){
   // SLOW 6000 releases (120 s, 24 cycles) passes the cycle 19.5 of the dev.4 T2 defect.
   {stand(s);s.tilt(.005,.008);walk(s,WalkMode::SLOW,2);for(unsigned k=0;k<6000;++k)s.tick();report("WALK100_SLOW_120s",s);}
   {stand(s);s.tilt(.005,.008);walk(s,WalkMode::STANDARD,1);for(unsigned k=0;k<4500;++k)s.tick();report("WALK75_STANDARD_90s",s);}
-  {stand(s);s.tilt(.005,.008);walk(s,WalkMode::FAST,1);for(unsigned k=0;k<4500;++k)s.tick();report("WALK75_FAST_90s",s);}
+  {stand(s);s.tilt(.005,.008);walk(s,WalkMode::FAST,2);for(unsigned k=0;k<4500;++k)s.tick();report("WALK80_FAST_90s",s);}
   // 4: joystick held sequence with continuous regime changes and a full reversal.
   {stand(s);const double T=simple::kJoystickPeriodS,pub=simple::kStrideM[2]/T,lat=simple::kJoystickLateralM/T,yaw=simple::kJoystickYawRad/T;
    const double seg[][3]={{pub,0,0},{.7071*pub,-.7071*lat,0},{0,-lat,0},{0,0,yaw},{-.5*simple::kJoystickStrideM/T,-.7*lat,0},{-.7*simple::kJoystickStrideM/T,-.5*lat,0},{pub,0,0}};
@@ -109,6 +109,6 @@ inline void run(Sim& s){
    char n[96];std::snprintf(n,sizeof n,"FAULT_LATCH_off%u_%s_%s",unsigned(s.m.offVerified()),a?a:"ACCEPTED",b?b:"ACCEPTED");report(n,s);}
   // 8: one release of feedback lag and loaded sag in WALK100 SLOW and WALK75 FAST.
   {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::SLOW,2);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK100_SLOW",s);}
-  {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::FAST,1);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK75_FAST",s);}
+  {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::FAST,2);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK80_FAST",s);}
 }
 }
