@@ -122,7 +122,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  // accepted as a WALK STOP first: the ACK says so, and the page holds the
  // stick silent until STANDING (no refresh into the stop).
  if(joystick){const char* r=motion_->drive(c.vx,c.vy,c.yaw_rate,us);const char* why=motion_->reason();
-   return result(r,!r&&(!strcmp(why,"JOYSTICK_REVERSING")||!strcmp(why,"JOYSTICK_STEERING"))?why:"COMMAND_ACCEPTED");}
+   return result(r,!r&&!strcmp(why,"JOYSTICK_REVERSING")?why:"COMMAND_ACCEPTED");}
  if(c.vy!=0||c.yaw_rate!=0)return result("STANDARD_FORWARD_PRESETS_ONLY");
  if(preset>=0)return result(motion_->walk(static_cast<unsigned>(preset),us));
  return result("STANDARD_STRIDE_REQUIRED");

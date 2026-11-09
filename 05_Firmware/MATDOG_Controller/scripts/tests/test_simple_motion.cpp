@@ -578,55 +578,65 @@ static void joystickWalk(){
       maxY=std::fmax(maxY,std::abs(P::walkNominal(r.m).cartesian.body.translationM.y));}
     assert(maxY<=simple::kWalkSwayYM+1e-9&&std::abs(r.m.walkVelocityX()-.0069)<1e-12);r.m.walkStop();assert(r.reachStand());
     std::printf("JOYSTICK fore/aft with the recorded touch jitter: WALK STANDARD law, body lateral excursion %.2f mm (sway %.1f mm), no WALK STOP\n",maxY*1e3,simple::kWalkSwayYM*1e3);}
-  // B. A steering demand during a fore/aft walk: WALK STOP (JOYSTICK_STEERING),
-  // STANDING, then the held stick walks the steered law from its start.
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{pub[0]/2,0,0});hold(r,{pub[0]/2,0,0},400);
-    const V3 steer{pub[0]/2,.5*lim[1],0};assert(!drive(r,steer)&&!std::strcmp(r.m.reason(),"JOYSTICK_STEERING")&&!r.m.joystickActive());
-    bool stood=false;
-    for(unsigned n=0;n<4000&&!(r.m.state()==simple::State::WALKING&&&P::box(r.m)==&simple::collision::kSteer);++n){
-      if(n%12==0){const char* why=drive(r,steer);assert(!why||!std::strcmp(why,"WALK_STOPPING")||!std::strcmp(why,"MOTION_BUSY"));}
-      r.tick();stood|=r.m.state()==simple::State::STANDING;assert(r.m.state()!=simple::State::FAULT);}
-    assert(stood&&r.m.state()==simple::State::WALKING&&&P::box(r.m)==&simple::collision::kSteer&&r.m.walkCycles()<1);r.m.walkStop();assert(r.reachStand());}
+  // B. dev.6 one law: a steering demand during a fore/aft walk never stops it.
+  // The stride retires to the steered range first (no lateral before the
+  // regime handover), then lateral grows; every RAW step stays inside the drive.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{pub[0],0,0});hold(r,{pub[0],0,0},400);
+    const V3 steer{pub[0]/2,.5*lim[1],0};std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0,handover=0;
+    for(unsigned n=0;n<1500;++n){if(n%12==0)assert(!drive(r,steer));r.tick();assert(r.m.state()==simple::State::WALKING&&r.m.joystickActive());
+      const auto& g=P::gait(r.m);if(&P::box(r.m)!=&simple::collision::kSteer)assert(g.advanceYM==0);else if(!handover)handover=n;
+      if(g.advanceYM!=0)assert(std::abs(g.advanceXM)<=simple::kJoystickStrideM+1e-12);
+      for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
+    assert(handover>0&&&P::box(r.m)==&simple::collision::kSteer&&r.m.walkVelocityY()>0&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    std::printf("JOYSTICK fore/aft -> steered without WALK STOP: regime handover after %.2f s, max RAW step %u ticks/release\n",handover*.02,maxRaw);
+    r.m.walkStop();assert(r.reachStand());}
   // C. The full backward stick walks kJoystickBackM per cycle (the reversed v2 law).
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{-pub[0],0,0});while(r.m.walkCycles()<1.5)hold(r,{-pub[0],0,0},1);
     assert(P::reverse(r.m)&&std::abs(r.m.walkVelocityX()+back)<1e-12&&&P::box(r.m)==&simple::kWalkBox);r.m.walkStop();assert(r.reachStand());}
-  // D. Fore/aft stride changes follow kJoystickFrontalRampCycles for the full
-  // 100 mm; every RAW step stays below the WALK drive per release.
+  // D. Fore/aft stride increases follow kJoystickFrontalRampCycles for the full
+  // 100 mm, forward decreases kJoystickFrontalDecelCycles; every RAW step stays
+  // below the WALK drive per release.
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{.2*pub[0],0,0});hold(r,{.2*pub[0],0,0},300);
-    double prev=P::stride(r.m),maxD=0;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
+    double prev=P::stride(r.m),maxD=0,maxDown=0;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
     const double seq[]={pub[0],.1*pub[0],.7*pub[0]};
     for(unsigned n=0;n<2100;++n){const double vx=seq[n/700];if(n%12==0)assert(!drive(r,{vx,0,0}));r.tick();assert(r.m.state()==simple::State::WALKING);
-      maxD=std::fmax(maxD,std::abs(P::stride(r.m)-prev));prev=P::stride(r.m);
+      const double d=P::stride(r.m)-prev;if(d>0)maxD=std::fmax(maxD,d);else maxDown=std::fmax(maxDown,-d);prev=P::stride(r.m);
       for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
     const double perRelease=simple::kStrideM[2]/simple::kJoystickFrontalRampCycles*simple::kPeriodUs/1e6/TW;
-    assert(maxD<=perRelease*(1+1e-6)&&std::abs(prev-.7*pub[0]*TW)<1e-12&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    const double perReleaseDown=perRelease*simple::kJoystickFrontalRampCycles/simple::kJoystickFrontalDecelCycles;
+    assert(maxD<=perRelease*(1+1e-6)&&maxDown<=perReleaseDown*(1+1e-6)&&std::abs(prev-.7*pub[0]*TW)<1e-12&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
     r.m.walkStop();assert(r.reachStand());
-    std::printf("JOYSTICK fore/aft stride changes: %.6f m per release (limit %.6f), max RAW step %u ticks/release\n",maxD,perRelease,maxRaw);}
+    std::printf("JOYSTICK fore/aft stride changes: +%.6f m (limit %.6f) / -%.6f m (limit %.6f) per release, max RAW step %u ticks/release\n",maxD,perRelease,maxDown,perReleaseDown,maxRaw);}
   // E. STOP at five instants of a fore/aft walk: verified arrest with torque,
   // then STAND completes the interrupted WALK STANDARD gait to STANDING.
   for(unsigned when=0;when<250;when+=50){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 v{pub[0],0,0};walkTo(r,v);hold(r,v,300+when);
     r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n){if(n%12==0)assert(drive(r,v));r.tick();}
     assert(r.m.stopVerified()&&r.m.energized()&&!r.m.joystickActive());
     assert(!r.m.stand(.12,r.p.now)&&!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK"));assert(r.reachStand());}
-  // F. Review 09/11 (held stick FORWARD -> DIAGONAL -> LATERAL -> FORWARD).
-  // Characterizes the dev.5 contract: one law change at the first steering
-  // demand (WALK STOP, JOYSTICK_STEERING), then the steered law until release;
-  // back to pure fore/aft it stays steered at its own speed and its sway returns
-  // to the 2 mm base (never the 14 mm of a steered demand). A law change without
-  // WALK STOP is not offered by the gait (gaitRetarget: advance/yaw/swayY only).
+  // F. Held stick FORWARD -> DIAGONAL -> RIGHT -> ROTATION -> RIGHT-BACK ->
+  // BACK-RIGHT -> FORWARD in one press (dev.6 one law): WALK STOP only at the
+  // two fore/aft reversals, no fault over the whole trajectory, every RAW step
+  // inside the drive, the regime follows the demand and the final fore/aft
+  // walk is back in the WALK STANDARD regime (kHeight, 1.5 mm sway) at its full
+  // speed. dev.6 2c53ecf: a WALK STOP at the first steering demand and a final
+  // steered walk at 6.9 mm/s.
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
-    struct Seg{const char* name;V3 v;} seg[]={{"FORWARD",{pub[0],0,0}},{"DIAGONAL",{.7071*pub[0],.7071*lim[1],0}},{"LATERAL",{0,lim[1],0}},{"FORWARD",{pub[0],0,0}}};
-    unsigned stops=0;double changeS=0,decayS=-1;bool walking=false;
-    for(unsigned k=0;k<4;++k){bool settled=false;double t=0;
-      for(unsigned n=0;n<1500;++n){if(n%12==0)drive(r,seg[k].v);r.tick();t+=.02;assert(r.m.state()!=simple::State::FAULT);
-        const bool w=r.m.state()==simple::State::WALKING;if(walking&&!w){++stops;changeS=0;}if(!w)changeS+=.02;walking=w;
-        if(k==3&&w&&decayS<0&&P::gait(r.m).swayYM<=simple::kJoystickSwayLowM)decayS=t;settled|=w;}
-      assert(settled&&r.m.state()==simple::State::WALKING);
-      const bool steered=&P::box(r.m)==&simple::collision::kSteer;
-      std::printf("JOYSTICK held sequence %-8s law=%s sway=%.1f mm vx=%.2f vy=%.2f mm/s\n",seg[k].name,steered?"STEERED":"WALK_STANDARD",P::gait(r.m).swayYM*1e3,r.m.walkVelocityX()*1e3,r.m.walkVelocityY()*1e3);
-      if(k==0)assert(!steered);else assert(steered);}
-    assert(stops==1&&std::abs(r.m.walkVelocityX()-lim[0])<1e-12&&std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayBaseYM)<1e-12&&decayS>0);
-    std::printf("JOYSTICK held sequence: 1 WALK STOP (law change, %.1f s without walking), final fore/aft stays steered at %.2f mm/s, sway back under %.0f mm after %.1f s\n",changeS,lim[0]*1e3,simple::kJoystickSwayLowM*1e3,decayS);
+    struct Seg{const char* name;V3 v;unsigned releases;} seg[]={{"FORWARD",{pub[0],0,0},1500},{"DIAGONAL",{.7071*pub[0],-.7071*lim[1],0},1500},{"RIGHT",{0,-lim[1],0},1500},
+      {"ROTATION",{0,0,lim[2]},1500},{"RIGHT-BACK",{-.5*lim[0],-.7*lim[1],0},1500},{"BACK-RIGHT",{-.7*lim[0],-.5*lim[1],0},2000},{"FORWARD",{pub[0],0,0},4000}};
+    unsigned stops=0,maxRaw=0;bool walking=false;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());
+    for(const auto& s:seg){double t=0,handover=-1;const bool was=&P::box(r.m)==&simple::collision::kSteer;
+      for(unsigned n=0;n<s.releases;++n){if(n%12==0)drive(r,s.v);r.tick();t+=.02;assert(r.m.state()!=simple::State::FAULT);
+        const bool w=r.m.state()==simple::State::WALKING;if(walking&&!w)++stops;walking=w;
+        if(w){for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));}}
+        for(unsigned i=0;i<12;++i)raw[i]=r.p.target[i];
+        if(handover<0&&(&P::box(r.m)==&simple::collision::kSteer)!=was)handover=t;}
+      std::printf("JOYSTICK held %-10s regime=%s handover=%5.1f s sway=%.1f mm vx=%.2f vy=%.2f mm/s yaw=%.2f deg/s state=%s\n",s.name,&P::box(r.m)==&simple::collision::kSteer?"STEERED":"FORE/AFT",handover,
+        P::gait(r.m).swayYM*1e3,r.m.walkVelocityX()*1e3,r.m.walkVelocityY()*1e3,r.m.walkYawRate()*180/M_PI,simple::name(r.m.state()));}
+    // RIGHT-BACK (lateral above fore/aft) walks right with the backward part held
+    // at zero; BACK-RIGHT and the final FORWARD reverse the leg order: the two
+    // WALK STOPs the leg order still needs, nothing else stops.
+    assert(stops==2&&&P::box(r.m)==&simple::kWalkBox&&P::gait(r.m).swayYM==simple::kWalkSwayYM&&r.m.walkVelocityX()>.95*pub[0]&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    std::printf("JOYSTICK held sequence: %u WALK STOP (the two reversals), max RAW step %u ticks/release, final fore/aft %.2f mm/s in the WALK STANDARD regime\n",stops,maxRaw,r.m.walkVelocityX()*1e3);
     r.m.walkStop();assert(r.reachStand());}
   // H. Review 09/11 defect of 3afe6ce: after steering, a forward stick with the
   // recorded touch jitter kept the steered 14 mm sway (11.9-14 mm offline, the
@@ -636,15 +646,20 @@ static void joystickWalk(){
     const double jit[]={.0001,.0002,-.0003,.0004,-.0001,.0003};unsigned k=0;double maxSway=0;
     for(unsigned n=0;n<4000;++n){if(n%12==0)assert(!drive(r,{.95*pub[0],jit[k++%6],0}));r.tick();assert(r.m.state()==simple::State::WALKING);
       if(n>2500)maxSway=std::fmax(maxSway,P::gait(r.m).swayYM);}
-    assert(&P::box(r.m)==&simple::collision::kSteer&&P::gait(r.m).advanceYM==0&&maxSway==simple::kJoystickSwayBaseYM);r.m.walkStop();assert(r.reachStand());
+    assert(&P::box(r.m)==&simple::kWalkBox&&P::gait(r.m).advanceYM==0&&maxSway==simple::kJoystickSwayBaseYM);r.m.walkStop();assert(r.reachStand());  // back in the fore/aft regime (dev.6)
     std::printf("JOYSTICK forward after steering with the recorded jitter: sway %.1f mm over the last 30 s (3afe6ce: 11.9-14 mm)\n",maxSway*1e3);}
-  // G. Fore/aft band sensitivity: a walk started at 19 % of lateral stays
-  // WALK STANDARD; demands alternating 18/22 % change law once, never again.
+  // G. Fore/aft band sensitivity: a walk started at 19 % of lateral stays in the
+  // fore/aft regime; demands alternating 18/22 % every 240 ms for 120 s never
+  // stop or fault the walk, the RAW steps stay inside the drive and the regime
+  // changes a bounded number of times (handovers need retired lateral and sway).
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double vx=.9*pub[0];
-    walkTo(r,{vx,.19*lim[1],0});assert(&P::box(r.m)==&simple::kWalkBox);unsigned stops=0,n=0;bool w=true;
-    for(;n<6000;++n){if(n%12==0)drive(r,{vx,(n/12%2?.22:.18)*lim[1],0});r.tick();const bool now=r.m.state()==simple::State::WALKING;stops+=w&&!now;w=now;}
-    assert(stops==1&&w&&&P::box(r.m)==&simple::collision::kSteer);r.m.walkStop();assert(r.reachStand());
-    std::printf("JOYSTICK band: 19 %% stays fore/aft; 18/22 %% alternating every 240 ms for 120 s: exactly 1 law change\n");}
+    walkTo(r,{vx,.19*lim[1],0});assert(&P::box(r.m)==&simple::kWalkBox);unsigned stops=0,changes=0,maxRaw=0;bool w=true,steered=false;
+    std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());
+    for(unsigned n=0;n<6000;++n){if(n%12==0)drive(r,{vx,(n/12%2?.22:.18)*lim[1],0});r.tick();const bool now=r.m.state()==simple::State::WALKING;stops+=w&&!now;w=now;
+      const bool s=&P::box(r.m)==&simple::collision::kSteer;changes+=s!=steered;steered=s;
+      for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
+    assert(stops==0&&w&&changes<=4&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK band: 19 %% stays fore/aft; 18/22 %% alternating every 240 ms for 120 s: 0 WALK STOP, %u regime changes, max RAW step %u ticks\n",changes,maxRaw);}
   // Contract: BASE_VELOCITY gait JOYSTICK through the JSON parser and MotionService.
   {Rig api;core::MotionService service;service.begin(&api.m,nullptr,nullptr);service.setReady(true,"READY");assert(!api.m.stand(.15,api.p.now));assert(api.reachStand());
     unsigned seq=0;auto send=[&](const char* params){char json[400];const int n=std::snprintf(json,sizeof json,
@@ -1092,7 +1107,8 @@ static void swayMap(){
     for(unsigned n=0;n<2600;++n){if(n%12==0)assert(!r.m.drive(vx,.19*lat,0,r.p.now));
       bool four=true;for(const auto& ph:P::walkNominal(r.m).cartesian.phases)four=four&&ph.stance;r.tick();assert(r.m.state()==simple::State::WALKING);
       const double s=P::gait(r.m).swayYM;if(s!=last){++changes;if(!four)++changesWithSwing;last=s;}}
-    assert(changes>0&&changesWithSwing==0&&P::gait(r.m).advanceYM==0&&std::abs(last-simple::kJoystickSwayBaseYM)<1e-12&&&P::box(r.m)==&simple::collision::kSteer);
+    // dev.6: retired lateral and sway hand the walk back to the fore/aft regime (no WALK STOP).
+    assert(changes>0&&changesWithSwing==0&&P::gait(r.m).advanceYM==0&&std::abs(last-simple::kJoystickSwayBaseYM)<1e-12&&&P::box(r.m)==&simple::kWalkBox);
     hold(r,.21,1300);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
     r.m.walkStop();assert(r.reachStand());}
   // A new walk: just under the band it is fore/aft, WALK STANDARD sway and box,
@@ -1112,7 +1128,7 @@ static void steeredEnvelopeHeading(){
   Rig r;const double T=simple::kJoystickPeriodS,vy=.5*simple::kJoystickLateralM/T;assert(!r.m.drive(.5*simple::kJoystickStrideM/T,vy,0,r.p.now));  // steered (dev.5)
   for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.5*simple::kJoystickStrideM/T,vy,0,r.p.now);r.tick();}assert(r.m.state()==simple::State::WALKING);
   double roll=.0,pitch=.05;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&pitch==.05);           // inside, identity heading, untouched
-  roll=.0;pitch=.10;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&std::abs(pitch-.07)<1e-12);     // pitch-up vertex, identity heading
+  roll=.0;pitch=.10;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&std::abs(pitch-simple::kSteerTilt[1].pitch)<1e-12);     // pitch-up vertex, identity heading
   roll=.0;pitch=.05;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&std::abs(roll)<1e-12&&std::abs(pitch-.0245)<1e-12);  // heading 90 deg: a body roll, roll vertex
   roll=.0;pitch=.02;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&roll==0&&pitch==.02);                    // inside at 90 deg too
   r.m.walkStop();assert(r.reachStand());

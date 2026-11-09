@@ -82,9 +82,6 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
   if(scale>=1)return false;
   roll*=scale;pitch*=scale;return true;
 }
-// Inner convex envelope of kSteer, gen-1 RAW, the tread fillet up to
-// kEdgeContactMaxTiltRad and STOP over the steered phase set (offline rays).
-constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.07},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
 }
 GaitParameters walkGait(unsigned stride){
   GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
@@ -92,8 +89,8 @@ GaitParameters walkGait(unsigned stride){
   g.comShiftXM=kWalkComShiftXM;g.swingRamp=kWalkSwingRamp;g.settleCycles=kWalkSettleCycles;return g;
 }
 GaitParameters steerGait(const double goal[3]){
-  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kJoystickDuty;
-  g.swayXM=kJoystickSwayXM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+  // dev.6: the WALK STANDARD v2 law itself, steered in SE(2), fillet contact allowed.
+  GaitParameters g=walkGait(2);
   g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
   g.swayYM=joystickSwayYM(goal[1],goal[2],kJoystickSwayBaseYM);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
@@ -583,13 +580,13 @@ const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)
   // STOP; the next command after STANDING starts the other one. Lateral and yaw
   // are continuous in a steered walk: a mainly lateral/yaw demand keeps walking,
   // its contrary fore/aft part held at zero by steerWalk (dev.17 HW: a sideways
-  // stick a hair behind centre stopped the walk). A fore/aft walk runs the WALK
-  // STANDARD law: a steering demand ends it the same way (JOYSTICK_STEERING).
+  // stick a hair behind centre stopped the walk). Between the fore/aft (WALK
+  // STANDARD) and steered regimes the walk changes law without stopping
+  // (steerWalk, regimeHandover).
   const bool reverse=vx<0;
   if(state_==State::WALKING){
     if(!joystick_)return "WALK_STANDARD_ACTIVE";
     if(walkStopping_)return "WALK_STOPPING";
-    if(!steered_&&!frontal){walkStop();reason_="JOYSTICK_STEERING";return nullptr;}
     // "Mostly" in the walking law's own ellipsoid (the steered fore/aft range is shorter).
     const double fore=steered_?(vx*kJoystickPeriodS/kJoystickStrideM)*(vx*kJoystickPeriodS/kJoystickStrideM):n[0];
     if(vx!=0&&reverse!=gait_.reverse&&fore>n[1]+n[2]){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
@@ -916,12 +913,13 @@ void SimpleMotion::startWalk(uint64_t now){
   steered_=joystick_&&!joystickFrontal_;
   if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_);}
   else{
-    // The latest target, from the start ramp; never against the leg order. A
-    // fore/aft demand walks the WALK STANDARD 100 law and envelope.
+    // The latest target, from the start ramp; never against the leg order. One
+    // law (steerGait) in the regime of the demand: fore/aft (kHeight,
+    // kWalkTilt100) or steered (kSteer, kSteerTilt).
     double goal[3];joystickGoal(!steered_,goal);const bool reverse=gait_.reverse;
-    if(steered_)gait_=steerGait(goal);else{stride_=2;gait_=walkGait(2);}
+    stride_=2;gait_=steerGait(goal);if(!steered_)gait_.swayYM=kJoystickSwayBaseYM;
     gait_.reverse=reverse;gait_.advanceXM=(goal[0]<0)!=reverse?0:goal[0];gait_.advanceYM=goal[1];gait_.yawRad=goal[2];}
-  plannedHeight_=kWalkHeightM;track_={};steeredCycles_=0;resetLookahead();
+  plannedHeight_=kWalkHeightM;track_={};steeredCycles_=0;regimeSinceCycles_=-1;resetLookahead();
   walkPrevious_=solveGait(gait_,gaitTrackCartesian(track_,gait_,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(walkBox(),walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
@@ -931,18 +929,34 @@ void SimpleMotion::steerWalk(uint64_t now){
   if(!joystick_||walkStopping_||walkRecover_){for(double& r:track_.goalRate)r=0;return;}
   // Released, unreachable or silent client: the Controller ends the walk itself.
   if(now>joystickDeadlineUs_){walkStop();reason_="JOYSTICK_TIMEOUT";return;}
-  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad},goal[3];joystickGoal(!steered_,goal);
-  // Full scale over kJoystickRampCycles (steered) or, on the WALK STANDARD law,
-  // over its own start ramp (the stride change of a walk started at rest).
-  const double limit[3]={steered_?kJoystickStrideM:kStrideM[2],kJoystickLateralM,kJoystickYawRad},ramp=steered_?kJoystickRampCycles:kJoystickFrontalRampCycles;
+  // Regime change of the one law, never by WALK STOP (dev.6): fore/aft ->
+  // steered once the stride is inside the steered range, steered -> fore/aft once
+  // lateral, yaw and sway are retired; both only where regimeHandover holds.
+  // The precondition must hold for one whole cycle first: every foot has then
+  // stepped under it (offline, a handover with feet still planted for the long
+  // fore/aft stride or a lateral step put IMU envelope rays outside the box).
+  const bool toSteered=!steered_&&!joystickFrontal_&&std::abs(gait_.advanceXM)<=kJoystickStrideM+1e-12;
+  const bool toForeAft=steered_&&joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM&&std::abs(gait_.advanceXM)<=kJoystickStrideM+1e-12;
+  if(!toSteered&&!toForeAft)regimeSinceCycles_=-1;
+  else if(regimeSinceCycles_<0)regimeSinceCycles_=cycles_;
+  else if(cycles_-regimeSinceCycles_>=1&&regimeHandover(toSteered)){steered_=toSteered;regimeSinceCycles_=-1;}
+  // Fore/aft regime with a steering demand: the stride retires to the steered
+  // range first, lateral and yaw wait for the handover.
+  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad},goal[3];joystickGoal(!steered_&&joystickFrontal_,goal);
+  if(!steered_)goal[1]=goal[2]=0;
+  // Full scale over kJoystickRampCycles (steered); fore/aft increases over
+  // kJoystickFrontalRampCycles, forward decreases over kJoystickFrontalDecelCycles.
+  const double limit[3]={steered_?kJoystickStrideM:kStrideM[2],kJoystickLateralM,kJoystickYawRad};
   const double dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
   for(unsigned j=0;j<3;++j){
-    const double g=j==0&&(goal[0]<0)!=gait_.reverse?0:goal[j],rate=limit[j]/ramp;  // never against the leg order
+    const double g=j==0&&(goal[0]<0)!=gait_.reverse?0:goal[j];  // never against the leg order
+    // Forward only: a faster backward decrease left -0.69 mm of static support (seeded random sequence).
+    const double ramp=steered_?kJoystickRampCycles:!gait_.reverse&&std::abs(g)<std::abs(*axis[j])?kJoystickFrontalDecelCycles:kJoystickFrontalRampCycles,rate=limit[j]/ramp;
     *axis[j]+=std::clamp(g-*axis[j],-rate*dc,rate*dc);track_.goal[j]=g;track_.goalRate[j]=rate;}
   // Lateral sway follows the rate-limited lateral/yaw demand, changing only
   // while all four feet are down (last nominal sample): the body never crosses
   // the fillet contact band (SimpleMotion.h) during a three-contact phase. The
-  // WALK STANDARD law keeps its own sway.
+  // fore/aft regime keeps the WALK sway.
   const double swayRate=(kJoystickSwayYM-kJoystickSwayBaseYM)/kJoystickSwayRampCycles;
   bool fourDown=steered_;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
   if(fourDown)next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad,gait_.swayYM)-next.swayYM,-swayRate*dc,swayRate*dc);
@@ -952,8 +966,25 @@ void SimpleMotion::steerWalk(uint64_t now){
 #endif
     gait_=next;}
 }
+bool SimpleMotion::regimeHandover(bool toSteered) const {
+  const collision::Box& box=toSteered?collision::kSteer:kWalkBox;
+  JointTargetFrame q;q.valid=true;
+  for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(q,i)))return false;
+  if(!pointSafe(q)||!contains(box,q))return false;
+  const auto& b=walkPrevious_.cartesian.body;const double c=b.rotation[0][0],s=b.rotation[1][0];
+  const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;
+  double rb=c*r+s*p,pb=-s*r+c*p;
+  return toSteered?!projectWalkTilt(kSteerTilt,rb,pb):!projectWalkTilt(kWalkTilt100,rb,pb);
+}
 bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) const {
-  if(!steered_)return stride_==2?projectWalkTilt(kWalkTilt100,roll,pitch):projectWalkTilt(kWalkTilt75,roll,pitch);
+  // Fore/aft regime: its envelope, also in the heading frame (a joystick walk
+  // may have turned; identity heading keeps roll/pitch bit for bit). A steered
+  // walk whose lateral, yaw and sway are retired for a fore/aft demand already
+  // limits to it: the applied correction slews inside, then the regime hands over.
+  if(!steeredEnvelope()){const auto& poly=stride_==2?kWalkTilt100:kWalkTilt75;
+    if(c==1&&s==0)return projectWalkTilt(poly,roll,pitch);
+    double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(poly,rb,pb);
+    if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;}
   // The steered envelope bounds the hip roll and fillet tilt the correction
   // loads on the stance legs, a body-frame quantity, while the fitted tilt and
   // headed() live in the support frame. Take the tilt vector into the heading

@@ -551,16 +551,19 @@ int envelopes(const char* path, const char* src) {
     };
     hold("joystick_dynamic_forward", 1.5);
     check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() == 0, "dynamic: forward");
-    // dev.5: forward alone walks the WALK STANDARD law; the first steering demand
-    // changes law through one WALK STOP (ACK JOYSTICK_STEERING, page silent), then
-    // the held intent walks steered from STANDING.
-    check(post("joystick_dynamic_diagonal") == "ACCEPTED JOYSTICK_STEERING" && !std::strcmp(rig.m.reason(), "JOYSTICK_STEERING"), "dynamic: forward-right during a fore/aft walk changes law (WALK STOP), the ACK says so");
-    for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) step("law change");
-    check(rig.m.state() == simple::State::STANDING && stops == 1, "dynamic: law change ends in STANDING (page silent)");
-    for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) {
-      if (k % 12 == 0) check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held forward-right accepted at STANDING");
-      step("joystick_dynamic_diagonal");
-    }
+    // dev.6 one law: forward alone walks the WALK STANDARD regime; a held
+    // steering demand retires the stride to the steered range and hands the
+    // walk over to the steered regime without a WALK STOP (no ACK reason, the
+    // page stays in its walk).
+    {double handover = -1;
+     for (unsigned k = 0; k < 6000 && handover < 0; ++k) {
+       if (k % 12 == 0) check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held forward-right accepted during the fore/aft walk");
+       step("joystick_dynamic_diagonal");
+       check(rig.m.state() == simple::State::WALKING, "dynamic: forward-right during a fore/aft walk keeps walking");
+       if (rig.m.walkVelocityY() < 0) handover = k * .02;
+     }
+     check(handover > 0 && stops == 0, "dynamic: forward-right hands over to the steered regime without WALK STOP");
+     std::printf("dynamic joystick: fore/aft -> steered handover %.1f s after the steering demand, no WALK STOP\n", handover);}
     // Intent -> reference: the next release moves the lateral reference; full
     // scale takes kJoystickRampCycles cycles (rate limit, envelope gate).
     hold("joystick_dynamic_forward", .5);
@@ -573,13 +576,13 @@ int envelopes(const char* path, const char* src) {
     hold("joystick_dynamic_lateral", 2.5);
     check(rig.m.walkVelocityX() == 0 && rig.m.walkVelocityY() < 0, "dynamic: right, fore/aft at zero, no reversal");
     hold("joystick_dynamic_left", 3);
-    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 1, "dynamic: forward-left; no further WALK STOP in four steered direction changes");
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 0, "dynamic: forward-left; no WALK STOP in five direction changes");
     std::printf("dynamic joystick: intent->reference at the next release (%.3f mm/s of lateral per release), full scale %.1f s (kJoystickRampCycles %.1f x %.1f s); %.2f cycles without a stop\n",
                 firstMove * 1000, simple::kJoystickRampCycles * simple::kJoystickPeriodS, simple::kJoystickRampCycles, simple::kJoystickPeriodS, rig.m.walkCycles() - c0);
     check(post("joystick_dynamic_back") == "ACCEPTED JOYSTICK_REVERSING" && !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING"), "dynamic: full pull back reverses (WALK STOP), the ACK says so");
     bool settled = false;
     for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) { step("reversal"); settled |= !std::strcmp(rig.m.reason(), "WALK_SETTLING"); }
-    check(rig.m.state() == simple::State::STANDING && settled && stops == 2, "dynamic: one more WALK STOP, settling, STANDING (page silent)");
+    check(rig.m.state() == simple::State::STANDING && settled && stops == 1, "dynamic: the reversal is the one WALK STOP, settling, STANDING (page silent)");
     for (unsigned k = 0; k < 3000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() > 1); ++k) {
       if (k % 12 == 0) check(post("joystick_dynamic_reverse") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held backward intent accepted at STANDING");
       step("joystick_dynamic_reverse");

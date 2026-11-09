@@ -49,69 +49,54 @@ inline double walkClockS(double t){const double u=std::fmin(1.,t);return t<1?u*u
 // The two walking laws (single definition for the firmware and offline tools).
 motion::GaitParameters walkGait(unsigned stride);
 motion::GaitParameters steerGait(const double goal[3]);
-// JOYSTICK: the dev.15 steered law, unchanged by the WALK STANDARD v2 redesign
-// (its own period, duty and 10 mm fore/aft sway, no COM offset, smootherstep
-// swing, as certified with kSteer), steered in SE(2). Displacement per cycle inside
-// the ellipsoid (x/kJoystickStrideM)^2+(y/kJoystickLateralM)^2+(yaw/
-// kJoystickYawRad)^2 <= 1, each axis rate limited to full scale over two gait
-// cycles; swing targets are planned on that ramp. A steered walk keeps the
-// WALK height, duty, lift and stride ramps and differs from WALK STANDARD only
-// where lateral and turning steps need it: up to 14 mm lateral sway and stance
-// contact on the tread fillet (FootContact.h), inside its own certified joint
-// box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
-// the URDF COM, the binding support edge is the RF-LH diagonal while RH swings;
-// the lateral sway moves the COM away from it by ~0.75 mm per mm and tilts the
-// stance feet (hip roll), so 15 mm already leaves the fillet limit at the IMU
-// envelope boundary. At 14 mm steady commands keep >= +1.8 mm static support
-// and the random multi-axis set >= +0.5 mm, a static model margin, not a
-// dynamic stability claim (scripts/offline_motion/run_joystick_envelope.sh). The Controller
-// ends the walk with WALK STOP when no admitted joystick command arrives for
-// kJoystickTimeoutUs (ESP clock).
-constexpr double kJoystickPeriodS=6.5, kJoystickDuty=.825, kJoystickSwayXM=.010, kJoystickSwayBaseYM=.002;
-constexpr double kJoystickStrideM=.045, kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
-// Steered lateral sway (motion-perf-next). A purely longitudinal joystick walks
-// with kJoystickSwayBaseYM (2 mm, the v1.0.1 WALK sway); up to kJoystickSwayOnDemand of the
-// lateral/yaw fraction of the ellipsoid the amplitude rises linearly to
-// kJoystickSwayLowM, and from there any lateral or turning intent uses the
-// full kJoystickSwayYM until the demand falls below kJoystickSwayOffDemand
-// (hysteresis keyed on the current amplitude, no extra state). The gap is
-// physical, not a tuning choice: at ~5.5 mm of body sway the stance hips tilt
-// the foot axis past the 2 deg nominal strip and the real contact migrates
-// ~5 mm along the tread fillet in the sway direction, so the support polygon
-// follows the COM. Offline (URDF COM, real fillet contacts) a steady 6 mm
-// amplitude gives -0.08 mm of static support at the first swing, 2 mm +1.07,
-// 4.4 mm +2.9, 10 mm +3.0, 14 mm +5.9. The amplitude changes only with four
-// feet down (steerWalk), rate limited over kJoystickSwayRampCycles, so no
-// three-contact phase is crossed inside the 5-9 mm band.
-constexpr double kJoystickSwayYM=.014, kJoystickSwayLowM=.005, kJoystickSwayOnDemand=.03, kJoystickSwayOffDemand=.015, kJoystickSwayRampCycles=.5;
+// JOYSTICK (dev.6 consolidation, one law). Every joystick walk runs the WALK
+// STANDARD v2 law (walkGait: 5 s, duty .80, 11 mm COM shift, trapezoidal swing,
+// eased clock), steered in SE(2) by gaitRetarget, the fillet contact always
+// allowed (inside the nominal strip it changes no joint). Two regimes of the
+// same law differ only by their certified region and IMU envelope:
+// - fore/aft: kHeight, kWalkTilt100, stride up to 100 mm (back kJoystickBackM),
+//   sway kWalkSwayYM;
+// - steered: kSteer, kSteerTilt (heading frame), stride <= kJoystickStrideM,
+//   lateral and yaw per cycle in the ellipsoid, sway by joystickSwayYM.
+// The regime changes inside the walk, at a release where the reference with its
+// applied correction already lies in the new region (regimeHandover): v2 frames
+// up to a 60 mm stride with the WALK sway are inside both boxes (kSteer >= 30
+// mrad, kHeight 14.2 mrad offline), so the box changes under an unchanged
+// reference. Fore/aft -> steered: the stride first retires to kJoystickStrideM,
+// lateral and yaw start after the handover; steered -> fore/aft: lateral, yaw
+// and sway retire first. No WALK STOP: only a fore/aft reversal still stops
+// (leg order). Offline (joystick gate, fillet contacts, URDF COM): with the v2
+// law the 14 mm steered sway fails the STOP proof (sway transfer in the 0.25 s
+// four-contact window, refused_by STOP_PLAN), 11-13 mm too in 18-28 of 42
+// scenarios; 10 mm passes; 7 mm or less gives negative static support. With
+// 10 mm, 24 seeded random sequences: lateral 25 mm/yaw .16 rad per cycle one
+// fault and p10 +0.37 mm of static support; lateral 20 mm/yaw .16 (4 mm/s,
+// 1.83 deg/s) no fault, p10 +0.63 mm; yaw .20 only +0.18 mm minimum.
+constexpr double kJoystickPeriodS=kWalkPeriodS, kJoystickSwayBaseYM=kWalkSwayYM;
+constexpr double kJoystickStrideM=.045, kJoystickLateralM=.020, kJoystickYawRad=.16, kJoystickRampCycles=2;
+// Steered lateral sway: a demand under kJoystickSwayOnDemand of the lateral/yaw
+// ellipsoid rises linearly from the base to kJoystickSwayLowM; from there any
+// lateral or turning intent takes the full kJoystickSwayYM until the demand falls
+// below kJoystickSwayOffDemand (hysteresis keyed on the current amplitude). The
+// amplitude changes only with four feet down (steerWalk), rate limited.
+constexpr double kJoystickSwayYM=.010, kJoystickSwayLowM=.005, kJoystickSwayOnDemand=.03, kJoystickSwayOffDemand=.015, kJoystickSwayRampCycles=.5;
 inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){
   const double y=advanceYM/kJoystickLateralM,w=yawRad/kJoystickYawRad,s=std::sqrt(y*y+w*w);
   if(s>=(currentSwayYM>kJoystickSwayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return kJoystickSwayYM;
   return kJoystickSwayBaseYM+(kJoystickSwayLowM-kJoystickSwayBaseYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
 }
 constexpr uint64_t kJoystickTimeoutUs=1000000;
-// Fore/aft JOYSTICK (dev.5, ground HW 08/11/2026). A demand whose lateral and
-// yaw part of the published ellipsoid stays under kJoystickFrontalBand is pure
-// fore/aft and walks the WALK STANDARD v2 law itself (walkGait: period, duty,
-// COM shift, swing, 1.5 mm sway, kHeight box, kWalkTilt100, nominal strip),
-// its stride continuous up to the 100 mm preset forward and kJoystickBackM
-// backward. Offline the v2 law keeps positive static support at 10-100 mm in
-// both directions with the URDF COM; backward its support window on a forward
-// COM error is narrower (zero near +2.9 mm at 50 mm, +2.3 mm at 75 mm, against
-// +3.6 mm forward at 100 mm), hence the shorter backward stride. Lateral or
-// yaw at or above the band use the steered law; a steering demand during a
-// fore/aft walk ends it with WALK STOP (JOYSTICK_STEERING) and the held stick
-// starts the steered walk from STANDING, like a reversal. On the ground a
-// nearly forward stick carried 0.1-0.4 mm/s of lateral (3-13 % of the range):
-// with the steered law that took the full 14 mm sway (28 mm p-p measured).
-// A walk starts at the demanded stride (the v2 start ramp); a stride change
-// while walking follows kJoystickFrontalRampCycles for the full 100 mm. A
-// swing target is fixed at lift-off, so a fast increase leaves the stance feet
-// behind the steady pattern: offline (fillet contacts, URDF COM) 20 -> 100 mm
-// gave -2.91 mm of static support with 1 cycle, -0.24 with 2, +0.52 with 3
-// and >= +0.83 mm with 4 over phased increases and seeded random fore/aft
-// sequences (run_joystick_envelope.sh); decreases were positive with 1.
-constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontalRampCycles=4;
+// Fore/aft band (dev.5, ground HW 08/11/2026: a nearly forward stick carried
+// 0.1-0.4 mm/s of lateral, 3-13 % of the range, and took the full steered sway,
+// 28 mm p-p measured). A demand whose lateral and yaw part of the published
+// ellipsoid stays under kJoystickFrontalBand is fore/aft only, in either regime.
+// Stride increases ramp over kJoystickFrontalRampCycles for the full 100 mm
+// (offline 20 -> 100 mm: -2.91 mm of static support with 1 cycle, >= +0.83 with
+// 4); decreases over kJoystickFrontalDecelCycles (seeded fore/aft sequences:
+// -0.31 mm with 1 cycle, positive with 2). Backward
+// the v2 support window on a forward COM error is narrower (zero near +2.9 mm
+// at 50 mm against +3.6 mm forward at 100 mm), hence kJoystickBackM.
+constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontalRampCycles=4, kJoystickFrontalDecelCycles=2;
 // WALK STANDARD IMU tilt envelopes: inner convex polygons of the kHeight box,
 // gen-1 RAW, nominal support strip (including rounding) and the StopPlan over
 // the full phase set of walkGait (start, steady, every WALK STOP terminal and
@@ -135,6 +120,12 @@ inline constexpr const char* kSafeChecks[]={"","POINT_SAFE","RAW_CONVERSION","RA
 struct TiltVertex { double roll,pitch; };
 constexpr TiltVertex kWalkTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019071,0.046042},{0.000000,0.066738},{-0.019000,0.045870},{-0.019700,0.019700},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.017392,-0.041987},{-0.000000,-0.081773},{0.017392,-0.041987},{0.018313,-0.018313},{0.018722,-0.007755}};
 constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.012877,0.031088},{0.000000,0.036669},{-0.012877,0.031088},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.013430,-0.005563},{-0.008320,-0.008320},{-0.004336,-0.010468},{-0.000000,-0.012794},{0.004336,-0.010468},{0.008320,-0.008320},{0.013430,-0.005563}};
+// Steered IMU envelope (heading frame): inner convex envelope of kSteer, gen-1
+// RAW, the tread fillet up to kEdgeContactMaxTiltRad and STOP over the steered
+// phase set (offline rays, run_joystick_envelope.sh). Shared with the gate.
+// dev.6 one law (v2 parameters, 10 mm sway): pitch-up vertex .070 -> .055
+// (.060 still fails one ray at the 45 mm stride).
+constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.055},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
 // by at most kImuSlewMaxDtUs: no catch-up step after a pause.
@@ -273,11 +264,12 @@ class SimpleMotion {
   double walkVelocityY() const { return phase_==Phase::WALK?gait_.advanceYM/period():0; }
   double walkYawRate() const { return phase_==Phase::WALK?gait_.yawRad/period():0; }
   // Gait period of the current (or last) walk: JOYSTICK or WALK STANDARD.
-  double period() const { return steered_?kJoystickPeriodS:kWalkPeriodS; }
-  // Gait time t s after the start: WALK STANDARD eases in (walkClockS, its
-  // first four-contact window carries the COM offset); the JOYSTICK law keeps
-  // its constant clock as certified.
-  double walkClock(double t) const { return steered_?t:walkClockS(t); }
+  // One law (dev.6): the period and the eased clock never depend on the regime,
+  // which can change inside a walk.
+  double period() const { return kWalkPeriodS; }
+  // Gait time t s after the start: eased in (walkClockS, its first four-contact
+  // window carries the COM offset).
+  double walkClock(double t) const { return walkClockS(t); }
   // A joystick intent holds the walk: walking or rising to walk, not stopping.
   bool joystickActive() const { return joystick_&&(walkRequested_||(state_==State::WALKING&&!walkStopping_)); }
   uint32_t releases() const { return releases_; }
@@ -394,6 +386,13 @@ class SimpleMotion {
   void steerWalk(uint64_t);
   // Displacement per cycle of the latest JOYSTICK demand on one law.
   void joystickGoal(bool frontal,double goal[3]) const;
+  // The joystick regime may change only where the issued reference, with its
+  // applied level correction, already lies in the other region (box, envelope).
+  bool regimeHandover(bool toSteered) const;
+  // The steered IMU envelope is active: steered regime, not returning to fore/aft
+  // (lateral, yaw and sway retired for a fore/aft demand). Single source for
+  // limitWalkTilt and the offline envelope gate.
+  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM); }
   bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
   const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
   void serviceOff();
@@ -480,6 +479,7 @@ private:
   bool joystick_=false,steered_=false;
   double joystickVel_[3]{},steeredCycles_=0;  // latest admitted demand: vx, vy (m/s), yaw rate (rad/s)
   bool joystickFrontal_=false;  // that demand is fore/aft only (kJoystickFrontalBand)
+  double regimeSinceCycles_=-1;  // gait cycle since which a regime handover precondition holds (-1: none)
   uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
   // T2 (motion-perf-next): the walking law is solved exactly at release grid
