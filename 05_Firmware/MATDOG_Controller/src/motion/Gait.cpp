@@ -90,8 +90,12 @@ template<class T> void body(CartesianSample& out,PlanarT<T> b,T height,T shift,T
 }
 template<class T> T ramp(T u){return u*u*u*u*(T(2.5)+u*(T(-3)+u));}  // integral of smooth(u)
 // Swing progress 0->1: smootherstep, or trapezoidal velocity with linear ramps r.
-template<class T> T swingProfile(T u,double r){
+template<class T> T swingProfile(T u,double r,double rd=0){
   if(r<=0)return smooth(u);
+  if(rd>0){const double peak=1/(1-.5*(r+rd));
+    if(pv(u)<=r)return T(.5*peak/r)*u*u;
+    if(pv(u)>=1-rd){const T w=T(1)-u;return T(1)-T(.5*peak/rd)*w*w;}
+    return T(peak)*(u-T(.5*r));}
   const double k=.5/(r*(1-r));
   if(pv(u)<=r)return T(k)*u*u;
   if(pv(u)>=1-r){const T w=T(1)-u;return T(1)-T(k)*w*w;}
@@ -177,7 +181,7 @@ template<class T> void sampleLaw(CartesianSample& out,const GaitParameters& p,T 
       a=track->anchor[i];b=track->target[i];
     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
     out.feet[i]=a;
-    if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp);
+    if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp,p.swingRampEnd);
       T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
       out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
 }
@@ -227,14 +231,14 @@ Vector3 rotateBack(const BodyPose& b,Vector3 v){return {b.rotation[0][0]*v.x+b.r
 Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 }
 bool validGaitParameters(const GaitParameters& p) {
-  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.settleCycles};
+  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles};
   for(double v:values)if(!std::isfinite(v))return false;
   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
     p.duty>=(p.type==GaitType::WALK?.75:.5)&&p.maxCondition>=1&&p.swayXM>=0&&
     (p.swayXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&(p.comShiftXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
     p.swayYM>=0&&(p.swayYM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
     p.startCycles>=0&&p.stopCycles>=0&&(!p.reverse||p.type==GaitType::WALK)&&
-    std::isfinite(p.edgeTiltRad)&&p.edgeTiltRad>=0&&p.edgeTiltRad<=kEdgeContactMaxTiltRad&&p.swingRamp>=0&&p.swingRamp<.5&&p.settleCycles>=0&&p.settleCycles<=1;
+    std::isfinite(p.edgeTiltRad)&&p.edgeTiltRad>=0&&p.edgeTiltRad<=kEdgeContactMaxTiltRad&&p.swingRamp>=0&&p.swingRamp<.5&&p.swingRampEnd>=0&&(p.swingRampEnd==0||(p.swingRamp>0&&p.swingRamp+p.swingRampEnd<1))&&p.settleCycles>=0&&p.settleCycles<=1;
 }
 double gaitSettleCycles(const GaitParameters& p){
   if(p.type!=GaitType::WALK||(p.swayXM==0&&p.swayYM==0&&p.comShiftXM==0))return 0;
@@ -266,7 +270,7 @@ bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParamete
   if(!validGaitParameters(from)||!validGaitParameters(to)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(terminal)||
      from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||from.swayXM!=to.swayXM||
      from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad||
-     from.comShiftXM!=to.comShiftXM||from.swingRamp!=to.swingRamp||from.settleCycles!=to.settleCycles)return false;
+     from.comShiftXM!=to.comShiftXM||from.swingRamp!=to.swingRamp||from.swingRampEnd!=to.swingRampEnd||from.settleCycles!=to.settleCycles)return false;
   // Same world pose of the nominal body at this progress under both laws.
   const double r=progress(from,cycles,terminal,true);
   const auto world=place(track.frame,nominal(from,r)),next=nominal(to,r);

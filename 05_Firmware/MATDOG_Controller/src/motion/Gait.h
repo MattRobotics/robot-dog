@@ -45,6 +45,13 @@ struct GaitParameters {
   // swing (C1): peak 1/(1-r) and acceleration 1/(r(1-r)) times the mean
   // (smootherstep 1.875 and 5.77).
   double swingRamp = 0;
+  // Asymmetric trapezoid (walk modes 2026-11-09): with swingRampEnd in
+  // (0, 1 - swingRamp) the foot accelerates over the first swingRamp and
+  // decelerates over the last swingRampEnd of the swing: peak 1/(1-(ra+rd)/2)
+  // times the mean, touchdown deceleration peak/rd. 0 keeps the symmetric law
+  // above bit for bit. Slows the swing end, where a fast crawl meets the
+  // kHeight UPPER bound and its STOP arrest needs room.
+  double swingRampEnd = 0;
   // WALK only: the time reverse of the forward leg order (LF, LH, RF, RH
   // instead of RH, RF, LH, LF), for backward travel. Same swing and four-contact
   // windows and fore/aft offsets; the lateral offset still moves away from
