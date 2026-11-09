@@ -1,0 +1,91 @@
+DECISIVE slot=0 id=13 OFF->enable->validated_ON raw=1989 next_enable_count=1
+DECISIVE slot=5 id=21 OFF->enable->validated_ON raw=967 next_enable_count=6
+DECISIVE slot=11 id=41 OFF->enable->validated_ON raw=3130 next_enable_count=12
+DECISIVE PASS STAND50 + post-enable control rotation 12/12; hardware=false
+REFERENCE_OFF_RETRY slot=0 OFF_verified_before_enable no_goal_resend
+REFERENCE_OFF_RETRY slot=5 OFF_verified_before_enable no_goal_resend
+REFERENCE_OFF_RETRY slot=11 OFF_verified_before_enable no_goal_resend
+PRIME lost_OFF rejected; SAFE_OFF=13/13
+PRIME OFF_TX_uncertain SAFE_OFF=13/13 no_enable
+PRIME STOP_during_frame SAFE_OFF=13/13 no_enable
+INTEGRATED recovery kind=0 phase=ACQUIRE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=0 phase=ACQUIRE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=0 phase=ACQUIRE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=0 phase=ENABLE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=0 phase=ENABLE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=0 phase=ENABLE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ACQUIRE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ACQUIRE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ACQUIRE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ENABLE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ENABLE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=1 phase=ENABLE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2750
+INTEGRATED recovery kind=2 phase=ACQUIRE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+INTEGRATED recovery kind=2 phase=ACQUIRE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+INTEGRATED recovery kind=2 phase=ACQUIRE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+INTEGRATED recovery kind=2 phase=ENABLE slot=0 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+INTEGRATED recovery kind=2 phase=ENABLE slot=5 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+INTEGRATED recovery kind=2 phase=ENABLE slot=6 reached=12 deferred=5 failed_tx=1 reason=ACQUIRING_REAL_POSE
+STAND50 reached; max_virtual_release_us=2545
+STAND50 actual_failed_tx=0 completed max_virtual_release_us=2545
+STAND50 actual_failed_tx=0 completed max_virtual_release_us=2545
+STAND50 actual_failed_tx=2 completed max_virtual_release_us=2755
+STAND50 actual_failed_tx=2 completed max_virtual_release_us=2755
+ABSENT_SERVO finite_fault_us=262135 reason=INITIAL_SERVO_READ_FAILED
+SECOND_BLOCK_ABSENT finite_fault_us=442380 reason=INITIAL_SERVO_READ_FAILED
+SECOND_BLOCK_ABSENT finite_fault_us=239465 reason=SERVO_FEEDBACK_STALE
+PERSISTENT finite_fault_us=362135 transmitted_failures=3 deferred=10
+PERSISTENT finite_fault_us=261260 transmitted_failures=3 deferred=10
+PROTECTION slot=0 fault=13_ticks SAFE_OFF=13/13
+PROTECTION slot=0 fault=unexpected_ON SAFE_OFF=13/13
+PROTECTION slot=5 fault=13_ticks SAFE_OFF=13/13
+PROTECTION slot=5 fault=unexpected_ON SAFE_OFF=13/13
+PROTECTION slot=11 fault=13_ticks SAFE_OFF=13/13
+PROTECTION slot=11 fault=unexpected_ON SAFE_OFF=13/13
+STOP phase=0 SAFE_OFF=13/13 no_auto_restart
+STOP phase=1 SAFE_OFF=13/13 no_auto_restart
+STOP phase=2 SAFE_OFF=13/13 no_auto_restart
+WALK_MODE_DRIVE PASS STAND {480,13} admitted
+WALK_MODE_DRIVE PASS SLOW {1000,50} admitted
+WALK_MODE_DRIVE PASS STANDARD {1800,180} admitted
+WALK_MODE_DRIVE PASS FAST {1950,220} admitted
+WALK_MODE_DRIVE PASS 11 unlisted pairs refused by the production frame path, zero bytes on the UART
+WALK_MODE_DRIVE PASS SYNC_WRITE {1000,50}: 104 B, 12 ids, ACC, GoalSpeed, 12 targets, checksum
+WALK_MODE_DRIVE PASS SYNC_WRITE {1800,180}: 104 B, 12 ids, ACC, GoalSpeed, 12 targets, checksum
+WALK_MODE_DRIVE PASS SYNC_WRITE {1950,220}: 104 B, 12 ids, ACC, GoalSpeed, 12 targets, checksum
+WALK_MODE_DRIVE PASS SYNC_WRITE {480,13}: 104 B, 12 ids, ACC, GoalSpeed, 12 targets, checksum
+WALK_MODE_DRIVE PASS STAND 150: every frame {480,13}
+WALK_MODE_DRIVE PASS WALK SLOW preset 2: WALKING WALK_STANDARD, 6.50 cycles, mode SLOW, refused frames 0
+WALK_MODE_DRIVE PASS WALK SLOW: every walk frame {1000,50} on the UART
+WALK_MODE_DRIVE PASS WALK SLOW -> WALK STOP -> STANDING STAND_REACHED
+WALK_MODE_DRIVE PASS selection made during SLOW kept for the next walk
+WALK_MODE_DRIVE PASS WALK STANDARD preset 1: WALKING WALK_STANDARD, 6.50 cycles, mode STANDARD, refused frames 0
+WALK_MODE_DRIVE PASS WALK STANDARD: every walk frame {1800,180} on the UART
+  STOP during STANDARD: state=STOPPED reason=STOPPED_SUPPORT_UNVERIFIED verified=1 energized=1 arrest_frames=1
+WALK_MODE_DRIVE PASS STOP during STANDARD: arrest frames carry {1800,180}, STOP verified, torque ON
+WALK_MODE_DRIVE PASS WALK after STOP resumes STANDARD
+WALK_MODE_DRIVE PASS STANDARD -> WALK STOP -> STANDING
+WALK_MODE_DRIVE PASS WALK FAST preset 2: WALKING WALK_STANDARD, 7.80 cycles, mode FAST, refused frames 0
+WALK_MODE_DRIVE PASS WALK FAST: every walk frame {1950,220} on the UART
+WALK_MODE_DRIVE PASS WALK FAST -> WALK STOP -> STANDING STAND_REACHED
+WALK_MODE_DRIVE PASS back to SLOW after FAST: HEIGHT {480,13}, walk {1000,50}
+WALK_MODE_DRIVE PASS SAFE_OFF from WALK: 13/13 torque OFF verified
+WALK_MODE_DRIVES PASS failures=0 hardware=false (gate, bytes and sequence; ACC 180/220 physics not qualified)
+PREENABLE_INTEGRATED PASS failures=0 hardware=false

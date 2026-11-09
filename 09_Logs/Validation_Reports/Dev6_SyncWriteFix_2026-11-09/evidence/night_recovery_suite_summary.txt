@@ -1,0 +1,33 @@
+DALY_ASYNC PASS production scheduler/parser, no flush/wire wait, alarms retained, stale/persistent fail closed, wrap, TX backpressure; hardware=false
+walk mode STANDARD: 90 mm stride, 3.00 s, 110 mm, drive 1800/180, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+walk mode FAST: 80 mm stride, 2.50 s, 105 mm, drive 1950/220, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+walk recovery from a 30 mrad board roll: held up to 13.1 mrad, WALK_IMU_SETTLING seen, STANDARD starts at -9.1/0.1 mrad inside its envelope, 1500 releases without fault PASS (software only)
+exit cause: WALK fault at cycle 5.488 keeps correction -2.4/-11.4 mrad, refused_by 0, law 100 mm fore/aft after STOP PASS (software only)
+long walk: JOYSTICK 100 mm, WALK STANDARD 100 and 75, 8000 releases (160 s) each without fault PASS (software only)
+PRONE REST PASS: automatic torque OFF only after the verified terminal, STOP latch kept, STAND from the settled pose through ACQUIRE/ENABLE; passive support NOT validated
+ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged
+production closed-loop STAND board plant PASS: quantized 0.1s servo lag, signed/combined/slow tilt, saturation reversal, flat return, stale IMU, height/PRONE unwind, STOP and explicit STAND; no hardware stability claim
+T2 look-ahead: alternation, missed-release and WALK STOP re-sync, STOP on both release kinds, retarget tolerance PASS (software only)
+P1 STOP rate history: span >= one period on the grid, zero rate on identical RAW, fail-closed on stale history, first references, STAND resume fallback PASS (software only)
+steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %; in a steered walk a demand under the fore/aft band returns to the base sway through four-contact windows only; new walk under the band = WALK STANDARD sway PASS (software only)
+steered tilt envelope: heading-frame projection, identity bit for bit, 90 deg heading maps pitch to the roll vertex PASS (software only)
+STOP->WALK: STOP in WALK/HOLD/HEIGHT then WALK STANDARD through the STAND-after-STOP admission and resume routes, stride applied at HOLD, refusals unchanged PASS (offline)
+JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP only when mostly backward, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION
+WALK profile entry STOP and production closed-loop board tests PASS; no hardware contact/stability qualification
+TX latency 7 ms / alternating 0-7 ms / late releases: WALK45/60 pre-check, STOP in WALK and long HOLD PASS (software timing only)
+PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION
+SERVO_BUS_DEADLINE PASS checks=17795 failures=0 hardware=false
+DECISIVE PASS STAND50 + post-enable control rotation 12/12; hardware=false
+ABSENT_SERVO finite_fault_us=262135 reason=INITIAL_SERVO_READ_FAILED
+SECOND_BLOCK_ABSENT finite_fault_us=442380 reason=INITIAL_SERVO_READ_FAILED
+WALK_MODE_DRIVES PASS failures=0 hardware=false (gate, bytes and sequence; ACC 180/220 physics not qualified)
+PREENABLE_INTEGRATED PASS failures=0 hardware=false
+COOPERATIVE PASS synthetic_cpu_us=6000 max_gap_us=20670 missed=0 max_feedback_age_us=119270 bms_replies=16 hardware=false
+CONTROL_SECOND_BLOCK_DEFERRED PASS answered_first_block not_counted_as_lost_reply
+ENABLE_PERSISTENT_FEEDBACK PASS stale_gate250ms before_further_enable
+NIGHT_RECOVERY PASS hardware captured poses13/13, cooperative deadlines, live monitoring/alarm stop, transient/persistent feedback; hardware=false
+SERVO_PACKET [MISURATO HOST] SyncWritePosEx 104 B identical to SCServo 1.0.2, torque-OFF sync 32 B identical, parser rejects checksum/id/length/trailing, PASS checks=16 failures=0
+IMU_PASS idle_sh2_calls=0 cap_transfers=8 budget_transfers=3 (bounded, never waits)
+IMU_FEED PASS checks=56 failures=0 hardware=false
+IMU_FEED PASS checks=57 failures=0 hardware=false
+rc=0

@@ -1,0 +1,13 @@
+SIMPLE_DASHBOARD_FIXTURES = PASS (84 checks; real MotionService bodies)
+SIMPLE_DASHBOARD_DOM = PASS (21 envelopes captured from the shipped page; real MotionService fixtures; 92 commands)
+WALK_SELECTOR viewport 1280px selector=299px label=99px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 1024px selector=294px label=97px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 941px selector=266px label=88px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 939px selector=416px label=138px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 600px selector=526px label=175px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 390px selector=316px label=105px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+WALK_SELECTOR viewport 360px selector=286px label=95px labels=["🐢 SLOW 20 mm/s","🐾 STANDARD 25 mm/s","🐇 FAST 32 mm/s"] issues=[] -> PASS
+DASHBOARD_LAYOUT_BROWSER PASS (Chrome 156.0.8078.79; shipped page; fixtures; no device)
+TWIN_VIEWCUBE_BROWSER PASS (Chrome 156.0.8078.79, software WebGL; shipped page and TwinAssets.h; camera only; no device)
+STOP_DURING_TWIN_LOAD_BROWSER PASS (Chrome 156.0.8078.79; worst input->STOP request at the server during a Twin load: 518 ms; measured, not a bound; offline, software WebGL, no device)
+SIMPLE_DASHBOARD_CONTRACT = PASS (6112 checks; 21 shipped-JS envelopes through real parser, origin, session/CSRF, MotionService, SimpleMotion; HTTPD/socket/mailbox/STOP-lane threading mirrored and source-anchored, not executed; NO HARDWARE VALIDATION)
