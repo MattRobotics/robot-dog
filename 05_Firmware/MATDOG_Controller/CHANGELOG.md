@@ -4,7 +4,17 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 technical closure: one speed selector, STANDARD recovery fault fixed — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 trace-44 fix: ServoBus admits the STANDARD/FAST drives — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `70abcff` (APP `67d55e1a…`, kept as reference and installed until the next flash). Report: [`Dev6_SyncWriteFix_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_SyncWriteFix_2026-11-09/REPORT.md); RCA in `MATDOG_1_0_2_DEV6_INCIDENT_SYNCWRITE_20261109T175118Z`.
+
+- **Fix (hardware trace 44):** `ServoBus::setOperationalDrive` admitted only {480,13} and {1000,50}; the first WALK STANDARD frame ({1800,180}) was refused before TX and Motion faulted `SYNC_WRITE_FAILED` at cycle 0.000. The gate now admits exactly STAND {480,13}, SLOW {1000,50}, STANDARD {1800,180}, FAST {1950,220}; any other pair is still refused before transmission. STOP, SAFE_OFF, torque enable, RAW conversion, kinematics and limits unchanged.
+- **Regression on the real ServoBus** (`test_preenable_bus.cpp`): the production `Controller::SimpleServoPort::frame` (extracted verbatim) and the production bus-preemption predicate; gate = mode table; 11 other pairs refused with zero bytes; the transmitted SYNC_WRITE decoded (ACC, GoalSpeed, 12 targets, checksum); STAND -> SLOW -> WALK STOP -> STANDARD (trace 44) -> STOP -> resume -> FAST -> SLOW -> SAFE_OFF. On the `70abcff` source the same test faults `SYNC_WRITE_FAILED` at 0.00 cycles (7 FAIL). Harness gaps fixed: gen-1 `decodeRaw` (the artificial RAW_CONVERSION), the production preemption predicate (an energized STOP could not be exercised), the PERSISTENT case aligned with the c2d95a8 fault latch.
+- **Kinematic Rig:** every frame of the SimpleMotion suite carries a drive of the mode table.
+- **Dashboard:** WALK speed selector readable in the narrow cockpit column (5938fd9).
+- ACC 180/220 and speeds 1800/1950 remain **not measured on the servos**.
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 technical closure (`70abcff`, APP `67d55e1a…`, installed 09/11/2026, trace 44 fault): one speed selector, STANDARD recovery fault fixed — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes `4e62b81` (APP `d8ba3f14…`, never flashed, kept as reference). Installed: `1.0.2-dev.4`. Report: [`Dev6_Closure_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Closure_2026-11-09/REPORT.md).
 

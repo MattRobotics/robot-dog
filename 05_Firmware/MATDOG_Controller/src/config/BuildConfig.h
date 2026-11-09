@@ -119,7 +119,12 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   kept by the servo response model. Technical closure (same version
 //   string, new build): a walk starts only inside its own IMU envelope
 //   (STANDARD recovery fault RCA); dashboard: one speed selector SLOW 20 /
-//   STANDARD 25 / FAST 32 mm/s ordered after GAIT.SELECT. Offline candidate.
+//   STANDARD 25 / FAST 32 mm/s ordered after GAIT.SELECT. Installed 09/11
+//   (70abcff); trace 44: its first STANDARD frame faulted SYNC_WRITE_FAILED,
+//   the ServoBus drive gate refused {1800,180}. Trace-44 fix (same version
+//   string, new build): the gate admits the STANDARD/FAST pairs {1800,180} and
+//   {1950,220} too; WALK speed selector readable in the narrow cockpit.
+//   Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
