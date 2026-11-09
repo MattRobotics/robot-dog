@@ -608,6 +608,43 @@ static void joystickWalk(){
     r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n){if(n%12==0)assert(drive(r,v));r.tick();}
     assert(r.m.stopVerified()&&r.m.energized()&&!r.m.joystickActive());
     assert(!r.m.stand(.12,r.p.now)&&!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK"));assert(r.reachStand());}
+  // F. Review 09/11 (held stick FORWARD -> DIAGONAL -> LATERAL -> FORWARD).
+  // Characterizes the dev.5 contract: one law change at the first steering
+  // demand (WALK STOP, JOYSTICK_STEERING), then the steered law until release;
+  // back to pure fore/aft it stays steered at its own speed and its sway returns
+  // to the 2 mm base (never the 14 mm of a steered demand). A law change without
+  // WALK STOP is not offered by the gait (gaitRetarget: advance/yaw/swayY only).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    struct Seg{const char* name;V3 v;} seg[]={{"FORWARD",{pub[0],0,0}},{"DIAGONAL",{.7071*pub[0],.7071*lim[1],0}},{"LATERAL",{0,lim[1],0}},{"FORWARD",{pub[0],0,0}}};
+    unsigned stops=0;double changeS=0,decayS=-1;bool walking=false;
+    for(unsigned k=0;k<4;++k){bool settled=false;double t=0;
+      for(unsigned n=0;n<1500;++n){if(n%12==0)drive(r,seg[k].v);r.tick();t+=.02;assert(r.m.state()!=simple::State::FAULT);
+        const bool w=r.m.state()==simple::State::WALKING;if(walking&&!w){++stops;changeS=0;}if(!w)changeS+=.02;walking=w;
+        if(k==3&&w&&decayS<0&&P::gait(r.m).swayYM<=simple::kJoystickSwayLowM)decayS=t;settled|=w;}
+      assert(settled&&r.m.state()==simple::State::WALKING);
+      const bool steered=&P::box(r.m)==&simple::collision::kSteer;
+      std::printf("JOYSTICK held sequence %-8s law=%s sway=%.1f mm vx=%.2f vy=%.2f mm/s\n",seg[k].name,steered?"STEERED":"WALK_STANDARD",P::gait(r.m).swayYM*1e3,r.m.walkVelocityX()*1e3,r.m.walkVelocityY()*1e3);
+      if(k==0)assert(!steered);else assert(steered);}
+    assert(stops==1&&std::abs(r.m.walkVelocityX()-lim[0])<1e-12&&std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayBaseYM)<1e-12&&decayS>0);
+    std::printf("JOYSTICK held sequence: 1 WALK STOP (law change, %.1f s without walking), final fore/aft stays steered at %.2f mm/s, sway back under %.0f mm after %.1f s\n",changeS,lim[0]*1e3,simple::kJoystickSwayLowM*1e3,decayS);
+    r.m.walkStop();assert(r.reachStand());}
+  // H. Review 09/11 defect of 3afe6ce: after steering, a forward stick with the
+  // recorded touch jitter kept the steered 14 mm sway (11.9-14 mm offline, the
+  // dev.4 ground defect). Now the jitter is fore/aft noise in either law: the
+  // lateral advance retires and the sway returns to the 2 mm base.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 diag{.7*pub[0],.7*lim[1],0};walkTo(r,diag);hold(r,diag,1000);
+    const double jit[]={.0001,.0002,-.0003,.0004,-.0001,.0003};unsigned k=0;double maxSway=0;
+    for(unsigned n=0;n<4000;++n){if(n%12==0)assert(!drive(r,{.95*pub[0],jit[k++%6],0}));r.tick();assert(r.m.state()==simple::State::WALKING);
+      if(n>2500)maxSway=std::fmax(maxSway,P::gait(r.m).swayYM);}
+    assert(&P::box(r.m)==&simple::collision::kSteer&&P::gait(r.m).advanceYM==0&&maxSway==simple::kJoystickSwayBaseYM);r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK forward after steering with the recorded jitter: sway %.1f mm over the last 30 s (3afe6ce: 11.9-14 mm)\n",maxSway*1e3);}
+  // G. Fore/aft band sensitivity: a walk started at 19 % of lateral stays
+  // WALK STANDARD; demands alternating 18/22 % change law once, never again.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double vx=.9*pub[0];
+    walkTo(r,{vx,.19*lim[1],0});assert(&P::box(r.m)==&simple::kWalkBox);unsigned stops=0,n=0;bool w=true;
+    for(;n<6000;++n){if(n%12==0)drive(r,{vx,(n/12%2?.22:.18)*lim[1],0});r.tick();const bool now=r.m.state()==simple::State::WALKING;stops+=w&&!now;w=now;}
+    assert(stops==1&&w&&&P::box(r.m)==&simple::collision::kSteer);r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK band: 19 %% stays fore/aft; 18/22 %% alternating every 240 ms for 120 s: exactly 1 law change\n");}
   // Contract: BASE_VELOCITY gait JOYSTICK through the JSON parser and MotionService.
   {Rig api;core::MotionService service;service.begin(&api.m,nullptr,nullptr);service.setReady(true,"READY");assert(!api.m.stand(.15,api.p.now));assert(api.reachStand());
     unsigned seq=0;auto send=[&](const char* params){char json[400];const int n=std::snprintf(json,sizeof json,
@@ -1043,18 +1080,20 @@ static void swayMap(){
   using P=simple::StopReferenceProbe;const double T=simple::kJoystickPeriodS,vx=.8*simple::kJoystickStrideM/T,lat=simple::kJoystickLateralM/T;
   auto walking=[](Rig& r,double vx,double vy){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(!r.m.drive(vx,vy,0,r.p.now));r.tick();}assert(r.m.state()==simple::State::WALKING);};
   auto hold=[&](Rig& r,double vy,unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)assert(!r.m.drive(vx,vy*lat,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING);}};
+  // The map itself (the steered retarget feeds it its rate-limited lateral/yaw).
+  {using simple::joystickSwayYM;const double L=simple::kJoystickLateralM,B=simple::kJoystickSwayBaseYM,F=simple::kJoystickSwayYM,Lo=simple::kJoystickSwayLowM;
+    assert(joystickSwayYM(0,0,B)==B&&joystickSwayYM(.029*L,0,B)>B&&joystickSwayYM(.029*L,0,B)<=Lo+1e-12&&joystickSwayYM(.033*L,0,B)==F);
+    assert(joystickSwayYM(.025*L,0,F)==F&&joystickSwayYM(.01*L,0,F)<Lo);}
+  // In a steered walk (review 09/11): a demand under kJoystickFrontalBand is
+  // fore/aft, its lateral retired: the sway returns to the base through
+  // four-contact windows only; at the band the full amplitude comes back.
   {Rig r;walking(r,vx,.5*lat);assert(&P::box(r.m)==&simple::collision::kSteer);hold(r,.5,1300);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
-    hold(r,.01,1300);const double a=P::gait(r.m).swayYM;assert(a>simple::kJoystickSwayBaseYM&&a<=simple::kJoystickSwayLowM+1e-12);
-    hold(r,.029,400);assert(P::gait(r.m).swayYM<=simple::kJoystickSwayLowM+1e-12);
-    // raise to 3.3 %: full amplitude, reached only through four-contact windows
     double last=P::gait(r.m).swayYM;unsigned changes=0,changesWithSwing=0;
-    for(unsigned n=0;n<1300;++n){if(n%12==0)r.m.drive(vx,.033*lat,0,r.p.now);
-      bool four=true;for(const auto& ph:P::walkNominal(r.m).cartesian.phases)four=four&&ph.stance;r.tick();
+    for(unsigned n=0;n<2600;++n){if(n%12==0)assert(!r.m.drive(vx,.19*lat,0,r.p.now));
+      bool four=true;for(const auto& ph:P::walkNominal(r.m).cartesian.phases)four=four&&ph.stance;r.tick();assert(r.m.state()==simple::State::WALKING);
       const double s=P::gait(r.m).swayYM;if(s!=last){++changes;if(!four)++changesWithSwing;last=s;}}
-    assert(changes>0&&changesWithSwing==0&&std::abs(last-simple::kJoystickSwayYM)<1e-12);
-    // 2.5 %: above the release threshold, stays full; 1 %: back to the low band
-    hold(r,.025,400);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
-    hold(r,.01,1300);const double low=P::gait(r.m).swayYM;assert(low<simple::kJoystickSwayLowM&&low>simple::kJoystickSwayBaseYM);
+    assert(changes>0&&changesWithSwing==0&&P::gait(r.m).advanceYM==0&&std::abs(last-simple::kJoystickSwayBaseYM)<1e-12&&&P::box(r.m)==&simple::collision::kSteer);
+    hold(r,.21,1300);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
     r.m.walkStop();assert(r.reachStand());}
   // A new walk: just under the band it is fore/aft, WALK STANDARD sway and box,
   // its lateral demand ignored; at the band it is steered with the full sway.
@@ -1063,7 +1102,7 @@ static void swayMap(){
     for(unsigned n=0;n<1300;++n){if(n%12==0)assert(!r.m.drive(vx,.999*band*lat,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING&&P::gait(r.m).swayYM==simple::kWalkSwayYM);}
     assert(std::abs(r.m.walkVelocityX()-vx)<1e-12&&r.m.walkVelocityY()==0);r.m.walkStop();assert(r.reachStand());}
   {Rig r;walking(r,vx,band*lat);assert(&P::box(r.m)==&simple::collision::kSteer&&std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);r.m.walkStop();assert(r.reachStand());}
-  std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %, amplitude changes only with four feet down; new walk under the fore/aft band = WALK STANDARD sway PASS (software only)");
+  std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %; in a steered walk a demand under the fore/aft band returns to the base sway through four-contact windows only; new walk under the band = WALK STANDARD sway PASS (software only)");
 }
 // Steered tilt envelope in the heading frame (review 2026-11-08): with
 // identity heading the limit is bit for bit the old one; at a 90 deg heading

@@ -610,7 +610,12 @@ const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)
 void SimpleMotion::joystickGoal(bool frontal,double goal[3]) const {
   if(frontal){goal[0]=std::clamp(joystickVel_[0]*kWalkPeriodS,-kJoystickBackM,kStrideM[2]);goal[1]=goal[2]=0;return;}
   const double limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};double n=0;
-  for(unsigned j=0;j<3;++j){goal[j]=joystickVel_[j]*kJoystickPeriodS;n+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
+  for(unsigned j=0;j<3;++j)goal[j]=joystickVel_[j]*kJoystickPeriodS;
+  // Under the band lateral and yaw are touch noise in either law (review 09/11:
+  // back to a forward stick after steering, the recorded jitter held the full
+  // 14 mm sway); the steered law retires them at its own rates.
+  if(joystickFrontal_)goal[1]=goal[2]=0;
+  for(unsigned j=0;j<3;++j)n+=(goal[j]/limit[j])*(goal[j]/limit[j]);
   if(n>1)for(unsigned j=0;j<3;++j)goal[j]/=std::sqrt(n);
 }
 void SimpleMotion::walkStop(){
