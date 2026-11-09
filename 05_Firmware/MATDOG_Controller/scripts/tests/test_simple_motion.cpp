@@ -80,7 +80,17 @@ struct ScriptedObservationPort: simple::ServoPort {
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
   bool decodeRaw(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
+  // Every frame of every scenario carries a drive of the Controller's table:
+  // the RAM pairs ServoBus::setOperationalDrive admits (test_preenable_bus keeps
+  // the two lists equal; trace 44: a pair outside the gate is SYNC_WRITE_FAILED).
+  static bool tableDrive(simple::Drive d){
+    auto same=[&](simple::Drive t){return d.speed==t.speed&&d.acc==t.acc;};
+    if(same(simple::kStandDrive))return true;
+    for(unsigned m=0;m<3;++m)if(same(simple::walkModeSpec(static_cast<simple::WalkMode>(m)).drive))return true;
+    return false;
+  }
   bool frame(const uint16_t raw[12],simple::Drive d) override{
+    assert(tableDrive(d));
     assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;test_clock_us+=frameDelayUs;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}
     const bool drop=dropFrames>0;if(drop)--dropFrames;
