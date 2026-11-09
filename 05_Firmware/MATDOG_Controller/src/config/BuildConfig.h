@@ -102,9 +102,13 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   in-place HTTP response reset (loop stack worst path -7 KB); refusal and
 //   entry diagnostics. Steered law, boxes, envelopes, geometry, calibration,
 //   STOP and drive {1000,50} unchanged. Offline candidate.
-// 1.0.2-dev.6: 1.0.2-dev.5 + pre-flash review fix: a demand under the fore/aft
-//   band is fore/aft in the steered law too (after steering, touch jitter kept
-//   the 14 mm sway). Everything else as dev.5. Offline candidate.
+// 1.0.2-dev.6 (consolidated 2026-11-09, supersedes the 2c53ecf dev.6 build):
+//   one continuous joystick law (fore/aft and steered regimes hand over
+//   without WALK STOP; only a fore/aft reversal stops); WALK100 STOP proof
+//   with the T2 midpoints (kWalkTilt100 re-derived, held correction on a
+//   refused WALK step); first-exit cause in @MOTION DIAG. Geometry, URDF,
+//   calibration, limits, STOP/SAFE_OFF and drive {1000,50} unchanged.
+//   Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;

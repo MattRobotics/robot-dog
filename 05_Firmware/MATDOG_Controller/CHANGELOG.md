@@ -4,7 +4,17 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 candidate: pre-flash review fix of the steered joystick (on 1.0.2-dev.5 `3afe6ce`) — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 consolidated candidate: one joystick law, WALK100 STOP proof with T2, first-exit cause — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**. **Same version string `1.0.2-dev.6`, new source, build and APP**: it supersedes the earlier dev.6 build of `2c53ecf` (APP `eef32e61…`, never flashed). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_Consolidation_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Consolidation_2026-11-09/REPORT.md).
+
+- **One continuous joystick law.** Every joystick walk runs walkGait v2 (5.0 s, duty .80) in a fore/aft regime (kHeight, kWalkTilt100, WALK sway, up to 100 mm forward / 50 mm back) or a steered regime (kSteer, kSteerTilt, 10 mm sway, ≤ 45 mm, lateral 20 mm and yaw .16 rad per cycle). Regimes hand over without stopping after one settled cycle in the overlap of the two boxes (≤ 60 mm), when the commanded RAW is in the new box and the applied correction in the new envelope. Only a true fore/aft reversal stops (WALK STOP). `JOYSTICK_STEERING` retired. Held FORWARD → DIAGONAL → RIGHT → ROTATION → BACK-RIGHT → FORWARD: two stops (the reversals), final 20 mm/s in the WALK STANDARD regime (2c53ecf: a stop at the first steering demand and a final 6.9 mm/s).
+- **WALK100 STOP proof with T2 (defect present dev.3…dev.6, including the installed dev.4).** A long WALK STANDARD 100 faulted `WALK_IK_OR_WORKSPACE` (refused_by `STOP_PLAN`) at cycle 19.46 on the rig: the T2 chord-midpoint reference at the swing end made the STOP secant one tick faster than the envelope had been proved for. `walk_tilt_envelope_check` now proves T2 midpoints and 8 sub-period phases; `kWalkTilt100` re-derived (pitch-down −18.7 → −12.8 mrad); a refused WALK slew step is retried once at the accepted correction (same `compensationSafe`). Rig 600 s per mode without fault.
+- **First-exit cause.** The ExitSnapshot keeps the refused check, walk clock, law, nominal-solve flag and applied/wanted correction; `@MOTION DIAG` prints them as `exit_cause`.
+- **Not changed, with evidence.** Drive `{1000,50}` ([servo study](../../09_Logs/Validation_Reports/Dev6_Consolidation_2026-11-09/SERVO_PROFILE_STUDY.md): `{1000,80}` would double the WALK100 pitch-down envelope, no hardware data). Geometry, URDF, calibration gen-1, limits, STOP/SAFE_OFF.
+- **Tests.** Long walk, exit cause, held sequence and handover regressions; joystick gate 46 + random scenarios; perturbation matrix 60 cells 0 faults; version repro of six historical defects; transport fixtures `ap_transport`/`ap_ingress` repaired.
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 build of `2c53ecf`: pre-flash review fix of the steered joystick (on 1.0.2-dev.5 `3afe6ce`) — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**; supersedes 1.0.2-dev.5 (never flashed; its CLEAN binary `da6d0ad6…` is kept as reference). Installed on the robot: `1.0.2-dev.4`. Review: [`Night_2026-11-09/REVIEW_JOYSTICK_LAW.md`](../../09_Logs/Validation_Reports/Night_2026-11-09/REVIEW_JOYSTICK_LAW.md).
 
