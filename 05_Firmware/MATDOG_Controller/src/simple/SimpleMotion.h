@@ -212,6 +212,11 @@ struct ExitSnapshot {
   uint32_t releases=0,missed=0; unsigned lastPolled=12; Drive drive{0,0};
   uint16_t commandedRaw[12]{}; Feedback fb[12]{};
   uint16_t loadedMask=0; const char* loadedPhase="";
+  // First cause of a refused levelled reference (dev.6 consolidation): the
+  // compensationSafe check of that release, the walk clock and law, and the
+  // IMU correction enterOff resets right after.
+  uint8_t refusedBy=0; bool nominalSolved=false,steered=false; const char* imuReason="";
+  double cycles=0,roll=0,pitch=0,wantedRoll=0,wantedPitch=0,advance[3]{};
 };
 class SimpleMotion {
  public:

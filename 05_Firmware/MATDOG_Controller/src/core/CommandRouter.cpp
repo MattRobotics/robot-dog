@@ -258,6 +258,9 @@ void CommandRouter::handleLine(String line) {
       unsigned(e.valid),unsigned(e.fault),e.reason,e.phase,simple::name(e.state),(unsigned long long)e.atUs,(unsigned long long)e.nowUs,unsigned(e.energized),(unsigned long)e.releases,(unsigned long)e.missed,
       (unsigned long long)e.maxGapUs,unsigned(e.drive.speed),unsigned(e.drive.acc),(unsigned long long)e.goalSentUs,(unsigned long long)e.settleUs,(unsigned long long)e.deadlineUs,e.lastPolled,
       *e.loadedPhase?e.loadedPhase:"NONE",unsigned(e.loadedMask));
+    Serial.printf("MOTION_DIAG exit_cause refused_by=%u check=%s imu_reason=%s cycles=%.3f nominal_solved=%u steered=%u correction_mrad=%.1f,%.1f wanted_mrad=%.1f,%.1f advance=%.4f,%.4f,%.4f\n",
+      unsigned(e.refusedBy),e.refusedBy<sizeof(simple::kSafeChecks)/sizeof(*simple::kSafeChecks)?simple::kSafeChecks[e.refusedBy]:"?",e.imuReason,e.cycles,unsigned(e.nominalSolved),unsigned(e.steered),
+      e.roll*1e3,e.pitch*1e3,e.wantedRoll*1e3,e.wantedPitch*1e3,e.advance[0],e.advance[1],e.advance[2]);
     if(e.valid)for(unsigned i=0;i<12;++i)joint("exit_j",i,e.commandedRaw[i],e.fb[i],e.atUs);
     return;
   }

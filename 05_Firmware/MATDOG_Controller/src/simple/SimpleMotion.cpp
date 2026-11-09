@@ -132,6 +132,9 @@ void SimpleMotion::enterOff(bool fault,const char* r){
     e.releases=releases_;e.missed=missed_;e.lastPolled=(pollNext_+11)%12;e.drive=commandedDrive_;
     for(unsigned i=0;i<12;++i){e.commandedRaw[i]=commandedRaw_[i];e.fb[i]=fb_[i];}
     e.loadedMask=loadedMask_;e.loadedPhase=loadedPhase_;
+    e.refusedBy=safeRefusal_;e.nominalSolved=nominalSolved_;e.steered=steered_;e.imuReason=imuReason_;
+    e.cycles=cycles_;e.roll=rollCorrection_*correctionScale_;e.pitch=pitchCorrection_*correctionScale_;e.wantedRoll=imuWanted_[0];e.wantedPitch=imuWanted_[1];
+    e.advance[0]=gait_.advanceXM;e.advance[1]=gait_.advanceYM;e.advance[2]=gait_.yawRad;
   }
   loadedSinceUs_=0;holdReason_=nullptr;
   // A repeated STOP while the same SAFE_OFF is still pending keeps its

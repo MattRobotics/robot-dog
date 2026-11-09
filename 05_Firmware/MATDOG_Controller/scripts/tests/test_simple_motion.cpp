@@ -1263,7 +1263,20 @@ static void longWalk100(){
     assert(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>31);r.m.walkStop();assert(r.reachStand());}
   std::puts("long walk: JOYSTICK 100 mm, WALK STANDARD 100 and 75, 8000 releases (160 s) each without fault PASS (software only)");
 }
-int main(){longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+// dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
+// law, applied/wanted IMU correction, the release's compensationSafe check):
+// enterOff resets the correction right after, a later STOP keeps the record.
+static void exitCause(){
+  Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(2,r.p.now));
+  for(unsigned n=0;n<1500;++n)r.tick();assert(r.m.state()==simple::State::WALKING);
+  const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m),cycles=r.m.walkCycles();assert(pitch!=0);
+  r.m.fault("SERVO_COMMUNICATION_LOST");r.m.stop();for(unsigned n=0;n<20;++n)r.tick();
+  const auto& e=r.m.exitSnapshot();
+  assert(e.valid&&e.fault&&!std::strcmp(e.reason,"SERVO_COMMUNICATION_LOST")&&!std::strcmp(e.phase,"WALK_STANDARD")&&e.cycles==cycles&&e.roll==roll&&e.pitch==pitch&&
+         e.refusedBy==0&&e.advance[0]==simple::kStrideM[2]&&!e.steered&&simple::StopReferenceProbe::pitch(r.m)==0);
+  std::printf("exit cause: WALK fault at cycle %.3f keeps correction %.1f/%.1f mrad, refused_by %u, law %.0f mm fore/aft after STOP PASS (software only)\n",e.cycles,e.roll*1e3,e.pitch*1e3,unsigned(e.refusedBy),e.advance[0]*1e3);
+}
+int main(){exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
