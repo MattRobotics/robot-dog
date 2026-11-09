@@ -149,8 +149,6 @@ int main(int argc,char** argv){
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);if(!std::strcmp(argv[i],"--mode"))modeIndex=std::atoi(argv[i+1]);}
   if(stride>2||modeIndex>2)return 2;
   const auto mode=static_cast<simple::WalkMode>(modeIndex);const auto& spec=simple::walkModeSpec(mode);
-  const bool whatIfStride=[&]{for(int i=1;i<argc;++i)if(!std::strcmp(argv[i],"--stride-mm"))return true;return false;}();
-  if(stride>spec.maxStride&&!whatIfStride){std::fprintf(stderr,"stride %u is above the %s top stride (walk() refuses it); --stride-mm for a what-if\n",stride,spec.name);return 2;}
   GaitParameters g=simple::walkGait(stride,mode);
   double period=spec.periodS,driveSpeed=spec.drive.speed,driveAcc=spec.drive.acc,proofAcc=-1,height=spec.heightM,reverse=0;
   const Opt opts[]={{"--period",&period,1},{"--drive-speed",&driveSpeed,1},{"--drive-acc",&driveAcc,1},{"--duty",&g.duty,1},{"--lift-mm",&g.liftM,1e-3},
@@ -197,7 +195,7 @@ int main(int argc,char** argv){
     // proof is not monotone in the tilt: shrink until vertices, midpoints and
     // quarter points all pass.
     for(unsigned it=0;it<40;++it){Stats s;if(run(L,withMidpoints(withMidpoints(poly)),s,false))break;for(auto& p:poly){p.roll*=.97;p.pitch*=.97;}std::fprintf(stderr,"edge failure: polygon x0.97\n");}
-    std::printf("constexpr TiltVertex k%sTilt%s[]={",modeIndex==0?"Walk":modeIndex==1?"Standard":"Fast",stride==2?"100":"75");
+    std::printf("constexpr TiltVertex k%sTilt%s[]={",modeIndex==0?"Walk":modeIndex==1?"Standard":"Fast",modeIndex==0?(stride==2?"100":"75"):(stride==2?"Top":"Short"));
     for(size_t i=0;i<poly.size();++i)std::printf("%s{%.6f,%.6f}",i?",":"",poly[i].roll,poly[i].pitch);std::printf("};\n");
   }else if(!single.empty()){
     // --ray roll,pitch: these rays alone (attribution of a single direction).
@@ -207,7 +205,7 @@ int main(int argc,char** argv){
     if(st.failStop)std::printf("  first StopPlan failure: %s\n",st.firstStop);
     return pass?0:1;
   }else{
-    const V* v=stride==2&&spec.tilt100?*spec.tilt100:*spec.tilt75;poly.assign(v,v+16);
+    const V* v=stride==2?*spec.tiltTop:*spec.tiltShort;poly.assign(v,v+16);
   }
   Stats st;auto rays=withMidpoints(withMidpoints(poly));rays.insert(rays.begin(),V{0,0});
   const bool pass=run(L,rays,st,true)&&st.vmax<L.vmaxDrive&&st.amax<L.amaxDrive;
