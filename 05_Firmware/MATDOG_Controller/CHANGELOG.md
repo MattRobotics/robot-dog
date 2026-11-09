@@ -4,7 +4,18 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 walk-modes candidate: SLOW / STANDARD / FAST, measured STOP braking, QEMU and servo-response bench — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 final candidate: STANDARD 30 mm/s, FAST 32 mm/s, per-mode presets, servo-model envelopes — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the walk-modes build of `5159c7f` (APP `bce9a022…`, never flashed, kept as reference). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_Final_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_Final_2026-11-09/REPORT.md).
+
+- **Speeds.** SLOW unchanged (50/75/100 mm, 5.0 s, 10/15/20 mm/s). STANDARD 60/75/90 mm at 3.0 s (20/25/**30** mm/s), 110 mm, `{1800,180}`. FAST 60/70/80 mm at 2.5 s (24/28/**32** mm/s), 105 mm, lift 6 mm, lateral sway 1.0 mm, `{1950,220}`. **40 mm/s not reached**: above ~34 mm/s every configuration passing the STOP proof at the measured braking leaves a STOP capture point ≤ 1.1 mm (SLOW 1.41), ~0 at 40 mm/s; the HIP dragged through the common arrest binds the proof.
+- **Presets per mode.** Every WALK preset is valid in every mode (`WalkModeSpec::strideM`); `STRIDE_NOT_IN_WALK_MODE` removed; capabilities publish `strides_mm` and `lift_mm`.
+- **IMU envelopes.** One per mode, from the geometric search scaled until the servo response model left no fault: STANDARD ×0.5 (pitch-down −17.1 mrad), FAST ×0.65 (−34.2 mrad).
+- **STOP braking unchanged** (`min(ACC, 84)`); QC position analysis: profile followed at 0.8–1.0× up to ACC 50, ≥ 10 000 step/s² at full speed, unloaded; loaded never measured. The quartic arrest needs a constant braking ≥ 2/3 of its peak.
+- **Dashboard.** Mode selector first, presets labelled with the mode's strides and speeds, stale notes removed (6.5 s, 6.9/3.1 mm/s), joystick limits read from the capabilities (the page was sending lateral and yaw at 77 % and 80 % of the Controller range); joystick explicitly SLOW.
+- **Bench.** Servo plant: separate braking capability (`PLANT_BRAKE_LO/HI`), acceleration scaled by voltage (9.6 and 11.1 V were identical: the model scaled only the speed, never reached), STOP box excursion and speed-bound fraction reported.
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 walk-modes candidate (`5159c7f`, APP `bce9a022…`, never flashed): SLOW / STANDARD / FAST, measured STOP braking, QEMU and servo-response bench — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE** for STANDARD and FAST. **Same version string `1.0.2-dev.6`, new source, build and APP**; it contains the consolidated dev.6 below (APP `05935919…` of `3803960` is kept as historical reference, never flashed). Installed on the robot: `1.0.2-dev.4`. Report: [`Dev6_WalkModes_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Dev6_WalkModes_2026-11-09/REPORT.md).
 
