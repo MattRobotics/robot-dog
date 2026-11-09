@@ -56,5 +56,5 @@ with tempfile.TemporaryDirectory(prefix='matdog-f01-') as d:
     subprocess.run(['g++','-std=c++17','-Wall','-Wextra','-Werror','-O1',
                     '-fsanitize=address,undefined','-fno-omit-frame-pointer','-I',str(src),str(cpp),
                     str(src/'network/PortalSecurity.cpp'),str(src/'network/NetworkConfig.cpp'),
-                    str(src/'update/Sha256.cpp'),'-o',str(exe)],check=True)
+                    str(src/'update/Sha256.cpp'),str(src/'update/Hmac256.cpp'),'-o',str(exe)],check=True)
     raise SystemExit(subprocess.run([str(exe)]).returncode)
