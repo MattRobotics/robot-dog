@@ -102,7 +102,10 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   in-place HTTP response reset (loop stack worst path -7 KB); refusal and
 //   entry diagnostics. Steered law, boxes, envelopes, geometry, calibration,
 //   STOP and drive {1000,50} unchanged. Offline candidate.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.5"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.6: 1.0.2-dev.5 + pre-flash review fix: a demand under the fore/aft
+//   band is fore/aft in the steered law too (after steering, touch jitter kept
+//   the 14 mm sway). Everything else as dev.5. Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

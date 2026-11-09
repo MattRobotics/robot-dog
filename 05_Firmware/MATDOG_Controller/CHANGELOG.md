@@ -4,6 +4,14 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — MATDOG Controller 1.0.2-dev.6 candidate: pre-flash review fix of the steered joystick (on 1.0.2-dev.5 `3afe6ce`) — 2026-11-09
+
+> Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**; supersedes 1.0.2-dev.5 (never flashed; its CLEAN binary `da6d0ad6…` is kept as reference). Installed on the robot: `1.0.2-dev.4`. Review: [`Night_2026-11-09/REVIEW_JOYSTICK_LAW.md`](../../09_Logs/Validation_Reports/Night_2026-11-09/REVIEW_JOYSTICK_LAW.md).
+
+- **Fix.** After steering, a forward stick with the recorded touch jitter kept the steered 14 mm sway (11.9–14 mm offline; the dev.4 ground defect): the fore/aft band only chose the law at the walk start. A demand under `kJoystickFrontalBand` is now fore/aft in the steered law too (lateral and yaw zero, retired at the certified steered rates): sway 2.0 mm. One line in `joystickGoal`.
+- **Confirmed, not changed (design decision).** Once steered, a walk stays steered until release (6.9 mm/s fore/aft); no law change without WALK STOP exists in the gait (retarget limited to advance/yaw/sway; a parameter swap needs ≥ 4.6 mm of planted-foot slip and a 21-tick joint jump). Re-press the stick for WALK STANDARD; a symmetric WALK STOP option is documented, not implemented.
+- **Tests.** New held FORWARD→DIAGONAL→LATERAL→FORWARD characterization, jitter after steering (fails on `3afe6ce`), band 18/22 % sensitivity; sway map rewritten for the in-walk band. The four transport tests failing since before dev.4 are stale fixtures (cookie map, link list, removed file, text anchor), not operational defects.
+
 ## Unreleased — MATDOG Controller 1.0.2-dev.5 candidate: entry recovery, fore/aft joystick on WALK STANDARD, loop stack, diagnostics (on 1.0.2-dev.4 `4358f13`) — 2026-11-09
 
 > Offline candidate, **IMPLEMENTED NOT VALIDATED HARDWARE**. Installed on the robot: `1.0.2-dev.4` (VALIDATED HARDWARE in the scope of [`Dev4_HW_2026-11-08/REPORT.md`](../../09_Logs/Validation_Reports/Dev4_HW_2026-11-08/REPORT.md): H1-RCA fix on the fixture, WALK STANDARD 100 on the floor). Steered joystick law, collision boxes, IMU envelopes, geometry/URDF, calibration gen-1, limits, STOP/SAFE_OFF and the drive `{1000,50}` unchanged. Report: [`Night_2026-11-09/REPORT.md`](../../09_Logs/Validation_Reports/Night_2026-11-09/REPORT.md).
