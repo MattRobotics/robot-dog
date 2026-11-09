@@ -1,0 +1,22 @@
+dev3 REPRO R1 jitter-forward: sway=14.0 mm lateral excursion (half p-p, last cycle)=14.32 mm stops=0 faults=0 state=WALKING
+dev3 REPRO R2 jitter-after-steer: sway=14.0 mm lateral excursion (half p-p, last cycle)=14.26 mm vy=0.16 mm/s stops=0 faults=0
+dev3 REPRO R3 note: forward 20.0 mm/s refused (JOYSTICK_VELOCITY_RANGE), using the steered range
+dev3 REPRO R3 law-change: fwd vx=6.23; diag stops=0 vy=2.15; back-to-fwd stops=0 vx=6.23 sway=2.0 mm (demand 6.23 mm/s) faults=0
+dev3 REPRO R4 long WALK100: releases=4994 cycles=19.46 state=FAULT reason=WALK_IK_OR_WORKSPACE
+dev4 REPRO R1 jitter-forward: sway=14.0 mm lateral excursion (half p-p, last cycle)=14.32 mm stops=0 faults=0 state=WALKING
+dev4 REPRO R2 jitter-after-steer: sway=14.0 mm lateral excursion (half p-p, last cycle)=14.26 mm vy=0.16 mm/s stops=0 faults=0
+dev4 REPRO R3 note: forward 20.0 mm/s refused (JOYSTICK_VELOCITY_RANGE), using the steered range
+dev4 REPRO R3 law-change: fwd vx=6.23; diag stops=0 vy=2.15; back-to-fwd stops=0 vx=6.23 sway=2.0 mm (demand 6.23 mm/s) faults=0
+dev4 REPRO R4 long WALK100: releases=4994 cycles=19.46 state=FAULT reason=WALK_IK_OR_WORKSPACE
+dev5 REPRO R1 jitter-forward: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm stops=0 faults=0 state=WALKING
+dev5 REPRO R2 jitter-after-steer: sway=14.0 mm lateral excursion (half p-p, last cycle)=14.26 mm vy=0.16 mm/s stops=0 faults=0
+dev5 REPRO R3 law-change: fwd vx=20.00; diag stops=1 vy=2.15; back-to-fwd stops=0 vx=6.92 sway=2.0 mm (demand 20.00 mm/s) faults=0
+dev5 REPRO R4 long WALK100: releases=4994 cycles=19.46 state=FAULT reason=WALK_IK_OR_WORKSPACE
+dev6 REPRO R1 jitter-forward: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm stops=0 faults=0 state=WALKING
+dev6 REPRO R2 jitter-after-steer: sway=2.0 mm lateral excursion (half p-p, last cycle)=2.00 mm vy=0.00 mm/s stops=0 faults=0
+dev6 REPRO R3 law-change: fwd vx=20.00; diag stops=1 vy=2.15; back-to-fwd stops=0 vx=6.92 sway=2.0 mm (demand 20.00 mm/s) faults=0
+dev6 REPRO R4 long WALK100: releases=4994 cycles=19.46 state=FAULT reason=WALK_IK_OR_WORKSPACE
+final REPRO R1 jitter-forward: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm stops=0 faults=0 state=WALKING
+final REPRO R2 jitter-after-steer: sway=1.5 mm lateral excursion (half p-p, last cycle)=1.50 mm vy=0.00 mm/s stops=0 faults=0
+final REPRO R3 law-change: fwd vx=20.00; diag stops=0 vy=2.80; back-to-fwd stops=0 vx=20.00 sway=1.5 mm (demand 20.00 mm/s) faults=0
+final REPRO R4 long WALK100: releases=8000 cycles=31.49 state=WALKING reason=WALK_STANDARD

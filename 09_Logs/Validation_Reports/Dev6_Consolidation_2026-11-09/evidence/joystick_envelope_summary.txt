@@ -1,0 +1,2 @@
+summary: min support 0.39 mm (random_4), min non-foot clearance 2.29 mm (octant_ppm), max compensated stance-foot tilt 9.76 deg
+JOYSTICK envelope PASS: geometry and sequencing only, no hardware motion validation 
