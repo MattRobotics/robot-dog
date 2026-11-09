@@ -263,8 +263,12 @@ class ServoBus {
                     (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
     validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
   // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
+  // Exact pairs: STAND rc.10, then WALK SLOW, STANDARD, FAST of
+  // simple::kWalkModes (dev.6 trace 44: STANDARD was refused here, so its first
+  // frame faulted SYNC_WRITE_FAILED before any TX). Any other pair is refused
+  // before transmission. Kept equal to the mode table by test_preenable_bus.
   bool setOperationalDrive(uint16_t speed,uint8_t acc) {
-    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)))return false;  // STAND rc.10, WALK
+    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)||(speed==1800&&acc==180)||(speed==1950&&acc==220)))return false;
     validation_speed_=speed;validation_acceleration_=acc;return true;
   }
   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
