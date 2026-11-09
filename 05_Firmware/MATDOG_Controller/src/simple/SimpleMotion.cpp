@@ -1156,7 +1156,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // 2026-11-08: +63.7/-66.5 mrad, NATIVE_TARGET_NOT_REACHED). Every other
   // check of compensationSafe is unchanged.
   const double edgeTilt=walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:unwind?kEdgeContactMaxTiltRad:0;
-  const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
+  auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
   if(compensationSafe(q,safeBox,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{
@@ -1169,12 +1169,12 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
     // compensationSafe decides. Rig: at the WALK100 swing end a 0.8 mrad step
     // added one tick to the STOP secant (STOP_PLAN, then WALK_IK_OR_WORKSPACE).
     if(walk&&!unwind&&(roll!=oldRoll||pitch!=oldPitch)){
-      const uint8_t refused=safeRefusal_;JointTargetFrame held=nominal;
-      if(oldRoll!=0||oldPitch!=0){auto hb=headed(f.cartesian.body,oldRoll,oldPitch);
-        hb.translationM={t.x+t.z*hb.rotation[0][2],t.y+t.z*hb.rotation[1][2],t.z*hb.rotation[2][2]};
-        held=compensationTarget(f,hb,goal_.valid?goal_:f.target,true,edgeTilt);}
-      if(held.valid&&compensationSafe(held,safeBox,!walkRecover_)){
-        safeRefusal_=refused;f.target=held;correctionScale_=1;rememberCorrection(held,nominal,now);reuseSettled_=true;imuLimited_=true;imuReason_="WORKSPACE";return;}
+      const uint8_t refused=safeRefusal_;  // the refused step stays the recorded cause
+      if(oldRoll!=0||oldPitch!=0){body=headed(f.cartesian.body,oldRoll,oldPitch);  // locals reused: loop-task stack
+        body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
+        q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);}else q=nominal;
+      if(q.valid&&compensationSafe(q,safeBox,!walkRecover_)){
+        safeRefusal_=refused;f.target=q;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=true;imuLimited_=true;imuReason_="WORKSPACE";return;}
       safeRefusal_=refused;
     }
     if(walk){fault("WALK_IK_OR_WORKSPACE");return;}
