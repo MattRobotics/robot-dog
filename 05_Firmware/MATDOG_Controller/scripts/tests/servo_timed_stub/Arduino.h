@@ -36,12 +36,17 @@ class HardwareSerial {
     bool corrupt_checksum=false;
     bool wrong_id=false;
     bool no_ack=false;               // write ACK suppressed (applied, not acknowledged)
+    uint8_t status=0;                // READ reply status byte (non-zero: servo error)
   };
   inline static HardwareSerial* bus=nullptr;
   inline static HardwareSerial* bms=nullptr;
   int uart_id=0;
   explicit HardwareSerial(int id=0):uart_id(id){if(id==2)bms=this;else bus=this;}
   std::array<std::array<uint8_t,71>,254> regs{};
+  // Read-only 80..95 (trace 45: 85/86 per LeRobot/rustypot) answered only when
+  // factory_readable; otherwise, as before, a READ past 70 gets no reply.
+  std::array<std::array<uint8_t,16>,254> factory{};
+  bool factory_readable=false;
   std::deque<Timed> rx;
   ReplyPlan plan;
   int silent_read_id=-1,silent_read_width=-1,silent_reads=0; // selective actual request loss
@@ -100,7 +105,9 @@ class HardwareSerial {
       if(!plan.no_ack)schedule(frame(id,{}));
     }else if(inst==2&&p.size()==8&&address+p[6]<=71){
       if(id==silent_read_id&&p[6]==silent_read_width&&silent_reads){if(silent_reads>0)--silent_reads;return;}
-      schedule(frame(id,std::vector<uint8_t>(regs[id].begin()+address,regs[id].begin()+address+p[6])));
+      schedule(frame(id,std::vector<uint8_t>(regs[id].begin()+address,regs[id].begin()+address+p[6]),plan.status));
+    }else if(inst==2&&p.size()==8&&factory_readable&&address>=80&&address+p[6]<=96){
+      schedule(frame(id,std::vector<uint8_t>(factory[id].begin()+(address-80),factory[id].begin()+(address-80)+p[6]),plan.status));
     }else if(inst==1){schedule(frame(id,{}));}              // PING
   }
   size_t write(const uint8_t* p,size_t n){

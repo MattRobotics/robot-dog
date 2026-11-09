@@ -306,6 +306,42 @@ int main(){
     CHECK(r.bus.busStats().no_response>=failuresBefore+20);
     std::puts("BUS_PERSISTENT absent_id11=STALE healthy_id23=OK no_fabricated_sample=1 hardware=false");
   }
+  // ===== trace 45: @SERVO READ's captured 1-byte reads of 40/41/85/86 =====
+  {
+    using diagnostics::ReadValidity;
+    auto expectRead=[](const std::vector<uint8_t>& q,uint8_t reg){
+      std::vector<uint8_t> want={255,255,kId,4,2,reg,1};want.push_back(HardwareSerial::checksum(want));return q==want;};
+    Rig r;r.uart->regs[kId][40]=0;r.uart->regs[kId][41]=50;
+    r.uart->factory_readable=true;r.uart->factory[kId][85-80]=50;r.uart->factory[kId][86-80]=7;
+    for(uint8_t reg:{40,41,85,86}){
+      const uint8_t want=reg==40?0:reg==41?50:reg==85?50:7;
+      int32_t plain=-1,captured=-1;diagnostics::ReadCapture cap;const size_t before=r.uart->requests.size();
+      CHECK(r.bus.readProfileRegister(kId,reg,1,&plain));
+      CHECK(r.bus.readProfileRegister(kId,reg,1,&captured,&cap));
+      // Same value, same wire: two identical 1-byte READ requests and nothing else.
+      CHECK(plain==want&&captured==want&&r.uart->requests.size()==before+2);
+      CHECK(expectRead(r.uart->requests[before],reg)&&expectRead(r.uart->requests[before+1],reg));
+      CHECK(cap.validity==ReadValidity::VALID&&cap.id==kId&&cap.address==reg&&cap.width==1&&cap.size==7&&
+            cap.bytes[0]==255&&cap.bytes[1]==255&&cap.bytes[2]==kId&&cap.bytes[3]==3&&cap.bytes[4]==0&&cap.bytes[5]==want);
+    }
+    // A reply that is not a valid status packet is a failed read, never a value;
+    // the capture keeps what arrived. Fresh rig each: no recovery debt.
+    struct Bad{const char* name;HardwareSerial::ReplyPlan plan;bool readable;ReadValidity validity;uint8_t size;};
+    HardwareSerial::ReplyPlan silent,status,corrupt,wrong;silent.silent=true;status.status=0x20;corrupt.corrupt_checksum=true;wrong.wrong_id=true;
+    for(const Bad& b:{Bad{"unanswered_address",{},false,ReadValidity::NO_RESPONSE,0},Bad{"silent",silent,true,ReadValidity::NO_RESPONSE,0},
+                      Bad{"servo_status",status,true,ReadValidity::STATUS,7},Bad{"checksum",corrupt,true,ReadValidity::CHECKSUM,7},
+                      Bad{"wrong_id",wrong,true,ReadValidity::ID,7}}){
+      Rig q;q.uart->factory_readable=b.readable;q.uart->factory[kId][85-80]=50;q.uart->plan=b.plan;
+      int32_t value=-1;diagnostics::ReadCapture cap;const size_t before=q.uart->requests.size();
+      CHECK(!q.bus.readProfileRegister(kId,85,1,&value,&cap));
+      CHECK(value==-1&&cap.validity==b.validity&&cap.size==b.size&&cap.address==85&&cap.width==1);
+      CHECK(q.uart->requests.size()==before+1&&expectRead(q.uart->requests[before],85));
+      Rig p;p.uart->factory_readable=b.readable;p.uart->factory[kId][85-80]=50;p.uart->plan=b.plan;
+      int32_t plain=-1;CHECK(!p.bus.readProfileRegister(kId,85,1,&plain)&&plain==-1);   // the uncaptured read agrees
+      std::printf("BUS_ACC_REGISTER_READ case=%s ok=0 validity=%s rx_size=%u value_untouched=1\n",b.name,diagnostics::toString(cap.validity),unsigned(cap.size));
+    }
+    std::puts("BUS_ACC_REGISTER_READ 40/41/85/86 1-byte reads: captured == uncaptured (value and wire), invalid replies fail");
+  }
   std::printf("SERVO_BUS_DEADLINE %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;
 }

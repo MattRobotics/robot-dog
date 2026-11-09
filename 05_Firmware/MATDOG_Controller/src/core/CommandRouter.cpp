@@ -2258,6 +2258,26 @@ void CommandRouter::printServoRead(int id) {
   }
   Serial.printf("SERVO_LIMITS id=%d sampled_ms=%lu max_torque=%ld torque_limit=%ld unload_condition=%ld led_alarm=%ld protection_current=%ld protection_torque=%ld protection_time=%ld overload_torque=%ld overcurrent_time=%ld servo_status=%ld known_mask=%u source=READ_ONLY_REGISTERS eeprom=16,18,19,28,34,35,36,38 ram=48,65 unknown=-1\n",
     id,(unsigned long)millis(),(long)value[0],(long)value[1],(long)value[2],(long)value[3],(long)value[4],(long)value[5],(long)value[6],(long)value[7],(long)value[8],(long)value[9],known);
+  // Trace 45 (ACC 180 written, 50 stored): four separate 1-byte reads, 40
+  // TorqueEnable, 41 ACC, 85 and 86 (LeRobot/rustypot "Maximum_Acceleration"
+  // and "Acceleration_Multiplier", not in Feetech's SDK; never one 2-byte read
+  // of 85). 41/85/86 only once 40 read VALID 0. Each reply is printed raw; a
+  // failed read is READ_FAILED with value -1, never a value.
+  const uint8_t acc_address[]={40,41,85,86};
+  int32_t acc[4]={-1,-1,-1,-1};unsigned acc_valid=0;
+  for(unsigned i=0;i<4;++i){
+    diagnostics::ReadCapture c;
+    const bool torque_off_verified=(acc_valid&1u)&&acc[0]==0;
+    if((i==0||torque_off_verified)&&modules_.servo_bus->readProfileRegister(id,acc_address[i],1,&acc[i],&c))acc_valid|=1u<<i;
+    else acc[i]=-1;
+    char rx[2*sizeof(c.bytes)+1]="-";
+    for(unsigned k=0;k<c.size&&k<sizeof(c.bytes);++k)snprintf(rx+2*k,3,"%02X",unsigned(c.bytes[k]));
+    Serial.printf("SERVO_ACC id=%d reg=%u status=%s value=%ld validity=%s rx_size=%u drained=%u read_ms=%lu..%lu rx=%s\n",
+      id,unsigned(acc_address[i]),(acc_valid>>i)&1u?"VALID":i==0||torque_off_verified?"READ_FAILED":"NOT_READ_TORQUE_NOT_VERIFIED_OFF",
+      (long)acc[i],diagnostics::toString(c.validity),unsigned(c.size),unsigned(c.drained),(unsigned long)c.started_ms,(unsigned long)c.finished_ms,rx);
+  }
+  Serial.printf("SERVO_ACC_SUMMARY id=%d torque_40=%ld acc_41=%ld max_acc_85=%ld acc_multiplier_86=%ld valid_mask=%u source=READ_ONLY_1_BYTE unknown=-1\n",
+    id,(long)acc[0],(long)acc[1],(long)acc[2],(long)acc[3],acc_valid);
 }
 
 void CommandRouter::printServoSafeOff(int id) {

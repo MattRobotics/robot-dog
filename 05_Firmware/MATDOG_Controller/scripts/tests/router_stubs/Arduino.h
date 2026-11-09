@@ -30,6 +30,10 @@ class String {
 namespace router_test {
 inline uint32_t now_ms = 1000;
 inline unsigned hardware_calls = 0;
+// @SERVO READ tests (router_fake_hardware.cpp): one scripted servo whose
+// registers answer when `answers` says so; nullptr = every servo read fails.
+struct ServoReadScript { int torque = 0; bool answers[256] = {}; uint8_t values[256] = {}; std::string reads; };
+inline ServoReadScript* servo_read_script = nullptr;
 }
 inline uint32_t millis() { return router_test::now_ms; }
 inline uint32_t micros() { return router_test::now_ms * 1000u; }

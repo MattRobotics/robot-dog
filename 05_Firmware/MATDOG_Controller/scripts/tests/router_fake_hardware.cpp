@@ -23,8 +23,32 @@ const char* toString(LedDiagnostic) { return "UNRELATED_LED_DIAGNOSTIC"; }
 namespace servo {
 core::AvailabilityStatus ServoBus::availability() const { ++router_test::hardware_calls; return {}; }
 bool ServoBus::startScan(int, int) { ++router_test::hardware_calls; return false; }
-bool ServoBus::readProfileRegister(int, uint8_t, uint8_t, int32_t*) { ++router_test::hardware_calls; return false; }
-bool ServoBus::readRuntimeState(int, RuntimeState*) { ++router_test::hardware_calls; return false; }
+bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
+                                   diagnostics::ReadCapture* capture) {
+  ++router_test::hardware_calls;
+  auto* s = router_test::servo_read_script;
+  if (s == nullptr) return false;
+  s->reads += std::to_string(address) + "/" + std::to_string(width) + " ";
+  if (capture != nullptr) { *capture = diagnostics::ReadCapture{}; capture->id = id; capture->address = address; capture->width = width; }
+  if (!s->answers[address] || width != 1) {
+    if (capture != nullptr) capture->validity = diagnostics::ReadValidity::NO_RESPONSE;
+    return false;
+  }
+  if (capture != nullptr) {  // the status packet a servo returns: FF FF ID 03 00 value checksum
+    const uint8_t frame[7] = {0xFF, 0xFF, uint8_t(id), 3, 0, s->values[address],
+                              uint8_t(~(uint8_t(id) + 3 + s->values[address]))};
+    for (unsigned i = 0; i < 7; ++i) capture->bytes[i] = frame[i];
+    capture->size = 7; capture->validity = diagnostics::ReadValidity::VALID;
+  }
+  *out = s->values[address];
+  return true;
+}
+bool ServoBus::readRuntimeState(int, RuntimeState* out) {
+  ++router_test::hardware_calls;
+  if (router_test::servo_read_script == nullptr) return false;
+  *out = RuntimeState{2048, 0, 0, 115, 30, router_test::servo_read_script->torque, 0};
+  return true;
+}
 SafeOffResult ServoBus::safeOff(int) { ++router_test::hardware_calls; return SafeOffResult::UNVERIFIED_NO_RESPONSE; }
 bool ServoCensus::start() { ++router_test::hardware_calls; return false; }
 bool ServoPreflight::start() { ++router_test::hardware_calls; return false; }

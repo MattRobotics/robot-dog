@@ -354,8 +354,10 @@ class ServoBus {
 
   // One persistent-profile register. Width 1 or 2; any other width is refused
   // rather than guessed. Read-only by construction: there is no width-aware
-  // write counterpart anywhere.
-  bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out);
+  // write counterpart anywhere. `capture` (@SERVO READ evidence only) also
+  // receives this one reply's bytes and validity; the read is the same.
+  bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
+                           diagnostics::ReadCapture* capture = nullptr);
 
  private:
   // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -

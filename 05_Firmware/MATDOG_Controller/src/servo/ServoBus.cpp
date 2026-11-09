@@ -478,15 +478,25 @@ bool ServoBus::readPositionOffset(int id, int16_t* out) {
   return true;
 }
 
-bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out) {
+bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
+                                   diagnostics::ReadCapture* capture) {
   if (id < 0 || id > 253 || out == nullptr) return false;
   if (width != 1 && width != 2) return false;  // refuse, never guess
 
   BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
   if (!guard.ok()) return false;
 
-  const int raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
-                               : st_.readWord(static_cast<uint8_t>(id), address);
+  int raw = -1;
+  if (capture != nullptr) {
+    // readByte()/readWord() run exactly this ReadCaptured (ID, length, status,
+    // checksum, deadline); the capture only keeps a copy of the reply.
+    uint8_t data[2] = {0, 0};
+    if (st_.ReadCaptured(static_cast<uint8_t>(id), address, data, width, capture) == width)
+      raw = (width == 1) ? data[0] : (data[0] | (data[1] << 8));
+  } else {
+    raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
+                       : st_.readWord(static_cast<uint8_t>(id), address);
+  }
   guard.result(raw >= 0);
   if (raw < 0) {
     last_detected_ = core::DetectedState::NO_RESPONSE;

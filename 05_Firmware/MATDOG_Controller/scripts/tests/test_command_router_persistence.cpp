@@ -703,6 +703,63 @@ void hostlink_motion_contract() {
   std::printf("HOSTLINK USB contract: hello, capabilities, status, STAND/LIE_DOWN/JOYSTICK/STOP acks, TTL/owner/schema refusals, overflow recovery; no ServoBus call\n");
 }
 
+// Trace 45: @SERVO READ adds 40/41/85/86 as four 1-byte reads with the raw
+// reply; 41/85/86 only after 40 read VALID 0; MAINTENANCE only; a failed read
+// is never a value. The fake bus records every read (address/width).
+void servo_read_acc_registers() {
+  framing_case = "servo_read_acc";
+  Fixture f;
+  const auto hardware_before = router_test::hardware_calls;  // other cases count from zero
+  router_test::ServoReadScript s;
+  for (int reg : {16, 18, 19, 28, 34, 35, 36, 38, 48, 65, 40, 41, 85, 86}) s.answers[reg] = true;
+  s.values[41] = 50; s.values[85] = 50; s.values[86] = 0;
+  router_test::servo_read_script = &s;
+  auto has = [](const std::string& out, const char* text) { return out.find(text) != std::string::npos; };
+
+  std::string out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_READ id=23 position=2048") && has(out, "torque=0"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=VALID value=0 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=41 status=VALID value=50 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=85 status=VALID value=50 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=86 status=VALID value=0 validity=VALID rx_size=7"));
+  // 85's own reply: FF FF 23 len 3 status 0 value 50 checksum.
+  CHECK(has(out, "reg=85 status=VALID value=50 validity=VALID rx_size=7 drained=0 read_ms=0..0 rx=FFFF17030032B3\n"));
+  CHECK(has(out, "SERVO_ACC_SUMMARY id=23 torque_40=0 acc_41=50 max_acc_85=50 acc_multiplier_86=0 valid_mask=15 "));
+  CHECK(s.reads.find("40/1 41/1 85/1 86/1 ") != std::string::npos);  // four distinct 1-byte reads, last
+  CHECK(s.reads.find("85/2") == std::string::npos);
+
+  s.answers[85] = false; s.reads.clear();
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=85 status=READ_FAILED value=-1 validity=NO_RESPONSE rx_size=0"));
+  CHECK(has(out, "rx=-\n"));
+  CHECK(has(out, "max_acc_85=-1 acc_multiplier_86=0 valid_mask=11 "));
+  s.answers[85] = true;
+
+  s.answers[40] = false; s.reads.clear();  // torque not read: nothing else is read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=READ_FAILED value=-1"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=41 status=NOT_READ_TORQUE_NOT_VERIFIED_OFF value=-1 validity=NOT_ATTEMPTED"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=86 status=NOT_READ_TORQUE_NOT_VERIFIED_OFF value=-1"));
+  CHECK(s.reads.find("41/1") == std::string::npos && s.reads.find("85/1") == std::string::npos);
+  s.answers[40] = true;
+
+  s.torque = 1; s.values[40] = 1; s.reads.clear();  // torque ON: no ACC read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=VALID value=1"));
+  CHECK(has(out, "SERVO_ACC_SUMMARY id=23 torque_40=1 acc_41=-1 max_acc_85=-1 acc_multiplier_86=-1 valid_mask=1 "));
+  CHECK(s.reads.find("41/1") == std::string::npos && s.reads.find("85/1") == std::string::npos &&
+        s.reads.find("86/1") == std::string::npos);
+  s.torque = 0; s.values[40] = 0;
+
+  f.mode.setMode(OperatingMode::RUN); s.reads.clear();  // outside MAINTENANCE: refused before any read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_READ=BLOCKED") && has(out, "REASON=NOT_IN_MAINTENANCE_MODE") && s.reads.empty());
+  CHECK(!has(out, "SERVO_ACC"));
+  router_test::servo_read_script = nullptr;
+  router_test::hardware_calls = hardware_before;
+  std::printf("@SERVO READ ACC registers: 40/41/85/86 as 1-byte reads with raw replies, torque-OFF gate, READ_FAILED never a value, MAINTENANCE only\n");
+}
+
 int main() {
   hostlink_motion_contract();
   source_identity_is_read_only();
@@ -712,6 +769,7 @@ int main() {
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();
   wifi_commands_keep_safety_invariants();
   mode_changes_keep_actuators_closed();
+  servo_read_acc_registers();
   std::printf("test_command_router_persistence: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }
