@@ -122,7 +122,9 @@ async function boot(initialStatus = fx.status_ready) {
     assert.strictEqual(q('#simple-height-value').textContent, '75 mm');
     // Final dev.6: one speed selector, no stride selector.
     const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
-    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['SLOW:SLOW 20 mm/s', 'STANDARD:STANDARD 25 mm/s', 'FAST:FAST 32 mm/s']);
+    // Icon and name over the speed (modeLabels updates only the speed element).
+    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.querySelector('.mode-name').textContent + '|' + r.nextElementSibling.querySelector('.mode-speed').textContent),
+      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|25 mm/s', 'FAST:🐇 FAST|32 mm/s']);
     assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
     await settle();
     assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');

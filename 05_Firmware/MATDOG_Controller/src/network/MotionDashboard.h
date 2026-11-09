@@ -26,6 +26,10 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-motion .segmented label:first-child span{border-left:0}
 #simple-motion .segmented input:checked+span{background:var(--accent);color:#06222a;font-weight:700}
 #simple-motion .segmented input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-3px}
+/* WALK speed selector: name (icon + mode) over the speed, wrapping inside its third of a narrow cockpit column. */
+#simple-walk-mode span{flex-direction:column;gap:2px;padding:6px 3px;white-space:normal;text-align:center;line-height:1.15;min-width:0}
+#simple-walk-mode .mode-name{font-size:12px;max-width:100%;overflow-wrap:anywhere}#simple-walk-mode .mode-speed{font-size:12px;color:inherit;text-transform:none;letter-spacing:0;opacity:.85}
+#simple-walk-mode input:checked+span{box-shadow:inset 0 0 0 2px #e6fbff}#simple-walk-mode input:checked+span .mode-speed{opacity:1}
 #simple-controls{scroll-margin-top:130px}
 /* The command column grows with its contents, including future controls. */
 #simple-motion .command-panel{min-width:0}
@@ -70,7 +74,7 @@ card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
 <div class="stepper"><button type="button" id="simple-height-down" aria-label="Quota STAND −5 mm">−</button><input id="simple-height" type="range" min="50" max="150" step="5" value="150" aria-describedby="simple-height-value"><button type="button" id="simple-height-up" aria-label="Quota STAND +5 mm">+</button></div>
 <div class="pair"><button id="simple-stand" disabled>STAND</button><button id="simple-prone" disabled title="Discesa PRONE: al termine verificato la coppia viene rilasciata (SAFE_OFF ordinario, PRONE_REST). Appoggio non verificato.">PRONE</button></div></fieldset>
 <fieldset class="cockpit-group"><legend>WALK · modalità</legend>
-<div id="simple-walk-mode" class="segmented" role="radiogroup" aria-label="Velocità WALK del prossimo WALK (modalità del Controller)"><label><input type="radio" name="simple-walk-mode" value="SLOW" checked><span>SLOW 20 mm/s</span></label><label><input type="radio" name="simple-walk-mode" value="STANDARD"><span>STANDARD 25 mm/s</span></label><label><input type="radio" name="simple-walk-mode" value="FAST"><span>FAST 32 mm/s</span></label></div>
+<div id="simple-walk-mode" class="segmented" role="radiogroup" aria-label="Velocità WALK del prossimo WALK (modalità del Controller)"><label><input type="radio" name="simple-walk-mode" value="SLOW" checked><span><b class="mode-name">🐢 SLOW</b><small class="mode-speed">20 mm/s</small></span></label><label><input type="radio" name="simple-walk-mode" value="STANDARD"><span><b class="mode-name">🐾 STANDARD</b><small class="mode-speed">25 mm/s</small></span></label><label><input type="radio" name="simple-walk-mode" value="FAST"><span><b class="mode-name">🐇 FAST</b><small class="mode-speed">32 mm/s</small></span></label></div>
 <p id="simple-walk-mode-state" role="status">Modalità WALK: lettura dal Controller.</p>
 <div class="pair"><button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div></fieldset>
 <section id="simple-joystick" aria-label="Joystick avanti/indietro, laterale e rotazione" aria-disabled="true" data-active="false">
@@ -365,7 +369,7 @@ height.addEventListener('input',showHeight);by('simple-height-down').onclick=()=
 // WalkModeSpec::strideM); the labels' speeds come from the capabilities table.
 const MODE_PRESET={SLOW:2,STANDARD:1,FAST:2};
 function modeLabels(){for(const r of document.querySelectorAll('input[name="simple-walk-mode"]')){const m=walkModes.find(w=>w.name===r.value);if(!m||!Array.isArray(m.strides_mm))continue;
- const v=r.value+' '+(m.strides_mm[MODE_PRESET[r.value]]/Number(m.period_s)).toFixed(0)+' mm/s';if(r.nextElementSibling.textContent!==v)r.nextElementSibling.textContent=v}}
+ const e=r.nextElementSibling.querySelector('.mode-speed'),v=(m.strides_mm[MODE_PRESET[r.value]]/Number(m.period_s)).toFixed(0)+' mm/s';if(e&&e.textContent!==v)e.textContent=v}}
 const selectedMode=()=>document.querySelector('input[name="simple-walk-mode"]:checked')?.value||'SLOW';
 // GAIT.SELECT in flight (a promise of the Controller's ACCEPTED) and the last
 // selection it accepted: WALK waits for the first and never runs another mode.

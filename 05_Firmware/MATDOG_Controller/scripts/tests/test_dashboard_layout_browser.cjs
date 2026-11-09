@@ -37,6 +37,8 @@ const server = http.createServer((req, res) => {
     if (url === '/wifi/status') return send(200, 'application/json', JSON.stringify({ profiles: [], scan: [], active_profile: 0, sta_test: { seq: 0 }, policy: {}, network_phase: 'ADMIN_AP', admin_generation: 1 }));
     if (url === '/wifi/session') return send(200, 'text/plain', CSRF);
     if (url === '/api/motion/status') return send(200, 'application/json', device.status);
+    // Optional (MATDOG_CAPS_JSON): the real capabilities body, so modeLabels() rewrites the speeds.
+    if (url === '/api/motion/capabilities' && process.env.MATDOG_CAPS_JSON) return send(200, 'application/json', fs.readFileSync(process.env.MATDOG_CAPS_JSON, 'utf8'));
     if (url === '/api/motion/command') {
       const c = JSON.parse(body); device.commands.push(c);
       const r = device.replies.shift() || { status: 200, body: c.params.vx || c.params.vy || c.params.yaw_rate ? fx.ack_walk_accepted : fx.ack_walk_stop };
@@ -47,6 +49,37 @@ const server = http.createServer((req, res) => {
     return send(404, 'application/json', '{}');
   });
 });
+
+// WALK speed selector (final dev.6 UI patch): three choices readable in the
+// cockpit column at the real widths; name (icon + mode) above the speed, no
+// overlap between labels or between name and speed, nothing clipped.
+async function selectorLayout(browser, base, width, height) {
+  Object.assign(device, { status: fx.status_ready, budget: false, replies: [], commands: [] });
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const page = await context.newPage(), errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  try {
+    await page.goto(base + '/');
+    await page.waitForSelector('#simple-walk-mode .mode-speed');
+    await page.waitForFunction(() => /Prossimo WALK/.test(document.getElementById('simple-walk-mode-state').textContent), null, { timeout: 10000 });
+    const m = await page.evaluate(() => {
+      const box = e => { const r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom }; };
+      const labels = [...document.querySelectorAll('#simple-walk-mode label')].map(l => ({ label: box(l), name: box(l.querySelector('.mode-name')), speed: box(l.querySelector('.mode-speed')),
+        span: l.querySelector('span'), text: l.querySelector('.mode-name').textContent + ' ' + l.querySelector('.mode-speed').textContent }));
+      const issues = [];
+      labels.forEach((x, i) => {
+        for (const k of ['name', 'speed']) if (x[k].l < x.label.l - .5 || x[k].r > x.label.r + .5) issues.push(x.text + ': ' + k + ' outside its label');
+        if (x.speed.t < x.name.b - .5) issues.push(x.text + ': speed not below the name');
+        if (x.span.scrollWidth > x.span.clientWidth + 1) issues.push(x.text + ': horizontal overflow');
+        if (i && labels[i - 1].label.r > x.label.l + .5) issues.push(x.text + ': overlaps the previous label');
+      });
+      const g = box(document.getElementById('simple-walk-mode'));
+      return { issues, labels: labels.map(x => x.text), group: Math.round(g.r - g.l), label_width: Math.round(labels[0].label.r - labels[0].label.l), checked: document.querySelector('#simple-walk-mode input:checked + span').getBoundingClientRect().height };
+    });
+    if (shots) await page.locator('fieldset', { has: page.locator('#simple-walk-mode') }).screenshot({ path: path.join(shots, 'walk-selector-' + width + '.png') });
+    return { viewport: width, ...m, errors };
+  } finally { await context.close(); }
+}
 
 async function scenario(browser, base, name, viewport, touch) {
   Object.assign(device, { status: fx.status_ready, budget: false, replies: [], commands: [] });
@@ -148,9 +181,14 @@ async function scenario(browser, base, name, viewport, touch) {
   try {
     results.push(await scenario(browser, base, 'desktop', { width: 1280, height: 900 }, false));
     results.push(await scenario(browser, base, 'phone', { width: 390, height: 844 }, true));
+    for (const [w, h] of [[1280, 900], [1024, 768], [941, 900], [939, 900], [600, 900], [390, 844], [360, 740]]) results.push({ selector: await selectorLayout(browser, base, w, h) });
   } finally { await browser.close(); server.close(); }
   let failures = 0;
-  for (const r of results) {
+  for (const { selector: s } of results.filter(r => r.selector)) {
+    const ok = !s.issues.length && !s.errors.length; if (!ok) failures++;
+    console.log('WALK_SELECTOR viewport ' + s.viewport + 'px selector=' + s.group + 'px label=' + s.label_width + 'px labels=' + JSON.stringify(s.labels) + ' issues=' + JSON.stringify(s.issues) + ' -> ' + (ok ? 'PASS' : 'FAIL'));
+  }
+  for (const r of results.filter(r => !r.selector)) {
     const worst = Math.max(...Object.values(r.shifts));
     const ok = worst < 0.5 && r.request_constant && r.dynamic_ok && r.neutral_on_release && r.stop.hit === 'simple-stop' && r.stop_with_banner === 'simple-stop' && r.stop.top >= 0 && r.stop.bottom <= r.stop.viewport && r.errors.length === 0;
     if (!ok) failures++;
