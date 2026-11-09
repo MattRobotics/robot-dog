@@ -1,0 +1,6 @@
+SIMPLE_DASHBOARD_FIXTURES = PASS (79 checks; real MotionService bodies)
+SIMPLE_DASHBOARD_DOM = PASS (21 envelopes captured from the shipped page; real MotionService fixtures; 89 commands)
+DASHBOARD_LAYOUT_BROWSER PASS (Chrome 156.0.8078.79; shipped page; fixtures; no device)
+TWIN_VIEWCUBE_BROWSER PASS (Chrome 156.0.8078.79, software WebGL; shipped page and TwinAssets.h; camera only; no device)
+STOP_DURING_TWIN_LOAD_BROWSER PASS (Chrome 156.0.8078.79; worst input->STOP request at the server during a Twin load: 453 ms; measured, not a bound; offline, software WebGL, no device)
+SIMPLE_DASHBOARD_CONTRACT = PASS (6114 checks; 21 shipped-JS envelopes through real parser, origin, session/CSRF, MotionService, SimpleMotion; HTTPD/socket/mailbox/STOP-lane threading mirrored and source-anchored, not executed; NO HARDWARE VALIDATION)

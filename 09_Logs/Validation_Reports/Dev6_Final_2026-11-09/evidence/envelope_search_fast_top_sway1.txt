@@ -1,0 +1,18 @@
+ray  0 at   0.0 deg: 0.0214 rad
+ray  1 at  22.5 deg: 0.0246 rad
+ray  2 at  45.0 deg: 0.0350 rad
+ray  3 at  67.5 deg: 0.0522 rad
+ray  4 at  90.0 deg: 0.0486 rad
+ray  5 at 112.5 deg: 0.0522 rad
+ray  6 at 135.0 deg: 0.0350 rad
+ray  7 at 157.5 deg: 0.0246 rad
+ray  8 at 180.0 deg: 0.0214 rad
+ray  9 at 202.5 deg: 0.0218 rad
+ray 10 at 225.0 deg: 0.0261 rad
+ray 11 at 247.5 deg: 0.0389 rad
+ray 12 at 270.0 deg: 0.0620 rad
+ray 13 at 292.5 deg: 0.0389 rad
+ray 14 at 315.0 deg: 0.0261 rad
+ray 15 at 337.5 deg: 0.0218 rad
+constexpr TiltVertex kFastTiltTop[]={{0.018210,0.000000},{0.019326,0.008005},{0.021020,0.021020},{0.016987,0.041010},{0.000000,0.041307},{-0.016987,0.041010},{-0.021020,0.021020},{-0.019326,0.008005},{-0.018210,0.000000},{-0.017111,-0.007088},{-0.015694,-0.015694},{-0.012639,-0.030513},{-0.000000,-0.052668},{0.012639,-0.030513},{0.015694,-0.015694},{0.017111,-0.007088}};
+mode=FAST stride=80 period=2.50 duty=0.825 lift=6 swayx=3.0 com=11.0 ramp=0.35 settle=0.10 start=1.00 stop=1.00 drive=1950/220 proof_acc=12.89 rad/s2 v_cmd=32.00 mm/s samples=9682 checks=629330 fail nominal/ik/box/stop=0/0/0/0 box_margin_ticks nominal/compensated=11.30/10.30 step_ticks/release nominal/compensated=30.51/31.00 joint vmax=2.350 rad/s LF_UPPER (drive 2.991) amax=26.39 rad/s2 LF_UPPER (drive 33.75) body a_x/a_y/a_z max=1.293/0.328/0.000 m/s2 PASS(geometry+law only)

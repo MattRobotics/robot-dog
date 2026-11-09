@@ -1,0 +1,93 @@
+forward foot_x=[-53.8,32.0] mm frames=1344 box_margin=14.2 mrad gen1_margin=656.8 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.02521 rad end=STANDING STAND_REACHED
+backward foot_x=[-33.9,11.8] mm frames=1344 box_margin=14.2 mrad gen1_margin=737.7 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01405 rad end=STANDING STAND_REACHED
+forward_steered foot_x=[-34.1,10.0] mm frames=1344 box_margin=61.2 mrad gen1_margin=688.5 mrad tilt_margin=4.7 mrad tilt_fail=0 foot_tilt nominal/compensated=5.20/6.69 deg lift_err=20.6 um max_target_step=0.02007 rad end=STANDING STAND_REACHED
+backward_steered foot_x=[-31.9,10.8] mm frames=1344 box_margin=60.7 mrad gen1_margin=680.9 mrad tilt_margin=9.3 mrad tilt_fail=0 foot_tilt nominal/compensated=5.23/6.89 deg lift_err=20.7 um max_target_step=0.02018 rad end=STANDING STAND_REACHED
+frontal_changes foot_x=[-33.8,13.2] mm frames=1344 box_margin=14.2 mrad gen1_margin=743.6 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01359 rad end=STANDING STAND_REACHED
+frontal_jitter foot_x=[-27.7,5.8] mm frames=1388 box_margin=14.2 mrad gen1_margin=754.4 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01106 rad end=STANDING STAND_REACHED
+frontal_to_steer foot_x=[-53.8,32.4] mm frames=1544 box_margin=14.2 mrad gen1_margin=656.8 mrad tilt_margin=12.4 mrad tilt_fail=0 foot_tilt nominal/compensated=4.42/5.98 deg lift_err=20.5 um max_target_step=0.02531 rad end=STANDING STAND_REACHED
+held_fwd_diag_lat_rot_backright_fwd foot_x=[-53.8,32.0] mm frames=5144 box_margin=14.2 mrad gen1_margin=645.1 mrad tilt_margin=3.2 mrad tilt_fail=0 foot_tilt nominal/compensated=7.25/9.01 deg lift_err=20.7 um max_target_step=0.02521 rad end=STANDING STAND_REACHED
+held_rev_lat_fwd foot_x=[-53.8,32.0] mm frames=2863 box_margin=14.2 mrad gen1_margin=656.5 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=5.79/7.36 deg lift_err=20.4 um max_target_step=0.02521 rad end=STANDING STAND_REACHED
+held_yaw_lat_fwd foot_x=[-44.9,27.0] mm frames=2294 box_margin=14.2 mrad gen1_margin=674.6 mrad tilt_margin=4.7 mrad tilt_fail=0 foot_tilt nominal/compensated=6.23/7.70 deg lift_err=20.7 um max_target_step=0.02055 rad end=STANDING STAND_REACHED
+frontal_accel0 foot_x=[-40.6,22.2] mm frames=944 box_margin=14.2 mrad gen1_margin=701.9 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01787 rad end=STANDING STAND_REACHED
+frontal_accel1 foot_x=[-38.3,19.8] mm frames=1004 box_margin=14.2 mrad gen1_margin=711.3 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01654 rad end=STANDING STAND_REACHED
+frontal_accel2 foot_x=[-40.8,22.4] mm frames=1064 box_margin=14.2 mrad gen1_margin=710.2 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01823 rad end=STANDING STAND_REACHED
+frontal_random_1 foot_x=[-40.0,19.8] mm frames=5729 box_margin=14.2 mrad gen1_margin=720.4 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01669 rad end=STANDING STAND_REACHED
+frontal_random_2 foot_x=[-48.7,29.0] mm frames=5451 box_margin=14.2 mrad gen1_margin=680.3 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.02137 rad end=STANDING STAND_REACHED
+frontal_random_3 foot_x=[-46.1,26.3] mm frames=5766 box_margin=14.2 mrad gen1_margin=693.3 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01972 rad end=STANDING STAND_REACHED
+left foot_x=[-14.0,0.0] mm frames=1344 box_margin=88.7 mrad gen1_margin=661.5 mrad tilt_margin=56.9 mrad tilt_fail=0 foot_tilt nominal/compensated=6.88/8.50 deg lift_err=20.5 um max_target_step=0.02009 rad end=STANDING STAND_REACHED
+right foot_x=[-14.0,0.0] mm frames=1344 box_margin=88.2 mrad gen1_margin=653.5 mrad tilt_margin=59.9 mrad tilt_fail=0 foot_tilt nominal/compensated=6.88/8.51 deg lift_err=20.5 um max_target_step=0.02046 rad end=STANDING STAND_REACHED
+ccw foot_x=[-19.7,0.0] mm frames=1344 box_margin=86.0 mrad gen1_margin=645.1 mrad tilt_margin=50.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.25/9.01 deg lift_err=20.5 um max_target_step=0.02052 rad end=STANDING STAND_REACHED
+cw foot_x=[-19.7,0.0] mm frames=1344 box_margin=85.6 mrad gen1_margin=654.9 mrad tilt_margin=53.8 mrad tilt_fail=0 foot_tilt nominal/compensated=7.25/9.02 deg lift_err=20.5 um max_target_step=0.02015 rad end=STANDING STAND_REACHED
+octant_ppp foot_x=[-27.8,5.7] mm frames=1344 box_margin=79.8 mrad gen1_margin=667.8 mrad tilt_margin=63.0 mrad tilt_fail=0 foot_tilt nominal/compensated=6.61/8.09 deg lift_err=20.8 um max_target_step=0.02013 rad end=STANDING STAND_REACHED
+octant_ppm foot_x=[-27.6,5.9] mm frames=1344 box_margin=81.9 mrad gen1_margin=649.5 mrad tilt_margin=33.9 mrad tilt_fail=0 foot_tilt nominal/compensated=7.64/9.32 deg lift_err=20.6 um max_target_step=0.02019 rad end=STANDING STAND_REACHED
+octant_pmp foot_x=[-27.6,5.8] mm frames=1344 box_margin=86.6 mrad gen1_margin=640.3 mrad tilt_margin=40.0 mrad tilt_fail=0 foot_tilt nominal/compensated=7.59/9.32 deg lift_err=20.5 um max_target_step=0.02056 rad end=STANDING STAND_REACHED
+octant_pmm foot_x=[-27.7,5.7] mm frames=1344 box_margin=79.3 mrad gen1_margin=667.9 mrad tilt_margin=56.9 mrad tilt_fail=0 foot_tilt nominal/compensated=6.59/8.10 deg lift_err=20.9 um max_target_step=0.02007 rad end=STANDING STAND_REACHED
+octant_mpp foot_x=[-27.8,5.5] mm frames=1344 box_margin=79.3 mrad gen1_margin=667.9 mrad tilt_margin=58.4 mrad tilt_fail=0 foot_tilt nominal/compensated=6.55/8.10 deg lift_err=20.7 um max_target_step=0.02010 rad end=STANDING STAND_REACHED
+octant_mpm foot_x=[-27.6,5.7] mm frames=1344 box_margin=86.6 mrad gen1_margin=640.3 mrad tilt_margin=33.9 mrad tilt_fail=0 foot_tilt nominal/compensated=7.64/9.32 deg lift_err=20.5 um max_target_step=0.02056 rad end=STANDING STAND_REACHED
+octant_mmp foot_x=[-27.6,5.6] mm frames=1344 box_margin=81.9 mrad gen1_margin=649.5 mrad tilt_margin=33.9 mrad tilt_fail=0 foot_tilt nominal/compensated=7.64/9.32 deg lift_err=20.5 um max_target_step=0.02019 rad end=STANDING STAND_REACHED
+octant_mmm foot_x=[-27.8,5.5] mm frames=1344 box_margin=79.3 mrad gen1_margin=667.9 mrad tilt_margin=53.8 mrad tilt_fail=0 foot_tilt nominal/compensated=6.48/8.10 deg lift_err=20.6 um max_target_step=0.02013 rad end=STANDING STAND_REACHED
+lat_small foot_x=[-28.3,6.4] mm frames=1044 box_margin=14.2 mrad gen1_margin=752.9 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01128 rad end=STANDING STAND_REACHED
+yaw_small foot_x=[-28.3,6.4] mm frames=1044 box_margin=14.2 mrad gen1_margin=752.9 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01128 rad end=STANDING STAND_REACHED
+lat_mid foot_x=[-28.3,6.4] mm frames=1044 box_margin=14.2 mrad gen1_margin=752.9 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01128 rad end=STANDING STAND_REACHED
+yaw_mid foot_x=[-28.3,6.4] mm frames=1044 box_margin=14.2 mrad gen1_margin=752.9 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=0.59/1.76 deg lift_err=1.0 um max_target_step=0.01128 rad end=STANDING STAND_REACHED
+turn_cw foot_x=[-19.6,0.0] mm frames=9959 box_margin=85.6 mrad gen1_margin=654.9 mrad tilt_margin=52.3 mrad tilt_fail=0 foot_tilt nominal/compensated=7.25/9.02 deg lift_err=20.6 um max_target_step=0.02015 rad end=STANDING STAND_REACHED
+turn_ccw foot_x=[-19.7,0.0] mm frames=9959 box_margin=86.0 mrad gen1_margin=645.1 mrad tilt_margin=50.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.25/9.01 deg lift_err=20.6 um max_target_step=0.02052 rad end=STANDING STAND_REACHED
+reverse_twice foot_x=[-31.9,10.0] mm frames=1805 box_margin=14.2 mrad gen1_margin=711.0 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=4.17/5.81 deg lift_err=20.6 um max_target_step=0.01287 rad end=STANDING STAND_REACHED
+silent_client foot_x=[-25.9,3.9] mm frames=1113 box_margin=86.9 mrad gen1_margin=675.4 mrad tilt_margin=67.6 mrad tilt_fail=0 foot_tilt nominal/compensated=6.18/7.65 deg lift_err=20.7 um max_target_step=0.02012 rad end=STANDING STAND_REACHED
+release_in_start foot_x=[-21.8,0.0] mm frames=94 box_margin=120.2 mrad gen1_margin=702.1 mrad tilt_margin=55.3 mrad tilt_fail=0 foot_tilt nominal/compensated=3.98/5.61 deg lift_err=20.5 um max_target_step=0.01961 rad end=STANDING STAND_REACHED
+random_1 foot_x=[-26.3,6.8] mm frames=7777 box_margin=14.2 mrad gen1_margin=647.5 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.77/9.29 deg lift_err=20.6 um max_target_step=0.02038 rad end=STANDING STAND_REACHED
+random_2 foot_x=[-31.5,8.5] mm frames=7964 box_margin=68.8 mrad gen1_margin=652.8 mrad tilt_margin=32.3 mrad tilt_fail=0 foot_tilt nominal/compensated=7.42/8.92 deg lift_err=20.6 um max_target_step=0.02042 rad end=STANDING STAND_REACHED
+random_3 foot_x=[-33.5,9.5] mm frames=8208 box_margin=58.1 mrad gen1_margin=650.5 mrad tilt_margin=1.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.52/9.02 deg lift_err=20.8 um max_target_step=0.02027 rad end=STANDING STAND_REACHED
+random_4 foot_x=[-31.8,9.7] mm frames=7955 box_margin=14.2 mrad gen1_margin=654.4 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=6.72/8.46 deg lift_err=20.8 um max_target_step=0.02044 rad end=STANDING STAND_REACHED
+random_5 foot_x=[-30.1,6.9] mm frames=8181 box_margin=14.2 mrad gen1_margin=651.8 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.11/8.88 deg lift_err=20.8 um max_target_step=0.02037 rad end=STANDING STAND_REACHED
+random_6 foot_x=[-29.9,5.8] mm frames=7998 box_margin=79.5 mrad gen1_margin=650.9 mrad tilt_margin=32.3 mrad tilt_fail=0 foot_tilt nominal/compensated=7.49/9.00 deg lift_err=20.7 um max_target_step=0.02041 rad end=STANDING STAND_REACHED
+random_7 foot_x=[-29.6,6.4] mm frames=8001 box_margin=14.2 mrad gen1_margin=643.0 mrad tilt_margin=12.7 mrad tilt_fail=0 foot_tilt nominal/compensated=7.93/9.47 deg lift_err=20.6 um max_target_step=0.02043 rad end=STANDING STAND_REACHED
+random_8 foot_x=[-28.1,7.1] mm frames=8001 box_margin=69.7 mrad gen1_margin=644.9 mrad tilt_margin=36.9 mrad tilt_fail=0 foot_tilt nominal/compensated=7.96/9.76 deg lift_err=20.6 um max_target_step=0.02045 rad end=STANDING STAND_REACHED
+forward support 2.44 mm c0.488 | non-foot clearance 2.46 mm (lh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+backward support 2.60 mm c0.308 | non-foot clearance 2.66 mm (lh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+forward_steered support 2.71 mm c4.496 | non-foot clearance 2.38 mm (rh_lower_leg_link) | foot penetration 0.185 mm | stance tilt 5.20 deg
+backward_steered support 2.76 mm c4.304 | non-foot clearance 2.37 mm (lh_lower_leg_link) | foot penetration 0.196 mm | stance tilt 5.20 deg
+frontal_changes support 1.08 mm c1.496 | non-foot clearance 2.66 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+frontal_jitter support 2.25 mm c0.488 | non-foot clearance 2.72 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+frontal_to_steer support 2.26 mm c5.492 | non-foot clearance 2.40 mm (rh_lower_leg_link) | foot penetration 0.196 mm | stance tilt 4.36 deg
+held_fwd_diag_lat_rot_backright_fwd support 1.47 mm c10.988 | non-foot clearance 2.35 mm (rh_lower_leg_link) | foot penetration 0.204 mm | stance tilt 7.25 deg
+held_rev_lat_fwd support 1.94 mm c5.552 | non-foot clearance 2.43 mm (rh_lower_leg_link) | foot penetration 0.189 mm | stance tilt 5.79 deg
+held_yaw_lat_fwd support 2.71 mm c7.496 | non-foot clearance 2.36 mm (rf_lower_leg_link) | foot penetration 0.193 mm | stance tilt 6.18 deg
+frontal_accel0 support 0.96 mm c1.496 | non-foot clearance 2.60 mm (lh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+frontal_accel1 support 1.94 mm c1.988 | non-foot clearance 2.62 mm (lh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+frontal_accel2 support 1.38 mm c1.988 | non-foot clearance 2.59 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+frontal_random_1 support 1.47 mm c1.496 | non-foot clearance 2.61 mm (rh_lower_leg_link) | foot penetration 0.056 mm | stance tilt 0.59 deg
+frontal_random_2 support 1.67 mm c0.992 | non-foot clearance 2.52 mm (rh_lower_leg_link) | foot penetration 0.056 mm | stance tilt 0.59 deg
+frontal_random_3 support 1.49 mm c1.492 | non-foot clearance 2.54 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+left support 2.55 mm c2.408 | non-foot clearance 2.38 mm (rh_lower_leg_link) | foot penetration 0.213 mm | stance tilt 6.88 deg
+right support 3.00 mm c3.908 | non-foot clearance 2.38 mm (lh_lower_leg_link) | foot penetration 0.204 mm | stance tilt 6.88 deg
+ccw support 1.47 mm c2.984 | non-foot clearance 2.35 mm (rh_lower_leg_link) | foot penetration 0.201 mm | stance tilt 7.25 deg
+cw support 1.01 mm c2.480 | non-foot clearance 2.36 mm (lh_lower_leg_link) | foot penetration 0.210 mm | stance tilt 7.25 deg
+octant_ppp support 3.39 mm c2.996 | non-foot clearance 2.34 mm (rf_lower_leg_link) | foot penetration 0.197 mm | stance tilt 6.61 deg
+octant_ppm support 2.56 mm c1.496 | non-foot clearance 2.29 mm (rh_lower_leg_link) | foot penetration 0.214 mm | stance tilt 7.64 deg
+octant_pmp support 3.01 mm c2.996 | non-foot clearance 2.29 mm (lh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 7.59 deg
+octant_pmm support 2.94 mm c1.496 | non-foot clearance 2.34 mm (lf_lower_leg_link) | foot penetration 0.210 mm | stance tilt 6.59 deg
+octant_mpp support 2.82 mm c2.300 | non-foot clearance 2.33 mm (lf_lower_leg_link) | foot penetration 0.211 mm | stance tilt 6.55 deg
+octant_mpm support 2.99 mm c3.800 | non-foot clearance 2.29 mm (lh_lower_leg_link) | foot penetration 0.199 mm | stance tilt 7.64 deg
+octant_mmp support 2.50 mm c2.300 | non-foot clearance 2.29 mm (rh_lower_leg_link) | foot penetration 0.214 mm | stance tilt 7.64 deg
+octant_mmm support 3.31 mm c3.800 | non-foot clearance 2.33 mm (rf_lower_leg_link) | foot penetration 0.197 mm | stance tilt 6.48 deg
+lat_small support 2.26 mm c0.488 | non-foot clearance 2.71 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+yaw_small support 2.26 mm c0.488 | non-foot clearance 2.71 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+lat_mid support 2.26 mm c0.488 | non-foot clearance 2.71 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+yaw_mid support 2.26 mm c0.488 | non-foot clearance 2.71 mm (rh_lower_leg_link) | foot penetration 0.055 mm | stance tilt 0.59 deg
+turn_cw support 1.01 mm c2.480 | non-foot clearance 2.36 mm (lh_lower_leg_link) | foot penetration 0.210 mm | stance tilt 7.25 deg
+turn_ccw support 1.47 mm c2.984 | non-foot clearance 2.35 mm (rh_lower_leg_link) | foot penetration 0.201 mm | stance tilt 7.25 deg
+reverse_twice support 2.09 mm c3.308 | non-foot clearance 2.50 mm (lh_lower_leg_link) | foot penetration 0.187 mm | stance tilt 4.17 deg
+silent_client support 3.58 mm c2.996 | non-foot clearance 2.36 mm (rf_lower_leg_link) | foot penetration 0.193 mm | stance tilt 6.18 deg
+release_in_start support 5.26 mm c0.248 | non-foot clearance 2.50 mm (lh_lower_leg_link) | foot penetration 0.177 mm | stance tilt 3.98 deg
+random_1 support 0.65 mm c6.976 | non-foot clearance 2.33 mm (lf_lower_leg_link) | foot penetration 0.204 mm | stance tilt 7.77 deg
+random_2 support 1.66 mm c6.448 | non-foot clearance 2.31 mm (rh_lower_leg_link) | foot penetration 0.214 mm | stance tilt 7.37 deg
+random_3 support 0.95 mm c12.492 | non-foot clearance 2.35 mm (lf_lower_leg_link) | foot penetration 0.213 mm | stance tilt 7.52 deg
+random_4 support 0.39 mm c2.308 | non-foot clearance 2.34 mm (lh_lower_leg_link) | foot penetration 0.202 mm | stance tilt 6.72 deg
+random_5 support 0.63 mm c6.816 | non-foot clearance 2.30 mm (rh_lower_leg_link) | foot penetration 0.214 mm | stance tilt 7.11 deg
+random_6 support 0.66 mm c1.060 | non-foot clearance 2.35 mm (lf_lower_leg_link) | foot penetration 0.199 mm | stance tilt 7.43 deg
+random_7 support 0.79 mm c2.552 | non-foot clearance 2.32 mm (lh_lower_leg_link) | foot penetration 0.208 mm | stance tilt 7.86 deg
+random_8 support 1.03 mm c7.308 | non-foot clearance 2.33 mm (lh_lower_leg_link) | foot penetration 0.210 mm | stance tilt 7.92 deg
+summary: min support 0.39 mm (random_4), min non-foot clearance 2.29 mm (octant_ppm), max compensated stance-foot tilt 9.76 deg
+JOYSTICK envelope PASS: geometry and sequencing only, no hardware motion validation (<scratch>/joy)
+rc=0

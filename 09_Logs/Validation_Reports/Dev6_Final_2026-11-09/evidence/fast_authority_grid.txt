@@ -1,0 +1,53 @@
+# Pitch-down / pitch-up / roll+ ray bisection (raw, before x0.85), FAST candidates, proof ACC 84 (partial grid: 80 mm strides; stopped when the choice was made)
+BrokenPipeError: [Errno 32] Broken pipe
+BrokenPipeError: [Errno 32] Broken pipe
+Exception ignored in: <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
+Exception ignored in: <_io.TextIOWrapper name='<stdout>' mode='w' encoding='utf-8'>
+F10 m2 s80 T2.581 v31.0 h115 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.028281249999999997 pu=0.056640625 roll=0.025937500000000002
+F11 m2 s80 T2.581 v31.0 h115 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=P pd=0.017109375000000003 pu=0.017968750000000002 roll=0.021953124999999997
+F12 m2 s80 T2.581 v31.0 h115 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=P pd=0.017968750000000002 pu=0.017890625 roll=0.025468750000000002
+F13 m2 s80 T2.5 v32.0 h105 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.0465625 pu=0.04875 roll=0.0215625
+F14 m2 s80 T2.5 v32.0 h105 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.061953125 pu=0.048593750000000005 roll=0.021406249999999998
+F15 m2 s80 T2.5 v32.0 h105 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=P pd=0.0465625 pu=0.0017968749999999999 roll=0.015859375000000002
+F16 m2 s80 T2.5 v32.0 h105 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=P pd=0.04890625 pu=0.001484375 roll=0.014218749999999999
+F17 m2 s80 T2.5 v32.0 h110 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.035937500000000004 pu=0.045156249999999995 roll=0.02203125
+F18 m2 s80 T2.5 v32.0 h110 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.034921875000000005 pu=0.045078125 roll=0.025703125
+F19 m2 s80 T2.5 v32.0 h110 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=P pd=0.025937500000000002 pu=0.00140625 roll=0.021484375
+F1 m2 s80 T2.581 v31.0 h105 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.07257812500000001 pu=0.06843750000000001 roll=0.0215625
+F20 m2 s80 T2.5 v32.0 h110 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=P pd=0.026875000000000003 pu=0.00125 roll=0.0221875
+F21 m2 s80 T2.5 v32.0 h115 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.0153125 pu=0.040390625 roll=0.022421875
+F22 m2 s80 T2.5 v32.0 h115 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.016171875000000002 pu=0.040390625 roll=0.025937500000000002
+F23 m2 s80 T2.5 v32.0 h115 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0.004296875 pu=0 roll=0
+F24 m2 s80 T2.5 v32.0 h115 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0.0035156249999999997 pu=0 roll=0
+F25 m2 s80 T2.424 v33.0 h105 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F26 m2 s80 T2.424 v33.0 h105 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F27 m2 s80 T2.424 v33.0 h105 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F28 m2 s80 T2.424 v33.0 h105 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F29 m2 s80 T2.424 v33.0 h110 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.023515625 pu=0.027187500000000003 roll=0.02203125
+F2 m2 s80 T2.581 v31.0 h105 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.07218750000000002 pu=0.06835937500000001 roll=0.0253125
+F30 m2 s80 T2.424 v33.0 h110 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.024375 pu=0.027109375000000005 roll=0.025703125
+F31 m2 s80 T2.424 v33.0 h110 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F32 m2 s80 T2.424 v33.0 h110 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F33 m2 s80 T2.424 v33.0 h115 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.0021875 pu=0.023828125 roll=0.004375
+F34 m2 s80 T2.424 v33.0 h115 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.003125 pu=0.023828125 roll=0.0059375
+F35 m2 s80 T2.424 v33.0 h115 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F36 m2 s80 T2.424 v33.0 h115 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F37 m2 s80 T2.353 v34.0 h105 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F38 m2 s80 T2.353 v34.0 h105 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F39 m2 s80 T2.353 v34.0 h105 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F3 m2 s80 T2.581 v31.0 h105 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=P pd=0.062031249999999996 pu=0.02421875 roll=0.021015624999999996
+F40 m2 s80 T2.353 v34.0 h105 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F41 m2 s80 T2.353 v34.0 h110 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F42 m2 s80 T2.353 v34.0 h110 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F43 m2 s80 T2.353 v34.0 h110 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F44 m2 s80 T2.353 v34.0 h110 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F45 m2 s80 T2.353 v34.0 h115 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F46 m2 s80 T2.353 v34.0 h115 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F47 m2 s80 T2.353 v34.0 h115 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F48 m2 s80 T2.353 v34.0 h115 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=F pd=0 pu=0 roll=0
+F4 m2 s80 T2.581 v31.0 h105 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=P pd=0.06296874999999999 pu=0.023984375000000002 roll=0.02484375
+F5 m2 s80 T2.581 v31.0 h110 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.05101562500000001 pu=0.063125 roll=0.02203125
+F6 m2 s80 T2.581 v31.0 h110 d.825 re.55 lift6 sy1.0 drive2000/220 p84 zero=P pd=0.049921875000000004 pu=0.063125 roll=0.025703125
+F7 m2 s80 T2.581 v31.0 h110 d.825 re.55 lift8 sy1.5 drive2000/220 p84 zero=P pd=0.03867187500000001 pu=0.021875 roll=0.021484375
+F8 m2 s80 T2.581 v31.0 h110 d.825 re.55 lift8 sy1.0 drive2000/220 p84 zero=P pd=0.039609375 pu=0.02171875 roll=0.02515625
+F9 m2 s80 T2.581 v31.0 h115 d.825 re.55 lift6 sy1.5 drive2000/220 p84 zero=P pd=0.027421875 pu=0.056640625 roll=0.022421875

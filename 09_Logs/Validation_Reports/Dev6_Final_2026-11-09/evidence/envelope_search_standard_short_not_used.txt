@@ -1,0 +1,18 @@
+ray  0 at   0.0 deg: 0.0215 rad
+ray  1 at  22.5 deg: 0.0237 rad
+ray  2 at  45.0 deg: 0.0316 rad
+ray  3 at  67.5 deg: 0.0566 rad
+ray  4 at  90.0 deg: 0.1273 rad
+ray  5 at 112.5 deg: 0.0565 rad
+ray  6 at 135.0 deg: 0.0316 rad
+ray  7 at 157.5 deg: 0.0237 rad
+ray  8 at 180.0 deg: 0.0215 rad
+ray  9 at 202.5 deg: 0.0229 rad
+ray 10 at 225.0 deg: 0.0292 rad
+ray 11 at 247.5 deg: 0.0512 rad
+ray 12 at 270.0 deg: 0.1122 rad
+ray 13 at 292.5 deg: 0.0512 rad
+ray 14 at 315.0 deg: 0.0292 rad
+ray 15 at 337.5 deg: 0.0229 rad
+constexpr TiltVertex kStandardTiltShort[]={{0.018272,0.000000},{0.018578,0.007695},{0.018973,0.018973},{0.018416,0.044461},{0.000000,0.108170},{-0.018369,0.044346},{-0.019017,0.019017},{-0.018578,0.007695},{-0.018272,0.000000},{-0.017974,-0.007445},{-0.017565,-0.017565},{-0.016641,-0.040176},{-0.000000,-0.095407},{0.016641,-0.040176},{0.017565,-0.017565},{0.017974,-0.007445}};
+mode=STANDARD stride=75 period=3.00 duty=0.825 lift=8 swayx=3.0 com=11.0 ramp=0.35 settle=0.10 start=1.00 stop=1.00 drive=1800/180 proof_acc=12.89 rad/s2 v_cmd=25.00 mm/s samples=11612 checks=754780 fail nominal/ik/box/stop=0/0/0/0 box_margin_ticks nominal/compensated=8.30/7.30 step_ticks/release nominal/compensated=24.41/30.00 joint vmax=1.877 rad/s LH_LOWER (drive 2.761) amax=17.71 rad/s2 LF_UPPER (drive 27.61) body a_x/a_y/a_z max=0.898/0.342/0.000 m/s2 PASS(geometry+law only)
