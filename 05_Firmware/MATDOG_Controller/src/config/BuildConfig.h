@@ -127,7 +127,10 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   Installed 09/11 (dd76fad); trace 45: ACC 180 written, 50 stored in
 //   register 41. ACC diagnostic (same version string, new build): the
 //   MAINTENANCE/idle-gated @SERVO READ also prints registers 40, 41, 85 and
-//   86, read-only, as separate 1-byte reads. Offline candidate.
+//   86, read-only, as separate 1-byte reads. Installed 09/11 (975fe51): 85 =
+//   50, 86 = 1 on 12/12. ACC causal test (same version string, new build):
+//   @SERVO ACC BACKUP / SRAM 41 / register 85 on one servo behind a token,
+//   MAINTENANCE, idle, torque OFF. Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;

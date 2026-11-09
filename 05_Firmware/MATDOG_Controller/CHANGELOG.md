@@ -4,7 +4,15 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 ACC diagnostic: read-only registers 40/41/85/86 in @SERVO READ — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 ACC causal test: @SERVO ACC (register 85 on one servo) — 2026-11-09
+
+> Diagnostic candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `975fe51` (APP `a22fb0f6…`), which stays the rollback image with `dd76fad`. Source `1055610`. Hardware session plan: `MATDOG_1_0_2_DEV6_ACCCAUSAL_HW_20261110`.
+
+- **Why:** hardware 09/11 (`975fe51`): register 85 = 50 and 86 = 1 on the 12 leg servos; trace 45 stored ACC 180 as 50. Coincidence is not causation: the test changes 85 on one servo and watches the clamp.
+- **Change (MAINTENANCE, idle, torque OFF only):** `@SERVO ACC BACKUP <id>` (read-only image 0..70 and 80..86); `@SERVO ACC SRAM <id> <1..254>` (register 41 alone, read back); `@SERVO ACC FACTORY <id> <1..254> VOLATILE|PERSIST <token>` (register 85 on ONE servo per boot, token `CONFIRM_ACC85[_PERSIST]_<id>_<value>`, ACC 41 != 0, Lock 1, 84/86 unchanged, restore on failure, latch until reboot); `@SERVO ACC STATUS`. Writes go only through `ServoBus::writeAccDiagnosticByte()` (41/55/85, torque read 0 before, readback verdict, SAFE_OFF if torque not 0 after) under a DIAGNOSTICS authority lease. Nothing writes 85 by itself.
+- **Unchanged:** Motion, STOP, SAFE_OFF, drive table, readback, NVS, calibration, IDs, geometry, dashboard. Static audit: the ServoBus byte-write ban stays, admitting exactly this function; the @SERVO ACC path is pinned (14/15 mutations detected, 1 equivalent).
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 ACC diagnostic (`975fe51`, APP `a22fb0f6…`, installed 09/11/2026 21:35Z; 85 = 50, 86 = 1 on 12/12): read-only registers 40/41/85/86 in @SERVO READ — 2026-11-09
 
 > Diagnostic candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `dd76fad` (APP `5fac0a11…`, trace 45 fault), which stays the reference and rollback-ready. Source `ca71051`. Hardware session plan: `MATDOG_1_0_2_DEV6_ACCDIAG_HW_20261109`.
 
