@@ -38,18 +38,15 @@ def main():
     model, data = twin.load_model()
     centers = twin.site_ids(model, "foot_cylinder_center")
     feet = np.array([model.geom(f"{l}_foot_cylinder").id for l in twin.LEGS])
-    every = []
-    for path in sys.argv[1:]:
-        rows = []
-        for s in m5_hw.read(path)[0]:
-            if s["state"] == "STANDING" and s["phase"] == "HOLD" and s["torque"] and s["quat"]:
-                imu = np.array(dynamics.quat_rpy(s["quat"]))
-                rows.append((s["height_mm"], 1e3 * (imu - feet_plane_tilt(model, data, centers, feet, direction * (s["raw"] - q0) * twin.TICK))))
-        for h in sorted({r[0] for r in rows}):
-            d = np.array([r[1] for r in rows if r[0] == h])
-            print(f"{path.split('/')[-1]:34s} HOLD {h:5.0f} mm n {len(d):3d}: IMU - encoders roll {np.median(d[:, 0]):6.1f} pitch {np.median(d[:, 1]):6.1f} mrad")
-        every += [r[1] for r in rows]
-    d = np.array(every)
+    rows = []  # traces exported one after the other overlap: each controller instant once (m5_hw.merge)
+    for s in m5_hw.load(sys.argv[1:])[1]:
+        if s["state"] == "STANDING" and s["phase"] == "HOLD" and s["torque"] and s["quat"]:
+            imu = np.array(dynamics.quat_rpy(s["quat"]))
+            rows.append((s["source"], s["height_mm"], 1e3 * (imu - feet_plane_tilt(model, data, centers, feet, direction * (s["raw"] - q0) * twin.TICK))))
+    for source, h in dict.fromkeys((r[0], r[1]) for r in rows):
+        d = np.array([r[2] for r in rows if r[0] == source and r[1] == h])
+        print(f"{source:34s} HOLD {h:5.0f} mm n {len(d):3d}: IMU - encoders roll {np.median(d[:, 0]):6.1f} pitch {np.median(d[:, 1]):6.1f} mrad")
+    d = np.array([r[2] for r in rows])
     if len(d):
         print(f"all: n {len(d)}, roll {np.median(d[:, 0]):.1f} (p5 {np.percentile(d[:, 0], 5):.1f}, p95 {np.percentile(d[:, 0], 95):.1f}), "
               f"pitch {np.median(d[:, 1]):.1f} (p5 {np.percentile(d[:, 1], 5):.1f}, p95 {np.percentile(d[:, 1], 95):.1f}) mrad")

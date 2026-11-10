@@ -34,8 +34,9 @@ LEAD_S = 1.5  # twin HOLD before the first command (the run's own HOLD is not re
 STRIDES_MM = {"SLOW": (50, 75, 100), "STANDARD": (60, 75, 90), "FAST": (60, 70, 80)}  # WALK presets, SimpleMotion.cpp kModes
 # One motivated physical correction at a time (name -> {"params": {...}, "mu": .., "unit": [...], "imu_offset_mrad": (roll, pitch)}).
 VARIANTS = {"baseline": {},
-            # IMU mounted turned from base_link: on the ground HOLDs of dev.4 (08/11, 209 snapshots, traces 1-3) the IMU
-            # tilt exceeds the tilt of the four-feet plane from the encoders by pitch 22.9 mrad (p5-p95 21.8-36.7), roll -0.5
+            # IMU mounted turned from base_link: on the ground HOLDs of dev.4 (08/11, traces 1-3, 184 distinct snapshots,
+            # m5_imu_tilt.py) the IMU tilt exceeds the tilt of the four-feet plane from the encoders by pitch 22.9 mrad
+            # (median; p5-p95 21.8-37.0), roll -0.5
             "imu_mount": {"imu_offset_mrad": (-0.5, 22.9)}}
 
 
