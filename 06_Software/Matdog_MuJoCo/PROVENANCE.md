@@ -8,9 +8,11 @@ The twin compiles and reads, unchanged, the firmware sources of this tree. The
 branch `sim/mujoco-twin-20261110` starts at `ae70e0301237ea75b2e694e62578fd636c50477a`
 (1.0.2-dev.6 ACC 220 candidate, Motion feature `5617f0e`).
 
-Final candidate `450d2c793dcb76d08ea341eb5c4b1e50215cee40` (dashboard fix; not installed, not
-validated on hardware): `git diff --quiet ae70e03 450d2c793dcb -- <paths below>` → **IDENTICAL**.
-The twin is not rebased on it.
+Final candidate `450d2c793dcb76d08ea341eb5c4b1e50215cee40` (dashboard fix): installed on the robot on
+2026-11-10 (APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`, flash
+verify PASS), qualified on the fixture (Q1–Q8), first ground check positive out of protocol (firmware
+workstream's `REPORT_HW_SESSION.md`). `git diff --quiet ae70e03 450d2c793dcb -- <paths below>` →
+**IDENTICAL**. The twin is not rebased on it.
 
 | Used by | Path |
 |---|---|
@@ -42,7 +44,19 @@ The twin is not rebased on it.
 - rc.11 STAND150 HOLD: `~/MATDOG/verification-artifacts/MATDOG_RC11_HW_20261030T060305Z/02-stand150/joints_timeseries.csv`,
   `ee531faa941d130825ed767cf3808f48efa0e67e4699c06ae938e0f1d7918459`.
 - dev.4 ground walk: `~/MATDOG/verification-artifacts/MATDOG_1_0_2_DEV4_GROUND_20261108/MATDOG_DEV4_GROUND_VALIDATION_2026-11-08/evidence/02_ground_walk100/matdog-motion-trace (1).json`,
-  `3a810799586215beb7e2dcb175a7804aec581b504df2c10557b2c8f2622f8cd0`.
+  `3a810799586215beb7e2dcb175a7804aec581b504df2c10557b2c8f2622f8cd0`; M5 also `03_ground_joystick_and_recovery/matdog-motion-trace (2).json`
+  `746377ba385f2d6993da04fa908ec178165a1471cd2a5b5de32e84f0923603b9` and `(3).json`
+  `812d15df99446fd6376bc6605e9a601ad0ca2a255f157605245f45bd4bfa5fae`.
+- 450d2c7 session of 2026-11-10 (M5): `~/MATDOG/verification-artifacts/MATDOG_1_0_2_DEV6_ACC220_HW_20261110/`,
+  the raw logs below equal to its 21:02Z manifest and to its closure `SHA256SUMS`
+  (`35a98771bfbc480eaca66222c76240839e5f816833a161be91c3dacd706d6515`); `rehearsal/` (simulated device) is
+  never read; `EVIDENCE.sha256` is the firmware workstream's to close.
+  `b9355916adea91138b63617b78f817a476243c02b37ad85d4970b667197ae63c usb/http.jsonl`,
+  `af661bd4c2e4cd2b54142c9e063111d3ce3c1b2b9a913daf7ee290613f0085e2 usb/serial.log`,
+  `f4f7601f1891e38e2584ee1330c0bce74a0f990118580d3fafdfa553025bf314 terra/dashboard_trace_47.json`,
+  `8109a49aef2da12906c21de0ccdc3b36a375c2b9bcf977dea6f8a9c55fc0ebf8 terra/dashboard_trace_48.json`,
+  `0c259d5d61e3a5434a89a5bd9954934c8a373483c58b19f9dc869e27563f9a90 flash/flash.log`,
+  `1bef1910081da7e8ad96dbbf5fbc0722f40136fce380f9b5ca506384a247d0b8 h0/preflight_h0.json`.
 
 ## Environment
 
