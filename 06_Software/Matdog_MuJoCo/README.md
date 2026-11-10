@@ -33,6 +33,7 @@ SimpleMotion fed by the twin).
 | `m3_hw_compare.py` | twin vs the dev.4 ground walk (SLOW law, hardware trace) |
 | `cosim.py` | closed loop with `fw_bridge/cosim` |
 | `m4_hip_stop.py` | STOP_MEASURED_OUTSIDE_BOX: hip evidence from hardware traces vs the twin, closed-loop attribution variants |
+| `rca_ground_stop.py` | ground STOP RCA: per STOP, the joint out of the STOP box and since when, reference, error, duty, foot forces, COM, attitude, settle criteria; the gait's own stop |
 | `view.py` | desktop viewer (play/pause, step, speed, fault, replay selection) and MP4/PNG offscreen, with tagged overlays and the hip-vs-kHeight plot |
 | `demo.sh` | renders the visual demo (5 MP4 + key frames) offscreen |
 | `report_tables.py` | markdown tables of all results |
@@ -53,6 +54,7 @@ $PY m3_replays.py $S $O [walks stops hip sensitivity lateswing]
 $PY m3_hw_compare.py <dev.4 matdog-motion-trace (1).json> $S $O
 $PY cosim.py $B/cosim $O [scenario ...]
 $PY m4_hip_stop.py $B/cosim <cl dir> $O <hardware traces ...>
+$PY rca_ground_stop.py <cl dir> $O [scenario ...]
 ```
 
 ## Visual supervision
