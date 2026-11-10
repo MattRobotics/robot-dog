@@ -1,0 +1,92 @@
+{
+  "generator": {
+    "path": "06_Software/Matdog_MuJoCo/build_model.py",
+    "sha256": "41f21811f355e7488fcaea2eccc8f5ba0fc0f564ecb51fb112f787a0203ee1a5"
+  },
+  "mujoco_version": "4.0.0",
+  "inputs": {
+    "urdf_package": {
+      "path": "03_CAD/URDF/matt_robodog_rev00",
+      "sha256sums": {
+        "matt_robodog_rev00.urdf": "ce63034e727e82ee82267fb97cea01cd6e171e850cb2d42cb42cf763ee3706f7",
+        "meshes/collision/base_link.stl": "c2eadf6d6db1b03379cf256b542dadbcd8d63076179bc84ebd7169634e9f0097",
+        "meshes/collision/lf_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "meshes/collision/lf_hip_link.stl": "b2e430aa99998791879f1ab80c46787a310c80f77a3df9116d1084e0a0e27d97",
+        "meshes/collision/lf_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "meshes/collision/lf_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "meshes/collision/lh_foot_link.stl": "e4d35cd4107bd7fad2d3fe511926ec4fc5211f15f978581e469787266ebe5357",
+        "meshes/collision/lh_hip_link.stl": "5350010e3623ec36301d2c0592e3209e1b06da83e823215caf55cca5aafe86da",
+        "meshes/collision/lh_lower_leg_link.stl": "bbb40400571fab554395d5671ad86b1b106ec3fe24fce733ef0be179a739508a",
+        "meshes/collision/lh_upper_leg_link.stl": "0830fc10d8873b6a45f2f58c2ca61f08a7f38092984a96b911ac6beed274c30c",
+        "meshes/collision/rf_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "meshes/collision/rf_hip_link.stl": "83a7622f990228e6c2b6bb0431e682fc462a76feb3ce2fe190b7553be879dc33",
+        "meshes/collision/rf_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "meshes/collision/rf_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "meshes/collision/rh_foot_link.stl": "18dfa7908e7410cc2920d5d37b0c0cce13cb2c683f765e7d073b3d5777c00d33",
+        "meshes/collision/rh_hip_link.stl": "04b205e9be3683b5238a035970b56ee319e4e7fca55ba7860a19fdb549c4efea",
+        "meshes/collision/rh_lower_leg_link.stl": "6b40148edad22670c420d1bcca2325c8befd72e27f4390569a292250df3e96c8",
+        "meshes/collision/rh_upper_leg_link.stl": "fbf43f047a943188a6c7b9a7a3a45763c22ddb35704a517b7b47b03dcb68cb91",
+        "reference/Coordinate_Cinematiche_matt_robodog_rev00.xlsx": "f376b42fef824732acae8e6569dbaed38c1c37f40ef4228ed869fb1332db1827"
+      }
+    },
+    "foot_contact_yaml": {
+      "path": "06_Software/Matdog_Core/kinematics/MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "sha256": "bcf3372d951dc62baaaf774bd2eceb05a034039f7897cf82e1576d0deb41e7aa"
+    },
+    "foot_contact_firmware": {
+      "path": "05_Firmware/MATDOG_Controller/src/motion/FootContactData.h",
+      "sha256": "fe6fe1fa593199d82cf829b2c5cd83f974dc0085e7e049024cd7209cf3dbe57c"
+    }
+  },
+  "output": {
+    "path": "generated/matdog.xml",
+    "sha256": "1e979194205801d66808b4591fa31cf87cbcb3d39cba3f28a9dc6eb5dbf7de20"
+  },
+  "copied_from_urdf": [
+    "joint origins, axes and limits",
+    "link masses, CoM, full inertia tensors",
+    "mesh files and scale"
+  ],
+  "not_from_urdf_model_assumptions": {
+    "timestep_s": {
+      "value": 0.0005,
+      "note": "integration step; the servo model runs at the same rate"
+    },
+    "integrator": {
+      "value": "implicitfast",
+      "note": "joint damping (back-EMF) integrated implicitly"
+    },
+    "floor": {
+      "value": "rigid plane z=0",
+      "note": "flat, level terrain; no compliance besides MuJoCo soft contact"
+    },
+    "foot_friction": {
+      "value": 0.8,
+      "note": "rubber tread on a typical floor: HYPOTHESIS, swept 0.5-1.0 by the replay tools"
+    },
+    "friction_cone": {
+      "value": "elliptic, impratio 10",
+      "note": "reduces the soft-contact creep of planted feet"
+    },
+    "contact_solref": {
+      "value": "0.004 1",
+      "note": "stiff soft contact (~0.1 mm static penetration at nominal load)"
+    },
+    "foot_collision": {
+      "value": "analytic cylinder from MATDOG_FOOT_CONTACT_GEOMETRY.yaml",
+      "note": "radius and tread width as declared; the 2 mm end fillet is NOT modelled (sharp rim)"
+    },
+    "other_collision": {
+      "value": "convex hull of each canonical STL, floor only",
+      "note": "detects body/leg ground contact; no self-collision (Geometry V5 owns it)"
+    }
+  },
+  "actuators": "12 torque motors (gear 1); torque, armature, back-EMF damping and friction come from servo.py",
+  "model_summary": {
+    "nbody": 18,
+    "njnt": 13,
+    "nu": 12,
+    "ngeom": 35,
+    "total_mass_kg": 2.928
+  }
+}
