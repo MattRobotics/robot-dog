@@ -464,8 +464,9 @@ int envelopes(const char* path, const char* src) {
       selectBody = body;
     } else if (name == "select_then_walk_walk") {
       // Final dev.6: the page's select-then-WALK pair through the real parser,
-      // session/CSRF, MotionService and SimpleMotion: STANDARD's preset 1.
-      check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[1] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0, name + ": preset 1 index");
+      // session/CSRF, MotionService and SimpleMotion: STANDARD's top preset
+      // (2026-11-10: every mode walks its preset 2, the index a mode change keeps).
+      check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[2] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0, name + ": preset 2 index");
       Session fresh; Rig r2; core::MotionService s2; s2.begin(&r2.m, nullptr, nullptr); s2.setReady(true, "READY");
       const auto sel = serve(request(selectBody, fresh), fresh, s2, r2, now);
       check(sel.status == 200 && sel.code == "ACCEPTED WALK_MODE_SELECTED", name + ": GAIT.SELECT accepted (" + sel.code + ")");
@@ -473,8 +474,8 @@ int envelopes(const char* path, const char* src) {
       check(w.status == 200 && w.code == "ACCEPTED COMMAND_ACCEPTED", name + ": WALK accepted (" + w.code + ")");
       for (unsigned k = 0; k < 4000 && r2.m.state() != simple::State::WALKING; ++k) r2.tick();
       const auto& std_ = simple::walkModeSpec(simple::WalkMode::STANDARD);
-      check(r2.m.state() == simple::State::WALKING && r2.m.walkMode() == simple::WalkMode::STANDARD && std::abs(r2.m.walkVelocityX() - std_.strideM[1] / std_.periodS) < 1e-12 &&
-            std::abs(r2.m.requestedHeightM() - std_.heightM) < 1e-12, name + ": STANDARD 75 mm / 3.0 s = 25 mm/s walking at its height (software only)");
+      check(r2.m.state() == simple::State::WALKING && r2.m.walkMode() == simple::WalkMode::STANDARD && std::abs(r2.m.walkVelocityX() - std_.strideM[2] / std_.periodS) < 1e-12 &&
+            std::abs(r2.m.requestedHeightM() - std_.heightM) < 1e-12, name + ": STANDARD 90 mm / 3.0 s = 30 mm/s walking at its height (software only)");
     } else if (name.rfind("walk", 0) == 0 && name != "walk_stop") {
       const unsigned i = name == "walk50" ? 0 : name == "walk75" ? 1 : 2;
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[i] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000,

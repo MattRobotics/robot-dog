@@ -104,9 +104,12 @@ async function boot(initialStatus = fx.status_ready) {
   assert.strictEqual(q('#simple-motion h2').textContent, 'MATDOG — Motion Cockpit');
   assert(joystick && q('#joy-pad') && joystick.textContent.includes('Rotazione') && !joystick.querySelector('.joystick-badge') &&
     !/VERIFICATO SU HARDWARE|mm\/s|Trascinare/.test(joystick.textContent.replace(q('#joy-state').textContent, '')), 'compact joystick: no badge, no prose');
-  // Final dev.6: the guide says the joystick walks SLOW and the presets belong to the mode; no stale 6.5 s.
-  assert(/Joystick: cammina sempre con la legge SLOW/.test(q('#simple-diagnostics').textContent) &&
+  // 2026-11-10: the guide says the joystick's full scale is the selected mode's top speed, steering SLOW only,
+  // and the selector changes a forward walk in progress; the presets belong to the mode; no stale 6.5 s.
+  assert(/fondo corsa in avanti è la velocità massima della modalità WALK scelta/.test(q('#simple-diagnostics').textContent) &&
+    /Sterzo, laterale e retromarcia solo in SLOW/.test(q('#simple-diagnostics').textContent) &&
     /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
+    /Durante un WALK in avanti il selettore cambia la modalità del passo in corso/.test(q('#simple-diagnostics').textContent) &&
     !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
   {
     // STAND height: 50-150 mm in 5 mm steps (slider + stepper); one WALK speed selector.
@@ -124,7 +127,7 @@ async function boot(initialStatus = fx.status_ready) {
     const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
     // Icon and name over the speed (modeLabels updates only the speed element).
     assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.querySelector('.mode-name').textContent + '|' + r.nextElementSibling.querySelector('.mode-speed').textContent),
-      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|25 mm/s', 'FAST:🐇 FAST|32 mm/s']);
+      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|32 mm/s']);
     assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
     await settle();
     assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');
@@ -380,14 +383,14 @@ async function boot(initialStatus = fx.status_ready) {
   await send('walk100', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: .100 / 5.0, vy: 0, yaw_rate: 0 }, 1000);
   assert(/WALK SLOW 100 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last());
   // 3b. STANDARD then an immediate WALK: GAIT.SELECT first, WALK only after
-  // its ACCEPTED ACK, with STANDARD's preset 1 (75 mm per 3 s); never before.
+  // its ACCEPTED ACK, with STANDARD's top preset (90 mm per 3 s); never before.
   { await refresh(fx.status_ready); const before = commands().length;
     device.replies.push(ok(fx.ack_gait_select), ok(fx.ack_walk_accepted));
     q('input[name="simple-walk-mode"][value="STANDARD"]').click(); q('#simple-walk').click(); await settle();
     const sent = commands().slice(before).map(c => JSON.parse(c.body));
     assert.deepStrictEqual(sent.map(b => b.type), ['GAIT.SELECT', 'BASE_VELOCITY'], 'select, then WALK: ' + JSON.stringify(sent.map(b => b.type)));
-    assert.deepStrictEqual(sent[0].params, { gait: 'STANDARD' }); assert.deepStrictEqual(sent[1].params, { vx: .075 / 5.0, vy: 0, yaw_rate: 0 });
-    assert(/WALK STANDARD 75 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last()); sequence += 2;
+    assert.deepStrictEqual(sent[0].params, { gait: 'STANDARD' }); assert.deepStrictEqual(sent[1].params, { vx: .100 / 5.0, vy: 0, yaw_rate: 0 });
+    assert(/WALK STANDARD 90 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last()); sequence += 2;
     envelopes.push('select_then_walk\t' + commands().at(-2).body, 'select_then_walk_walk\t' + commands().at(-1).body); }
   // 3c. Back to SLOW for the rest (accepted selection).
   { const before = commands().length; device.replies.push(ok(fx.ack_gait_select));

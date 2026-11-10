@@ -24,6 +24,10 @@ bool fastRead(Rig& r){ServoBus::FastFeedback fb;return r.bus.readFastFeedback(kI
 // ---- stop preemption model -------------------------------------------------
 struct StopAt { uint64_t at_us; unsigned polls=0; };
 bool stopPreempt(void* ctx){auto* s=static_cast<StopAt*>(ctx);++s->polls;return host_us>=s->at_us;}
+// configureAccCeiling polls the predicate once before each servo step, each
+// settle millisecond and each settle read: true from poll at+1 on.
+struct PollStop { unsigned at, polls=0; };
+bool pollStop(void* ctx){auto* s=static_cast<PollStop*>(ctx);return ++s->polls>s->at;}
 bool reentrantProbe(void* ctx){auto* r=static_cast<Rig*>(ctx);r->bus.ping(kId);return false;}   // a second bus user inside a wait
 struct Rng{uint64_t s;uint32_t next(){s=s*6364136223846793005ull+1442695040888963407ull;return static_cast<uint32_t>(s>>33);}};
 }
@@ -393,6 +397,74 @@ int main(){
       CHECK(!w.refused&&w.readback==-1&&w.torque_after==-1&&w.verify==V::UNVERIFIED_NO_RESPONSE&&w.safe_off_issued);
     }
     std::puts("BUS_ACC_DIAG_WRITE allowlist 41/55/85 (17 refusals, zero bytes), torque-ON precondition, clamp 180->50, 85 50->100->50 causal model, lock-gated model, arming -> SAFE_OFF, silence -> unverified + SAFE_OFF");
+  }
+  // ===== trace 45: configureAccCeiling, register 85 before a Motion activation =====
+  {
+    using Wire=std::vector<std::vector<uint8_t>>;
+    const uint8_t ids[12]={11,12,13,21,22,23,31,32,33,41,42,43};
+    auto read1=[](uint8_t id,uint8_t reg){std::vector<uint8_t> f={255,255,id,4,2,reg,1};f.push_back(HardwareSerial::checksum(f));return f;};
+    auto write1=[](uint8_t id,uint8_t reg,uint8_t v){std::vector<uint8_t> f={255,255,id,4,3,reg,v};f.push_back(HardwareSerial::checksum(f));return f;};
+    auto tail=[](Rig& r,size_t from){return Wire(r.uart->requests.begin()+from,r.uart->requests.end());};
+    auto writes85=[&](Rig& r,size_t from){unsigned w=0;for(const auto& q:tail(r,from))w+=q[4]==3&&q[5]==85;return w;};
+    // The 10/11 servo model: torque OFF, ACC 0 (power-on), Lock 1, 84/85/86 = 65/f85/1, 41 clamped to 85.
+    auto rig=[&](Rig& r,uint8_t f85){auto& u=*r.uart;u.factory_readable=u.factory_writable=u.acc_clamp_from_85=true;
+      for(uint8_t id:ids){u.regs[id][40]=u.regs[id][41]=0;u.regs[id][55]=1;u.factory[id][84-80]=65;u.factory[id][85-80]=f85;u.factory[id][86-80]=1;}};
+    auto untouched=[&](Rig& r){bool ok=true;for(uint8_t id:ids)ok=ok&&r.uart->regs[id][40]==0&&r.uart->regs[id][55]==1&&
+      r.uart->factory[id][84-80]==65&&r.uart->factory[id][86-80]==1;return ok;};
+    { // Already at the target (a later activation, same power cycle): twelve 1-byte READs of 85, nothing else.
+      Rig r;rig(r,220);const size_t b=r.uart->requests.size();const uint64_t t0=host_us;
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==220);
+      Wire want;for(uint8_t id:ids)want.push_back(read1(id,85));
+      CHECK(tail(r,b)==want&&host_us-t0<ServoBus::kAccCeilingSettleMs*1000&&untouched(r));
+    }
+    { // Factory 50 (power-on): per servo READ 85, READ 55, the reviewed write (READ
+      // 40, WRITE 85, READ 85, READ 40); kAccCeilingSettleMs later every 85 again.
+      Rig r;rig(r,50);const size_t b=r.uart->requests.size();const uint64_t t0=host_us;
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==220);
+      Wire want;for(uint8_t id:ids)for(const auto& f:{read1(id,85),read1(id,55),read1(id,40),write1(id,85,220),read1(id,85),read1(id,40)})want.push_back(f);
+      for(uint8_t id:ids)want.push_back(read1(id,85));
+      CHECK(tail(r,b)==want&&host_us-t0>=ServoBus::kAccCeilingSettleMs*1000&&untouched(r));
+      for(uint8_t id:ids)CHECK(r.uart->factory[id][85-80]==220&&r.uart->regs[id][41]==0);
+      CHECK(r.bus.writeAccDiagnosticByte(ids[5],41,180).readback==180&&r.bus.writeAccDiagnosticByte(ids[5],41,220).readback==220);  // STANDARD and FAST ACC stored
+    }
+    { // Mixed: servos at the target only read; one at 50 and one at 254 written to 220.
+      Rig r;rig(r,220);r.uart->factory[ids[3]][85-80]=50;r.uart->factory[ids[9]][85-80]=254;const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==220);
+      CHECK(writes85(r,b)==2&&tail(r,b).size()==10+2*6+12&&r.uart->factory[ids[3]][85-80]==220&&r.uart->factory[ids[9]][85-80]==220&&untouched(r));
+    }
+    // The lowest value left is what Motion may command (STAND and SLOW at 50).
+    { // Lock open on one servo: never written (EEPROM), the others are; 50.
+      Rig r;rig(r,50);r.uart->regs[ids[4]][55]=0;const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==50&&writes85(r,b)==11&&r.uart->factory[ids[4]][85-80]==50&&r.uart->regs[ids[4]][55]==0);
+      for(const auto& q:tail(r,b))CHECK(!(q[2]==ids[4]&&q[4]==3));
+    }
+    { // Not applied with Lock 1 (a servo that keeps 85): every write read back unchanged; 50.
+      Rig r;rig(r,50);r.uart->lock_gates_factory=true;const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==50&&writes85(r,b)==12&&r.uart->factory[ids[0]][85-80]==50&&untouched(r));
+    }
+    { // Settling late (immediate readback 220, settled 50): the settled value counts; 50.
+      Rig r;rig(r,50);auto& u=*r.uart;u.settle_85_id=ids[4];u.settle_85_reads=2;u.settle_85_value=50;
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==50&&u.requests.back()==read1(ids[11],85)&&u.factory[ids[4]][85-80]==50);
+    }
+    // Not verified (0) at the failing servo k: nothing sent to the servos after it.
+    auto failAt=[&](Rig& r,unsigned k,unsigned writes){const size_t b=r.uart->requests.size();
+      if(r.bus.configureAccCeiling(ids,12,220)!=0)return false;
+      unsigned w=0;bool after=false;for(const auto& q:tail(r,b)){for(unsigned j=k+1;j<12;++j)after|=q[2]==ids[j];w+=q[2]==ids[k]&&q[4]==3&&q[5]==85;}
+      return !after&&w==writes;};
+    {Rig r;rig(r,50);r.uart->regs[ids[4]][40]=1;CHECK(failAt(r,4,0)&&r.uart->factory[ids[4]][85-80]==50);}   // torque ON: no write
+    {Rig r;rig(r,50);r.uart->factory_readable=false;CHECK(failAt(r,0,0)&&r.uart->factory[ids[0]][85-80]==50);}  // 85 unanswered
+    {Rig r;rig(r,50);r.uart->arm_on_write_addr=85;CHECK(failAt(r,0,1)&&r.uart->regs[ids[0]][40]==0);}  // arming: SAFE_OFF, refused
+    // An admitted STOP ends the procedure (0): before any byte, after servo 3, inside the settle wait.
+    {Rig r;rig(r,50);PollStop stop{0};r.bus.setStopPreempt(&pollStop,&stop);const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==0&&r.uart->requests.size()==b);}
+    {Rig r;rig(r,50);PollStop stop{4};r.bus.setStopPreempt(&pollStop,&stop);CHECK(failAt(r,3,1)&&r.uart->factory[ids[4]][85-80]==50);}
+    {Rig r;rig(r,50);PollStop stop{12+5};r.bus.setStopPreempt(&pollStop,&stop);const size_t b=r.uart->requests.size();const uint64_t t0=host_us;
+      CHECK(r.bus.configureAccCeiling(ids,12,220)==0&&writes85(r,b)==12&&r.uart->requests.back()==read1(ids[11],40)&&host_us-t0<ServoBus::kAccCeilingSettleMs*1000);}
+    for(uint8_t target:{0,255}){Rig r;rig(r,50);const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(ids,12,target)==0&&r.uart->requests.size()==b);}
+    {Rig r;rig(r,50);const size_t b=r.uart->requests.size();
+      CHECK(r.bus.configureAccCeiling(nullptr,12,220)==0&&r.bus.configureAccCeiling(ids,0,220)==0&&r.uart->requests.size()==b);}
+    std::puts("BUS_ACC_CEILING 85 at 220: 12 reads only; factory/mixed: Lock 1 + reviewed write + settled re-read of 12, ACC 180/220 stored; Lock open, not applied, late settle -> lowest 50; torque ON, unanswered, arming -> 0 at that servo; STOP before, mid-scan, in settle -> 0");
   }
   std::printf("SERVO_BUS_DEADLINE %s checks=%d failures=%d hardware=false\n",failures?"FAIL":"PASS",checks,failures);
   return failures?1:0;

@@ -51,11 +51,13 @@ inline double walkClockS(double t){const double u=std::fmin(1.,t);return t<1?u*u
 enum class WalkMode : uint8_t { SLOW, STANDARD, FAST };
 motion::GaitParameters walkGait(unsigned stride,WalkMode mode=WalkMode::SLOW);
 motion::GaitParameters steerGait(const double goal[3]);
-// JOYSTICK (dev.6 consolidation, one law). Every joystick walk runs the WALK
-// STANDARD v2 law (walkGait: 5 s, duty .80, 11 mm COM shift, trapezoidal swing,
-// eased clock), steered in SE(2) by gaitRetarget, the fillet contact always
-// allowed (inside the nominal strip it changes no joint). Two regimes of the
-// same law differ only by their certified region and IMU envelope:
+// JOYSTICK (dev.6 consolidation, one law). A joystick walk on the SLOW mode
+// runs the WALK STANDARD v2 law (walkGait: 5 s, duty .80, 11 mm COM shift,
+// trapezoidal swing, eased clock), steered in SE(2) by gaitRetarget, the fillet
+// contact always allowed (inside the nominal strip it changes no joint); on
+// STANDARD and FAST it walks forward on that mode's own law (walkGait), fore/aft
+// regime only (2026-11-10). Two regimes of the SLOW law differ only by their
+// certified region and IMU envelope:
 // - fore/aft: kHeight, kWalkTilt100, stride up to 100 mm (back kJoystickBackM),
 //   sway kWalkSwayYM;
 // - steered: kSteer, kSteerTilt (heading frame), stride <= kJoystickStrideM,
@@ -177,6 +179,14 @@ struct Drive { uint16_t speed; uint8_t acc; };
 // STAND rc.10: register ceilings above the planner (above); inside the WALK
 // pair already used in operation. WALK retains the STANDARD reference's ceilings.
 constexpr Drive kStandDrive{480,13}, kWalkDrive{1000,50}, kCalibrationDrive{160,8};
+// Register 85 (the servo's ACC ceiling, factory 50, VOLATILE with the Lock
+// closed) is set to this on the 12 leg servos before each activation from
+// torque OFF and read back settled (Controller::prepareSimpleMotion): the
+// highest ACC of the drive table (FAST). Motion is given the LOWEST value read
+// back and refuses any command whose drive ACC is above it (stand(), and
+// selectWalkMode() during a walk): a failed write leaves the factory 50, so
+// STAND and SLOW only. kWalkModes static_asserts every drive under it.
+constexpr uint8_t kAccCeilingTarget=220;
 // STOP braking assumed by StopPlan (beginStop and the compensationSafe proof):
 // the RAM ACC of the commanded drive, never more than kStopBrakeAcc. ACC is the
 // servo's profile limit, not a deceleration it is known to reach (walk modes
@@ -191,8 +201,8 @@ constexpr uint8_t kStopBrakeAcc=84;
 inline double stopSpeedRadS(Drive d){return d.speed*kTickRad;}
 inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:kStopBrakeAcc)*100*kTickRad;}
 // WALK modes (final dev.6, 2026-11-09): the one WALK STANDARD v2 law at three
-// time scales, chosen for the NEXT walk (selectWalkMode, volatile, SLOW at
-// boot). SLOW is the law qualified on dev.4, bit for bit. Each mode has its
+// time scales, selected for the next walk and, since 2026-11-10, for a forward
+// walk in progress (selectWalkMode, volatile, SLOW at boot). SLOW is the law qualified on dev.4, bit for bit. Each mode has its
 // own three presets (strideM; the WALK command carries the preset index), so
 // no preset is refused. STANDARD and FAST: duty .825, asymmetric swing
 // (swingRampEnd .55: slower touchdown, where the front UPPER meets kHeight),
@@ -218,9 +228,27 @@ inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:k
 //   STOP capture point     1.41         1.69            1.41 mm
 //   kHeight margin HIP     9.3          8.7             11.1 ticks
 // RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
-// keeps {1000,50}. The joystick always walks SLOW (its steered envelopes are
-// certified for that law only).
+// keeps {1000,50}. The joystick walks forward on the selected mode's law (its
+// top speed is full scale); steering and backward walking exist on the SLOW
+// law only (its steered envelopes and backward stride are certified there).
 // STANDARD and FAST: IMPLEMENTED, NOT HARDWARE QUALIFIED.
+// Mode change inside a walk (stepWalkMode, 2026-11-10): the law moves on the
+// release grid, never through WALK STOP. Clock rate and stride stay within the
+// slower of the two laws until the law shape (duty, swing profile, lift)
+// changes, at the first release of a four-contact window (no foot in flight
+// under either duty) with the applied correction inside the target envelope.
+// Height and lateral sway (four feet down) between the two laws are walked
+// with the faster law's shape (designed for the lower body: the kHeight HIP
+// room grows with the height) at the slower law's clock; a slower law's shape
+// only at its own height; a smaller sway at once, a larger one only with the
+// target's own shape and height; a law's own clock only with its own shape,
+// height and sway (offline servo-plant pairs 10/11: a shape below its own
+// height or a sway grown early lost HIP room, STOP_MEASURED_OUTSIDE_BOX). The
+// drive is the faster mode's until the clock has the target's rate. Clock rate 0.1 cycle/s per s (SLOW
+// 0.2 -> FAST 0.4 in 2 s), height 2 mm/s (120 -> 105 mm in 7.5 s), lateral sway
+// 4 mm per cycle; the stride keeps the joystick's fore/aft ramps
+// (kJoystickFrontalRampCycles up, kJoystickFrontalDecelCycles down).
+constexpr double kWalkModeRateSlope=.1, kWalkModeHeightRate=.002, kWalkModeSwayRate=.004;
 using TiltPolygon=TiltVertex[16];
 struct WalkModeSpec {
   const char* name; double periodS,duty,heightM,swayXM,swingRamp,swingRampEnd; Drive drive;
@@ -274,6 +302,8 @@ struct Inputs {
   uint32_t bmsAgeMs=UINT32_MAX;
   uint64_t imuStampUs=0; double quaternion[4]{1,0,0,0};
   double minRad[12]{},maxRad[12]{};
+  // Lowest register 85 read back on the 12 leg servos at this activation (0: not verified).
+  uint8_t accCeiling=0;
 };
 // LOADDIAG evidence only: Motion state at the first exit (fault or STOP) of
 // the latest accepted command, frozen before SAFE_OFF. Never read by Motion.
@@ -294,7 +324,9 @@ class SimpleMotion {
  public:
   void begin(ServoPort* p,bool powered=true) { port_=p; if(powered)enterOff(false,"BOOTING");else reason_="USB_ONLY"; }
   void inputs(const Inputs& i) { input_=i; }
-  const char* stand(double height,uint64_t now);
+  // acc: the highest drive ACC the command will use (STAND's, or its WALK
+  // mode's), refused above the verified register 85 (Inputs::accCeiling).
+  const char* stand(double height,uint64_t now,uint8_t acc=kStandDrive.acc);
   // Descent to the PRONE terminal, then rest with torque OFF (proneRest). Arrival
   // is not proof of ventral or passive support.
   const char* prone(uint64_t now);
@@ -340,17 +372,23 @@ class SimpleMotion {
   double walkVelocityX() const { return phase_==Phase::WALK?gait_.advanceXM/period():0; }
   double walkVelocityY() const { return phase_==Phase::WALK?gait_.advanceYM/period():0; }
   double walkYawRate() const { return phase_==Phase::WALK?gait_.yawRad/period():0; }
-  // Gait period of the current (or last) walk: JOYSTICK or WALK STANDARD.
-  // One law (dev.6): the period and the eased clock never depend on the regime,
-  // which can change inside a walk; the WALK mode latched at its start sets it.
-  double period() const { return walkModeSpec(walkMode_).periodS; }
-  // WALK mode of the NEXT walk (volatile, SLOW at boot). No actuator changes
-  // here: walk() latches the selection, and a walk, its WALK STOP and its STOP
-  // recovery keep the mode they started with. The joystick walks SLOW.
-  void selectWalkMode(WalkMode m) { selectedMode_=m; }
+  // Gait period of the current (or last) walk: its WALK mode's, between two
+  // modes' while the walk changes mode (stepWalkMode). The regime (fore/aft,
+  // steered) never changes it.
+  double period() const { return walkPeriod_; }
+  // WALK mode selection (volatile, SLOW at boot): the next walk's and, while a
+  // walk can change its law (walkModeLive), that walk's too: it moves to the
+  // mode progressively (stepWalkMode) with torque, authority and gait phase
+  // kept. During a walk a mode whose drive ACC is above the verified register
+  // 85 is refused. WALK STOP, a STOP and its recovery keep the law they have.
+  const char* selectWalkMode(WalkMode m);
   WalkMode selectedWalkMode() const { return selectedMode_; }
-  WalkMode walkMode() const { return walkMode_; }  // current (or last) walk
-  double walkHeightM() const { return walkModeSpec(walkMode_).heightM; }
+  WalkMode walkMode() const { return walkMode_; }  // law shape of the current (or last) walk
+  WalkMode walkTarget() const { return walkTarget_; }  // the mode that walk moves to (walkMode() when none)
+  // A forward walk (WALK, or a joystick walk neither steered nor backward), not
+  // stopping: its law follows the selected WALK mode.
+  bool walkModeLive() const { return phase_==Phase::WALK&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&!steered_; }
+  double walkHeightM() const { return walkHeight_; }  // nominal height of that walk's law
   // Gait time t s after the start: eased in (walkClockS, its first four-contact
   // window carries the COM offset).
   double walkClock(double t) const { return walkClockS(t); }
@@ -468,6 +506,8 @@ class SimpleMotion {
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void steerWalk(uint64_t);
+  // One release of a WALK mode change (walkModeLive): the walk clock's eased time now.
+  void stepWalkMode(double eased);
   // Displacement per cycle of the latest JOYSTICK demand on one law.
   void joystickGoal(bool frontal,double goal[3]) const;
   // The joystick regime may change only where the issued reference, with its
@@ -606,7 +646,14 @@ private:
   // Explicit STAND after a verified WALK STOP: the same gait completes its WALK STOP
   // from the stopped phase. Clock eased in from rest; the held RAW offset fades out.
   bool walkRecover_=false; double recoverCycles_=0; uint64_t recoverUs_=0; motion::JointTargetFrame recoverOffset_{};
-  WalkMode selectedMode_=WalkMode::SLOW,pendingMode_=WalkMode::SLOW,walkMode_=WalkMode::SLOW;  // selected, latched by walk(), walking
+  WalkMode selectedMode_=WalkMode::SLOW,pendingMode_=WalkMode::SLOW,walkMode_=WalkMode::SLOW,walkTarget_=WalkMode::SLOW;  // selected, latched by walk()/drive(), the walk's law shape, its destination
+  // Walk clock: cycles_=clockCycles_+(walkClock-clockEased_)/walkPeriod_, re-based
+  // only when stepWalkMode changes the period (otherwise walkClock/period as
+  // before). modeEased_: eased time of the last mode step. walkHeight_: nominal
+  // height of the law. walkDrive_: what the walk sends (the faster mode's while
+  // the law changes mode).
+  double walkPeriod_=kWalkPeriodS,clockCycles_=0,clockEased_=0,modeEased_=0,walkHeight_=kWalkHeightM;
+  Drive walkDrive_=kWalkDrive;
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
   const char* imuReason_="IMU_STALE";double imuWanted_[2]{};

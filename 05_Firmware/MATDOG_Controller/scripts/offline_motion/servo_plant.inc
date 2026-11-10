@@ -67,7 +67,10 @@ static Param draw(std::mt19937& g,double volt){std::uniform_real_distribution<do
   p.brakeCap=blo&&bhi?atof(blo)+(atof(bhi)-atof(blo))*u(g):p.accCap;return p;}
 // scenario 0: long walk at the mode's top preset (4500 releases, 90 s) with a
 // small board tilt; 1: the same with 8 STOP at spread instants, each verified,
-// then the walk resumed (STAND recovery); 2: IMU at the mode's pitch-down vertex.
+// then the walk resumed (STAND recovery); 2: IMU at the mode's pitch-down vertex;
+// 3 (2026-11-10): the selector moved four times during the walk (every mode
+// change up and down), a STOP 1 s into the second and the fourth change, each
+// verified, then the walk resumed.
 static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
   std::mt19937 g(seed);Rig r;Out o;double boxOut=0;  // real joint beyond the WALK box during a STOP, ticks
   if(r.m.stand(.15,r.p.now)){o.faults=1;o.reason="STAND_REFUSED";return o;}
@@ -87,7 +90,8 @@ static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
   for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING&&!o.faults;++n){pl.tick();watch();}
   const unsigned cycleReleases=unsigned(w.periodS/.02);
   for(unsigned n=0;n<4500&&!o.faults;++n){pl.tick();watch();if(r.m.state()==simple::State::WALKING){++o.walkReleases;o.maxTrack=std::max(o.maxTrack,pl.tracking());}
-    if(scenario==1&&n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;
+    if(scenario==3&&(n==300||n==1100||n==1900||n==2700))r.m.selectWalkMode(static_cast<simple::WalkMode>((unsigned(mode)+1+n/800)%3));
+    if((scenario==1&&n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8)||(scenario==3&&(n==1150||n==2750))){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;
       for(unsigned k=0;k<600&&!r.m.stopVerified()&&!o.faults;++k){pl.tick();watch();
         for(unsigned i=0;i<12;++i){const double q=(pl.s[i].pos-2048)*simple::kTickRad;boxOut=std::max(boxOut,std::max(simple::kWalkBox.lo[i]-q,q-simple::kWalkBox.hi[i])/simple::kTickRad);}}
       if(o.faults||!r.m.stopVerified())break;
@@ -101,8 +105,8 @@ static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
 }
 static void matrix(){
   const int onlyMode=getenv("MODE")?atoi(getenv("MODE")):-1,onlyScenario=getenv("SCENARIO")?atoi(getenv("SCENARIO")):-1;
-  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
-  for(unsigned m=0;m<3;++m)for(int sc=0;sc<3;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario))continue;unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
+  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX","MODE_CHANGES"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
+  for(unsigned m=0;m<3;++m)for(int sc=0;sc<4;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario))continue;unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
     for(unsigned seed=1;seed<=seeds;++seed){const auto o=run(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt);f+=o.faults;stopsOk+=o.stopsOk;stopsTried+=o.stopsTried;
       track=std::max(track,o.maxTrack);over=std::max(over,o.maxStopOvershoot);settle=std::max(settle,o.maxStopSettleS);boxOut=std::max(boxOut,o.maxStopBoxOut);sb+=o.speedBound;mv+=o.moving;
       if(o.faults){char b[128];std::snprintf(b,sizeof b," %s[%s]@c%.2f",o.reason,o.refusedBy<10?simple::kSafeChecks[o.refusedBy]:"?",o.cycles);reasons+=b;}}

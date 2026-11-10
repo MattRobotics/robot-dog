@@ -16,6 +16,7 @@ inline uint64_t host_us=0;
 inline uint32_t spin_us=5;
 inline unsigned long millis(){host_us+=spin_us;return static_cast<unsigned long>(host_us/1000);}
 inline unsigned long micros(){host_us+=spin_us;return static_cast<unsigned long>(host_us);}
+inline void delay(unsigned long ms){host_us+=static_cast<uint64_t>(ms)*1000;}
 constexpr int SERIAL_8N1=0;
 template<class T> T constrain(T x,T lo,T hi){return std::min(hi,std::max(lo,x));}
 struct DebugSerial {
@@ -52,6 +53,10 @@ class HardwareSerial {
   // address arming torque, and a bus that goes silent after a WRITE.
   bool factory_writable=false,lock_gates_factory=false,acc_clamp_from_85=false,silent_after_write=false;
   int arm_on_write_addr=-1;
+  // Register 85 settling late (the asynchronous clamp seen on 41, hardware
+  // 10/11): after settle_85_reads READs of 85 on settle_85_id, the next one
+  // finds settle_85_value.
+  int settle_85_id=-1;unsigned settle_85_reads=0;uint8_t settle_85_value=0;
   std::deque<Timed> rx;
   ReplyPlan plan;
   int silent_read_id=-1,silent_read_width=-1,silent_reads=0; // selective actual request loss
@@ -116,6 +121,7 @@ class HardwareSerial {
       if(id==silent_read_id&&p[6]==silent_read_width&&silent_reads){if(silent_reads>0)--silent_reads;return;}
       schedule(frame(id,std::vector<uint8_t>(regs[id].begin()+address,regs[id].begin()+address+p[6]),plan.status));
     }else if(inst==2&&p.size()==8&&factory_readable&&address>=80&&address+p[6]<=96){
+      if(id==settle_85_id&&address<=85&&address+p[6]>85){if(settle_85_reads)--settle_85_reads;else factory[id][85-80]=settle_85_value;}
       schedule(frame(id,std::vector<uint8_t>(factory[id].begin()+(address-80),factory[id].begin()+(address-80)+p[6]),plan.status));
     }else if(inst==1){schedule(frame(id,{}));}              // PING
   }

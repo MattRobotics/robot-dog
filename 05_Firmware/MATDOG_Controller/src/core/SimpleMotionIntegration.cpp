@@ -104,6 +104,16 @@ const char* Controller::prepareSimpleMotion(){
     operating_mode_.enterRunAutomatic();authority_.onOperatingModeChanged(OperatingMode::RUN);
     if(authority_.request(ActuatorAuthority::MOTION,OperatingMode::RUN,&motion_authority_lease_)!=AuthorityResult::GRANTED)return "ACTUATOR_OWNER_BUSY";
   }
+  // Before an activation from torque OFF, under the MOTION authority just granted:
+  // register 85 on the 12 leg servos, the ceiling of every frame's ACC readback
+  // (trace 45). Motion gets the lowest value read back and refuses a drive
+  // above it (stand(): 0 = not verified, no activation; the next update
+  // releases the authority, as for any refusal). Never while engaged.
+  if(!simple_motion_.engaged()){
+    uint8_t ids[12];for(unsigned i=0;i<12;++i)ids[i]=slotId(i);
+    simple_inputs_.accCeiling=servo_bus_.configureAccCeiling(ids,12,simple::kAccCeilingTarget);
+    Serial.printf("MOTION_ACC_CEILING verified=%u target=%u\n",unsigned(simple_inputs_.accCeiling),unsigned(simple::kAccCeilingTarget));
+  }
   simple_inputs_.authorityOk=true;simple_motion_.inputs(simple_inputs_);return nullptr;
 }
 void Controller::updateSimpleMotion(uint64_t now){

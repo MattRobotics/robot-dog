@@ -79,7 +79,7 @@ struct Port : simple::ServoPort {
 };
 struct Rig {
  simple::SimpleMotion m;Port p;simple::Inputs in;uint64_t release=1000000;unsigned maxUs=0;
- Rig(const uint16_t* pose=rawPose):p(pose){host_us=release;p.m=&m;busStop();m.begin(&p);in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";
+ Rig(const uint16_t* pose=rawPose):p(pose){host_us=release;p.m=&m;busStop();m.begin(&p);in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.accCeiling=220;in.refusal="READY";
  const double lo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
  const double hi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981};
  for(unsigned i=0;i<12;++i){in.minRad[i]=lo[i];in.maxRad[i]=hi[i];}for(unsigned i=0;i<30;++i)tick();assert(m.offVerified()&&m.fresh(host_us));}
@@ -137,16 +137,35 @@ static unsigned walkModeDrives(){
   auto walk=[&](simple::WalkMode mode,unsigned preset,unsigned releases,bool stopAtEnd){const auto& w=simple::walkModeSpec(mode);const size_t from=r.p.frames.size();
    r.m.selectWalkMode(mode);const char* why=r.m.walk(preset,host_us);
    for(unsigned n=0;!why&&n<4000&&r.m.state()!=simple::State::WALKING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
-   for(unsigned n=0;!why&&n<releases&&r.m.state()==simple::State::WALKING;++n){r.tick();
-    if(mode==simple::WalkMode::SLOW&&n==600)r.m.selectWalkMode(simple::WalkMode::FAST);if(mode==simple::WalkMode::SLOW&&n==900)r.m.selectWalkMode(simple::WalkMode::STANDARD);}
+   for(unsigned n=0;!why&&n<releases&&r.m.state()==simple::State::WALKING;++n)r.tick();
    char what[160];std::snprintf(what,sizeof what,"WALK %s preset %u: %s %s, %.2f cycles, mode %s, refused frames %u",w.name,preset,simple::name(r.m.state()),r.m.reason(),r.m.walkCycles(),
      simple::walkModeSpec(r.m.walkMode()).name,r.p.refusedFrames);
    check(!why&&r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode&&r.m.walkCycles()>2&&r.p.refusedFrames==0,what);
    std::snprintf(what,sizeof what,"WALK %s: every walk frame {%u,%u} on the UART",w.name,unsigned(w.drive.speed),unsigned(w.drive.acc));check(framesSince(from,w.drive,true),what);
    if(stopAtEnd){r.m.walkStop();for(unsigned n=0;n<8000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
     std::snprintf(what,sizeof what,"WALK %s -> WALK STOP -> %s %s",w.name,simple::name(r.m.state()),r.m.reason());check(r.m.state()==simple::State::STANDING,what);}};
-  walk(simple::WalkMode::SLOW,2,1650,true);   // 33 s, selection changed twice during it (trace 44)
-  check(r.m.selectedWalkMode()==simple::WalkMode::STANDARD,"selection made during SLOW kept for the next walk");
+  // A SLOW walk with FAST, then STANDARD selected 6 s apart during it (2026-11-10):
+  // the walk moves to STANDARD without leaving WALK. On the UART every walk
+  // frame is a SYNC_WRITE of a table drive (its ACC in register 41) and nothing
+  // else is written: no register 85, no TorqueEnable (trace 44, trace 45).
+  {const size_t from=r.p.frames.size();r.m.selectWalkMode(simple::WalkMode::SLOW);const char* why=r.m.walk(2,host_us);
+   for(unsigned n=0;!why&&n<4000&&r.m.state()!=simple::State::WALKING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+   const size_t req=r.p.uart->requests.size();bool walking=r.m.state()==simple::State::WALKING;
+   for(unsigned n=0;!why&&n<1650&&walking;++n){r.tick();walking=r.m.state()==simple::State::WALKING;
+    if(n==600)r.m.selectWalkMode(simple::WalkMode::FAST);if(n==900)r.m.selectWalkMode(simple::WalkMode::STANDARD);}
+   unsigned writes=0;for(size_t k=req;k<r.p.uart->requests.size();++k)writes+=r.p.uart->requests[k][4]==3;
+   bool table=true;unsigned walkFrames=0;
+   for(size_t k=from;k<r.p.frames.size();++k){if(strcmp(r.p.phases[k],"WALK_STANDARD"))continue;++walkFrames;bool in=false;
+    for(unsigned m=0;m<3;++m){const auto& d=simple::walkModeSpec(static_cast<simple::WalkMode>(m)).drive;in=in||(r.p.drives[k].speed==d.speed&&r.p.drives[k].acc==d.acc&&goalFrameCarries(r.p.frames[k],d));}
+    table=table&&in;}
+   const auto& std_=simple::walkModeSpec(simple::WalkMode::STANDARD).drive;char what[220];
+   std::snprintf(what,sizeof what,"WALK SLOW, FAST then STANDARD selected during it: %s %s, law %s, drive {%u,%u}, %u walk frames on table drives, %u WRITE instructions on the UART",
+     simple::name(r.m.state()),r.m.reason(),simple::walkModeSpec(r.m.walkMode()).name,unsigned(r.p.drives.back().speed),unsigned(r.p.drives.back().acc),walkFrames,writes);
+   check(!why&&walking&&r.m.walkMode()==simple::WalkMode::STANDARD&&r.m.walkTarget()==simple::WalkMode::STANDARD&&r.p.drives.back().speed==std_.speed&&
+         r.p.drives.back().acc==std_.acc&&table&&walkFrames>0&&writes==0&&r.p.refusedFrames==0,what);
+   r.m.walkStop();for(unsigned n=0;n<8000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)r.tick();
+   check(r.m.state()==simple::State::STANDING,"WALK STOP after the mode change -> STANDING");}
+  check(r.m.selectedWalkMode()==simple::WalkMode::STANDARD,"the selection stays for the next walk");
   walk(simple::WalkMode::STANDARD,1,1000,false);  // trace 44: faulted SYNC_WRITE_FAILED at cycle 0.000 on 70abcff
   if(r.m.state()!=simple::State::WALKING)check(false,"STOP, resume, FAST and SLOW-again steps not run: STANDARD is not walking");
   else{{const size_t from=r.p.frames.size();r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified()&&r.m.state()!=simple::State::FAULT;++n)r.tick();

@@ -552,7 +552,9 @@ def check_acc_diagnostic_write_path(files):
       - callers: the @SERVO ACC handler only, behind MAINTENANCE, the CR2-B
         q0 refusal and servoDiagnosticBusy(); register 85 behind a per-value
         token, one servo per boot, ACC 41 != 0, Lock 1, a failure latch,
-        restore steps and a DIAGNOSTICS authority lease that is released."""
+        restore steps and a DIAGNOSTICS authority lease that is released;
+      - inside ServoBus, the one other caller is configureAccCeiling()
+        (register 85 only; check_acc_ceiling_runtime_path)."""
     by_name = {path.name: (path, code) for path, code in files if "tests" not in path.parts}
     header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", (None, ""))[1])
     if header.count("static constexpr uint8_t kAccDiagAcc = 41, kAccDiagLock = 55, kAccDiagMaxAcc = 85;") != 1:
@@ -622,6 +624,119 @@ def check_acc_diagnostic_write_path(files):
             fail(f"{router_path}: handleServoAcc() lost {required!r}")
     if compact.count("modules_.authority->release(lease);") != 3:
         fail(f"{router_path}: handleServoAcc() must release its DIAGNOSTICS lease on each of its 3 exits after the grant")
+
+
+def check_acc_ceiling_runtime_path(files):
+    """Trace 45 runtime fix (hardware 10/11: register 85 is the servo's ACC
+    ceiling, VOLATILE with the Lock closed). Before an activation from torque
+    OFF register 85 is set to 220 on the 12 leg servos and read back settled;
+    Motion gets the lowest value left. Pinned here:
+      - ServoBus::configureAccCeiling() is the one caller of
+        writeAccDiagnosticByte() inside ServoBus, for register 85 only, after 85
+        read != target and Lock 55 read 1 (an open Lock is never written: that
+        servo keeps its own 85, which bounds the result); a refused write or
+        TorqueEnable not read 0 after it -> 0; any write -> kAccCeilingSettleMs,
+        then 85 read again on every servo; an admitted STOP (the bound
+        preemption predicate, before every transaction and in the settle wait)
+        -> 0; the result is the lowest 85 left;
+      - its one caller is Controller::prepareSimpleMotion(), after the MOTION
+        grant, only while Motion is not engaged (never during a walk), with
+        simple::kAccCeilingTarget, into Inputs::accCeiling (0 by default);
+      - kAccCeilingTarget = 220 and every drive of the table under it, the
+        WALK modes STANDARD {1800,180} and FAST {1950,220} both present;
+      - stand() refuses a drive ACC above the verified ceiling after its own
+        admission checks (no earlier refusal masked); walk() and the joystick
+        pass their mode's ACC; a selection during a walk and the walk's
+        adoption of it never exceed the ceiling; the walk sends walkDrive_ and
+        the STOP proof assumes the same drive."""
+    by_name = {path.name: (path, code) for path, code in files if "tests" not in path.parts}
+
+    def ordered(path, what, code, steps):
+        rest = re.sub(r"\s+", "", strip_comments(code))
+        for step in steps:
+            _, found, rest = rest.partition(step)
+            if not found:
+                fail(f"{path}: {what} lost or reordered {step!r}")
+                return
+
+    header = re.sub(r"\s+", " ", by_name.get("ServoBus.h", (None, ""))[1])
+    for decl in ("static constexpr unsigned long kAccCeilingSettleMs = 100;",
+                 "uint8_t configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target);"):
+        if decl not in header:
+            fail(f"ServoBus.h: {decl!r} changed")
+    bus_path, bus = by_name.get("ServoBus.cpp", (None, ""))
+    body = function_body(bus, "uint8_t ServoBus::configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target)")
+    if body is None:
+        fail(f"{bus_path}: ServoBus::configureAccCeiling() not found")
+    else:
+        ordered(bus_path, "configureAccCeiling()", body, (
+            "if(ids==nullptr||count==0||target<1||target>254)return0;",
+            "int32_tceiling=target;",
+            "if(st_.bus.preemptRequested()||!readProfileRegister(ids[i],kAccDiagMaxAcc,1,&current))return0;",
+            "if(current==target)continue;",
+            "if(!readProfileRegister(ids[i],kAccDiagLock,1,&lock)||lock!=1){if(current<ceiling)ceiling=current;continue;}",
+            "constAccDiagWritew=writeAccDiagnosticByte(ids[i],kAccDiagMaxAcc,target);",
+            "if(w.refused||w.torque_after!=0)return0;",
+            "if(!wrote)returnstatic_cast<uint8_t>(ceiling);",
+            "while(millis()-last_write_ms<kAccCeilingSettleMs){if(st_.bus.preemptRequested())return0;delay(1);}",
+            "ceiling=target;",
+            "if(st_.bus.preemptRequested()||!readProfileRegister(ids[i],kAccDiagMaxAcc,1,&settled))return0;",
+            "if(settled<ceiling)ceiling=settled;",
+            "returnstatic_cast<uint8_t>(ceiling);"))
+        if len(re.findall(r"\bwriteAccDiagnosticByte\(", strip_comments(body))) != 1:
+            fail(f"{bus_path}: configureAccCeiling() must write through writeAccDiagnosticByte() exactly once")
+    if len(re.findall(r"\bwriteAccDiagnosticByte\(", strip_comments(bus))) != 2:  # definition + configureAccCeiling
+        fail(f"{bus_path}: inside ServoBus only configureAccCeiling() may call writeAccDiagnosticByte()")
+    integration_path, integration = by_name.get("SimpleMotionIntegration.cpp", (None, ""))
+    for path, code in by_name.values():
+        if path.name not in ("ServoBus.h", "ServoBus.cpp", "SimpleMotionIntegration.cpp") and \
+                re.search(r"\bconfigureAccCeiling\(", strip_comments(code)):
+            fail(f"{path}: configureAccCeiling() may be called only from Controller::prepareSimpleMotion()")
+    if len(re.findall(r"\bconfigureAccCeiling\(", strip_comments(integration))) != 1:
+        fail(f"{integration_path}: configureAccCeiling() must have exactly one caller")
+    prepare = function_body(integration, "const char* Controller::prepareSimpleMotion()")
+    if prepare is None:
+        fail(f"{integration_path}: Controller::prepareSimpleMotion() not found")
+    else:
+        ordered(integration_path, "prepareSimpleMotion()", prepare, (
+            "authority_.request(ActuatorAuthority::MOTION,OperatingMode::RUN,&motion_authority_lease_)",
+            "if(!simple_motion_.engaged()){",
+            "simple_inputs_.accCeiling=servo_bus_.configureAccCeiling(ids,12,simple::kAccCeilingTarget);",
+            "simple_inputs_.authorityOk=true;"))
+    motion_header = re.sub(r"\s+", "", strip_comments(by_name.get("SimpleMotion.h", (None, ""))[1]))
+    for required in ("constexpruint8_tkAccCeilingTarget=220;", "uint8_taccCeiling=0;",
+                     "constchar*stand(doubleheight,uint64_tnow,uint8_tacc=kStandDrive.acc);"):
+        if motion_header.count(required) != 1:
+            fail(f"SimpleMotion.h: {required!r} must appear exactly once")
+    motion_path, motion = by_name.get("SimpleMotion.cpp", (None, ""))
+    compact = re.sub(r"\s+", "", strip_comments(motion))
+    for required in ("static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&"
+                     "kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,",
+                     '{"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},',
+                     '{"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},'):
+        if compact.count(required) != 1:
+            fail(f"{motion_path}: {required!r} must appear exactly once (every drive under register 85; STANDARD and FAST in the build)")
+    stand = function_body(motion, "const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc)") or ""
+    if re.sub(r"\s+", "", strip_comments(stand)).count("acc>input_.accCeiling") != 1:
+        fail(f"{motion_path}: stand() must compare the drive ACC with the ceiling exactly once, after its admission checks")
+    ordered(motion_path, "stand()", stand, (
+        'if(faultLatched_)return"FAULT_STOP_REQUIRED";',
+        'if(offPending_||safeOffRequest_.load()||stop_.load())return"SAFE_OFF_IN_PROGRESS";',
+        'if(!input_.powerOk)return"POWER_NOT_READY";',
+        'if(!heightTarget(h,q))return"HEIGHT_OUTSIDE_MATDOG_WORKSPACE";',
+        'if(acc>input_.accCeiling)returninput_.accCeiling?"SERVO_ACC_CEILING_BELOW_DRIVE":"SERVO_ACC_CEILING_UNVERIFIED";',
+        "if(stopActive_){"))
+    ordered(motion_path, "walk()", function_body(motion, "const char* SimpleMotion::walk(unsigned stride,uint64_t now)") or "",
+            ("constchar*r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc);",))
+    ordered(motion_path, "drive()", function_body(motion, "const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)") or "",
+            ("constchar*r=stand(law.heightM,now,law.drive.acc);",))
+    ordered(motion_path, "selectWalkMode()", function_body(motion, "const char* SimpleMotion::selectWalkMode(WalkMode m)") or "",
+            ('if(walkModeLive()&&walkModeSpec(m).drive.acc>input_.accCeiling)return"SERVO_ACC_CEILING_BELOW_DRIVE";', "selectedMode_=m;"))
+    ordered(motion_path, "stepWalkMode()", function_body(motion, "void SimpleMotion::stepWalkMode(double eased)") or "",
+            ("if(!walkModeLive())return;", "if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling){"))
+    for required in ("if(!send(f.target,walkDrive_,now))return;", "constDrivedrive=phase_==Phase::WALK?walkDrive_:kStandDrive;"):
+        if compact.count(required) != 1:
+            fail(f"{motion_path}: the walk must send walkDrive_ and its STOP proof assume it ({required!r})")
 
 
 # The complete DALY transmit vocabulary. Each entry is re-verified below
@@ -6859,6 +6974,7 @@ def main():
     check_loop_task_stack(files)
     check_servo_id_write(files)
     check_acc_diagnostic_write_path(files)
+    check_acc_ceiling_runtime_path(files)
     check_daly_write(files)
     check_bms_command_surface(files)
     check_daly_protocol_is_host_linkable(files)

@@ -376,6 +376,24 @@ class ServoBus {
   };
   AccDiagWrite writeAccDiagnosticByte(int id, uint8_t address, uint8_t value);
 
+  // Runtime ACC ceiling, set before a Motion activation from torque OFF.
+  // Register 85 is the servo's ACC ceiling and a write with the Lock closed
+  // is VOLATILE (hardware 10/11, servo 23: 41 settles at min(written, 85),
+  // asynchronously, within 55 ms; a power cycle restores the factory 50).
+  // Per servo: 85 read equal to `target`, nothing is written. Otherwise Lock 55
+  // must read 1 (an open Lock would let the write reach EEPROM: that servo
+  // keeps its own 85) and the write goes through writeAccDiagnosticByte()
+  // (TorqueEnable read 0 before and after it, safeOff() otherwise). After any
+  // write, 85 is read again on every servo once kAccCeilingSettleMs have
+  // passed: the settled value. Returns the LOWEST 85 left on the `count`
+  // servos (at most `target`): what Motion may command. 0 = not verified: a
+  // servo unread, a write refused or torque not read OFF, or an admitted STOP
+  // (the bound preemption predicate, polled before every transaction and in
+  // the settle wait). A volatile 85 already written stays: it is a ceiling,
+  // the ACC applied is still each frame's 41.
+  static constexpr unsigned long kAccCeilingSettleMs = 100;
+  uint8_t configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target);
+
  private:
   // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -
   // ONE absolute budget (total + per-reply phase) on a wrap-safe microsecond

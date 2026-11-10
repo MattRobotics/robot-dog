@@ -3,7 +3,8 @@
 # on the rig of test_simple_motion.cpp, each servo replaced by the ST3215 response
 # model of servo_plant.inc (profile, capability, latency, deadband, sag; ranges
 # drawn per seed), for SLOW, STANDARD and FAST: long walk, 8 STOP + resume,
-# IMU at the pitch-down vertex; 11.1 and 9.6 V. Controller outcome against a
+# IMU at the pitch-down vertex, mode changes during the walk with STOPs inside
+# them (2026-11-10); 11.1 and 9.6 V. Controller outcome against a
 # servo that lags; software only, not a hardware result.
 # Usage: SEEDS=6 run_servo_plant.sh
 set -euo pipefail
