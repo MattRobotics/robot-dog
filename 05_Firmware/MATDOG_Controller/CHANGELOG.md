@@ -4,7 +4,20 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 ACC causal test: @SERVO ACC (register 85 on one servo) — 2026-11-09
+## Unreleased — MATDOG Controller 1.0.2-dev.6 operational ACC 220: register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
+
+> Operational candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `1fbee7b` (APP `39840bd4…`), which stays the rollback image with `975fe51` and `dd76fad`. Source `5617f0e`. Hardware validation plan: `MATDOG_1_0_2_DEV6_ACC220_OPERATIONAL_20261110/HW_VALIDATION_PLAN.md`.
+
+- **Why:** hardware 10/11: register 85 is the ST3215 ACC ceiling (register 41 stores min(written, 85)), factory 50, VOLATILE when written with the Lock closed; STANDARD (ACC 180) and FAST (220) faulted at their first control read (trace 45).
+- **Register 85:** before every activation from torque OFF, under the MOTION authority, `ServoBus::configureAccCeiling()` reads 85 on the 12 leg servos and writes 220 where it differs (Lock 55 read 1 only; through the reviewed `writeAccDiagnosticByte()`: TorqueEnable read 0 before and after, SAFE_OFF otherwise), then reads every 85 again 100 ms later. Motion gets the lowest value left: a write that failed leaves the factory 50 (STAND and SLOW only); a servo unread or an admitted STOP gives 0 (nothing starts). Never while engaged; no EEPROM, no unlock. USB `MOTION_ACC_CEILING verified=<lowest> target=220` at each activation.
+- **ACC gate:** `stand()` refuses a drive ACC above the verified ceiling after its own admission checks (`SERVO_ACC_CEILING_UNVERIFIED`, `SERVO_ACC_CEILING_BELOW_DRIVE`); WALK and the joystick pass their mode's ACC; a selection during a walk above it is refused.
+- **WALK mode change during a walk:** GAIT.SELECT during a forward walk (WALK, or a joystick walk neither steered nor backward, not stopping) moves its law to the mode progressively (`SimpleMotion::stepWalkMode`, ACK `WALK_MODE_CHANGING`, status `walk_mode.target`): clock rate and stride within the slower law until the law shape (duty, swing profile, lift) changes at the first release of a four-contact window; height 2 mm/s; lateral sway with four feet down; the faster mode's drive until the clock has the target's rate. Torque, authority and gait phase kept: no STOP, SAFE_OFF, ENABLE or new walk.
+- **Joystick:** forward on the selected mode's law, full scale its top speed (SLOW 20, STANDARD 30, FAST 32 mm/s); steering and backward on SLOW only (`JOYSTICK_STEERING_SLOW_ONLY`, `JOYSTICK_BACKWARD_SLOW_ONLY`); the page sends the forward part alone on STANDARD/FAST.
+- **Dashboard:** every mode's WALK walks its top preset, the index a mode change keeps (STANDARD 25 -> 30 mm/s); the selector changes a forward walk in progress; new reasons and guide texts.
+- **Unchanged:** the three gait laws, STOP and its proof, SAFE_OFF, NVS, calibration, IDs, geometry, FK/IK, EEPROM. Without a mode change every transmitted frame is bit-identical to `1fbee7b` (11 frame-digest scenarios).
+- **Static audit:** `check_acc_ceiling_runtime_path` pins the operational path (27/27 mutations detected).
+
+## Superseded — MATDOG Controller 1.0.2-dev.6 ACC causal test (`1fbee7b`, APP `39840bd4…`, installed 10/11/2026 05:30Z; register 85 = the ACC ceiling, VOLATILE): @SERVO ACC (register 85 on one servo) — 2026-11-09
 
 > Diagnostic candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `975fe51` (APP `a22fb0f6…`), which stays the rollback image with `dd76fad`. Source `1055610`. Hardware session plan: `MATDOG_1_0_2_DEV6_ACCCAUSAL_HW_20261110`.
 

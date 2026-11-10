@@ -130,7 +130,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   86, read-only, as separate 1-byte reads. Installed 09/11 (975fe51): 85 =
 //   50, 86 = 1 on 12/12. ACC causal test (same version string, new build):
 //   @SERVO ACC BACKUP / SRAM 41 / register 85 on one servo behind a token,
-//   MAINTENANCE, idle, torque OFF. Offline candidate.
+//   MAINTENANCE, idle, torque OFF. Installed 10/11 (1fbee7b): register 85 is
+//   the ACC ceiling, VOLATILE. Operational ACC 220 (same version string, new
+//   build): register 85 set to 220 before every activation, Motion bounded by
+//   the lowest value read back; WALK mode change during a walk; the joystick
+//   on the selected mode. Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
