@@ -321,7 +321,7 @@ else if(status.admin_session===false&&now-lapseAt>5000){lapseAt=now;cookieAt=now
 // JOY_LIMIT = kStrideM[2] / kWalkPeriodS, kJoystickLateralM, kJoystickYawRad /
 // kJoystickPeriodS; JOY_BACK = kJoystickBackM / kWalkPeriodS; JOY_DEADLINE_MS =
 // kJoystickTimeoutUs. Replaced by the capabilities' joystick block when read.
-// Forward full scale is the selected WALK mode's top speed (walk_modes); the
+// Forward full scale is the top speed (walk_modes) of the WALK mode the Controller accepted; the
 // Controller walks forward on that mode's law and allows steering and backward
 // on SLOW only (it refuses them otherwise): on STANDARD and FAST the page sends
 // the forward part alone.
@@ -330,7 +330,7 @@ let joy=[0,0],joyYaw=0,joyPad=false,joyActive=false,joyAllowed=false,joyTimer=0,
 // Fore/aft inside the dead band is zero (dev.17 HW): a sideways stick a hair
 // behind or ahead of centre carries no fore/aft sign, which would choose the
 // leg order of a new walk (backward if negative).
-function joyVelocity(){const slow=selectedMode()==='SLOW',w=walkModes.find(x=>x.name===selectedMode()),top=w&&Number.isFinite(Number(w.top_speed_mm_s))?Number(w.top_speed_mm_s)/1000:JOY_LIMIT[0];
+function joyVelocity(){const mode=status&&status.walk_mode?controllerMode(status.walk_mode):selectedMode(),slow=mode==='SLOW',w=walkModes.find(x=>x.name===mode),top=w&&Number.isFinite(Number(w.top_speed_mm_s))?Number(w.top_speed_mm_s)/1000:JOY_LIMIT[0];
  const f0=Math.abs(joy[0])<JOY_DEAD?0:joy[0],f=slow?f0:Math.max(0,f0),l=slow?joy[1]:0,r=Math.hypot(f,l),k=r<JOY_DEAD?0:Math.min(1,(r-JOY_DEAD)/(1-JOY_DEAD))/r;
  let n=[f*k,l*k,slow?joyYaw:0];const m=Math.hypot(n[0],n[1],n[2]);if(m>1)n=n.map(v=>v/m);return n.map((v,i)=>v*(i?JOY_LIMIT[i]:v>=0?top:JOY_BACK))}
 const joyText=v=>{const t=[];if(v[0])t.push((v[0]>0?'avanti ':'indietro ')+(Math.abs(v[0])*1000).toFixed(1)+' mm/s');
@@ -345,7 +345,7 @@ function joyMove(e){const o=joyOrigin;if(!o)return;  // knob travel: 58 of the 1
 function joyTick(){if(!joyActive||joyReverse)return;const v=joyVelocity();
  // Back to neutral: WALK STOP once, like a release. The STOP lane is untouched.
  if(!v[0]&&!v[1]&&!v[2]){if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK neutro')}return}
- if(sending)return;joySent=true;command('BASE_VELOCITY',{vx:v[0],vy:v[1],yaw_rate:v[2],gait:'JOYSTICK'},false,'JOYSTICK '+joyText(v))}
+ if(sending||modeSending)return;joySent=true;command('BASE_VELOCITY',{vx:v[0],vy:v[1],yaw_rate:v[2],gait:'JOYSTICK'},false,'JOYSTICK '+joyText(v))}
 function joyStart(){if(joyActive)return;joyActive=true;joyDraw();joyTick();joyTimer=setInterval(joyTick,JOY_MS)}
 function joyRelease(){if(!joyActive)return;joyActive=false;joyReverse=false;joyPad=false;joyPointer=null;joyOrigin=null;joyYaw=0;clearInterval(joyTimer);joy=[0,0];joyDraw();
  if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK rilascio')}twinResize()}
@@ -383,8 +383,16 @@ const selectedMode=()=>document.querySelector('input[name="simple-walk-mode"]:ch
 let modeRequest=null,modeAccepted=null,modeAcceptedAt=-Infinity;
 // The Controller's selection: its status, unless a later ACCEPTED GAIT.SELECT is newer than that status's request.
 const controllerMode=wm=>modeAcceptedAt>=received-transitAge?modeAccepted:wm.selected;
-function selectMode(name){modeSending=true;modeRequest=(async()=>{try{const a=await command('GAIT.SELECT',{gait:name},false,'Modalità WALK '+name);
- const ok=!!a&&a.outcome==='ACCEPTED';if(ok){modeAccepted=name;modeAcceptedAt=performance.now()}return ok}finally{modeSending=false}})();return modeRequest}
+// One request at a time (command): a selection waits for the one in flight (a
+// joystick refresh) instead of being dropped; still busy after 1 s, it is
+// refused with a message and the selector returns to the Controller's mode.
+// Only the latest selection ends the wait; then the joystick refreshes at once.
+function selectMode(name){modeSending=true;const request=(async()=>{try{
+ for(let t=0;sending&&t<50;++t)await new Promise(r=>setTimeout(r,20));
+ if(sending){show('Modalità WALK '+name+' NON inviata: un’altra richiesta è ancora in corso dopo 1 s. Riprovare.','warn');return false}
+ const a=await command('GAIT.SELECT',{gait:name},false,'Modalità WALK '+name);
+ const ok=!!a&&a.outcome==='ACCEPTED';if(ok){modeAccepted=name;modeAcceptedAt=performance.now()}return ok}
+ finally{if(modeRequest===request){modeSending=false;if(joyActive)joyTick()}}})();modeRequest=request;return request}
 by('simple-stand').onclick=()=>{const mm=Number(height.value);command('POSTURE.STAND',{target_height_m:mm/1000},false,'STAND '+mm+' mm')};
 by('simple-prone').onclick=()=>command('POSTURE.LIE_DOWN',{},false,'PRONE');
 // WALK: the preset index is encoded as kStrideM / kWalkPeriodS (exact match

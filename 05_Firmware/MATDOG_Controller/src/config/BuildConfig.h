@@ -134,7 +134,8 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   the ACC ceiling, VOLATILE. Operational ACC 220 (same version string, new
 //   build): register 85 set to 220 before every activation, Motion bounded by
 //   the lowest value read back; WALK mode change during a walk; the joystick
-//   on the selected mode. Offline candidate.
+//   on the selected mode, a selection with the stick held never dropped
+//   (final audit). Offline candidate.
 constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;

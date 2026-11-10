@@ -90,6 +90,9 @@ std::string statusJson(core::MotionService& service, Rig& rig) {
 std::string ackJson(core::MotionService& service, const motion::MotionAck& a) {
   char out[512]{}; check(service.ackJson(a, out, sizeof(out)), "ackJson"); return out;
 }
+std::string capabilitiesJson(core::MotionService& service) {
+  char out[4096]{}; check(service.capabilitiesJson(out, sizeof(out)), "capabilitiesJson"); return out;
+}
 motion::MotionCommand semantic(motion::Intent intent, Rig& rig, double vx = 0) {
   static uint32_t sequence = 0;
   motion::MotionCommand c; c.owner = motion::ClientOwner::DASHBOARD; c.intent = intent; c.sequence = ++sequence;
@@ -130,6 +133,7 @@ int fixtures(const char* path) {
     test_clock_us = rig.p.now;
     check(rig.m.fresh(rig.p.now) && !std::strcmp(rig.m.poseRegion(rig.p.now), "PRONE_ENTRY"), "idle PRONE pose classified from fresh feedback");
     put("status_ready", statusJson(service, rig));
+    put("capabilities", capabilitiesJson(service));  // walk_modes: the joystick's full scale per mode
     auto prone=semantic(motion::Intent::LIE_DOWN,rig);strcpy(prone.id,"prone-fixture");
     put("ack_prone",ackJson(service,service.command(prone,prone.issued_at_ms)));
     const auto c = semantic(motion::Intent::STAND, rig); auto stand = c; stand.target_height_m = .15;

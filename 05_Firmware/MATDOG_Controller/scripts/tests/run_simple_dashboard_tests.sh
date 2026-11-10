@@ -18,6 +18,7 @@ for name in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKine
   "$here/test_simple_dashboard_contract.cpp" "${sources[@]}" -o "$out/contract"
 "$out/contract" fixtures "$out/fixtures.json"
 "${NODE:-node}" "$here/test_simple_dashboard_dom.cjs" "$out/fixtures.json" "$out/envelopes.tsv"
+"${NODE:-node}" "$here/test_joystick_mode_dom.cjs" "$out/fixtures.json"
 "${NODE:-node}" "$here/test_twin_feed_parent.mjs" "$out/fixtures.json"
 "${NODE:-node}" "$here/test_portal_motion_budget_dom.cjs"
 # Real-browser layout under a held joystick (Chrome via playwright-core).

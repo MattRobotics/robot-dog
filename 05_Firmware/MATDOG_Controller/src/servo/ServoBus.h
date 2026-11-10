@@ -388,9 +388,11 @@ class ServoBus {
   // passed: the settled value. Returns the LOWEST 85 left on the `count`
   // servos (at most `target`): what Motion may command. 0 = not verified: a
   // servo unread, a write refused or torque not read OFF, or an admitted STOP
-  // (the bound preemption predicate, polled before every transaction and in
-  // the settle wait). A volatile 85 already written stays: it is a ceiling,
-  // the ACC applied is still each frame's 41.
+  // (the bound preemption predicate, polled before each servo's step, in every
+  // millisecond of the settle wait and before every settle read; a step
+  // already started completes: its 85 read, Lock read and write are bounded
+  // transactions, not preemptible). A volatile 85 already written stays: it
+  // is a ceiling, the ACC applied is still each frame's 41.
   static constexpr unsigned long kAccCeilingSettleMs = 100;
   uint8_t configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target);
 

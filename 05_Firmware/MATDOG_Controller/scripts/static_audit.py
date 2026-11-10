@@ -637,8 +637,8 @@ def check_acc_ceiling_runtime_path(files):
         servo keeps its own 85, which bounds the result); a refused write or
         TorqueEnable not read 0 after it -> 0; any write -> kAccCeilingSettleMs,
         then 85 read again on every servo; an admitted STOP (the bound
-        preemption predicate, before every transaction and in the settle wait)
-        -> 0; the result is the lowest 85 left;
+        preemption predicate, before each servo's step, in the settle wait and
+        before each settle read) -> 0; the result is the lowest 85 left;
       - its one caller is Controller::prepareSimpleMotion(), after the MOTION
         grant, only while Motion is not engaged (never during a walk), with
         simple::kAccCeilingTarget, into Inputs::accCeiling (0 by default);
