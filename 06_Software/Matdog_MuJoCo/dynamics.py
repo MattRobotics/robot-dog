@@ -77,9 +77,19 @@ def support_margin(points, com):
 
 
 class Twin:
-    def __init__(self, params, mu=0.8, unit=None):
+    def __init__(self, params, mu=0.8, unit=None, fixture=None):
+        """`fixture` (roll, pitch) in rad: the body welded at that attitude 0.5 m above the floor, legs free
+        (the hardware fixture, assumed rigid); None: free body on the floor."""
         self.p = params
-        self.m, self.d = twin.load_model()
+        self.fixture = fixture
+        if fixture is None:
+            self.m, self.d = twin.load_model()
+        else:
+            spec = mujoco.MjSpec.from_file(str(twin.MODEL_XML))
+            spec.add_equality(name="fixture", type=mujoco.mjtEq.mjEQ_WELD, objtype=mujoco.mjtObj.mjOBJ_BODY, name1="base_link")
+            self.m = spec.compile()
+            self.d = mujoco.MjData(self.m)
+            self.m.eq_solref[0] = [0.004, 1.0]  # as stiff as the contacts (geom default)
         self.feet = np.array([self.m.geom(f"{l}_foot_cylinder").id for l in twin.LEGS])
         self.floor = self.m.geom("floor").id
         self.m.geom_friction[self.feet, 0] = mu
@@ -93,8 +103,21 @@ class Twin:
         self.dt = self.m.opt.timestep
 
     def place(self, q):
-        """Joints at q, body level, lowest contact reference on the floor."""
+        """Joints at q, body level, lowest contact reference on the floor (on the fixture: body welded in the air)."""
         mujoco.mj_resetData(self.m, self.d)
+        if self.fixture is not None:
+            roll, pitch = self.fixture
+            quat = np.zeros(4)
+            mujoco.mju_euler2Quat(quat, np.array([pitch, roll, 0.0]), "yxz")  # Ry(pitch) Rx(roll): quat_rpy() inverts it
+            self.d.qpos[0:3], self.d.qpos[3:7] = (0, 0, 0.5), quat
+            inverse, at = np.zeros(4), np.zeros(3)
+            mujoco.mju_negQuat(inverse, quat)
+            mujoco.mju_rotVecQuat(at, np.array([0.0, 0.0, -0.5]), inverse)
+            self.m.eq_data[0, :] = 0  # weld: anchor 0, the world's pose in the body frame, torque scale 1
+            self.m.eq_data[0, 3:6], self.m.eq_data[0, 6:10], self.m.eq_data[0, 10] = at, inverse, 1.0
+            self.d.qpos[7:19] = q
+            mujoco.mj_forward(self.m, self.d)
+            return
         twin.set_base(self.d, (0, 0, 0.3))
         self.d.qpos[7:19] = q
         mujoco.mj_kinematics(self.m, self.d)

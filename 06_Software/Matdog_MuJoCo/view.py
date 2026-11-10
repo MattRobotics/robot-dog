@@ -17,10 +17,12 @@ inputs), [HW] measured on the robot, [IPOTESI] assumed parameter.
   view.py <replay> --mp4 <file> [--start s] [--end s] [--fps 50]    (MUJOCO_GL=egl)
   view.py <replay> --png <file> --at s [s ...]
   view.py <sequence.csv> --kinematic    joints imposed, no physics (milestone 1)
-A replay is a catalog name, a CSV path or stand:<height m>; data root $MATDOG_TWIN_DATA
+A replay is a catalog name, a CSV path or stand:<height m>. An m5_compare.py run (<run>_twin.csv)
+also shows its hardware samples [HW] (<run>_pairs.csv), each at its reading time; data root $MATDOG_TWIN_DATA
 (default ~/MATDOG/verification-artifacts/MATDOG_MUJOCO_TWIN_20261110).
 """
 import argparse
+import csv
 import dataclasses
 import json
 import os
@@ -49,6 +51,11 @@ CATALOG = {  # name: (source, title)
     "csv_imu_fisso": ("sequences/preset_slow_standard_fast_slow.csv", "CSV consegnato, IMU fisso (deriva artificiale): solo diagnostico"),
     "stop_fuori_box_anche_x2": ("results/m4/cl_stop_front_standard__hips_x2.csv",
                                 "STOP a meta' swing anteriore, STANDARD, anche 2x rigide (deviazione HIP come HW): STOP_MEASURED_OUTSIDE_BOX"),
+    # M5 (m5_compare.py): the commands of a hardware run replayed, with its samples [HW]
+    "m5_dev4_walk": ("M5/storico_dev4/t1_walk_walkstop__baseline_twin.csv", "M5 dev.4 08/11 a terra: WALK SLOW e WALK STOP"),
+    "m5_dev4_walk_imu": ("M5/storico_dev4/t1_walk_walkstop__imu_mount_twin.csv", "M5 dev.4 08/11 a terra: WALK SLOW e WALK STOP, IMU montata ruotata"),
+    "m5_dev4_stop": ("M5/storico_dev4/t3_walk_stop__baseline_twin.csv", "M5 dev.4 08/11 a terra: STOP d'emergenza in WALK SLOW"),
+    "m5_dev4_stop_imu": ("M5/storico_dev4/t3_walk_stop__imu_mount_twin.csv", "M5 dev.4 08/11 a terra: STOP d'emergenza, IMU montata ruotata"),
 }
 # Diagnostic variants of m4_hip_stop.py: the replay must use the servo model that produced the CSV.
 VARIANT_UNIT = {"__hips_x2": [2.0 if i in (0, 3, 6, 9) else 1.0 for i in range(12)]}
@@ -78,6 +85,7 @@ class Replay:
     fault_k: int = -1
     stop_k: int = -1
     variant: str = ""          # a diagnostic servo variant, never the nominal model
+    hw: dict = None            # m5_compare.py run: hardware samples aligned on the twin's time
 
 
 def resolve(name):
@@ -87,10 +95,26 @@ def resolve(name):
     return (name if name.startswith("stand:") else pathlib.Path(name).stem), name, name
 
 
+def m5_samples(source):
+    """(hardware samples, run report) of an m5_compare.py twin CSV, else (None, None)."""
+    path = pathlib.Path(source)
+    if not path.name.endswith("_twin.csv"):
+        return None, None
+    with open(path.with_name(path.name.replace("_twin.csv", "_pairs.csv")), newline="") as f:
+        rows = list(csv.DictReader(f))
+    col = lambda k: np.array([[float(r[f"{k}_{n}"]) for n in twin.SLOT_NAMES] for r in rows])
+    hw = {"t": np.array([float(r["t_sim"]) for r in rows]), "q": col("hw_q"), "age_s": col("age_ms") / 1e3, "err": col("hw_err"),
+          "duty": col("hw_duty"), "rp": np.array([[float(r["hw_roll"]), float(r["hw_pitch"])] for r in rows]),
+          "label": [r["hw_label"] for r in rows]}
+    return hw, json.loads(path.with_name(path.name.replace("_twin.csv", ".json")).read_text())
+
+
 def compute(name):
     label, source, title = resolve(name)
     unit = next((u for tag, u in VARIANT_UNIT.items() if tag in pathlib.Path(source).stem), None)
-    tw = dynamics.Twin(servo.Params(), unit=unit)
+    hw, m5 = m5_samples(source)
+    fixture = tuple(1e-3 * a for a in m5["fixture_attitude_mrad"]) if m5 and m5.get("fixture_attitude_mrad") else None
+    tw = dynamics.Twin(servo.Params(), unit=unit, fixture=fixture)
     snaps = {k: [] for k in ("qpos", "qvel", "fz", "duty")}
 
     def snapshot():
@@ -146,6 +170,11 @@ def compute(name):
     rep = Replay(label, title, kind, np.asarray(t, float), np.array(snaps["qpos"]), np.array(snaps["qvel"]), np.asarray(q_cmd),
                  np.array(snaps["fz"]), np.array(snaps["duty"]), info, check)
     rep.variant = "[IPOTESI diagnostica] anche con costante di coppia x2" if unit is not None else ""
+    if hw is not None:
+        rep.hw = hw
+        rep.title = f"M5 {m5['name']}: i comandi dell'HW riprodotti (in camminata alla stessa fase del passo)"
+        rep.variant = (f"[HW] {pathlib.Path(m5['sources'][0]).name}, {len(hw['t'])} campioni; variante {m5['variant']}"
+                       + (", fixture" if fixture else ", a terra"))
     states = [row["state"] for row in info]
     rep.fault_k = states.index("FAULT") if "FAULT" in states else -1
     stops = [k for k, row in enumerate(info) if row["stop_active"] == "1"]
@@ -227,6 +256,16 @@ class Painter:
             pairs = [f"{twin.SLOT_NAMES[i]} {abs(HW_HOLD[i]):.0f} / {err[i]:.0f}" for i in (2, 5, 7, 10)]
             labels += "\n|cmd-mis| [HW] / [SIM]\n(HW: HOLD rc.11)"
             values += f"\n{pairs[0]}   {pairs[1]}\n{pairs[2]}   {pairs[3]}"
+        hip_hw = f"{HW_HIP_MARGIN_MIN:+6.1f} tick (STOP verificati a terra)"
+        if rep.hw is not None:
+            i = int(np.argmin(np.abs(rep.hw["t"] - t)))
+            if abs(rep.hw["t"][i] - t) <= 0.4:
+                hip_hw = f"{hip_margin(rep.hw['q'][i][None, :])[0, h]:+6.1f} tick a {rep.hw['t'][i] - rep.hw['age_s'][i, rep.hip]:.2f} s ({rep.hw['label'][i]})"
+                labels += "\nassetto IMU [HW]\n|cmd-mis| max [HW]"
+                e = np.abs(rep.hw["err"][i])
+                values += f"\nroll {rep.hw['rp'][i, 0]:+6.1f}  pitch {rep.hw['rp'][i, 1]:+6.1f} mrad\n{e.max():5.1f} tick  {twin.SLOT_NAMES[int(np.argmax(e))]}"
+            else:
+                hip_hw = "nessun campione HW entro 0,4 s"
         return [
             (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPLEFT, title, None),
             (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_TOPRIGHT,
@@ -235,9 +274,9 @@ class Painter:
              f"{row['drive']}\n{stop}\n{fault}"),
             (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMLEFT, labels, values),
             (mujoco.mjtFont.mjFONT_NORMAL, mujoco.mjtGridPos.mjGRID_BOTTOMRIGHT,
-             f"{name} misurata [SIM]\n{name} comandata [FW]\ndistanza kHeight [SIM]\nminimo osservato [HW]",
+             f"{name} misurata [SIM]\n{name} comandata [FW]\ndistanza kHeight [SIM]\n" + ("distanza kHeight [HW]" if rep.hw is not None else "minimo osservato [HW]"),
              f"{q[rep.hip] / twin.TICK:+7.1f} tick\n{rep.q_cmd[k][rep.hip] / twin.TICK:+7.1f} tick\n"
-             f"{margin:+6.1f} tick (comandata {margin_cmd:+5.1f})\n{HW_HIP_MARGIN_MIN:+6.1f} tick (STOP verificati a terra)"),
+             f"{margin:+6.1f} tick (comandata {margin_cmd:+5.1f})\n{hip_hw}"),
         ]
 
     def figure(self, rep, k, window=6.0):
@@ -254,8 +293,14 @@ class Painter:
         ymin, ymax = -30.0, 50.0
         lines = [("misurata [SIM]", x[::step], meas[::step], (1.0, 0.55, 0.1)),
                  ("comandata [FW]", x[::step], cmd[::step], (0.75, 0.75, 0.75)),
-                 ("", [x[0], x[-1]], [0.0, 0.0], (0.95, 0.15, 0.15)),
-                 ("", [x[0], x[-1]], [HW_HIP_MARGIN_MIN] * 2, (0.2, 0.85, 0.3))]
+                 ("", [x[0], x[-1]], [0.0, 0.0], (0.95, 0.15, 0.15))]
+        if rep.hw is None:
+            lines.append(("", [x[0], x[-1]], [HW_HIP_MARGIN_MIN] * 2, (0.2, 0.85, 0.3)))
+        if rep.hw is not None:  # the hip read on the robot, each sample at its own reading time (age_ms before)
+            th = rep.hw["t"] - rep.hw["age_s"][:, rep.hip]
+            m = (th >= x[0]) & (th <= x[-1])
+            if m.sum() >= 2:
+                lines.insert(2, ("misurata [HW]", th[m], np.clip(hip_margin(rep.hw["q"][m])[:, h], -25, 25), (0.35, 0.6, 1.0)))
         for kk, rgb in ((rep.stop_k, (0.3, 0.8, 1.0)), (rep.fault_k, (1.0, 0.1, 0.6))):  # STOP, FAULT
             if k0 <= kk <= k:
                 lines.append(("", [rep.t[kk]] * 2, [ymin, ymax], rgb))
@@ -267,7 +312,7 @@ class Painter:
             fig.linename[i] = label
             fig.linergb[i] = rgb
         fig.title = f"{twin.SLOT_NAMES[rep.hip]}: distanza da kHeight (tick, >0 dentro)"
-        fig.xlabel = "t (s)   rosso: kHeight   verde: min. HW"
+        fig.xlabel = "t (s)   rosso: kHeight   " + ("blu: HW (2-3 Hz)" if rep.hw is not None else "verde: min. HW")
         fig.range[0] = [x[0], max(x[-1], x[0] + 0.1)]
         fig.range[1] = [ymin, ymax]
         fig.flg_legend = 1
