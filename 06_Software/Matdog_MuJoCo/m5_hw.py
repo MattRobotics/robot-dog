@@ -12,6 +12,7 @@ is never sampled faster than the snapshots: rates() measures it per joint.
 
 Usage: m5_hw.py <session dir | dashboard trace .json | http.jsonl> [...] [--out file.json]
 """
+import itertools
 import json
 import pathlib
 import re
@@ -127,7 +128,9 @@ def rates(snaps, where=lambda s: True):
 
 
 WALK_PRESET = re.compile(r"^WALK (SLOW|STANDARD|FAST)?\s*(\d+)?")
-JOY = re.compile(r"JOYSTICK (avanti|indietro) ([\d.]+) mm/s, (destra|sinistra) ([\d.]+) mm/s")
+# joyText of MotionDashboard.h: the nonzero parts of (vx, vy, yaw) among "avanti|indietro X mm/s",
+# "sinistra|destra Y mm/s", "antiorario|orario Z°/s"
+JOY = re.compile(r"(avanti|indietro|sinistra|destra) ([\d.]+) mm/s|(antiorario|orario) ([\d.]+)°/s")
 
 
 def command_kind(c):
@@ -144,10 +147,13 @@ def command_kind(c):
     if t == "BASE_VELOCITY":
         if lab in ("WALK STOP", "JOYSTICK neutro", "JOYSTICK rilascio"):
             return "WALKSTOP", None
-        if (m := JOY.search(lab)):
-            vx = float(m[2]) / 1000 * (1 if m[1] == "avanti" else -1)
-            vy = float(m[4]) / 1000 * (-1 if m[3] == "destra" else 1)
-            return "DRIVE", (vx, vy)
+        if lab.startswith("JOYSTICK ") and (parts := JOY.findall(lab)):
+            v = {"avanti": 0.0, "sinistra": 0.0, "antiorario": 0.0}
+            for word, x, turn, z in parts:
+                sign = 1 if (word or turn) in v else -1
+                key = {"indietro": "avanti", "destra": "sinistra", "orario": "antiorario"}.get(word or turn, word or turn)
+                v[key] = sign * (float(x) / 1000 if word else float(z) * np.pi / 180)
+            return "DRIVE", (v["avanti"], v["sinistra"], v["antiorario"])
         if lab.startswith("WALK"):
             return "WALK", lab
     return None, None
@@ -158,17 +164,19 @@ def commands(trace_commands, snaps):
 
     A dashboard command takes the Controller's `accepted_ms` when a snapshot saw it
     active, else `issued_at_ms` (the page's estimate of the Controller clock). GAIT.SELECT
-    never becomes the active command: its time is the page's. Without a dashboard
-    trace the active_command changes of the snapshots give the time and the kind is
-    read from what followed (`exact` False for a mode selection: +-1 snapshot)."""
-    out = []
+    never becomes the active command: its time is the page's. A trace keeps only the
+    page's last 48 commands and two exports repeat the ones they share (one per id):
+    every other command, all of them without a trace, comes from the active_command
+    changes of the snapshots, the kind read from what followed (`exact` False for a
+    mode selection: +-1 snapshot)."""
+    out, ids = [], {c.get("id") for c in trace_commands}
     if trace_commands:
         accepted = {}
         for s in snaps:
             a = s["command"]
             if a.get("id") and a.get("accepted_ms"):
                 accepted[a["id"]] = a["accepted_ms"]
-        for c in trace_commands:
+        for c in {c["id"]: c for c in trace_commands}.values():
             ack = c.get("ack") or {}
             if c.get("http") != 200 or ack.get("outcome") != "ACCEPTED":
                 continue
@@ -179,20 +187,23 @@ def commands(trace_commands, snaps):
             t = accepted.get(c["id"], obs) or c.get("issued_at_ms")
             out.append({"t_ms": float(t), "kind": kind, "arg": arg, "label": c.get("label"), "exact": c["id"] in accepted or bool(obs),
                         "ack_reason": ack.get("reason")})
-        return sorted(out, key=lambda c: c["t_ms"])
+    traced = list(out)
     prev = None
     for k, s in enumerate(snaps):
         a = s["command"]
-        if a.get("accepted_ms") and (prev is None or a.get("sequence") != prev.get("sequence")):
-            nxt = snaps[min(k + 1, len(snaps) - 1)]
+        if a.get("accepted_ms") and (prev is None or a.get("sequence") != prev.get("sequence")) and a.get("id") not in ids:
+            # the snapshots while it stays the active command (a walk starts with a ~2 s HEIGHT_CHANGE)
+            life = [snaps[k]] + list(itertools.takewhile(lambda x: x["command"].get("sequence") == a.get("sequence"), snaps[k + 1:]))
+            life.append(snaps[min(k + len(life), len(snaps) - 1)])
+            joy = [x["vel"] for x in life[:2] if x["vel"].get("joystick") and any(x["vel"].get(v) for v in ("vx_m_s", "vy_m_s", "yaw_rate_rad_s"))]
             kind = arg = None
             if a.get("reason", "").startswith("STOP_REQUESTED") or s["state"] == "STOPPED" or s["stop"].get("active"):
                 kind = "STOP"
-            elif s["vel"].get("joystick") and (s["vel"].get("vx_m_s") or nxt["vel"].get("vx_m_s")):
-                kind, arg = "DRIVE", (s["vel"].get("vx_m_s") or nxt["vel"].get("vx_m_s"), s["vel"].get("vy_m_s") or 0.0)
+            elif joy:
+                kind, arg = "DRIVE", tuple(float(joy[0].get(v) or 0.0) for v in ("vx_m_s", "vy_m_s", "yaw_rate_rad_s"))
             elif s["reason"] in ("WALK_STOPPING", "WALK_SETTLING") or s["phase"] == "WALK_SETTLE":
                 kind = "WALKSTOP"
-            elif s["state"] == "WALKING" or nxt["state"] == "WALKING":
+            elif any(x["state"] == "WALKING" for x in life):
                 kind, arg = "WALK", s["selected"]
             elif s["phase"].startswith("PRONE"):
                 kind = "PRONE"
@@ -200,8 +211,9 @@ def commands(trace_commands, snaps):
                 kind, arg = "STAND", (s["height_mm"] or 0) / 1000
             out.append({"t_ms": float(a["accepted_ms"]), "kind": kind, "arg": arg, "label": None, "exact": True, "ack_reason": a.get("reason")})
         prev = a if a.get("accepted_ms") else prev
-    for a, b in zip(snaps, snaps[1:]):  # a selection between two snapshots
-        if a["selected"] and b["selected"] and b["selected"] != a["selected"]:
+    for a, b in zip(snaps, snaps[1:]):  # a selection between two snapshots, unless the trace has it
+        if a["selected"] and b["selected"] and b["selected"] != a["selected"] and not any(
+                c["kind"] == "SELECT" and c["arg"] == b["selected"] and a["now_ms"] - 1000 <= c["t_ms"] <= b["now_ms"] + 1000 for c in traced):
             out.append({"t_ms": (a["now_ms"] + b["now_ms"]) / 2, "kind": "SELECT", "arg": b["selected"], "label": None, "exact": False,
                         "uncertainty_ms": (b["now_ms"] - a["now_ms"]) / 2, "ack_reason": None})
     return sorted(out, key=lambda c: c["t_ms"])
@@ -301,10 +313,13 @@ def provenance(root):
 
 
 def load(paths):
-    """Snapshots (merged, last boot of each stream kept separately) and commands of the given files/folders."""
+    """Snapshots (merged, last boot of each stream kept separately) and commands of the given files/folders.
+    A session folder gives only its own recordings, one level down (usb/http.jsonl, terra/*trace*.json, as
+    provenance() reads them): deeper folders such as rehearsal/run/ hold the dress rehearsal against a
+    simulated device, whose snapshots carry the same identity and must never be taken for hardware."""
     files = []
     for p in map(pathlib.Path, paths):
-        files += sorted(p.rglob("http.jsonl")) + sorted(p.rglob("*trace*.json")) if p.is_dir() else [p]
+        files += sorted(p.glob("*/http.jsonl")) + sorted(p.glob("*/*trace*.json")) if p.is_dir() else [p]
     snaps, cmds = [], []
     for f in files:
         s, c, _ = read(f)

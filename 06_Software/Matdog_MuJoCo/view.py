@@ -56,6 +56,12 @@ CATALOG = {  # name: (source, title)
     "m5_dev4_walk_imu": ("M5/storico_dev4/t1_walk_walkstop__imu_mount_twin.csv", "M5 dev.4 08/11 a terra: WALK SLOW e WALK STOP, IMU montata ruotata"),
     "m5_dev4_stop": ("M5/storico_dev4/t3_walk_stop__baseline_twin.csv", "M5 dev.4 08/11 a terra: STOP d'emergenza in WALK SLOW"),
     "m5_dev4_stop_imu": ("M5/storico_dev4/t3_walk_stop__imu_mount_twin.csv", "M5 dev.4 08/11 a terra: STOP d'emergenza, IMU montata ruotata"),
+    # M5 on the 450d2c7 session of 10/11 (dashboard traces 47 and 48 on the ground: one snapshot every 0.35 s)
+    "m5_terra_slow": ("M5/sessione_450d2c7/g1_slow_walk_walkstop__baseline_twin.csv", "M5 450d2c7 10/11 a terra: WALK SLOW e WALK STOP (traccia 47)"),
+    "m5_terra_slow_imu": ("M5/sessione_450d2c7/g1_slow_walk_walkstop__imu_mount_twin.csv", "M5 450d2c7 10/11 a terra: WALK SLOW e WALK STOP, IMU montata ruotata"),
+    "m5_terra_fast_stop": ("M5/sessione_450d2c7/g4_fast_walk_stop__baseline_twin.csv", "M5 450d2c7 10/11 a terra: STOP d'emergenza in WALK FAST (traccia 48)"),
+    "m5_terra_fast_stop_imu": ("M5/sessione_450d2c7/g4_fast_walk_stop__imu_mount_twin.csv", "M5 450d2c7 10/11 a terra: STOP in WALK FAST, IMU montata ruotata"),
+    "m5_fixture_fast_stop": ("M5/sessione_450d2c7/f4_q4_fast_stop_x2__baseline_twin.csv", "M5 450d2c7 10/11 su fixture: WALK FAST e due STOP (Q4, 1 Hz)"),
 }
 # Diagnostic variants of m4_hip_stop.py: the replay must use the servo model that produced the CSV.
 VARIANT_UNIT = {"__hips_x2": [2.0 if i in (0, 3, 6, 9) else 1.0 for i in range(12)]}
@@ -173,7 +179,8 @@ def compute(name):
     if hw is not None:
         rep.hw = hw
         rep.title = f"M5 {m5['name']}: i comandi dell'HW riprodotti (in camminata alla stessa fase del passo)"
-        rep.variant = (f"[HW] {pathlib.Path(m5['sources'][0]).name}, {len(hw['t'])} campioni; variante {m5['variant']}"
+        sources = " + ".join(m5["episode_sources"]) if m5.get("episode_sources") else pathlib.Path(m5["sources"][0]).name
+        rep.variant = (f"[HW] {sources}, {len(hw['t'])} campioni; variante {m5['variant']}"
                        + (", fixture" if fixture else ", a terra"))
     states = [row["state"] for row in info]
     rep.fault_k = states.index("FAULT") if "FAULT" in states else -1
