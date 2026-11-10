@@ -32,7 +32,9 @@ SimpleMotion fed by the twin).
 | `m3_replays.py` | open-loop replays of SLOW / STANDARD / FAST, mode changes, joystick, STOP, with sensitivity |
 | `m3_hw_compare.py` | twin vs the dev.4 ground walk (SLOW law, hardware trace) |
 | `cosim.py` | closed loop with `fw_bridge/cosim` |
-| `view.py` | interactive viewer or PNG snapshots of any sequence CSV |
+| `m4_hip_stop.py` | STOP_MEASURED_OUTSIDE_BOX: hip evidence from hardware traces vs the twin, closed-loop attribution variants |
+| `view.py` | desktop viewer (play/pause, step, speed, fault, replay selection) and MP4/PNG offscreen, with tagged overlays and the hip-vs-kHeight plot |
+| `demo.sh` | renders the visual demo (5 MP4 + key frames) offscreen |
 | `report_tables.py` | markdown tables of all results |
 | `fw_bridge/` | `build.sh`, `fk_reference.cpp`, `export_sequences.cpp`, `cosim.cpp`, `rig_record.h` (shared record columns) |
 | `requirements.txt`, `setup_venv.sh` | pinned environment |
@@ -50,8 +52,24 @@ $PY m2_stand_hold.py <rc.11 02-stand150/joints_timeseries.csv> $O
 $PY m3_replays.py $S $O [walks stops hip sensitivity lateswing]
 $PY m3_hw_compare.py <dev.4 matdog-motion-trace (1).json> $S $O
 $PY cosim.py $B/cosim $O [scenario ...]
-$PY view.py $S/imufollows_walk_slow.csv          # MUJOCO_GL=egl for --png
+$PY m4_hip_stop.py $B/cosim <cl dir> $O <hardware traces ...>
 ```
+
+## Visual supervision
+
+```bash
+cd 06_Software/Matdog_MuJoCo; PY=~/MATDOG/tools/mujoco-venv/bin/python
+$PY view.py --list                                   # catalog (data: $MATDOG_TWIN_DATA)
+$PY view.py stop_fuori_box modi stand150             # desktop viewer on the ASUS (X11)
+MUJOCO_GL=egl $PY view.py stop_fuori_box --mp4 out.mp4 --start 9 --end 16.5 --fps 25
+./demo.sh <out dir>                                  # the whole demo, no display needed
+```
+
+Viewer keys: SPACE play/pause, LEFT/RIGHT one 20 ms release (paused), UP/DOWN speed x2 / /2,
+F first fault, R restart, N/P next/previous replay, TAB MuJoCo panel; mouse rotates, pans and
+zooms the tracking camera. Every replay is recomputed with the nominal servo model; a closed-loop
+replay is checked release by release against the feedback SimpleMotion read. Overlay tags: [SIM]
+MuJoCo, [FW] production SimpleMotion output, [HW] measured on the robot, [IPOTESI] assumed.
 
 ## Model boundaries
 

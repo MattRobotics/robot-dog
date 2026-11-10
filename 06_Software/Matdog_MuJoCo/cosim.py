@@ -59,13 +59,14 @@ class Bridge:
         self.p.wait(timeout=10)
 
 
-def run(binary, out_dir, name, params=None, mu=0.8, tag=""):
+def run(binary, out_dir, name, params=None, mu=0.8, tag="", unit=None):
+    """One closed-loop scenario; `unit` scales a servo's torque constant (servo.apply_to_model)."""
     params = params or servo.Params()
     events, duration = SCENARIOS[name]
     bridge = Bridge(binary)
     standing = bridge.record(bridge.ask("STAND 0.15"))
     raw0 = np.array([int(standing[f"raw{i}"]) for i in range(12)])
-    tw = dynamics.Twin(params, mu=mu)
+    tw = dynamics.Twin(params, mu=mu, unit=unit)
     tw.begin((raw0 - 2048) * twin.TICK, int(standing["drive_speed_step_s"]), int(standing["drive_acc_100step_s2"]))
     rows, replies, pending = [], [], list(events)
     started = time.time()

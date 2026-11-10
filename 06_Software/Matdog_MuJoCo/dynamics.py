@@ -136,13 +136,13 @@ class Twin:
                 g1, g2 = self.d.contact.geom1[:nc], self.d.contact.geom2[:nc]
                 rec["other"].append(float(np.any(~np.isin(np.where(g1 == self.floor, g2, g1), self.feet))))
 
-    def release(self, goal, speed, acc, torque_on=None):
+    def release(self, goal, speed, acc, torque_on=None, record=True):
         """One Motion release: a SYNC_WRITE frame, then 20 ms of physics."""
         if torque_on is not None and not np.array_equal(torque_on, self.servos.torque_on):
             self.servos.torque_on = np.asarray(torque_on, bool)  # SAFE_OFF: no drive, no back-EMF
             servo.apply_to_model(self.m, self.p, self.dofs, self.unit, self.servos.torque_on)
         self.servos.command(self.now, goal, speed, acc)
-        self.advance(twin.RELEASE_S)
+        self.advance(twin.RELEASE_S, record)
         self.release_end.append(self.d.qpos[7:19].copy())
 
     def result(self):
