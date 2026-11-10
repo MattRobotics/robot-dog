@@ -1,6 +1,15 @@
 # MATDOG Roadmap
 
-> **STATO OPERATIVO ATTUALE — 07/11/2026:** [MATDOG v1.0.1 prima Stable](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), firmware installato `1.0.1-dev.17` / `17db0efe2324`, VERIFIED HARDWARE nel perimetro STAND/WALK STANDARD/STOP/PRONE e dashboard. [Report hardware](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [issue attive #52/#62/#48](../../09_Logs/OPEN_ITEMS.md). **Le frasi sotto su «Motion NO-GO», `0.2.0-dev.3`, assenza di release e roadmap G0–Gx appartengono allo snapshot 2026-10-01/11, NON alle autorizzazioni correnti.** Nel prossimo ciclo prevalgono verifiche pertinenti a difetti dimostrati, senza nuovi gate amministrativi né modifica unilaterale delle protezioni.
+> **STATO OPERATIVO ATTUALE — 10/11/2026.**
+> - **Firmware installato:** build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`). [Report hardware](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md).
+> - **Validazione:** VERIFIED HARDWARE sulla fixture Q1–Q8 (SLOW, STANDARD e FAST, cambi di profilo, STOP, joystick in avanti); 14/14 STOP verificati; a terra positiva ma fuori protocollo.
+> - **Stable storica:** [v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`).
+> - **Gemello:** MuJoCo V1 offline, in [`06_Software/Matdog_MuJoCo`](../../06_Software/Matdog_MuJoCo/README.md).
+> - **Prossimi passi:** qualifica a terra G0–G5, joystick multidirezionale in STANDARD e FAST, diagnostica timing e temperature ([OPEN_ITEMS](../../09_Logs/OPEN_ITEMS.md), issue #52/#62/#48). Le misure ai piedi servono per il passo successivo del gemello.
+>
+> **Storico 07/11/2026:** v1.0.1 VERIFIED HARDWARE nel perimetro STAND/WALK STANDARD/STOP/PRONE e dashboard ([report](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md)).
+>
+> **Le frasi sotto su «Motion NO-GO», `0.2.0-dev.3`, assenza di release e roadmap G0–Gx appartengono allo snapshot 2026-10-01/11, NON alle autorizzazioni correnti.** Nel prossimo ciclo prevalgono verifiche pertinenti a difetti dimostrati, senza nuovi gate amministrativi né modifica unilaterale delle protezioni.
 
 
 **Update 2026-10-11:** [non-motion closeout](../../09_Logs/Validation_Reports/MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md)
@@ -66,7 +75,7 @@ IMPLEMENTED  !=  VALIDATED
 | **PARTIAL** | Some of the stage's capability exists; the rest does not. Always enumerated. |
 
 **Capability status** — the repository-wide vocabulary defined in the
-[root README](../../README.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**, **DECIDED**,
+[root README, snapshot storico](../../09_Logs/Historical/README_until_2026-10-26.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**, **DECIDED**,
 **TO_TEST**, **TO_DESIGN**, **FROZEN**, **SUPERSEDED**, **HISTORICAL**.
 
 A stage may be COMPLETE in software while its capability is only IMPLEMENTED, never VALIDATED,

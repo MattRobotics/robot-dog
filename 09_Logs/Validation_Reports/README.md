@@ -1,8 +1,15 @@
-> **Candidata offline per il prossimo flash (09/11/2026) — `1.0.2-dev.6` / `2c53ecfad664` (APP SHA256 `eef32e61…14c1`):** dev.5 più la correzione emersa dalla [review pre-flash](Night_2026-11-09/REVIEW_JOYSTICK_LAW.md) (banda frontale applicata anche nella camminata sterzata). IMPLEMENTED NOT VALIDATED HARDWARE.
+> **Robot installato (10/11/2026) — `1.0.2-dev.6` ACC 220 / `450d2c793dcb` (APP SHA256 `82122e06…6256`):** [validazione hardware](Dev6_ACC220_HW_2026-11-10/REPORT.md) · [manifest delle evidenze](Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md) · [rapporto originale](Dev6_ACC220_HW_2026-11-10/REPORT_HW_SESSION.md).
+> - **Esito:** fixture Q1–Q8 qualificata; 14/14 STOP verificati; 0 fault.
+> - **A terra:** verifica positiva ma fuori protocollo G0–G5.
+> - **Stato:** build di sviluppo, non una release; sorgente in `main` dalla PR #67.
+>
+> **Gemello MuJoCo V1 (offline, 10/11/2026):** [rapporto M5](../../06_Software/Matdog_MuJoCo/REPORT_M5.md), confronto HW/SIM sulla sessione del 10/11. Non è un'evidenza hardware.
+
+> **Storico — candidata offline per il prossimo flash (09/11/2026) — `1.0.2-dev.6` / `2c53ecfad664` (APP SHA256 `eef32e61…14c1`):** dev.5 più la correzione emersa dalla [review pre-flash](Night_2026-11-09/REVIEW_JOYSTICK_LAW.md) (banda frontale applicata anche nella camminata sterzata). IMPLEMENTED NOT VALIDATED HARDWARE.
 
 > **Candidata offline (09/11/2026) — `1.0.2-dev.5` / `3afe6ce10a2e` (APP SHA256 `da6d0ad6…8cc0`), NON flashata:** [rapporto della notte](Night_2026-11-09/REPORT.md) — recupero della posa d'ingresso senza riavvio, joystick avanti/indietro sulla legge WALK STANDARD (20/10 mm/s), stack della loop task −4,9 KB nel caso peggiore statico, diagnostica della prima causa. IMPLEMENTED NOT VALIDATED HARDWARE.
 
-> **Robot installato (08/11/2026) — `1.0.2-dev.4` / `4358f13234f9` (APP SHA256 `3e7ee77d…9c66`), PR #67 Draft:** [VALIDATED HARDWARE nel perimetro provato, NOT STABLE](Dev4_HW_2026-11-08/REPORT.md) — fix H1-RCA verificato sulla fixture, WALK STANDARD 100 a terra, STOP/STAND/PRONE nelle finestre osservate; difetti aperti: rifiuto della posa iniziale non recuperabile senza riavvio, sway e lentezza del joystick, budget temporale del joystick · [evidenze e SHA256](Dev4_HW_2026-11-08/EVIDENCE_MANIFEST.md) · [metriche](Dev4_HW_2026-11-08/TRACE_METRICS.csv). La Stable resta `v1.0.1` (dev.17), rollback qui sotto.
+> **Storico — robot installato l'08/11/2026, `1.0.2-dev.4` / `4358f13234f9` (APP SHA256 `3e7ee77d…9c66`), PR #67 Draft:** [VALIDATED HARDWARE nel perimetro provato, NOT STABLE](Dev4_HW_2026-11-08/REPORT.md) — fix H1-RCA verificato sulla fixture, WALK STANDARD 100 a terra, STOP/STAND/PRONE nelle finestre osservate; difetti aperti: rifiuto della posa iniziale non recuperabile senza riavvio, sway e lentezza del joystick, budget temporale del joystick · [evidenze e SHA256](Dev4_HW_2026-11-08/EVIDENCE_MANIFEST.md) · [metriche](Dev4_HW_2026-11-08/TRACE_METRICS.csv). La Stable resta `v1.0.1` (dev.17), rollback qui sotto.
 
 > **Stable corrente (07/11/2026) — prima Stable GitHub `v1.0.1`:** [dev.17 VERIFIED HARDWARE — QUALIFIED FUNCTIONAL SCOPE, installata fino all'08/11](Dev17_HW_2026-11-07/REPORT.md) · [manifest firmware/release](Dev17_HW_2026-11-07/RELEASE_MANIFEST.md) · [evidenze e SHA256](Dev17_HW_2026-11-07/EVIDENCE_MANIFEST.md) · [metriche tracce](Dev17_HW_2026-11-07/TRACE_METRICS.csv). APP `1.0.1-dev.17` / `17db0efe2324` (SHA256 `14e055a0…4a83`) installata e promossa senza ricompilazione; PR #64 integrata in `main`. Candidata e regressioni offline: [Dev17_Candidate_2026-11-07](Dev17_Candidate_2026-11-07/REPORT.md) · [flash e collaudo](Dev17_Candidate_2026-11-07/FLASH_AND_TEST.md). Rollback: dev.16 qui sotto.
 
@@ -13,7 +20,7 @@
 
 # Validation reports — index
 
-**Latest hardware checkpoint: 07/11/2026 — [dev.17, prima Stable v1.0.1](Dev17_HW_2026-11-07/REPORT.md)**. Per la sequenza precedente: [dev.16](Dev16_HW_2026-11-07/REPORT.md) → [dev.15](Dev15_HW_2026-11-06/REPORT.md) → [dev.14](Dev14_HW_2026-11-05/REPORT.md). Il [tag storico dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) è soltanto un checkpoint passato.
+**Latest hardware checkpoint: 10/11/2026 — [`1.0.2-dev.6` ACC 220](Dev6_ACC220_HW_2026-11-10/REPORT.md)** (fixture Q1–Q8 qualificata, terra fuori protocollo). **Stable storica:** 07/11/2026, [dev.17, prima Stable v1.0.1](Dev17_HW_2026-11-07/REPORT.md). Per la sequenza precedente: [dev.16](Dev16_HW_2026-11-07/REPORT.md) → [dev.15](Dev15_HW_2026-11-06/REPORT.md) → [dev.14](Dev14_HW_2026-11-05/REPORT.md). Il [tag storico dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) è soltanto un checkpoint passato.
 
 Historical scoped closure (11/10/2026): [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 

@@ -1,6 +1,11 @@
 # MATDOG Firmware
 
-> **STATO CORRENTE — 07/11/2026:** il firmware operativo installato e hardware-validato è **MATDOG `1.0.1-dev.17`**, build `17db0efe2324`, pubblicato senza ricompilazione come **[Stable v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1)**. APP verificata: 1.707.808 byte, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, `ROBOT_POWERED`, NVS gen-1 preservata. **STAND/WALK STANDARD/STOP/PRONE sono operativi nel perimetro qualificato**; [report hardware](../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md). Il compilato arbitrario di `main` non sostituisce l'APP originale distribuita. Le note su dev.3, V0.1 e LED-only *sotto* sono snapshot storici e non una descrizione del firmware oggi installato.
+> **STATO CORRENTE — 10/11/2026:** è installata la build di sviluppo **MATDOG `1.0.2-dev.6` ACC 220**.
+> - **Identità:** sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP 1 751 040 byte, SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`; `ROBOT_POWERED`; NVS gen-1 preservata.
+> - **Validazione:** fixture Q1–Q8 qualificata (SLOW, STANDARD e FAST, cambi di profilo, STOP, joystick in avanti); 14/14 STOP verificati; a terra verifica positiva ma fuori protocollo. [Report hardware](../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md).
+> - **Stable storica:** [v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`, APP `14e055a0…`, [report](../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md)).
+>
+> Il compilato arbitrario di `main` non sostituisce l'APP originale distribuita. Le note su dev.3, V0.1 e LED-only *sotto* sono snapshot storici e non una descrizione del firmware oggi installato.
 
 
 This directory is reserved for low-level firmware that belongs specifically to MATDOG.
@@ -40,7 +45,7 @@ expected-offline classification for DALY/ST3215/LED) is recorded in
 motion controller.
 
 The official tagged baseline and exact validated source are recorded in the
-[`MATDOG_Controller` README](MATDOG_Controller/README.md#official-baseline). The root
+[`MATDOG_Controller` README](MATDOG_Controller/README.md#historical-official-baseline--controller-v01-2026-09-15). The root
 [`README.md`](../README.md) owns the current project and hardware snapshot; the Controller
 [`VALIDATION.md`](MATDOG_Controller/VALIDATION.md#present-day-baseline-and-next-gate) owns the
 detailed validation status and next gate. This page is the firmware-area index.

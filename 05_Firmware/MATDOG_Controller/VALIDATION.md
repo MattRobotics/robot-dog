@@ -1,6 +1,12 @@
 # MATDOG Controller V0.1 — Validation
 
-> **VALIDAZIONE CORRENTE — 07/11/2026:** [MATDOG v1.0.1 Hardware Validation](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) / [manifest](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md): firmware `1.0.1-dev.17` / `17db0efe2324` installato, STAND/WALK STANDARD/STOP/PRONE e dashboard verificati nel perimetro dichiarato. La release è **Stable** sull'hardware corrente, con limiti timing/stack/HTTP esplicitamente accettati. **Il resto di questo file registra prove precedenti (dev.3, V0.1, ecc.) e non è il gate operativo di v1.0.1.** Vedi [OPEN_ITEMS](../../09_Logs/OPEN_ITEMS.md).
+> **VALIDAZIONE CORRENTE — 10/11/2026:** [validazione hardware di `1.0.2-dev.6` ACC 220](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) e [manifest delle evidenze](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
+> - **Installata:** build di sviluppo `450d2c793dcb`, APP `82122e06…`.
+> - **Esito:** fixture Q1–Q8 qualificata; 14/14 STOP verificati; 0 fault; a terra verifica positiva ma fuori protocollo G0–G5.
+>
+> **Stable storica, 07/11/2026:** [MATDOG v1.0.1 Hardware Validation](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) / [manifest](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md): `1.0.1-dev.17` / `17db0efe2324`, STAND/WALK STANDARD/STOP/PRONE e dashboard nel perimetro dichiarato, con limiti timing/stack/HTTP accettati.
+>
+> **Il resto di questo file registra prove precedenti (dev.3, V0.1, ecc.) e non è il gate operativo di v1.0.1.** Vedi [OPEN_ITEMS](../../09_Logs/OPEN_ITEMS.md).
 
 
 > **Reading guide (added 2026-10-08).** Sections are dated records; a result is valid for its own
@@ -96,7 +102,7 @@ remote reboot is BLOCKED/unimplemented; ingest remains 0. No historical VALIDATE
 below applies automatically to this candidate.
 
 Current-facing status vocabulary follows the canonical meanings in the root
-[`README.md`](../../README.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**,
+[`README.md`, snapshot storico](../../09_Logs/Historical/README_until_2026-10-26.md#status-vocabulary): **VALIDATED**, **IMPLEMENTED**,
 **DECIDED**, **TO_TEST**, **TO_DESIGN**, **FROZEN**, **SUPERSEDED**, and
 **HISTORICAL**. Dated session evidence below preserves the status language that
 was used when each session was recorded; it is not rewritten into present-day

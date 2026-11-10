@@ -1,11 +1,18 @@
 # MATDOG Controller — Changelog
 
-> **Current as of 2026-11-07:** first hardware-qualified Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) is published; the installed APP is exactly `1.0.1-dev.17`, build `17db0efe2324` and SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. `main` is canonical source, **not** by itself a verified flashable binary. Use the published APP asset and manifest.
+> **Current as of 2026-11-10:** the installed APP is the development build `1.0.2-dev.6` operational ACC 220.
+> - **Identity:** source `450d2c7`, merged into `main` by PR #67; build `450d2c793dcb`; SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
+> - **Hardware validation of 10/11:** fixture Q1–Q8 qualified; ground check positive but out of protocol ([report](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
+> - **Stable:** the first hardware-qualified Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`, build `17db0efe2324`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`) stays the immutable historical baseline.
+> - **`main`** is canonical source, **not** by itself a verified flashable binary: use the verified APP and its manifest.
+>
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — MATDOG Controller 1.0.2-dev.6 operational ACC 220: register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
+## Installed — MATDOG Controller 1.0.2-dev.6 operational ACC 220 (`450d2c7`, APP `82122e06…`, installed 10/11/2026 19:18Z; fixture Q1–Q8 qualified, ground check out of protocol): register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
 
+> **Hardware, 10/11/2026** ([report](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)): flashed APP-only and verified, 14/14 emergency STOPs verified (8 fixture, 6 ground), 0 Motion faults, register 85 = 220 on 12/12. Development build, not a release. The text below is the pre-flash candidate description.
+>
 > Operational candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `1fbee7b` (APP `39840bd4…`), which stays the rollback image with `975fe51` and `dd76fad`. Sources `5617f0e` and the dashboard fix after `ae70e03` (final audit 10/11). Hardware validation plan: `MATDOG_1_0_2_DEV6_ACC220_OPERATIONAL_20261110/HW_VALIDATION_PLAN.md`.
 
 - **Why:** hardware 10/11: register 85 is the ST3215 ACC ceiling (register 41 stores min(written, 85)), factory 50, VOLATILE when written with the Lock closed; STANDARD (ACC 180) and FAST (220) faulted at their first control read (trace 45).

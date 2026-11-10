@@ -1,6 +1,12 @@
 # MATDOG Controller
 
-> **STATO CORRENTE — Stable `v1.0.1` (07/11/2026):** su MATDOG è installata e hardware-verificata l'APP **`1.0.1-dev.17`**, build `17db0efe2324`, commit sorgente `17db0efe23242ae8932b5549546a9758d9aa4645`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. [Release e APP](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) · [validazione hardware](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest installazione/rollback](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Motion operativo via `src/simple`: STAND/WALK STANDARD/STOP/PRONE qualificati nel perimetro report; NVS gen-1 conservata. **Non flashare una ricompilazione di `main` come se fosse la stessa APP**; utilizzare artefatto originale, checksum e procedura supervisionata. *Le sezioni su branch `matdog/simple-motion-v1`, dev.3 e V0.1 sotto sono record delle loro date e non descrivono il Controller attuale.*
+> **STATO CORRENTE — 10/11/2026:** su MATDOG è installata la build di sviluppo **`1.0.2-dev.6` ACC 220**.
+> - **Identità:** build `450d2c793dcb`; commit sorgente `450d2c793dcb76d08ea341eb5c4b1e50215cee40`, in `main` dalla PR #67; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
+> - **Riferimenti:** [validazione hardware](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) · [evidenze, manifest e rollback](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
+> - **Validazione:** Motion via `src/simple`. Fixture Q1–Q8 qualificata: SLOW, STANDARD e FAST, cambi di profilo in camminata, STOP nelle transizioni, joystick in avanti. 14/14 STOP verificati. A terra verifica positiva ma fuori protocollo G0–G5. NVS gen-1 conservata.
+> - **Stable storica:** [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), `1.0.1-dev.17` ([validazione](../../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md)).
+>
+> **Non flashare una ricompilazione di `main` come se fosse la stessa APP**; utilizzare artefatto originale, checksum e procedura supervisionata. *Le sezioni su branch `matdog/simple-motion-v1`, dev.3 e V0.1 sotto sono record delle loro date e non descrivono il Controller attuale.*
 
 
 **Snapshot del branch storico `matdog/simple-motion-v1`:** il percorso operativo è descritto in [SIMPLE_MOTION_V1.md](SIMPLE_MOTION_V1.md). STAND/WALK STANDARD usano `src/simple`; le note Motion Core qui sotto sono storiche. Nessuna autorizzazione hardware è implicita nella build.

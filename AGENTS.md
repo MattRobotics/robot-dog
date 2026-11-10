@@ -1,6 +1,12 @@
 # AGENTS.md — MATDOG
 
-> **Baseline attuale (07/11/2026):** `main` contiene il sorgente operativo della [Stable `v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1). Firmware realmente installato: APP originale `1.0.1-dev.17` / `17db0efe2324`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`; [dossier HW](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md). `main` in evoluzione, tag release e binario verificato sono identità distinte; nessun flash/merge/riscrittura di calibrazione senza mandato. Problemi residui: [OPEN_ITEMS](09_Logs/OPEN_ITEMS.md).
+> **Baseline attuale (10/11/2026).**
+> - **Firmware installato:** build di sviluppo `1.0.2-dev.6` ACC 220. Sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
+> - **Validazione:** fixture Q1–Q8 qualificata; a terra verifica positiva ma fuori protocollo ([dossier HW](09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
+> - **Stable storica:** [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`), immutabile.
+> - **Gemello MuJoCo V1:** offline, in `06_Software/Matdog_MuJoCo` (tag `matdog-mujoco-v1-20261110`). Non è una qualifica hardware.
+> - **Regole:** `main`, tag, binario verificato e firmware installato sono identità distinte. Nessun flash, merge o riscrittura di calibrazione senza mandato.
+> - **Problemi residui:** [OPEN_ITEMS](09_Logs/OPEN_ITEMS.md).
 
 
 Punto d'ingresso: [`README.md`](README.md). Storia fino al 26/10/2026: diario V2 in [`09_Logs/Firmware_History/`](09_Logs/Firmware_History/README.md). Architettura: [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md). Sicurezza flash: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).
