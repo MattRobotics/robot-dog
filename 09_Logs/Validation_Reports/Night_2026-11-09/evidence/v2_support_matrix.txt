@@ -1,0 +1,30 @@
+rev=0 stride=10 comerr=0 solve fails=0 static support min 2.13 mm ZMP min 2.10 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=0 stride=10 comerr=-4 solve fails=0 static support min 0.44 mm ZMP min 0.43 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=0 stride=10 comerr=3.6 solve fails=0 static support min 0.09 mm ZMP min 0.07 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=0 stride=25 comerr=0 solve fails=0 static support min 2.13 mm ZMP min 2.10 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 PASS(static model only) 
+rev=0 stride=25 comerr=-4 solve fails=0 static support min 0.37 mm ZMP min 0.38 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 PASS(static model only) 
+rev=0 stride=25 comerr=3.6 solve fails=0 static support min 0.08 mm ZMP min 0.07 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 PASS(static model only) 
+rev=0 stride=50 comerr=0 solve fails=0 static support min 2.13 mm ZMP min 2.10 mm box margin ticks HIP 9.3 UPPER 144.3 LOWER 192.3 PASS(static model only) 
+rev=0 stride=50 comerr=-4 solve fails=0 static support min 0.25 mm ZMP min 0.27 mm box margin ticks HIP 9.3 UPPER 144.3 LOWER 192.3 PASS(static model only) 
+rev=0 stride=50 comerr=3.6 solve fails=0 static support min 0.07 mm ZMP min 0.06 mm box margin ticks HIP 9.3 UPPER 144.3 LOWER 192.3 PASS(static model only) 
+rev=0 stride=75 comerr=0 solve fails=0 static support min 2.13 mm ZMP min 2.10 mm box margin ticks HIP 9.3 UPPER 89.3 LOWER 146.2 PASS(static model only) 
+rev=0 stride=75 comerr=-4 solve fails=0 static support min 0.13 mm ZMP min 0.16 mm box margin ticks HIP 9.3 UPPER 89.3 LOWER 146.2 PASS(static model only) 
+rev=0 stride=75 comerr=3.6 solve fails=0 static support min 0.03 mm ZMP min 0.05 mm box margin ticks HIP 9.3 UPPER 89.3 LOWER 146.2 PASS(static model only) 
+rev=0 stride=100 comerr=0 solve fails=0 static support min 2.12 mm ZMP min 2.10 mm box margin ticks HIP 9.3 UPPER 31.7 LOWER 93.0 PASS(static model only) 
+rev=0 stride=100 comerr=-4 solve fails=0 static support min 0.01 mm ZMP min 0.06 mm box margin ticks HIP 9.3 UPPER 31.7 LOWER 93.0 PASS(static model only) 
+rev=0 stride=100 comerr=3.6 solve fails=0 static support min -0.01 mm ZMP min 0.01 mm box margin ticks HIP 9.3 UPPER 31.7 LOWER 93.0 FAIL 
+rev=1 stride=10 comerr=0 solve fails=0 static support min 2.06 mm ZMP min 2.06 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=1 stride=10 comerr=-4 solve fails=0 static support min 0.46 mm ZMP min 0.44 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=1 stride=10 comerr=3.6 solve fails=0 static support min 0.02 mm ZMP min 0.02 mm box margin ticks HIP 9.3 UPPER 208.9 LOWER 252.0 PASS(static model only) 
+rev=1 stride=25 comerr=0 solve fails=0 static support min 1.95 mm ZMP min 1.95 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 PASS(static model only) 
+rev=1 stride=25 comerr=-4 solve fails=0 static support min 0.46 mm ZMP min 0.45 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 PASS(static model only) 
+rev=1 stride=25 comerr=3.6 solve fails=0 static support min -0.10 mm ZMP min -0.10 mm box margin ticks HIP 9.3 UPPER 196.2 LOWER 231.6 FAIL 
+rev=1 stride=50 comerr=0 solve fails=0 static support min 1.77 mm ZMP min 1.77 mm box margin ticks HIP 9.3 UPPER 144.2 LOWER 192.4 PASS(static model only) 
+rev=1 stride=50 comerr=-4 solve fails=0 static support min 0.47 mm ZMP min 0.46 mm box margin ticks HIP 9.3 UPPER 144.2 LOWER 192.4 PASS(static model only) 
+rev=1 stride=50 comerr=3.6 solve fails=0 static support min -0.29 mm ZMP min -0.29 mm box margin ticks HIP 9.3 UPPER 144.2 LOWER 192.4 FAIL 
+rev=1 stride=75 comerr=0 solve fails=0 static support min 1.57 mm ZMP min 1.58 mm box margin ticks HIP 9.3 UPPER 89.2 LOWER 146.4 PASS(static model only) 
+rev=1 stride=75 comerr=-4 solve fails=0 static support min 0.48 mm ZMP min 0.47 mm box margin ticks HIP 9.3 UPPER 89.2 LOWER 146.4 PASS(static model only) 
+rev=1 stride=75 comerr=3.6 solve fails=0 static support min -0.50 mm ZMP min -0.50 mm box margin ticks HIP 9.3 UPPER 89.2 LOWER 146.4 FAIL 
+rev=1 stride=100 comerr=0 solve fails=0 static support min 1.36 mm ZMP min 1.37 mm box margin ticks HIP 9.3 UPPER 31.5 LOWER 93.3 PASS(static model only) 
+rev=1 stride=100 comerr=-4 solve fails=0 static support min 0.44 mm ZMP min 0.47 mm box margin ticks HIP 9.3 UPPER 31.5 LOWER 93.3 PASS(static model only) 
+rev=1 stride=100 comerr=3.6 solve fails=0 static support min -0.72 mm ZMP min -0.72 mm box margin ticks HIP 9.3 UPPER 31.5 LOWER 93.3 FAIL 

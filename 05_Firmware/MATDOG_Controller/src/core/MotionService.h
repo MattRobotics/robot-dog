@@ -1,7 +1,7 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
 namespace matdog { namespace core {
-constexpr size_t kMotionStatusJsonBytes=5248; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case)
+constexpr size_t kMotionStatusJsonBytes=5376; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case); 5248 + 128 for the work histogram (motion-perf-next D11)
 // Immutable per-request observation, transferred by the existing HTTP mailbox.
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
@@ -21,11 +21,15 @@ struct MotionStatusSnapshot {
   uint32_t activeSequence=0,acceptedMs=0,finishedMs=0;
   uint32_t tempSpikes=0,tempChecks=0;
   uint32_t overrunsTotal=0,commandOverruns=0;  // releases whose work exceeded 20 ms
+  uint16_t workHist[8]{};  // this command's releases by work: <5,<10,<15,<20,<25,<30,<40,>=40 ms (saturated)
   unsigned referenceFaultSlot=12;
   simple::State state=simple::State::STOPPED;
+  uint8_t imuRefusedBy=0,entrySlot=12;  // dev.5 diagnostics, in the padding after state
+  uint8_t walkModes=0;  // simple::WalkMode: next walk (bits 0-1), the walk's target (bits 2-3), its law shape (high nibble); last padding byte
   float imuWanted[2]{},imuApplied[2]{};
   uint16_t commandedRaw[12]{};
   uint16_t offMask=0,referenceFaultRaw=0,hotPendingMask=0;
+  int16_t entryOutsideMrad=0;  // dev.5 diagnostics (SimpleMotion::entryViolation)
   // MotionTiming records (same release): parts us, previous release parts us,
   // work counters. Copies of data already held; USB @MOTION TIMING has the rest.
   uint16_t timing[2][16]{};  // saturated at 65535
@@ -36,7 +40,7 @@ struct MotionStatusSnapshot {
   bool joystick=false;
   char activeId[49]{};
 };
-static_assert(sizeof(MotionStatusSnapshot)<=1536,"bounded per-request Motion observation");
+static_assert(sizeof(MotionStatusSnapshot)<=1552,"bounded per-request Motion observation");  // 1536 + the 16 B work histogram (motion-perf-next D11)
 // Transport adapter only. SimpleMotion is the one operational state owner.
 class MotionService {
  public:

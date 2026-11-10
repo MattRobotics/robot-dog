@@ -117,7 +117,7 @@ struct ObservationPort : simple::ServoPort {
 };
 struct Rig {
   simple::SimpleMotion m;ObservationPort p;simple::Inputs in;
-  Rig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";
+  Rig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.accCeiling=220;in.refusal="READY";
     const double lo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
     const double hi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981};
     for(unsigned i=0;i<12;++i){in.minRad[i]=lo[i];in.maxRad[i]=hi[i];}
@@ -341,10 +341,13 @@ void fallbackAndWalkStop(){
   std::puts("STOP unsupported native acquisition reference explicitly falls back SAFE_OFF; WALK STOP remains ordinary gait completion to STAND torque ON");
 }
 void phaseCoverageAndRaces(){
-  // Every leg's swing and each intervening four-stance window, at stride60.
+  // Every leg's swing and each intervening four-stance window, at the longest
+  // stride: mid-window w/2 and mid-swing (w+.25)/2 of each quarter (w = duty-.75),
+  // on the walk clock (walkClockS: gait time = real time - 0.5 s after the ease).
+  const double w=simple::kWalkDuty-.75;
   for(unsigned quarter=0;quarter<4;++quarter)for(bool swing:{false,true}){
-    Rig r;r.walk(2);const double cycle=1+quarter*.25+(swing?.1625:.0375);
-    r.ticks(static_cast<unsigned>(std::ceil(cycle*simple::kWalkPeriodS/.02)));
+    Rig r;r.walk(2);const double cycle=1+quarter*.25+(swing?(w+.25)/2:w/2);
+    r.ticks(static_cast<unsigned>(std::ceil((cycle*simple::kWalkPeriodS+.5)/.02)));
     motion::GaitParameters gait;gait.duty=simple::kWalkDuty;unsigned stance=0;
     for(unsigned i=0;i<4;++i)stance+=motion::legPhase(gait,static_cast<motion::LegId>(i),r.m.walkCycles()).stance;
     assert(stance==(swing?3u:4u));checkHeldStop(r);
@@ -462,7 +465,8 @@ void writerHandoffWithImu(){
   for(unsigned mode=0;mode<3;++mode)for(unsigned window=0;window<(mode==2?8u:2u);++window){
     Rig r;if(mode==2)r.walk();else {r.stand(.05);r.ticks(100);}
     if(mode==1){assert(!r.m.stand(.10,r.p.now));r.ticks(20);}
-    unsigned ticks=mode==2?unsigned(std::ceil((1.+(window/2)*.25+(window%2?.1625:.0375))*simple::kWalkPeriodS/.02)):10;
+    const double w=simple::kWalkDuty-.75;
+    unsigned ticks=mode==2?unsigned(std::ceil(((1.+(window/2)*.25+(window%2?(w+.25)/2:w/2))*simple::kWalkPeriodS+.5)/.02)):10;
     for(unsigned n=0;n<ticks;++n){const double angle=.02+(window%2?.006*std::sin(n*.3):0);
       r.in.quaternion[0]=std::cos(angle/2);r.in.quaternion[1]=std::sin(angle/2);r.tick();assert(r.m.state()!=simple::State::FAULT);}
     assert(simple::StopReferenceProbe::correction(r.m)>1e-8);

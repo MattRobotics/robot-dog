@@ -1,4 +1,5 @@
-// JOYSTICK envelope, offline (dev.15). Drives the production SimpleMotion with
+// JOYSTICK envelope, offline (dev.15; dev.5: fore/aft demands walk the WALK
+// STANDARD law, checked on its own envelope kWalkTilt100 and box). Drives the production SimpleMotion with
 // scripted joystick commands (ideal tracking, flat IMU) and checks every WALK
 // release of the nominal law: joint margin to the walk box and gen-1, foot
 // axis tilt, and the IMU tilt envelope (rays to the boundary of the steered
@@ -17,6 +18,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <iterator>
 static int64_t clock_us=1000000;
 extern "C" int64_t esp_timer_get_time(){return clock_us;}
 using namespace matdog;
@@ -25,14 +27,15 @@ struct StopReferenceProbe {
   static const motion::LocomotionFrame& walkNominal(const SimpleMotion& m){return m.walkPrevious_;}
   static const motion::GaitParameters& gait(const SimpleMotion& m){return m.gait_;}
   static const collision::Box& box(const SimpleMotion& m){return m.walkBox();}
+  static bool steeredEnvelope(const SimpleMotion& m){return m.steeredEnvelope();}
 };
 } }
 namespace {
 const double kLo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
 const double kHi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981};
-// Same polygon as kSteerTilt in SimpleMotion.cpp; boundary by rays.
+// Envelope polygons from SimpleMotion.h; boundary by rays.
 struct V{double r,p;};
-const V kSteerTilt[]={{0.0245,0.0245},{0,0.07},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
+
 template<unsigned N> double rayScale(const V (&v)[N],double r,double p){double s=1e9;
   for(unsigned i=0;i<N;++i){const auto a=v[i],b=v[(i+1)%N];const double x=b.r-a.r,y=b.p-a.p,e=x*a.p-y*a.r,ray=x*p-y*r;if(ray<0)s=std::fmin(s,e/ray);}
   return s;}
@@ -59,8 +62,10 @@ int main(int argc,char** argv){
   // "rand:SEED:SECONDS" = random commands inside the Controller ellipsoid.
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
-  const double T=simple::kWalkPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
-  struct Step{double seconds,v[3];bool silent;};std::vector<Step> steps;
+  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  V kSteerTilt[std::size(simple::kSteerTilt)];for(unsigned i=0;i<std::size(kSteerTilt);++i)kSteerTilt[i]={simple::kSteerTilt[i].roll,simple::kSteerTilt[i].pitch};
+  V walk100[std::size(simple::kWalkTilt100)];for(unsigned i=0;i<std::size(walk100);++i)walk100[i]={simple::kWalkTilt100[i].roll,simple::kWalkTilt100[i].pitch};
+  struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);
       for(double t=0;t<total;){Step s{.25+std::rand()%700/100.,{0,0,0},false};double n=0;
@@ -68,6 +73,7 @@ int main(int argc,char** argv){
         n=std::sqrt(n);const double radius=std::rand()%3==0?1:std::rand()%1001/1000.;for(unsigned j=0;j<3;++j)s.v[j]*=radius/n*lim[j];
         steps.push_back(s);t+=s.seconds;}
       steps.push_back({1,{0,0,0},false});}
+    else if(std::sscanf(argv[a],"walk:%d:%lf",&seed,&total)==2){Step s{total,{0,0,0},false};s.walk=int(seed);steps.push_back(s);}  // "walk:<preset>:<seconds>"
     else{Step s{0,{0,0,0},false};char v[64]{};if(std::sscanf(argv[a],"%lf:%63s",&s.seconds,v)!=2)return 2;
       if(!std::strcmp(v,"-"))s.silent=true;else std::sscanf(v,"%lf,%lf,%lf",&s.v[0],&s.v[1],&s.v[2]);steps.push_back(s);}}
   simple::SimpleMotion m;Port port;simple::Inputs in;m.begin(&port);
@@ -80,7 +86,8 @@ int main(int argc,char** argv){
   Result r;motion::JointTargetFrame last{};
   for(const auto& st:steps){
     for(int n=0;n<std::lround(st.seconds*50);++n){
-      if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
+      if(st.walk>=0){if(n==0)m.walk(unsigned(st.walk),port.now);}
+      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
       tick();
       if(m.state()==simple::State::FAULT){r.end=std::string("FAULT ")+m.reason();break;}
       if(std::strcmp(m.phase(),"WALK_STANDARD"))continue;
@@ -90,12 +97,19 @@ int main(int argc,char** argv){
         r.box=std::fmin(r.box,std::fmin(q-box.lo[i],box.hi[i]-q));r.gen1=std::fmin(r.gen1,std::fmin(q-kLo[i],kHi[i]-q));
         if(last.valid)r.maxStep=std::fmax(r.maxStep,std::abs(q-motion::jointSlot(last,i)));}
       last=f.target;
-      const auto& b=f.cartesian.body;const double cy=b.rotation[0][0],sy=b.rotation[1][0];const auto& c=motion::canonicalStandDefinition().contactsWorldM;
+      const auto& b=f.cartesian.body;const double cy=b.rotation[0][0],sy=b.rotation[1][0];
+      if(const char* tr=std::getenv("JOY_TRACE"))if(std::abs(f.cartesian.cycles-std::atof(tr))<.03)std::fprintf(stderr,"trace c=%.4f kSteer=%d steeredEnvelope=%d advX=%.4f advY=%.4f yaw=%.4f sway=%.4f\n",f.cartesian.cycles,int(&box==&simple::collision::kSteer),int(simple::StopReferenceProbe::steeredEnvelope(m)),g.advanceXM,g.advanceYM,g.yawRad,g.swayYM);const auto& c=motion::canonicalStandDefinition().contactsWorldM;
       for(unsigned l=0;l<4;++l)if(f.cartesian.phases[l].stance){const double dx=f.cartesian.feet[l].x-b.translationM.x,dy=f.cartesian.feet[l].y-b.translationM.y;
         const double x=cy*dx+sy*dy-c[l].x;r.footLo=std::fmin(r.footLo,x);r.footHi=std::fmax(r.footHi,x);r.nominalTilt=std::fmax(r.nominalTilt,std::abs(f.target.legs[l].hip));}
-      // IMU tilt envelope: 32 rays to its boundary, same lift and checks as compensationTarget.
+      // IMU tilt envelope: 32 rays to its boundary (heading frame), same lift and checks as compensationTarget.
       for(unsigned k=0;k<32;++k){const double ang=2*M_PI*k/32,dr=std::cos(ang),dp=std::sin(ang);
-        const double sc=rayScale(kSteerTilt,dr,dp),roll=sc*dr,pitch=sc*dp;
+        // Rays on the certified polygon in the heading (body) frame, taken into
+        // the support frame like SimpleMotion::limitWalkTilt (the hip/fillet
+        // loading they bound does not depend on the accumulated heading).
+        // The fore/aft JOYSTICK walks the WALK STANDARD law: its envelope, support frame (limitWalkTilt).
+        // dev.6: the envelope the firmware applies (steeredEnvelope), both in the heading frame.
+        const bool steered=simple::StopReferenceProbe::steeredEnvelope(m);
+        const double sc=steered?rayScale(kSteerTilt,dr,dp):rayScale(walk100,dr,dp),rb=sc*dr,pb=sc*dp,roll=cy*rb-sy*pb,pitch=sy*rb+cy*pb;
         auto body=motion::bodyPoseFromRollPitch({},roll,pitch);const auto t=b.translationM;
         {double rr[3][3];for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)rr[i][j]=body.rotation[i][0]*b.rotation[0][j]+body.rotation[i][1]*b.rotation[1][j]+body.rotation[i][2]*b.rotation[2][j];
          for(unsigned i=0;i<3;++i)for(unsigned j=0;j<3;++j)body.rotation[i][j]=rr[i][j];}  // same heading as compensateLevel
@@ -111,7 +125,7 @@ int main(int argc,char** argv){
           const double q3[3]={ik.base.joints.hip,ik.base.joints.upper,ik.base.joints.lower};
           for(unsigned j=0;j<3;++j){const unsigned i=l*3+j;const double q=std::lround(q3[j]/simple::kTickRad)*simple::kTickRad;r.joint(i,q);
             const double mg=std::fmin(std::fmin(q-box.lo[i],box.hi[i]-q),std::fmin(q-kLo[i],kHi[i]-q));r.tilt=std::fmin(r.tilt,mg);if(mg<0)ok=false;}}
-        if(!ok){++r.tiltFail;if(std::getenv("JOY_DEBUG"))std::fprintf(stderr,"tilt fail c=%.4f roll=%.4f pitch=%.4f\n",f.cartesian.cycles,roll,pitch);}}
+        if(!ok){++r.tiltFail;if(std::getenv("JOY_DEBUG"))std::fprintf(stderr,"tilt fail c=%.4f roll=%.4f pitch=%.4f steeredEnvelope=%d kSteer=%d advX=%.4f advY=%.4f yaw=%.4f sway=%.4f\n",f.cartesian.cycles,roll,pitch,int(steered),int(&box==&simple::collision::kSteer),g.advanceXM,g.advanceYM,g.yawRad,g.swayYM);}}
       // walk_quality.py row in the body heading frame: cycles, body xyz, q12, feet (x,y,z,stance)x4
       std::fprintf(out,"%.9f 0 0 %.9f",f.cartesian.cycles,b.translationM.z);
       for(unsigned i=0;i<12;++i)std::fprintf(out," %.9f",motion::jointSlot(f.target,i));

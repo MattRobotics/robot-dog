@@ -26,6 +26,10 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-motion .segmented label:first-child span{border-left:0}
 #simple-motion .segmented input:checked+span{background:var(--accent);color:#06222a;font-weight:700}
 #simple-motion .segmented input:focus-visible+span{outline:2px solid var(--accent);outline-offset:-3px}
+/* WALK speed selector: name (icon + mode) over the speed, wrapping inside its third of a narrow cockpit column. */
+#simple-walk-mode span{flex-direction:column;gap:2px;padding:6px 3px;white-space:normal;text-align:center;line-height:1.15;min-width:0}
+#simple-walk-mode .mode-name{font-size:12px;max-width:100%;overflow-wrap:anywhere}#simple-walk-mode .mode-speed{font-size:12px;color:inherit;text-transform:none;letter-spacing:0;opacity:.85}
+#simple-walk-mode input:checked+span{box-shadow:inset 0 0 0 2px #e6fbff}#simple-walk-mode input:checked+span .mode-speed{opacity:1}
 #simple-controls{scroll-margin-top:130px}
 /* The command column grows with its contents, including future controls. */
 #simple-motion .command-panel{min-width:0}
@@ -58,6 +62,7 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 @media(max-width:600px){#simple-motion .cockpit-controls{grid-template-columns:minmax(0,1fr)}#simple-twin-frame{height:clamp(280px,44vh,400px)}#simple-joints{display:block;overflow-x:auto;font-size:13px}#simple-stop{min-width:90px}}
 </style><script>
 (()=>{'use strict';const by=id=>document.getElementById(id);
+let walkModes=[],modeSending=false;  // WALK mode table (capabilities) and a selection in flight
 const card=document.createElement('div');card.className='card';card.id='simple-motion';
 card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
 <p class="cockpit-status"><span id="simple-state" data-state="STOPPED" data-tone="muted">COLLEGAMENTO…</span></p>
@@ -68,8 +73,9 @@ card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
 <div class="height-row"><label for="simple-height">Quota STAND</label><output id="simple-height-value" for="simple-height">150 mm</output></div>
 <div class="stepper"><button type="button" id="simple-height-down" aria-label="Quota STAND −5 mm">−</button><input id="simple-height" type="range" min="50" max="150" step="5" value="150" aria-describedby="simple-height-value"><button type="button" id="simple-height-up" aria-label="Quota STAND +5 mm">+</button></div>
 <div class="pair"><button id="simple-stand" disabled>STAND</button><button id="simple-prone" disabled title="Discesa PRONE: al termine verificato la coppia viene rilasciata (SAFE_OFF ordinario, PRONE_REST). Appoggio non verificato.">PRONE</button></div></fieldset>
-<fieldset class="cockpit-group"><legend>WALK STANDARD · passo per ciclo</legend>
-<div id="simple-stride" class="segmented" role="radiogroup" aria-label="Passo WALK per ciclo (non velocità)"><label><input type="radio" name="simple-stride" value="0"><span>🐢 30 mm</span></label><label><input type="radio" name="simple-stride" value="1" checked><span>45 mm</span></label><label><input type="radio" name="simple-stride" value="2"><span>🐇 60 mm</span></label></div>
+<fieldset class="cockpit-group"><legend>WALK · modalità</legend>
+<div id="simple-walk-mode" class="segmented" role="radiogroup" aria-label="Velocità WALK (modalità del Controller): prossimo WALK o passo in corso"><label><input type="radio" name="simple-walk-mode" value="SLOW" checked><span><b class="mode-name">🐢 SLOW</b><small class="mode-speed">20 mm/s</small></span></label><label><input type="radio" name="simple-walk-mode" value="STANDARD"><span><b class="mode-name">🐾 STANDARD</b><small class="mode-speed">30 mm/s</small></span></label><label><input type="radio" name="simple-walk-mode" value="FAST"><span><b class="mode-name">🐇 FAST</b><small class="mode-speed">32 mm/s</small></span></label></div>
+<p id="simple-walk-mode-state" role="status">Modalità WALK: lettura dal Controller.</p>
 <div class="pair"><button id="simple-walk" disabled>WALK</button><button id="simple-walk-stop" disabled>WALK STOP</button></div></fieldset>
 <section id="simple-joystick" aria-label="Joystick avanti/indietro, laterale e rotazione" aria-disabled="true" data-active="false">
 <h3>Joystick</h3>
@@ -85,9 +91,9 @@ card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
 </div></div>
 <details id="simple-diagnostics"><summary>Stato, guida e diagnostica Motion</summary><h4>Ultimi esiti dei comandi (dal più recente)</h4><ol id="simple-log"></ol><dl id="simple-values"></dl>
 <h4>Guida comandi</h4><p class="note">STOP richiede l’arresto al Controller: può mantenere la coppia ON. SAFE_OFF verifica coppia OFF sui 13 servo. WALK STOP mantiene STAND.</p>
-<p class="note">Joystick (verificato su hardware in dev.15): trascinare per avanti/indietro fino a 6,9 mm/s e laterale fino a 3,1 mm/s, proporzionali; tenere premuto ↶/↷ per ruotare fino a 1,8°/s. Combinazioni scalate nel limite del Controller. Al rilascio WALK STOP; senza comandi per 1 s il Controller esegue WALK STOP da solo. Cambio avanti/indietro: il passo si conclude, poi si riparte.</p>
-<p class="note">WALK STANDARD: 🐢 30, 45 o 🐇 60 mm è il passo per ciclo da 6,5 s, non una velocità impostabile. Quota STAND: 50–150 mm a passi di 5 mm; il valore è inviato solo con il pulsante STAND e il Controller può rifiutarlo con il motivo. Dopo uno STOP completato con coppia ON, WALK riparte direttamente se il Controller ammette la ripresa (stessa verifica di STAND): completa l’eventuale passo interrotto, porta alla quota WALK e avvia WALK STANDARD.</p>
-<p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello caricato a robot fermo (anche con coppia ON, dai file nella cache del browser) e mantenuto durante Motion; a cache fredda con coppia ON attende torque OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla propria quota nominale indicata dal Controller e poi usa il ciclo STANDARD di 6,5 s. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente circa 7–9 s, più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
+<p class="note">Joystick: proporzionale alla leva; il fondo corsa in avanti è la velocità massima della modalità WALK scelta (SLOW 20, STANDARD 30, FAST 32 mm/s) e il passo usa la legge di quella modalità. Sterzo, laterale e retromarcia solo in SLOW (inviluppi certificati per quella legge): in STANDARD e FAST la pagina invia solo la componente in avanti. In SLOW: indietro fino a 10 mm/s e laterale fino a 4,0 mm/s; tenere premuto ↶/↷ per ruotare fino a 1,8°/s (limiti letti dal Controller). Cambiando modalità con la leva tenuta, il Controller porta il passo al nuovo massimo senza fermarsi. Combinazioni scalate nel limite del Controller. Al rilascio WALK STOP; senza comandi per 1 s il Controller esegue WALK STOP da solo. Cambio avanti/indietro: il passo si conclude, poi si riparte.</p>
+<p class="note">WALK: un solo selettore di velocità. SLOW 20 mm/s (100 mm ogni 5,0 s), STANDARD 30 mm/s (90 mm ogni 3,0 s), FAST 32 mm/s (80 mm ogni 2,5 s); periodo, quota, alzata e profilo servo sono quelli della modalità nel Controller. SLOW è la legge verificata su hardware in dev.4; STANDARD e FAST non sono qualificate su hardware. Durante un WALK in avanti il selettore cambia la modalità del passo in corso: il Controller passa alla nuova legge in modo progressivo (passo, ritmo, quota), senza STOP e senza fermare il passo; negli altri casi la scelta vale dal prossimo WALK. Non è salvata (al riavvio SLOW); WALK parte solo dopo che il Controller ha accettato la scelta. Quota STAND: 50–150 mm a passi di 5 mm; il valore è inviato solo con il pulsante STAND e il Controller può rifiutarlo con il motivo. Dopo uno STOP completato con coppia ON, WALK riparte direttamente se il Controller ammette la ripresa (stessa verifica di STAND): completa l’eventuale passo interrotto, porta alla quota WALK e avvia WALK STANDARD.</p>
+<p class="note">ACTUAL e assetto BNO085 dallo stesso stato Motion, senza letture servo aggiuntive. Modello caricato a robot fermo (anche con coppia ON, dai file nella cache del browser) e mantenuto durante Motion; a cache fredda con coppia ON attende torque OFF.</p><p class="note">Un solo comando basta: STAND acquisisce la posa reale, abilita i servo e raggiunge la quota (50–150 mm, workspace STAND a contatti fissi); WALK, se serve, porta prima alla quota della modalità scelta indicata dal Controller e poi cammina con il periodo di quella modalità. STAND e WALK proseguono anche se questa pagina viene chiusa: terminano solo con WALK STOP, STOP o un guasto fisico. WALK STOP risponde con ACK e poi conclude il passo: normalmente da uno a due periodi della modalità (SLOW circa 6–10 s), più assestamento; durante l’avvio può richiedere più tempo. Mantiene STAND e coppia ON. STOP (pulsante, Esc, USB @STOP) richiede l’arresto contestuale; completamento, coppia e supporto sono indicati dal Controller. Per torque OFF globale: USB @SERVO SAFE_OFF 51, con verifica 13/13. SAFE_OFF non interrompe l'alimentazione. Il KEY OFF del BMS sul dorso è un'interruzione hardware indipendente.</p>
 <p class="note">PRONE è disponibile da STAND/HOLD: esegue la discesa e, raggiunta la posa finale, rilascia la coppia con il SAFE_OFF ordinario (PRONE_REST, verifica OFF sui 13 servo). L'appoggio passivo non è misurato. STAND riparte dalla posa reale assestata: acquisizione, verifica della regione certificata, riabilitazione. La quota stimata deriva da encoder e IMU con ipotesi di piano di appoggio: non misura la distanza dal pavimento. La posa misurata è la regione geometrica certificata in cui si trovano gli encoder; non prova l'appoggio a terra.</p>
 <table id="simple-joints"><thead><tr><th>Giunto</th><th>ID</th><th>Angolo</th><th>RAW letto (FAST)</th><th>Temp.</th><th>Coppia</th><th>Età CONTROL (coppia/goal)</th><th>Età FAST (posizione)</th></tr></thead><tbody></tbody></table>
 
@@ -129,7 +135,7 @@ let latestCommand=null,commandNotice='';
 const trace=window.matdogMotionTrace={version:1,started_utc:new Date().toISOString(),commands:[],samples:[],poll_errors:[],poll_skipped:0,late_dropped:0};
 const keep=(list,item,max)=>{list.push(item);if(list.length>max)list.shift()};
 by('simple-trace').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(trace,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='matdog-motion-trace.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
-const reasons={PRONE_DESCENT_NOT_VALIDATED:"Discesa PRONE in corso; al termine la coppia viene rilasciata (PRONE_REST).",PRONE_REST:"PRONE a riposo: coppia OFF (verificata sui 13 servo al termine). Appoggio passivo non misurato. STAND riacquisisce la posa reale e riabilita la coppia.",STAND_PATH_NOT_CLEAR:"Posa reale fuori dalla regione di ingresso certificata: rialzata rifiutata.",NOT_WALKING:"Nessun passo in corso da fermare.",PRONE_REQUIRES_STAND_HOLD:"PRONE richiede uno STAND fermo con coppia ON.",PRONE_PATH_NOT_CLEAR:"Posa fuori dal passaggio PRONE ammesso.",PRONE_MEASURED_OUTSIDE_BOX:"Feedback fuori dalla box del tratto PRONE: arresto per fault.",PRONE_NOT_COMPLETED_STOPPING:"PRONE non completato entro il tempo: arresto controllato con coppia ON, nessun rilascio a quota intermedia.",PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD:"PRONE interrotto: posa sotto carico fuori dal tratto ma dentro una regione certificata; corpo sostenuto, coppia ON, protezioni attive. Usare STAND (se ammesso) oppure SAFE_OFF con il robot sostenuto.",PRONE_NOT_COMPLETED_SUPPORT_HELD:"PRONE non completato: corpo sostenuto, coppia ON e protezioni attive. Usare STAND (se la posa è certificata) oppure SAFE_OFF con il robot sostenuto.",PRONE_LANDING_NOT_QUALIFIED:'PRONE non disponibile: trasferimento del peso e appoggio ventrale non qualificati. HOLD resta attivo; STOP resta indipendente.',READY:'Pronto al comando.',STAND_REACHED:'Posa STAND raggiunta e mantenuta.',HEIGHT_CHANGE:'Cambio di quota in corso.',HEIGHT_PATH_NOT_CLEAR:'Cambio di quota non ammesso dalla posa reale attuale: nessun movimento.',ACQUIRING_REAL_POSE:'Acquisizione della posa iniziale reale.',WALK_STANDARD:'WALK STANDARD in corso.',WALK_STOPPING:'Conclusione coordinata del passo.',STOP_REQUESTED:'STOP richiesto: attendere il risultato del Controller.',STOP_REQUESTED_FAULT_LATCHED:'STOP richiesto con fault già presente: attendere la verifica coppia OFF sui 13 servo.',SAFE_OFF_VERIFIED_FAULT_LATCHED:'SAFE_OFF verificato sui 13 servo; il fault originale resta attivo.',SAFE_OFF_IN_PROGRESS_FAULT_LATCHED:'Verifica coppia OFF in corso; il fault originale resta attivo.',STAND_FROM_STOPPED_WALK:'Ripresa dal WALK arrestato in corso: completa il passo interrotto, poi STAND o WALK richiesto; coppia mantenuta e supporto non verificato.',STOP_HOLD_TRACKING_UNSAFE:'Posa STOP fuori dai limiti di mantenimento: coppia OFF.',STOP_RECOVERY_PATH_NOT_CLEAR:'Recupero STAND rifiutato: percorso del gait fuori dai limiti ammessi.',STOP_IN_PROGRESS:'Arresto controllato in corso, coppia mantenuta.',STOPPED_SUPPORT_UNVERIFIED:'Arresto verificato, coppia ON.',SAFE_OFF_VERIFIED:'SAFE_OFF verificato: coppia OFF sui 13 servo.',SAFE_OFF_STAND_REFUSED:'STAND rifiutato dopo SAFE_OFF: nessuna riabilitazione implicita.',STOP_RECOVERY_SWING_UNVERIFIED:'Recupero STAND rifiutato: swing non qualificato.',STOP_RECOVERY_WALK_UNVERIFIED:'Recupero STAND da WALK non qualificato.',STOP_RECOVERY_POSTURE_UNQUALIFIED:'Recupero STAND da posa intermedia non qualificato.',STOP_RECOVERY_FEEDBACK_UNAVAILABLE:'Feedback non disponibile per il recupero STAND.',STOP_RECOVERY_TORQUE_UNVERIFIED:'Coppia non verificata per il recupero STAND.',STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE:'Raccordo della correzione IMU non qualificato: fallback SAFE_OFF.',IMU_STALE:'Campione IMU scaduto: torque OFF.',HEIGHT_OUTSIDE_MATDOG_WORKSPACE:'Quota fuori dal workspace MATDOG o dai limiti reali.',SERVO_PREFLIGHT_REQUIRED:'Verifica iniziale dei profili servo in corso.',CALIBRATION_RESTORE_REQUIRED:'Calibrazione NVS non ancora ripristinata.',BMS_OR_POWER_UNAVAILABLE:'Alimentazione o BMS non disponibile.',SAFE_OFF_IN_PROGRESS:'Disabilitazione torque e verifica sui 13 servo in corso.',SERVO_COMMUNICATION_LOST:'Comunicazione servo persa: torque OFF.',SERVO_CONTROL_READ_LOST:'Lettura dei comandi servo persa: torque OFF.',SERVO_TORQUE_OR_GOAL_LOST:'Un servo non mantiene il comando richiesto: torque OFF.',SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT:'Allarme servo o limite elettrico: torque OFF.',MEASURED_MECHANICAL_LIMIT:'Un giunto ha raggiunto il limite meccanico ammesso.',NATIVE_TARGET_NOT_REACHED:'Un servo non ha raggiunto la posa entro il tempo disponibile.',INITIAL_POSE_OUTSIDE_SAFE_ENTRY:'Posa iniziale fuori dalla regione di ingresso geometricamente verificata.',REFERENCE_CHANGED_BEFORE_ENABLE:'La posa iniziale è cambiata prima dell’abilitazione.',STAND_CLEARANCE_UNAVAILABLE:'Il prossimo tratto STAND non ha spazio geometrico sufficiente.',STAND_PLAN_UNAVAILABLE:'Riferimento STAND non pianificabile entro i limiti: torque OFF.',WALK_SETTLING:'Assestamento finale del passo.',STAND_FROM_STOPPED_PRONE:'Ripresa dalla posa mantenuta dallo STOP (PRONE o salita) verso STAND o WALK richiesto, coppia mantenuta.',WALK_JOYSTICK:'Joystick: passo continuo in corso.',JOYSTICK_TIMEOUT:'Joystick: nessun comando entro 1 s, il Controller conclude il passo (WALK STOP).',JOYSTICK_REVERSING:'Joystick: cambio di verso, il passo si conclude prima di ripartire.',JOYSTICK_VELOCITY_RANGE:'Velocità oltre il limite del Controller.',WALK_STANDARD_ACTIVE:'WALK STANDARD in corso: WALK STOP prima del joystick.',WALK_STOPPING:'Conclusione del passo in corso.',GAIT_NOT_IN_SIMPLE_V1:'Andatura non disponibile.',IMU_UNAVAILABLE:'IMU non disponibile o campione non valido.',GEN1_LIMITS_OR_FINGERPRINT:'Calibrazione gen1 o limiti non corrispondenti.',SYNC_WRITE_FAILED:'Trasmissione coordinata ai servo non completata.',TORQUE_ENABLE_UNCERTAIN:'Abilitazione servo non confermata: torque OFF.',MOTION_DEADLINE_LOST:'Aggiornamento Motion interrotto: torque OFF.',SERVO_FEEDBACK_STALE:'Feedback dei 12 servo non aggiornati.',FAULT_STOP_REQUIRED:'Fault persistente: STOP non riabilita il robot.',
+const reasons={WALK_IMU_SETTLING:"WALK in attesa: la correzione d’assetto rientra nei limiti della modalità prima di partire.",WALK_MODE_SELECTED:"Modalità WALK registrata: vale dal prossimo WALK.",WALK_MODE_CHANGING:"Cambio profilo durante il WALK: il passo passa alla nuova modalità in modo progressivo, senza fermarsi (coppia e fase mantenute).",WALK_MODE_NEXT_WALK:"Modalità registrata per il prossimo WALK: la camminata in corso (in conclusione, ripresa dopo STOP, sterzata o all’indietro) mantiene la sua legge.",SERVO_ACC_CEILING_UNVERIFIED:"Tetto ACC dei servo (registro 85) non verificato all’attivazione: nessun movimento.",SERVO_ACC_CEILING_BELOW_DRIVE:"Tetto ACC verificato sui servo inferiore a quello richiesto dalla modalità: disponibili solo STAND e SLOW.",JOYSTICK_STEERING_SLOW_ONLY:"Sterzo e spostamento laterale disponibili solo in SLOW.",JOYSTICK_BACKWARD_SLOW_ONLY:"Retromarcia disponibile solo in SLOW.",WALK_MODE_UNKNOWN:"Modalità WALK sconosciuta (SLOW, STANDARD, FAST).",WALK_MODE_HEIGHT_MISMATCH:"WALK non avviato: la quota raggiunta non è quella della modalità latchata.",PRONE_DESCENT_NOT_VALIDATED:"Discesa PRONE in corso; al termine la coppia viene rilasciata (PRONE_REST).",PRONE_REST:"PRONE a riposo: coppia OFF (verificata sui 13 servo al termine). Appoggio passivo non misurato. STAND riacquisisce la posa reale e riabilita la coppia.",STAND_PATH_NOT_CLEAR:"Posa reale fuori dalla regione di ingresso certificata: rialzata rifiutata.",NOT_WALKING:"Nessun passo in corso da fermare.",PRONE_REQUIRES_STAND_HOLD:"PRONE richiede uno STAND fermo con coppia ON.",PRONE_PATH_NOT_CLEAR:"Posa fuori dal passaggio PRONE ammesso.",PRONE_MEASURED_OUTSIDE_BOX:"Feedback fuori dalla box del tratto PRONE: arresto per fault.",PRONE_NOT_COMPLETED_STOPPING:"PRONE non completato entro il tempo: arresto controllato con coppia ON, nessun rilascio a quota intermedia.",PRONE_OUTSIDE_SEGMENT_SUPPORT_HELD:"PRONE interrotto: posa sotto carico fuori dal tratto ma dentro una regione certificata; corpo sostenuto, coppia ON, protezioni attive. Usare STAND (se ammesso) oppure SAFE_OFF con il robot sostenuto.",PRONE_NOT_COMPLETED_SUPPORT_HELD:"PRONE non completato: corpo sostenuto, coppia ON e protezioni attive. Usare STAND (se la posa è certificata) oppure SAFE_OFF con il robot sostenuto.",PRONE_LANDING_NOT_QUALIFIED:'PRONE non disponibile: trasferimento del peso e appoggio ventrale non qualificati. HOLD resta attivo; STOP resta indipendente.',READY:'Pronto al comando.',STAND_REACHED:'Posa STAND raggiunta e mantenuta.',HEIGHT_CHANGE:'Cambio di quota in corso.',HEIGHT_PATH_NOT_CLEAR:'Cambio di quota non ammesso dalla posa reale attuale: nessun movimento.',ACQUIRING_REAL_POSE:'Acquisizione della posa iniziale reale.',WALK_STANDARD:'WALK STANDARD in corso.',WALK_STOPPING:'Conclusione coordinata del passo.',STOP_REQUESTED:'STOP richiesto: attendere il risultato del Controller.',STOP_REQUESTED_FAULT_LATCHED:'STOP richiesto con fault già presente: attendere la verifica coppia OFF sui 13 servo.',SAFE_OFF_VERIFIED_FAULT_LATCHED:'SAFE_OFF verificato sui 13 servo; il fault originale resta attivo.',SAFE_OFF_IN_PROGRESS_FAULT_LATCHED:'Verifica coppia OFF in corso; il fault originale resta attivo.',STAND_FROM_STOPPED_WALK:'Ripresa dal WALK arrestato in corso: completa il passo interrotto, poi STAND o WALK richiesto; coppia mantenuta e supporto non verificato.',STOP_HOLD_TRACKING_UNSAFE:'Posa STOP fuori dai limiti di mantenimento: coppia OFF.',STOP_RECOVERY_PATH_NOT_CLEAR:'Recupero STAND rifiutato: percorso del gait fuori dai limiti ammessi.',STOP_IN_PROGRESS:'Arresto controllato in corso, coppia mantenuta.',STOPPED_SUPPORT_UNVERIFIED:'Arresto verificato, coppia ON.',SAFE_OFF_VERIFIED:'SAFE_OFF verificato: coppia OFF sui 13 servo.',SAFE_OFF_STAND_REFUSED:'STAND rifiutato dopo SAFE_OFF: nessuna riabilitazione implicita.',STOP_RECOVERY_SWING_UNVERIFIED:'Recupero STAND rifiutato: swing non qualificato.',STOP_RECOVERY_WALK_UNVERIFIED:'Recupero STAND da WALK non qualificato.',STOP_RECOVERY_POSTURE_UNQUALIFIED:'Recupero STAND da posa intermedia non qualificato.',STOP_RECOVERY_FEEDBACK_UNAVAILABLE:'Feedback non disponibile per il recupero STAND.',STOP_RECOVERY_TORQUE_UNVERIFIED:'Coppia non verificata per il recupero STAND.',STOP_IMU_REFERENCE_NOT_DIFFERENTIABLE:'Raccordo della correzione IMU non qualificato: fallback SAFE_OFF.',IMU_STALE:'Campione IMU scaduto: torque OFF.',HEIGHT_OUTSIDE_MATDOG_WORKSPACE:'Quota fuori dal workspace MATDOG o dai limiti reali.',SERVO_PREFLIGHT_REQUIRED:'Verifica iniziale dei profili servo in corso.',CALIBRATION_RESTORE_REQUIRED:'Calibrazione NVS non ancora ripristinata.',BMS_OR_POWER_UNAVAILABLE:'Alimentazione o BMS non disponibile.',SAFE_OFF_IN_PROGRESS:'Disabilitazione torque e verifica sui 13 servo in corso.',SERVO_COMMUNICATION_LOST:'Comunicazione servo persa: torque OFF.',SERVO_CONTROL_READ_LOST:'Lettura dei comandi servo persa: torque OFF.',SERVO_TORQUE_OR_GOAL_LOST:'Un servo non mantiene il comando richiesto: torque OFF.',SERVO_NATIVE_ALARM_OR_ELECTRICAL_LIMIT:'Allarme servo o limite elettrico: torque OFF.',MEASURED_MECHANICAL_LIMIT:'Un giunto ha raggiunto il limite meccanico ammesso.',NATIVE_TARGET_NOT_REACHED:'Un servo non ha raggiunto la posa entro il tempo disponibile.',INITIAL_POSE_OUTSIDE_SAFE_ENTRY:'Posa iniziale fuori dalla regione di ingresso geometricamente verificata. Coppia OFF, nessun movimento: riposizionare il robot a mano; il Controller torna PRONTO da solo quando la posa reale è ammessa, poi serve un nuovo STAND.',REFERENCE_CHANGED_BEFORE_ENABLE:'La posa iniziale è cambiata prima dell’abilitazione.',STAND_CLEARANCE_UNAVAILABLE:'Il prossimo tratto STAND non ha spazio geometrico sufficiente.',STAND_PLAN_UNAVAILABLE:'Riferimento STAND non pianificabile entro i limiti: torque OFF.',WALK_SETTLING:'Assestamento finale del passo.',STAND_FROM_STOPPED_PRONE:'Ripresa dalla posa mantenuta dallo STOP (PRONE o salita) verso STAND o WALK richiesto, coppia mantenuta.',WALK_JOYSTICK:'Joystick: passo continuo in corso.',JOYSTICK_TIMEOUT:'Joystick: nessun comando entro 1 s, il Controller conclude il passo (WALK STOP).',JOYSTICK_REVERSING:'Joystick: inversione avanti/indietro, il passo si conclude (WALK STOP); con la leva tenuta riparte nel nuovo verso da STANDING.',JOYSTICK_VELOCITY_RANGE:'Velocità oltre il limite del Controller.',WALK_STANDARD_ACTIVE:'WALK STANDARD in corso: WALK STOP prima del joystick.',WALK_STOPPING:'Conclusione del passo in corso.',GAIT_NOT_IN_SIMPLE_V1:'Andatura non disponibile.',IMU_UNAVAILABLE:'IMU non disponibile o campione non valido.',GEN1_LIMITS_OR_FINGERPRINT:'Calibrazione gen1 o limiti non corrispondenti.',SYNC_WRITE_FAILED:'Trasmissione coordinata ai servo non completata.',TORQUE_ENABLE_UNCERTAIN:'Abilitazione servo non confermata: torque OFF.',MOTION_DEADLINE_LOST:'Aggiornamento Motion interrotto: torque OFF.',SERVO_FEEDBACK_STALE:'Feedback dei 12 servo non aggiornati.',FAULT_STOP_REQUIRED:'Fault persistente: STOP non riabilita il robot.',
 COMMAND_ACCEPTED:'Accettato dal Controller: l’esecuzione è confermata solo dallo stato Motion.',SAFE_OFF_REQUESTED:'Torque OFF richiesto: la verifica 13/13 è solo nella riga SAFE_OFF.',INVALID_JSON_SCHEMA:'Comando non conforme al contratto Motion.',DASHBOARD_OWNER_REQUIRED:'Owner del comando diverso da dashboard.',AUTH_FAILED:'Sessione o token CSRF non validi: accedere di nuovo.',JOYSTICK_SUPERSEDED:'Comando joystick più vecchio di uno già ricevuto (rete fuori ordine o pagina precedente): scartato dal Controller.',JOYSTICK_SEQUENCE_REQUIRED:'Comando joystick senza numerazione della pagina: rifiutato.',SUPERSEDED_BY_STOP:'Annullato da uno STOP successivo.',STOP_LANE_LATE:'STOP non confermato entro 600 ms: usare anche @STOP via USB.',CONTROLLER_LOOP_LATE:'Il Controller non ha servito la richiesta in tempo.',MAILBOX_BUSY:'Controller occupato da un’altra richiesta.',EXPIRED:'Comando scaduto prima dell’esecuzione.',FUTURE_TIMESTAMP:'Timestamp del comando oltre l’uptime del Controller.',MOTION_BUSY:'Motion già in movimento.',MAINTENANCE_BUSY:'Operazione di manutenzione in corso.',SYSTEM_CONFIGURATION_BUSY:'Configurazione di rete o OTA in corso.',CALIBRATION_OR_LIMITS_NOT_READY:'Calibrazione o limiti non ancora pronti.',ACTUATOR_OWNER_BUSY:'Attuatori in uso da un’altra funzione.',IMU_ACQUISITION_TASK_REQUIRED:'Acquisizione IMU non attiva.'};
 const poses={PRONE_ENTRY:'PRONE (ripiegata)',STAND_HEIGHT:'STAND (regione quote)',WALK:'WALK (regione passo)',STAND_LIFT:'STAND bassa o sollevamento',STAND_DEPLOY:'transizione STAND (apertura)',OUTSIDE_CERTIFIED:'fuori dalle regioni certificate',UNKNOWN:'non disponibile (feedback non fresco)'};
 // #simple-last is a fixed two-line slot (dev.17): the full text stays in its
@@ -159,16 +165,17 @@ window.mdMotionHealth={fresh,age:Math.ceil(snapshotAge)};
 const controllerFault=s.fault===true||s.state==='FAULT';
 const stopInfo=s.stop||{},offVerified=s.safe_off_verified===true&&s.safe_off_mask===8191&&s.torque_active===false;
 const stoppedOn=stopInfo.active===true&&stopInfo.motion_verified===true&&stopInfo.in_progress===false&&s.state==='STOPPED'&&s.torque_active===true;
-const offTerminal=offVerified&&s.state==='STOPPED';
-const shown=controllerFault?('FAULT'+(!fresh?' · DATI SCADUTI':'')):!linked?'COLLEGAMENTO PERSO':!fresh?'FEEDBACK NON FRESCO':offTerminal?'SAFE_OFF VERIFICATO · COPPIA OFF':stopInfo.in_progress===true?'STOP IN CORSO':stoppedOn?'STOP COMPLETATO · COPPIA ON':s.state==='READY'&&!s.ready?'NON PRONTO':s.state;
+const offTerminal=offVerified&&s.state==='STOPPED',entryRefused=s.state==='STOPPED'&&s.reason==='INITIAL_POSE_OUTSIDE_SAFE_ENTRY';
+const shown=controllerFault?('FAULT'+(!fresh?' · DATI SCADUTI':'')):!linked?'COLLEGAMENTO PERSO':!fresh?'FEEDBACK NON FRESCO':entryRefused?'POSA D’INGRESSO NON RICONOSCIUTA · COPPIA OFF':offTerminal?'SAFE_OFF VERIFICATO · COPPIA OFF':stopInfo.in_progress===true?'STOP IN CORSO':stoppedOn?'STOP COMPLETATO · COPPIA ON':s.state==='READY'&&!s.ready?'NON PRONTO':s.state;
 by('simple-state').textContent=by('simple-state').title=shown;
 // Admission and fault facts own the colour, independently of the displayed wording.
-by('simple-state').dataset.tone=controllerFault?'bad':!fresh?'muted':!s.ready?'warn':stopInfo.active?'warn':offTerminal?'ok':['READY','STANDING'].includes(s.state)?'ok':['MOVING','WALKING'].includes(s.state)?'warn':'muted';
+by('simple-state').dataset.tone=controllerFault?'bad':!fresh?'muted':!s.ready?'warn':stopInfo.active||entryRefused?'warn':offTerminal?'ok':['READY','STANDING'].includes(s.state)?'ok':['MOVING','WALKING'].includes(s.state)?'warn':'muted';
 const bar=by('motion');if(bar&&bar.firstChild)bar.firstChild.nodeValue=shown;if(by('motionWhy'))by('motionWhy').textContent=s.reason;by('simple-state').dataset.state=s.state;
 const demoReason=code=>code==='OFFLINE_UI_FIXTURE'||code==='OFFLINE_DISPLAY_ONLY';
 const reasonCodes=[s.reason,...(s.ready?[]:[s.readiness_reason])].filter(Boolean);
 const reasonMessages=[...new Set(reasonCodes.filter(code=>!demoReason(code)).map(code=>reasons[code]||code))];
 if(s.fault&&!reasonMessages.length)reasonMessages.push('Guasto segnalato dal Controller.');
+if(s.entry_violation&&s.entry_violation.joint)reasonMessages.push('Giunto più lontano dalla regione d’ingresso: '+s.entry_violation.joint+' ('+s.entry_violation.outside_mrad+' mrad).');
 // Once loaded, the Twin owns the single demo badge. Never suppress real faults.
 if(!twinReady&&reasonCodes.some(demoReason))reasonMessages.unshift('Modalità offline');
 if(stopInfo.active===true&&stopInfo.support_verified!==true)reasonMessages.push('Supporto non verificato');
@@ -178,18 +185,45 @@ if(stopInfo.active===true){
 }
 by('simple-reason').textContent=by('simple-reason').title=reasonMessages.join(' · ');
 const available=fresh&&s.ready&&!controllerFault&&!!csrf&&!sending&&!['MOVING','WALKING','FAULT'].includes(s.state);
-by('simple-stand').disabled=!available||(stopInfo.active?stopInfo.stand_resume_allowed!==true:!['READY','STANDING'].includes(s.state));by('simple-walk').disabled=!available||(stopInfo.active?stopInfo.stand_resume_allowed!==true:!['READY','STANDING'].includes(s.state));by('simple-prone').disabled=!available||stopInfo.active===true||s.state!=='STANDING';
+by('simple-stand').disabled=!available||(stopInfo.active?stopInfo.stand_resume_allowed!==true:!['READY','STANDING'].includes(s.state));// WALK stays usable while only a GAIT.SELECT is in flight: its click waits for that ACK.
+by('simple-walk').disabled=!(available||(modeSending&&fresh&&s.ready&&!controllerFault&&!!csrf&&!['MOVING','WALKING','FAULT'].includes(s.state)))||(stopInfo.active?stopInfo.stand_resume_allowed!==true:!['READY','STANDING'].includes(s.state));by('simple-prone').disabled=!available||stopInfo.active===true||s.state!=='STANDING';
 by('simple-walk-stop').disabled=!csrf||stopInfo.active===true||!['MOVING','WALKING'].includes(s.state);
 // Joystick: from a held pose, or while the Controller reports its joystick walk.
-const wv=s.walk_velocity||{};joyAllowed=fresh&&s.ready&&!controllerFault&&!!csrf&&stopInfo.active!==true&&(['READY','STANDING'].includes(s.state)||wv.joystick===true);
-if(!joyAllowed&&joyActive)joyRelease();by('simple-joystick').setAttribute('aria-disabled',String(!joyAllowed));by('joy-left').disabled=by('joy-right').disabled=!joyAllowed;
+const wv=s.walk_velocity||{},joyWalk=['READY','STANDING'].includes(s.state)||wv.joystick===true;
+joyAllowed=fresh&&s.ready&&!controllerFault&&!!csrf&&stopInfo.active!==true&&joyWalk;
+// A held stick ends on Controller facts (fault, STOP, the end of its joystick
+// walk other than a reversal) or on a lost link, never on a late poll, a
+// snapshot that is not fresh or a readiness flicker (dev.17 HW: a dropped hold
+// sends neutral, i.e. WALK STOP). The Controller owns the rest: it refuses
+// refreshes while not ready and its 1 s deadline ends the walk. The link is
+// alive while a status arrived within 1.5 s or the Controller accepted a
+// refresh within that deadline. A reversal (JOYSTICK_REVERSING: WALK STOP,
+// settling, STANDING) keeps the stick held and silent; at STANDING the held
+// intent starts the walk the other way.
+if(joyActive&&s.reason==='JOYSTICK_REVERSING')joyReverse=true;
+if(['READY','STANDING'].includes(s.state))joyReverse=false;
+const joyLive=linked||performance.now()-joyAckAt<JOY_DEADLINE_MS;
+if(joyActive&&!(joyLive&&!controllerFault&&!!csrf&&stopInfo.active!==true&&(joyWalk||joyReverse)))joyRelease();
+// A held stick keeps its controls enabled: its pointerup/pointercancel must still reach them.
+by('simple-joystick').setAttribute('aria-disabled',String(!joyAllowed&&!joyActive));by('joy-left').disabled=by('joy-right').disabled=!joyAllowed&&!joyActive;
 const law=Number.isFinite(wv.vx_m_s)?joyText([wv.vx_m_s,wv.vy_m_s||0,wv.yaw_rate_rad_s||0]):'N/D';
 by('joy-state').textContent='Richiesto: '+joyText(joyVelocity())+' · Controller: '+s.state+' · '+(reasons[s.reason]||s.reason)+(wv.joystick===true?' · legge del passo '+law:'');
+// WALK mode (Controller facts only): the selection for the next walk and the
+// walk's own mode, with their law and drive from the Controller's capabilities
+// table, and the goal speed/ACC the servos hold (control read).
+{const wm=s.walk_mode,el=by('simple-walk-mode-state');
+ if(!wm)el.textContent='Modalità WALK: non disponibile su questo firmware.';
+ else{if(!modeSending)for(const r of document.querySelectorAll('input[name="simple-walk-mode"]'))r.checked=r.value===controllerMode(wm);
+  const spec=n=>walkModes.find(m=>m.name===n),law=m=>m?Number(m.period_s).toFixed(2)+' s · fino a '+Number(m.top_speed_mm_s).toFixed(1)+' mm/s a '+m.strides_mm[2]+' mm · quota '+m.height_mm+' mm · alzata '+m.lift_mm+' mm · Speed/ACC '+m.drive.speed+'/'+m.drive.acc+' · frenata STOP ACC '+m.stop_brake_acc+(m.hardware_qualified?'':' · NON QUALIFICATA SU HARDWARE'):'parametri non letti';
+  const sr=Array.isArray(wm.servo_read)?wm.servo_read:[],read=sr[0]>=0?'letti dai servo '+sr[0]+'–'+sr[1]+' / '+sr[2]+'–'+sr[3]+' ('+sr[4]+' ms fa)':'letti dai servo: N/D';
+  const moving=s.state==='WALKING'&&wm.target&&wm.target!==wm.active;
+  el.textContent=(moving?'Cambio profilo in corso: '+wm.active+' → '+wm.target+' · ':s.state==='WALKING'&&wm.active!==wm.selected?'In corso: '+wm.active+' · prossimo WALK: ':'Prossimo WALK: ')+wm.selected+' · '+law(spec(wm.selected))+' — '+(s.state==='WALKING'?'in corso: ':'ultimo: ')+wm.active+' · '+read;
+  modeLabels();}}
 const dl=by('simple-values');dl.replaceChildren();let off=0;for(let m=s.safe_off_mask>>>0;m;m&=m-1)off++;
 const ct=s.command_timing||{},active=s.active_command||{},cal=typeof st==='object'&&st?st:{};
 const ic=s.imu_correction||{},tm=s.timing||{},th=s.thermal||{};
 const rec=r=>Array.isArray(r)?'lettura '+r[0]+' · nominale '+r[1]+' · compensazione '+r[2]+' · conversione '+r[3]+' · frame '+r[4]+' µs; release precedente '+r.slice(6,12).join('/')+' µs; solve '+r[12]+', IK '+r[13]+', Newton '+r[14]+', FK '+r[15]:'nessuna';
-const extra=[['Correzione IMU (richiesta → applicata, mrad)',ic.reason?ic.reason+' · roll '+ic.wanted_mrad[0]+' → '+ic.applied_mrad[0]+' · pitch '+ic.wanted_mrad[1]+' → '+ic.applied_mrad[1]:'N/D'],
+const extra=[['Correzione IMU (richiesta → applicata, mrad)',ic.reason?ic.reason+(ic.refused_by?' ['+ic.refused_by+']':'')+' · roll '+ic.wanted_mrad[0]+' → '+ic.applied_mrad[0]+' · pitch '+ic.wanted_mrad[1]+' → '+ic.applied_mrad[1]:'N/D'],
  ['Temperature servo','picchi isolati scartati '+(th.spikes??'N/D')+' · finestre calde aperte 0x'+((th.hot_pending_mask??0).toString(16))+' · conferme dirette '+(th.checks??'N/D')+(Array.isArray(th.last)?th.last.map(e=>' · ID '+e[0]+' bulk '+e[1]+' °C diretta '+(e[2]<0?'non valida':e[2]+' °C')+' ('+e[3]+', '+e[4]+' ms fa)').join(''):'')],
  ['Release più pesante · partizioni',rec(tm.max_work)],['Prima release persa · partizioni',rec(tm.first_miss)],
  ['Release oltre 20 ms / periodi persi','comando '+(ct.overruns??'N/D')+' / '+(ct.missed??'N/D')+' · dall\'avvio '+(s.overrun_releases??'N/D')+' / '+(s.missed_releases??'N/D')+(Array.isArray(tm.max_work_meta)?' · release più pesante: ritardo '+tm.max_work_meta[0]+' µs, fuori Motion '+tm.max_work_meta[1]+' µs, servizi '+tm.max_work_meta[2]+' µs':'')],
@@ -209,7 +243,7 @@ by('simple-detail').textContent=JSON.stringify({period_us:s.period_us,missed_rel
 // The last command result is kept apart from the telemetry render: an HTTP
 // answer or an ACK is never proof of motion, and a poll never hides it.
 async function command(type,params={},priority=false,label=type,retried=false,inputMs=null){
-let record=null;
+let record=null,acked=null;  // acked: the Controller's ACK when it reached the Controller (GAIT.SELECT ordering)
 const result=(kind,text)=>{if(record&&latestCommand!==record)return;lastShow(kind,'Ultimo comando · '+label+' · '+new Date().toLocaleTimeString('it-IT')+' · '+text);
  // The banner shows only the latest command: an earlier refusal stays in the Motion diagnostics, not here.
  if(kind==='bad'||kind==='warn'){commandNotice='Comando '+label+': '+text;show(commandNotice,kind)}
@@ -241,10 +275,10 @@ try{const r=await fetch('/api/motion/command',{method:'POST',cache:'no-store',he
   if(refused(r.status,code))result('bad',http+' · RIFIUTATO PRIMA DELL’ESECUZIONE · errore '+detail);else unknown(http+' · errore '+detail)}
  else if(a.id!==body.id||a.sequence!==body.sequence)unknown(http+' · ACK_ID_MISMATCH');
  else if(a.outcome==='REJECTED')result('warn',http+' · REJECTED dal Controller, non eseguito · '+why(a.reason));
- else result(a.outcome==='ABORTED'?'warn':'acked',http+' · '+a.outcome+' · '+why(a.reason)+(type==='MOTION.STOP'?(a.reason==='SAFE_OFF_REQUESTED'?' · SAFE_OFF non ancora verificato':' · arresto da verificare nello stato Motion'):' · movimento da confermare nello stato Motion'));}
+ else{acked=a;if(params.gait==='JOYSTICK'&&a.outcome==='ACCEPTED'){joyAckAt=record.body_ms;if(a.reason==='JOYSTICK_REVERSING'&&joyActive)joyReverse=true}result(a.outcome==='ABORTED'?'warn':'acked',http+' · '+a.outcome+' · '+why(a.reason)+(type==='MOTION.STOP'?(a.reason==='SAFE_OFF_REQUESTED'?' · SAFE_OFF non ancora verificato':' · arresto da verificare nello stato Motion'):' · movimento da confermare nello stato Motion'))}}
 catch(e){record.error=e.name;record.failed_ms=performance.now();unknown(e.name==='AbortError'?'nessuna risposta entro 5 s':'errore di rete: '+e.message)}
 finally{clearTimeout(timer);if(!priority)sending=false;render()}
-if(!renew||latestCommand!==record)return;
+if(!renew||latestCommand!==record)return acked;
 result('pending','sessione non valida: rinnovo e nuovo invio…');
 const renewed=await resume();if(latestCommand!==record)return;
 if(renewed)return command(type,params,priority,label,true,inputMs);
@@ -284,11 +318,21 @@ else if(status.admin_session===false&&now-lapseAt>5000){lapseAt=now;cookieAt=now
 // with a dead zone and scaled into the Controller's ellipsoid. The Controller
 // owns rate limits, gait, IK and timing; the page only refreshes the intent well
 // inside the Controller's 1 s deadline and sends neutral (WALK STOP) on release.
-// JOY_LIMIT = kJoystickStrideM, kJoystickLateralM, kJoystickYawRad / kWalkPeriodS.
-const JOY_LIMIT=[.045/6.5,.020/6.5,.20/6.5],JOY_DEAD=.12,JOY_MS=240,pad=by('joy-pad');
-let joy=[0,0],joyYaw=0,joyPad=false,joyActive=false,joyAllowed=false,joyTimer=0,joyPointer=null,joySent=false,joyOrigin=null;
-function joyVelocity(){const r=Math.hypot(joy[0],joy[1]),k=r<JOY_DEAD?0:Math.min(1,(r-JOY_DEAD)/(1-JOY_DEAD))/r;
- let n=[joy[0]*k,joy[1]*k,joyYaw];const m=Math.hypot(n[0],n[1],n[2]);if(m>1)n=n.map(v=>v/m);return n.map((v,i)=>v*JOY_LIMIT[i])}
+// JOY_LIMIT = kStrideM[2] / kWalkPeriodS, kJoystickLateralM, kJoystickYawRad /
+// kJoystickPeriodS; JOY_BACK = kJoystickBackM / kWalkPeriodS; JOY_DEADLINE_MS =
+// kJoystickTimeoutUs. Replaced by the capabilities' joystick block when read.
+// Forward full scale is the top speed (walk_modes) of the WALK mode the Controller accepted; the
+// Controller walks forward on that mode's law and allows steering and backward
+// on SLOW only (it refuses them otherwise): on STANDARD and FAST the page sends
+// the forward part alone.
+let JOY_LIMIT=[.100/5.0,.020/5.0,.16/5.0],JOY_BACK=.050/5.0;const JOY_DEAD=.12,JOY_MS=240,JOY_DEADLINE_MS=1000,pad=by('joy-pad');
+let joy=[0,0],joyYaw=0,joyPad=false,joyActive=false,joyAllowed=false,joyTimer=0,joyPointer=null,joySent=false,joyOrigin=null,joyReverse=false,joyAckAt=-Infinity;
+// Fore/aft inside the dead band is zero (dev.17 HW): a sideways stick a hair
+// behind or ahead of centre carries no fore/aft sign, which would choose the
+// leg order of a new walk (backward if negative).
+function joyVelocity(){const mode=status&&status.walk_mode?controllerMode(status.walk_mode):selectedMode(),slow=mode==='SLOW',w=walkModes.find(x=>x.name===mode),top=w&&Number.isFinite(Number(w.top_speed_mm_s))?Number(w.top_speed_mm_s)/1000:JOY_LIMIT[0];
+ const f0=Math.abs(joy[0])<JOY_DEAD?0:joy[0],f=slow?f0:Math.max(0,f0),l=slow?joy[1]:0,r=Math.hypot(f,l),k=r<JOY_DEAD?0:Math.min(1,(r-JOY_DEAD)/(1-JOY_DEAD))/r;
+ let n=[f*k,l*k,slow?joyYaw:0];const m=Math.hypot(n[0],n[1],n[2]);if(m>1)n=n.map(v=>v/m);return n.map((v,i)=>v*(i?JOY_LIMIT[i]:v>=0?top:JOY_BACK))}
 const joyText=v=>{const t=[];if(v[0])t.push((v[0]>0?'avanti ':'indietro ')+(Math.abs(v[0])*1000).toFixed(1)+' mm/s');
  if(v[1])t.push((v[1]>0?'sinistra ':'destra ')+(Math.abs(v[1])*1000).toFixed(1)+' mm/s');
  if(v[2])t.push((v[2]>0?'antiorario ':'orario ')+(Math.abs(v[2])*180/Math.PI).toFixed(2)+'°/s');return t.length?t.join(', '):'neutro'};
@@ -298,12 +342,12 @@ function joyDraw(){by('joy-knob').setAttribute('cx',String(90-58*joy[1]));by('jo
 function joyAnchor(){const r=pad.getBoundingClientRect(),w=r.width||180,h=r.height||180;joyOrigin={x:r.left+w/2,y:r.top+h/2,w,h}}
 function joyMove(e){const o=joyOrigin;if(!o)return;  // knob travel: 58 of the 180 viewBox units
  let f=(o.y-e.clientY)*180/(58*o.h),l=(o.x-e.clientX)*180/(58*o.w);const m=Math.hypot(f,l);if(m>1){f/=m;l/=m}joy=[f,l];joyDraw()}
-function joyTick(){if(!joyActive)return;const v=joyVelocity();
+function joyTick(){if(!joyActive||joyReverse)return;const v=joyVelocity();
  // Back to neutral: WALK STOP once, like a release. The STOP lane is untouched.
  if(!v[0]&&!v[1]&&!v[2]){if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK neutro')}return}
- if(sending)return;joySent=true;command('BASE_VELOCITY',{vx:v[0],vy:v[1],yaw_rate:v[2],gait:'JOYSTICK'},false,'JOYSTICK '+joyText(v))}
-function joyStart(){if(joyActive)return;joyActive=true;joyTick();joyTimer=setInterval(joyTick,JOY_MS)}
-function joyRelease(){if(!joyActive)return;joyActive=false;joyPad=false;joyPointer=null;joyOrigin=null;joyYaw=0;clearInterval(joyTimer);joy=[0,0];joyDraw();
+ if(sending||modeSending)return;joySent=true;command('BASE_VELOCITY',{vx:v[0],vy:v[1],yaw_rate:v[2],gait:'JOYSTICK'},false,'JOYSTICK '+joyText(v))}
+function joyStart(){if(joyActive)return;joyActive=true;joyDraw();joyTick();joyTimer=setInterval(joyTick,JOY_MS)}
+function joyRelease(){if(!joyActive)return;joyActive=false;joyReverse=false;joyPad=false;joyPointer=null;joyOrigin=null;joyYaw=0;clearInterval(joyTimer);joy=[0,0];joyDraw();
  if(joySent){joySent=false;command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0,gait:'JOYSTICK'},true,'JOYSTICK rilascio')}twinResize()}
 // Release ends only when neither the pad nor a rotation button is held.
 const joyEnd=()=>{if(!joyPad&&!joyYaw)joyRelease();else joyTick()};
@@ -327,14 +371,52 @@ window.addEventListener('blur',joyRelease);document.addEventListener('visibility
 const height=by('simple-height'),showHeight=()=>{by('simple-height-value').textContent=height.value+' mm'};
 const stepHeight=d=>{height.value=String(Math.min(150,Math.max(50,Number(height.value)+d)));showHeight()};
 height.addEventListener('input',showHeight);by('simple-height-down').onclick=()=>stepHeight(-5);by('simple-height-up').onclick=()=>stepHeight(5);
-const stride=()=>Number(document.querySelector('input[name="simple-stride"]:checked')?.value??1);
+// One speed selector: each mode walks its top Controller preset (index 2 into
+// WalkModeSpec::strideM), the same index the walk keeps when the selector changes
+// its mode during the walk; the labels' speeds come from the capabilities table.
+const MODE_PRESET={SLOW:2,STANDARD:2,FAST:2};
+function modeLabels(){for(const r of document.querySelectorAll('input[name="simple-walk-mode"]')){const m=walkModes.find(w=>w.name===r.value);if(!m||!Array.isArray(m.strides_mm))continue;
+ const e=r.nextElementSibling.querySelector('.mode-speed'),v=(m.strides_mm[MODE_PRESET[r.value]]/Number(m.period_s)).toFixed(0)+' mm/s';if(e&&e.textContent!==v)e.textContent=v}}
+const selectedMode=()=>document.querySelector('input[name="simple-walk-mode"]:checked')?.value||'SLOW';
+// GAIT.SELECT in flight (a promise of the Controller's ACCEPTED) and the last
+// selection it accepted: WALK waits for the first and never runs another mode.
+let modeRequest=null,modeAccepted=null,modeAcceptedAt=-Infinity;
+// The Controller's selection: its status, unless a later ACCEPTED GAIT.SELECT is newer than that status's request.
+const controllerMode=wm=>modeAcceptedAt>=received-transitAge?modeAccepted:wm.selected;
+// One request at a time (command): a selection waits for the one in flight (a
+// joystick refresh) instead of being dropped; still busy after 1 s, it is
+// refused with a message and the selector returns to the Controller's mode.
+// Only the latest selection ends the wait; then the joystick refreshes at once.
+function selectMode(name){modeSending=true;const request=(async()=>{try{
+ for(let t=0;sending&&t<50;++t)await new Promise(r=>setTimeout(r,20));
+ if(sending){show('Modalità WALK '+name+' NON inviata: un’altra richiesta è ancora in corso dopo 1 s. Riprovare.','warn');return false}
+ const a=await command('GAIT.SELECT',{gait:name},false,'Modalità WALK '+name);
+ const ok=!!a&&a.outcome==='ACCEPTED';if(ok){modeAccepted=name;modeAcceptedAt=performance.now()}return ok}
+ finally{if(modeRequest===request){modeSending=false;if(joyActive)joyTick()}}})();modeRequest=request;return request}
 by('simple-stand').onclick=()=>{const mm=Number(height.value);command('POSTURE.STAND',{target_height_m:mm/1000},false,'STAND '+mm+' mm')};
 by('simple-prone').onclick=()=>command('POSTURE.LIE_DOWN',{},false,'PRONE');
-by('simple-walk').onclick=()=>{const i=stride();command('BASE_VELOCITY',{vx:[.030,.045,.060][i]/6.5,vy:0,yaw_rate:0},false,'WALK STANDARD '+[30,45,60][i]+' mm')};
+// WALK: the preset index is encoded as kStrideM / kWalkPeriodS (exact match
+// selects it); the Controller walks its latched mode's stride for it. A pending
+// GAIT.SELECT is awaited first; a refused or unconfirmed selection sends no WALK.
+by('simple-walk').onclick=async()=>{const want=selectedMode();if(modeRequest)await modeRequest;
+ const wm=status&&status.walk_mode,refusedMode=()=>show('WALK non inviato: la modalità '+want+' non è stata accettata dal Controller.','warn');
+ if(selectedMode()!==want)return refusedMode();  // the refused selection was taken back to the Controller's
+ if(wm&&controllerMode(wm)!==want&&!(await selectMode(want)))return refusedMode();
+ // After a STOP the recovery walks the stopped walk's mode (Controller): never a different one.
+ if(wm&&(status.stop||{}).active===true&&wm.active!==want){show('WALK non inviato: dopo lo STOP il Controller riprende in '+wm.active+', non '+want+'. Selezionare '+wm.active+' oppure STAND.','warn');return}
+ const i=MODE_PRESET[want],m=walkModes.find(w=>w.name===want),mm=m?m.strides_mm[i]:{SLOW:100,STANDARD:90,FAST:80}[want];  // label only, before the table is read
+ command('BASE_VELOCITY',{vx:[.050,.075,.100][i]/5.0,vy:0,yaw_rate:0},false,'WALK '+want+' '+mm+' mm')};
 by('simple-walk-stop').onclick=()=>command('BASE_VELOCITY',{vx:0,vy:0,yaw_rate:0},true,'WALK STOP');
+// WALK mode, sent at once: the Controller moves a forward walk in progress to it
+// progressively (WALK_MODE_CHANGING), otherwise it is for the next walk.
+for(const r of document.querySelectorAll('input[name="simple-walk-mode"]'))r.addEventListener('change',()=>{if(r.checked)selectMode(r.value)});
 stop.onclick=e=>command('MOTION.STOP',{},true,'STOP',false,e.timeStamp);
 // Each Escape press is a STOP; the key autorepeat of a held key is not.
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.repeat)command('MOTION.STOP',{},true,'STOP (Esc)',false,e.timeStamp)});
-Promise.resolve(authReady).finally(()=>{poll();setInterval(()=>{render();poll()},350)});
+// The WALK mode table: the Controller's capabilities, read once at page load
+// (no retry timer; without it the page says 'parametri non letti').
+const readModes=async()=>{try{const r=await fetch('/api/motion/capabilities',{cache:'no-store'});if(r.ok){const c=await r.json();if(Array.isArray(c.walk_modes))walkModes=c.walk_modes;
+ const j=c.joystick;if(j&&[j.vx_max_m_s,j.vy_max_m_s,j.yaw_rate_max_rad_s,j.vx_back_max_m_s].every(Number.isFinite)){JOY_LIMIT=[j.vx_max_m_s,j.vy_max_m_s,j.yaw_rate_max_rad_s];JOY_BACK=j.vx_back_max_m_s}}}catch(e){}};
+Promise.resolve(authReady).finally(async()=>{await readModes();poll();setInterval(()=>{render();poll()},350)});
 })();
 </script>)MOTION"

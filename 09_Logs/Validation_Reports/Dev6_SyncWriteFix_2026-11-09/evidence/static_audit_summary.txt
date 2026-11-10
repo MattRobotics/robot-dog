@@ -1,0 +1,3 @@
+Scanned 370 source files under ~/MATDOG/worktrees/matdog-gait-redesign-20261108/05_Firmware/MATDOG_Controller
+STATIC_AUDIT = PASS
+rc=0

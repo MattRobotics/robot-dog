@@ -65,32 +65,6 @@ template<unsigned N> unsigned nearestVia(const unsigned (&knots)[N],const JointT
 }
 constexpr unsigned kDeployEnd=collision::kDeployKnots[sizeof(collision::kDeployKnots)/sizeof(collision::kDeployKnots[0])-1];
 static_assert(kDeployEnd==collision::kLiftKnots[0],"DEPLOY ends where LIFT starts");
-// Inner convex envelope of the unchanged HEIGHT box, gen-1 RAW, nominal
-// support strip (including rounding), and the existing StopPlan over the full
-// WALK120/2mm-sway phase set. Vertices are roll/pitch BODY-in-support radians;
-// they are not independent rectangular limits or a claim of physical contact.
-struct TiltVertex { double roll,pitch; };
-constexpr TiltVertex kWalkTilt45[]={
- {0.014807950855685186,0.03574955578674701},
- {0,0.11930093706093331},
- {-0.014656913177372907,0.035384918575352142},
- {-0.011779818742757926,-0.028438998171065412},
- {-0,-0.053422005857361891},
- {0.011644818622368949,-0.028113079049515703},
-};
-constexpr TiltVertex kWalkTilt60[]={
- {0.014373513909108453,0.014373513909108453},
- {0.013471848316828587,0.032523918916725118},
- {0,0.10137685731507248},
- {-0.013436993467988561,0.032439771867942953},
- {-0.014373513909108453,0.014373513909108453},
- {-0.0085559368620721186,-0.0035439850870762082},
- {-0.0067072009272594714,-0.0067072009272594714},
- {-0.0034862036684149191,-0.0084164401774712468},
- {-0,-0.0084610410728295175},
- {0.0065962325017923174,-0.0065962325017923174},
- {0.0085559368620717925,-0.0035439850870778045},
-};
 // Level correction about the support axes, composed with the gait heading:
 // the support fit returns gravity's tilt in the support frame. Identity
 // heading (every unsteered walk) returns the roll/pitch pose bit for bit.
@@ -108,17 +82,39 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
   if(scale>=1)return false;
   roll*=scale;pitch*=scale;return true;
 }
-GaitParameters walkGait(unsigned stride){
-  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(kWalkHeightM);g.liftM=kWalkLiftM;g.duty=kWalkDuty;g.advanceXM=kStrideM[stride];
-  g.swayXM=kWalkSwayXM;g.swayYM=kWalkSwayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;return g;
+}
+// SLOW is the WALK STANDARD v2 constants above; STANDARD and FAST: SimpleMotion.h.
+// Envelopes: walk_tilt_envelope_check --mode N --stride 1|2 --search 16.
+constexpr WalkModeSpec kWalkModes[]={
+  {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
+  {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,kWalkSwayYM,&kStandardTilt,&kStandardTilt,false},
+  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.006,.0010,&kFastTilt,&kFastTilt,false}};
+// Register 85 is configured to cover every drive of the table.
+static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&
+              kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,"every drive within register 85");
+// stepWalkMode: the modes are ordered (a faster mode has the higher drive, so
+// the faster of two drives is one of the table's) and share the fore/aft COM
+// offsets, which therefore never change inside a walk.
+static_assert(kWalkModes[0].drive.speed<kWalkModes[1].drive.speed&&kWalkModes[1].drive.speed<kWalkModes[2].drive.speed&&
+              kWalkModes[0].drive.acc<kWalkModes[1].drive.acc&&kWalkModes[1].drive.acc<kWalkModes[2].drive.acc&&
+              kWalkModes[0].periodS>kWalkModes[1].periodS&&kWalkModes[1].periodS>kWalkModes[2].periodS&&
+              kWalkModes[0].swayXM==kWalkModes[1].swayXM&&kWalkModes[1].swayXM==kWalkModes[2].swayXM,"WALK modes ordered by speed");
+const WalkModeSpec& walkModeSpec(WalkMode m){return kWalkModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
+bool parseWalkMode(const char* name,WalkMode& m){
+  for(unsigned i=0;i<3;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
+  return false;
+}
+GaitParameters walkGait(unsigned stride,WalkMode mode){
+  const auto& w=walkModeSpec(mode);
+  GaitParameters g;g.heightM=baseLinkHeightFromNominalM(w.heightM);g.liftM=w.liftM;g.duty=w.duty;g.advanceXM=w.strideM[stride<3?stride:2];
+  g.swayXM=w.swayXM;g.swayYM=w.swayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+  g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;return g;
 }
 GaitParameters steerGait(const double goal[3]){
-  auto g=walkGait(0);g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
-  g.swayYM=kJoystickSwayYM;g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
-}
-// Inner convex envelope of kSteer, gen-1 RAW, the tread fillet up to
-// kEdgeContactMaxTiltRad and STOP over the steered phase set (offline rays).
-constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.07},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
+  // dev.6: the WALK STANDARD v2 law itself (SLOW), steered in SE(2), fillet contact allowed.
+  GaitParameters g=walkGait(2,WalkMode::SLOW);
+  g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
+  g.swayYM=joystickSwayYM(goal[1],goal[2],kJoystickSwayBaseYM);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
 bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   timing::Section section(timing::READ);
@@ -158,6 +154,9 @@ void SimpleMotion::enterOff(bool fault,const char* r){
     e.releases=releases_;e.missed=missed_;e.lastPolled=(pollNext_+11)%12;e.drive=commandedDrive_;
     for(unsigned i=0;i<12;++i){e.commandedRaw[i]=commandedRaw_[i];e.fb[i]=fb_[i];}
     e.loadedMask=loadedMask_;e.loadedPhase=loadedPhase_;
+    e.refusedBy=safeRefusal_;e.walkMode=static_cast<uint8_t>(walkMode_);e.nominalSolved=nominalSolved_;e.steered=steered_;e.imuReason=imuReason_;
+    e.cycles=cycles_;e.roll=rollCorrection_*correctionScale_;e.pitch=pitchCorrection_*correctionScale_;e.wantedRoll=imuWanted_[0];e.wantedPitch=imuWanted_[1];
+    e.advance[0]=gait_.advanceXM;e.advance[1]=gait_.advanceYM;e.advance[2]=gait_.yawRad;
   }
   loadedSinceUs_=0;holdReason_=nullptr;
   // A repeated STOP while the same SAFE_OFF is still pending keeps its
@@ -165,9 +164,12 @@ void SimpleMotion::enterOff(bool fault,const char* r){
   // re-broadcasts in serviceOff. A fault, or a STOP after a fault, during
   // motion or after completion starts SAFE_OFF again from the broadcast.
   const bool repeated=!fault&&state_==State::STOPPED&&offPending_;
+  // A STOP or SAFE_OFF while a refused entry waits for re-admission only
+  // re-verifies the OFF: no servo was enabled and the refusal stays the cause.
+  if(entryRefused_&&!fault)r="INITIAL_POSE_OUTSIDE_SAFE_ENTRY";
   faultLatched_=faultLatched_||fault;state_=faultLatched_?State::FAULT:State::STOPPED;reason_=r;
-  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=0;
-  if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0;
+  stopActive_=stopVerified_=stopIo_=stopFrame_=false;stopRaw_=nullptr;issuedUs_=previousUs_=previous2Us_=0;
+  if(!fault)operatorStopped_=strcmp(r,"BOOTING")!=0&&!entryRefused_;
   segmentBox_=nullptr;segmentTo_.valid=false;planned_=false;settleUs_=0;imuStartUs_=0;
   phase_=Phase::IDLE;offPending_=true;proneRest_=false;if(!repeated){offSent_=false;offMask_=0;offNext_=0;}
   walkRequested_=joystick_=false;walkStopping_=walkRecover_=false;pendingGoalValid_=false;rollCorrection_=pitchCorrection_=correctionScale_=0;
@@ -182,7 +184,7 @@ void SimpleMotion::serviceOff(){
 }
 bool SimpleMotion::serviceStop(){
   if(safeOffRequest_.exchange(false,std::memory_order_acq_rel)){
-    stop_.store(false,std::memory_order_release);operatorStopped_=true;
+    stop_.store(false,std::memory_order_release);operatorStopped_=!entryRefused_;
     if(!offPending_||proneRest_)enterOff(false,faultLatched_?reason_:"SAFE_OFF_REQUESTED");
     serviceOff();return true;
   }
@@ -199,13 +201,32 @@ void SimpleMotion::rememberReference(uint64_t now){
   // for an unchanged RAW goal. Never publish a failed/preempted frame.
   // now is the instant the reference was sampled at, not TX completion:
   // compute/bus latency must not shorten the secant of the reference.
-  if(issuedUs_&&now>issuedUs_){previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
+  if(issuedUs_&&now>issuedUs_){
+    previous2Us_=previousUs_;std::copy(previousRaw_,previousRaw_+12,previous2Raw_);
+    previousUs_=issuedUs_;std::copy(commandedRaw_,commandedRaw_+12,previousRaw_);}
   issuedUs_=now;
   if(stopActive_)return; // keep the revoked operation metadata, not stale RAW history
   // A pending posture command first releases the levelled HOLD reference.
   // Its samples are synchronous HOLD, not an endpoint-only native move. Set
   // this before send() services a STOP which may have arrived during TX.
   issuedPhase_=pendingGoalValid_&&(phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)?Phase::HOLD:phase_;issuedPlanned_=planned_;
+}
+// Reference rate for a STOP plan: secant between q (sampled at atUs) and the
+// most recent accepted reference at least one release period older, from the
+// history (current, previous, previous but one), after skipping `skip`
+// entries; the oldest available if none spans a period. Two references issued
+// a few ms apart differ by RAW quantization (one tick over 1.5 ms would read
+// as ~1 rad/s, a rate no law commands), so the window is never shorter than
+// the reference's own sampling period when the history allows it. The span
+// is bounded to 100 ms (stale history); only C0 is claimed at the handoff.
+bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
+  const uint16_t* raws[3]={commandedRaw_,previousRaw_,previous2Raw_};const uint64_t times[3]={issuedUs_,previousUs_,previous2Us_};
+  const uint16_t* far=nullptr;uint64_t farUs=0;
+  for(unsigned k=skip;k<3;++k){if(!times[k]||atUs<=times[k])break;far=raws[k];farUs=times[k];if(atUs-times[k]>=kPeriodUs)break;}
+  if(!far||atUs-farUs>100000)return false;
+  const double dt=(atUs-farUs)/1e6;
+  for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,far[i],old))return false;v[i]=std::clamp((q[i]-old)/dt,-vmax,vmax);}
+  return true;
 }
 void SimpleMotion::beginStop(uint64_t now){
   // Revoke the old operation immediately. STOP never calls nextStand, PRONE or
@@ -231,17 +252,13 @@ void SimpleMotion::beginStop(uint64_t now){
   // only a new bounded reference rate; it is not a measured motor velocity
   // or an analytic derivative of the preceding IMU-corrected signal.
   double q[12]{},v[12]{},a[12]{},lo[12],hi[12];JointTargetFrame start;start.valid=true;
-  const double dt=previousUs_&&issuedUs_>previousUs_?(issuedUs_-previousUs_)/1e6:0;
-  if(!(dt>0&&dt<=.1)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
-  const double vmax=commandedDrive_.speed*kTickRad;
-  for(unsigned i=0;i<12;++i){double previous=0;
-    if(!port_->decodeRaw(i,commandedRaw_[i],q[i])||!port_->decodeRaw(i,previousRaw_[i],previous)){
-      fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
-    jointSlot(start,i)=q[i];
-    v[i]=std::clamp((q[i]-previous)/dt,-vmax,vmax);
-    // Zero is the chosen initial acceleration of the NEW reference. We do
-    // not fit or promise continuity of an undefined prior acceleration.
-  }
+  if(!(previousUs_&&issuedUs_>previousUs_&&issuedUs_-previousUs_<=100000)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
+  for(unsigned i=0;i<12;++i){if(!port_->decodeRaw(i,commandedRaw_[i],q[i])){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}jointSlot(start,i)=q[i];}
+  // Rate: secant from the current reference back over at least one period
+  // (rateFromHistory, the same estimate compensationSafe proves against).
+  // Zero is the chosen initial acceleration of the NEW reference. We do not
+  // fit or promise continuity of an undefined prior acceleration.
+  if(!rateFromHistory(q,issuedUs_,1,stopSpeedRadS(commandedDrive_),v)){fault("STOP_REFERENCE_UNAVAILABLE");serviceOff();return;}
   stopBox_=source==Phase::WALK?&walkBox():segmentBox_;
   if(!stopBox_)stopBox_=contains(collision::kHeight,start)?&collision::kHeight:&collision::kLift;
   if((!contains(*stopBox_,measured())||!contains(*stopBox_,start))&&contains(collision::kLift,start)&&contains(collision::kLift,measured()))stopBox_=&collision::kLift;
@@ -249,7 +266,8 @@ void SimpleMotion::beginStop(uint64_t now){
     lo[i]=std::fmax(stopBox_->lo[i],input_.minRad[i]);hi[i]=std::fmin(stopBox_->hi[i],input_.maxRad[i]);
   }
   stopDrive_=commandedDrive_;
-  if(!stopPlan_.build(q,v,a,lo,hi,stopDrive_.speed*kTickRad,stopDrive_.acc*100*kTickRad)){
+  // Braking never above the measured one (kStopBrakeAcc), whatever the register.
+  if(!stopPlan_.build(q,v,a,lo,hi,stopSpeedRadS(stopDrive_),stopAccelerationRadS2(stopDrive_))){
     fault("STOP_REFERENCE_OUTSIDE_BOUNDS");serviceOff();return;
   }
   // q starts exactly at the decoded accepted RAW. All times use the ESP
@@ -352,6 +370,34 @@ bool SimpleMotion::planInitialReference(){
   // This is physical path selection from measured Q, never route tracking.
   return certifiedRegion(reference_,initialRoute_);
 }
+void SimpleMotion::refuseEntry(){
+  // Only before REFERENCE wrote anything: an enabled servo is a fault.
+  if(energized_){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+  entryRefused_=true;entrySinceUs_=0;enterOff(false,"INITIAL_POSE_OUTSIDE_SAFE_ENTRY");
+}
+// The refused entry is re-evaluated passively, never acted on: the operator
+// repositions the robot, then a NEW explicit STAND runs the full ACQUIRE.
+// Same evidence as ACQUIRE, continuously: 12 fresh positions in a certified
+// region, at rest, no alarm, ACQUIRE temperature/voltage limits, torque OFF.
+// The evidence must hold until every servo's torque has been read again by
+// its periodic control read (one cycle, ~1.4 s): a pose crossing an
+// uncertified region or still moving restarts the window.
+unsigned SimpleMotion::entryViolation(uint64_t now,double& outsideRad) const {
+  unsigned slot=12;outsideRad=0;if(!fresh(now))return slot;
+  const auto& b=collision::kEntry;
+  for(unsigned i=0;i<12;++i){const double q=fb_[i].q,d=q<b.lo[i]?q-b.lo[i]:q>b.hi[i]?q-b.hi[i]:0;
+    if(std::abs(d)>std::abs(outsideRad)){outsideRad=d;slot=i;}}
+  return slot;
+}
+bool SimpleMotion::entryReadmitted(uint64_t now){
+  InitialRoute route;
+  bool ok=fresh(now)&&certifiedRegion(measured(),route);
+  for(const auto& f:fb_)ok=ok&&f.torque==0&&!f.status&&f.temp<70&&f.voltage>=40&&f.voltage<=140&&magnitude(f.speed)<=50;
+  if(!ok){entrySinceUs_=0;return false;}
+  if(!entrySinceUs_)entrySinceUs_=now;
+  for(const auto& f:fb_)if(f.controlStampUs<entrySinceUs_)return false;
+  return true;
+}
 bool SimpleMotion::transitionSafe(const JointTargetFrame& a,const JointTargetFrame& b,const collision::Box& box) const {
   // All independent joint progress between two endpoints is enclosed. No
   // assumption that twelve motors have the same instantaneous response.
@@ -378,16 +424,17 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   held.valid=true;
   for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return false;
   const auto& g=gait_;
-  c=cycles_+.5*stopPlan_.duration/kWalkPeriodS;
+  c=cycles_+.5*stopPlan_.duration/period();
   stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
   c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
   auto track=track_;  // the admission check never advances the live track
   first=solveGait(g,gaitTrackCartesian(track,g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
   return pointSafe(held)&&contains(walkBox(),held)&&first.valid&&pointSafe(first)&&contains(walkBox(),first);
 }
-const char* SimpleMotion::stand(double h,uint64_t now){
+const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
+  if(entryRefused_)return "INITIAL_POSE_OUTSIDE_SAFE_ENTRY";  // until re-admitted (READY)
   // Reuse this admission's computed handoff; no second IK solve or persistent cache.
   WalkRecoveryStart recovery;
   if(stopActive_){if(const char* r=standResumeRefusal(now,recovery))return r;}
@@ -397,13 +444,15 @@ const char* SimpleMotion::stand(double h,uint64_t now){
   if(!input_.imuValid)return "IMU_UNAVAILABLE";
   if(state_==State::MOVING||state_==State::WALKING)return "MOTION_BUSY";
   JointTargetFrame q;if(!heightTarget(h,q))return "HEIGHT_OUTSIDE_MATDOG_WORKSPACE";
+  // The servo stores min(ACC, register 85): a drive above the verified ceiling would fault at its readback.
+  if(acc>input_.accCeiling)return input_.accCeiling?"SERVO_ACC_CEILING_BELOW_DRIVE":"SERVO_ACC_CEILING_UNVERIFIED";
   if(stopActive_){
     if(stopOrigin_==Phase::WALK){
       // Complete the interrupted WALK STOP with the same gait law: planted feet
       // keep their anchors, a swing lands on its own target, then four-contact
       // recentring and WALK_SETTLE to STAND150. No new walking intent.
-      walkRecover_=true;recoverCycles_=recovery.cycles;recoverUs_=0;stopCycle_=recovery.stopCycle;walkStopping_=true;
-      requestedHeight_=h;plannedHeight_=kWalkHeightM;
+      walkRecover_=true;recoverCycles_=recovery.cycles;recoverUs_=0;stopCycle_=recovery.stopCycle;walkStopping_=true;resetLookahead();
+      requestedHeight_=h;plannedHeight_=walkHeightM();
       stopActive_=stopVerified_=false;operatorStopped_=false;walkRequested_=false;
       phase_=Phase::WALK;state_=State::MOVING;segmentBox_=nullptr;planned_=false;
       reason_="STAND_FROM_STOPPED_WALK";referenceFaultSlot_=12;
@@ -537,36 +586,75 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   if(stopping()&&!(stopActive_&&stopVerified_))return stopActive_?"STOP_IN_PROGRESS":"SAFE_OFF_IN_PROGRESS";
   if(stride>=3)return "STANDARD_STRIDE_REQUIRED";
   if(state_==State::WALKING)return "ALREADY_WALKING";
-  // One user command can acquire, energize, stand at the WALK height and then walk.
-  const char* r=stand(kWalkHeightM,now);if(r)return r;
-  requestedStride_=stride;joystick_=false;walkRequested_=true;
+  // One user command can acquire, energize, stand at the WALK height and then
+  // walk. The selected WALK mode is latched here (its height is this stand's);
+  // after a STOP the resumed walk keeps the mode of the stopped one.
+  const WalkMode mode=stopActive_?walkMode_:selectedMode_;
+  const char* r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc);if(r)return r;
+  requestedStride_=stride;joystick_=false;walkRequested_=true;pendingMode_=mode;
   // A resumed WALK STOP finishes with its own gait and tilt envelope; the
   // requested stride starts at HOLD (startWalk).
-  if(phase_!=Phase::WALK){stride_=stride;gait_=walkGait(stride);}
+  if(phase_!=Phase::WALK){stride_=stride;gait_=walkGait(stride,mode);}
   return nullptr;
 }
 const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now){
   if(stopping())return stopActive_?(stopVerified_?"STOP_LATCHED":"STOP_IN_PROGRESS"):"SAFE_OFF_IN_PROGRESS";
-  const double goal[3]={vx*kWalkPeriodS,vy*kWalkPeriodS,yawRate*kWalkPeriodS},limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};
-  double norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(goal[j]))return "JOYSTICK_VELOCITY_RANGE";norm+=(goal[j]/limit[j])*(goal[j]/limit[j]);}
+  // Published range (capabilities): fore/aft at the selected WALK mode's top
+  // speed (walk_modes: full scale is that mode's maximum), lateral and yaw of
+  // the steered law, inside one ellipsoid.
+  const auto& law=walkModeSpec(selectedMode_);
+  const double v[3]={vx,vy,yawRate},range[3]={law.strideM[2]/law.periodS,kJoystickLateralM/kJoystickPeriodS,kJoystickYawRad/kJoystickPeriodS};
+  double n[3],norm=0;for(unsigned j=0;j<3;++j){if(!std::isfinite(v[j]))return "JOYSTICK_VELOCITY_RANGE";n[j]=(v[j]/range[j])*(v[j]/range[j]);norm+=n[j];}
   if(norm==0||norm>1+1e-9)return "JOYSTICK_VELOCITY_RANGE";
+  const bool frontal=n[1]+n[2]<kJoystickFrontalBand*kJoystickFrontalBand;
+  // Steering and backward walking exist on the SLOW law only (its steered
+  // envelopes and backward stride are the certified ones): STANDARD and FAST
+  // walk forward; a backward demand during their walk is the reversal below.
+  if(selectedMode_!=WalkMode::SLOW&&!frontal)return "JOYSTICK_STEERING_SLOW_ONLY";
+  if(selectedMode_!=WalkMode::SLOW&&vx<0&&state_!=State::WALKING)return "JOYSTICK_BACKWARD_SLOW_ONLY";
   // A walk keeps the leg order of its fore/aft direction: forward, or its time
-  // reverse backward. The opposite direction ends it with WALK STOP; the next
-  // command after STANDING starts the other one. Lateral and yaw are continuous.
-  const bool reverse=goal[0]<0;
+  // reverse backward. A demand pointing mostly the opposite way (its fore/aft
+  // part above lateral and yaw together, in the ellipsoid) ends it with WALK
+  // STOP; the next command after STANDING starts the other one. Lateral and yaw
+  // are continuous in a steered walk: a mainly lateral/yaw demand keeps walking,
+  // its contrary fore/aft part held at zero by steerWalk (dev.17 HW: a sideways
+  // stick a hair behind centre stopped the walk). Between the fore/aft (WALK
+  // STANDARD) and steered regimes the walk changes law without stopping
+  // (steerWalk, regimeHandover).
+  const bool reverse=vx<0;
   if(state_==State::WALKING){
     if(!joystick_)return "WALK_STANDARD_ACTIVE";
     if(walkStopping_)return "WALK_STOPPING";
-    if(goal[0]!=0&&reverse!=gait_.reverse){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
+    // "Mostly" in the walking law's own ellipsoid (the steered fore/aft range is shorter).
+    const double fore=steered_?(vx*kJoystickPeriodS/kJoystickStrideM)*(vx*kJoystickPeriodS/kJoystickStrideM):n[0];
+    if(vx!=0&&reverse!=gait_.reverse&&fore>n[1]+n[2]){walkStop();reason_="JOYSTICK_REVERSING";return nullptr;}
   }else if(joystick_&&walkRequested_){
-    if(goal[0]!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction
+    if(vx!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction and law
   }else{
     // One command can acquire, energize, stand at the WALK height and walk.
-    const char* r=stand(kWalkHeightM,now);if(r)return r;
-    gait_=steerGait(goal);walkRequested_=true;
+    const char* r=stand(law.heightM,now,law.drive.acc);if(r)return r;
+    gait_.reverse=reverse;walkRequested_=true;pendingMode_=selectedMode_;
   }
-  joystick_=true;for(unsigned j=0;j<3;++j)joystickGoal_[j]=goal[j];joystickDeadlineUs_=now+kJoystickTimeoutUs;
+  joystick_=true;std::copy(v,v+3,joystickVel_);joystickFrontal_=frontal;joystickDeadlineUs_=now+kJoystickTimeoutUs;
   return nullptr;
+}
+// The WALK STANDARD law takes the fore/aft part alone (backward up to
+// kJoystickBackM); the steered law the whole demand, saturated onto its
+// ellipsoid with the direction kept (a diagonal stick asks more fore/aft than
+// the steered law walks).
+void SimpleMotion::joystickGoal(bool frontal,double goal[3]) const {
+  // Fore/aft: the demanded speed at the clock's rate, inside the walk's law
+  // stride (the smaller of the two laws while the walk changes mode).
+  if(frontal){const double top=std::fmin(walkModeSpec(walkMode_).strideM[2],walkModeSpec(walkTarget_).strideM[2]);
+    goal[0]=std::clamp(joystickVel_[0]*period(),-kJoystickBackM,top);goal[1]=goal[2]=0;return;}
+  const double limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad};double n=0;
+  for(unsigned j=0;j<3;++j)goal[j]=joystickVel_[j]*kJoystickPeriodS;
+  // Under the band lateral and yaw are touch noise in either law (review 09/11:
+  // back to a forward stick after steering, the recorded jitter held the full
+  // 14 mm sway); the steered law retires them at its own rates.
+  if(joystickFrontal_)goal[1]=goal[2]=0;
+  for(unsigned j=0;j<3;++j)n+=(goal[j]/limit[j])*(goal[j]/limit[j]);
+  if(n>1)for(unsigned j=0;j<3;++j)goal[j]/=std::sqrt(n);
 }
 void SimpleMotion::walkStop(){
   walkRequested_=false;
@@ -863,29 +951,184 @@ void SimpleMotion::generateStand(uint64_t now){
 }
 void SimpleMotion::startWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
-  if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_);}
-  plannedHeight_=kWalkHeightM;track_={};steered_=joystick_;steeredCycles_=0;
-  // The latest target, from the start ramp; never against the leg order.
-  if(steered_){gait_.advanceXM=(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[0];gait_.advanceYM=joystickGoal_[1];gait_.yawRad=joystickGoal_[2];}
+  steered_=joystick_&&!joystickFrontal_;
+  // The walk's mode: latched by walk() or drive(). Its HOLD must be that mode's
+  // height (the stand of the same command); otherwise no walk.
+  const WalkMode mode=pendingMode_;
+  if(std::abs(requestedHeight_-walkModeSpec(mode).heightM)>1e-9){walkRequested_=joystick_=false;reason_="WALK_MODE_HEIGHT_MISMATCH";return;}
+  // The walk starts from the correction HOLD carries only inside its own
+  // fore/aft envelope (final dev.6 RCA): the walk-mode envelopes certify that
+  // region; a correction accepted at the WALK height outside it (WALK_HOLD and
+  // HOLD do not bound it; servo model: -22/-70 mrad after a STOP recovery,
+  // STANDARD envelope -17 mrad) left the first WALK steps without an IK solution
+  // (WALK_IK_OR_WORKSPACE, refused_by POINT_SAFE). HOLD bounds the wanted
+  // correction to that envelope while the walk is pending and retries the
+  // start each release, after the existing slew has brought it inside.
+  {double r=rollCorrection_,p=pitchCorrection_;if(projectWalkTilt(pendingWalkTilt(),r,p)){reason_="WALK_IMU_SETTLING";return;}}
+  const auto& law=walkModeSpec(mode);
+  walkMode_=walkTarget_=mode;walkPeriod_=law.periodS;clockCycles_=clockEased_=modeEased_=0;walkHeight_=law.heightM;walkDrive_=law.drive;
+  if(!joystick_){stride_=requestedStride_;gait_=walkGait(stride_,walkMode_);}
+  else{
+    // The latest target, from the start ramp; never against the leg order. One
+    // law in the regime of the demand: SLOW (steerGait) fore/aft (kHeight,
+    // kWalkTilt100) or steered (kSteer, kSteerTilt); STANDARD/FAST forward.
+    double goal[3];joystickGoal(!steered_,goal);const bool reverse=gait_.reverse;
+    stride_=2;gait_=mode==WalkMode::SLOW?steerGait(goal):walkGait(2,mode);if(!steered_)gait_.swayYM=law.swayYM;
+    gait_.reverse=reverse;gait_.advanceXM=(goal[0]<0)!=reverse?0:goal[0];gait_.advanceYM=goal[1];gait_.yawRad=goal[2];}
+  plannedHeight_=walkHeightM();track_={};steeredCycles_=0;regimeSinceCycles_=-1;resetLookahead();
   walkPrevious_=solveGait(gait_,gaitTrackCartesian(track_,gait_,0,0,0),nullptr,false);
   if(!pointSafe(walkPrevious_.target)||!contains(walkBox(),walkPrevious_.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkStartUs_=now;walkStopping_=walkRecover_=false;stopCycle_=-1;cycles_=0;
-  phase_=Phase::WALK;state_=State::WALKING;reason_=steered_?"WALK_JOYSTICK":"WALK_STANDARD";
+  phase_=Phase::WALK;state_=State::WALKING;reason_=joystick_?"WALK_JOYSTICK":"WALK_STANDARD";
 }
 void SimpleMotion::steerWalk(uint64_t now){
   if(!joystick_||walkStopping_||walkRecover_){for(double& r:track_.goalRate)r=0;return;}
   // Released, unreachable or silent client: the Controller ends the walk itself.
   if(now>joystickDeadlineUs_){walkStop();reason_="JOYSTICK_TIMEOUT";return;}
-  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad};
-  const double limit[3]={kJoystickStrideM,kJoystickLateralM,kJoystickYawRad},dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
+  // Regime change of the one law, never by WALK STOP (dev.6): fore/aft ->
+  // steered once the stride is inside the steered range, steered -> fore/aft once
+  // lateral, yaw and sway are retired; both only where regimeHandover holds.
+  // The precondition must hold for one whole cycle first: every foot has then
+  // stepped under it (offline, a handover with feet still planted for the long
+  // fore/aft stride or a lateral step put IMU envelope rays outside the box).
+  // Steering is certified on the SLOW law alone: no handover before a mode change to it has ended.
+  const bool slowLaw=walkMode_==WalkMode::SLOW&&walkTarget_==WalkMode::SLOW&&walkPeriod_==kWalkPeriodS&&walkHeight_==kWalkHeightM;
+  const bool toSteered=slowLaw&&!steered_&&!joystickFrontal_&&std::abs(gait_.advanceXM)<=kJoystickStrideM+1e-12;
+  const bool toForeAft=steered_&&joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM&&std::abs(gait_.advanceXM)<=kJoystickStrideM+1e-12;
+  if(!toSteered&&!toForeAft)regimeSinceCycles_=-1;
+  else if(regimeSinceCycles_<0)regimeSinceCycles_=cycles_;
+  else if(cycles_-regimeSinceCycles_>=1&&regimeHandover(toSteered)){steered_=toSteered;regimeSinceCycles_=-1;}
+  // Fore/aft regime with a steering demand: the stride retires to the steered
+  // range first, lateral and yaw wait for the handover.
+  auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad},goal[3];joystickGoal(!steered_&&joystickFrontal_,goal);
+  if(!steered_)goal[1]=goal[2]=0;
+  // Full scale over kJoystickRampCycles (steered); fore/aft increases over
+  // kJoystickFrontalRampCycles, forward decreases over kJoystickFrontalDecelCycles.
+  const double limit[3]={steered_?kJoystickStrideM:kStrideM[2],kJoystickLateralM,kJoystickYawRad};
+  const double dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
   for(unsigned j=0;j<3;++j){
-    const double goal=j==0&&(joystickGoal_[0]<0)!=gait_.reverse?0:joystickGoal_[j],rate=limit[j]/kJoystickRampCycles;  // never against the leg order
-    *axis[j]+=std::clamp(goal-*axis[j],-rate*dc,rate*dc);track_.goal[j]=goal;track_.goalRate[j]=rate;}
-  if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad)&&gaitRetarget(track_,gait_,next,cycles_))gait_=next;
+    const double g=j==0&&(goal[0]<0)!=gait_.reverse?0:goal[j];  // never against the leg order
+    // Forward only: a faster backward decrease left -0.69 mm of static support (seeded random sequence).
+    const double ramp=steered_?kJoystickRampCycles:!gait_.reverse&&std::abs(g)<std::abs(*axis[j])?kJoystickFrontalDecelCycles:kJoystickFrontalRampCycles,rate=limit[j]/ramp;
+    *axis[j]+=std::clamp(g-*axis[j],-rate*dc,rate*dc);track_.goal[j]=g;track_.goalRate[j]=rate;}
+  // Lateral sway follows the rate-limited lateral/yaw demand, changing only
+  // while all four feet are down (last nominal sample): the body never crosses
+  // the fillet contact band (SimpleMotion.h) during a three-contact phase. The
+  // fore/aft regime keeps the WALK sway.
+  const double swayRate=(kJoystickSwayYM-kJoystickSwayBaseYM)/kJoystickSwayRampCycles;
+  bool fourDown=steered_;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
+  if(fourDown)next.swayYM+=std::clamp(joystickSwayYM(next.advanceYM,next.yawRad,gait_.swayYM)-next.swayYM,-swayRate*dc,swayRate*dc);
+  if((next.advanceXM!=gait_.advanceXM||next.advanceYM!=gait_.advanceYM||next.yawRad!=gait_.yawRad||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_)){
+#ifdef MATDOG_T2_SHADOW
+    gaitRetarget(shadowTrack_,gait_,next,cycles_);
+#endif
+    gait_=next;}
 }
-bool SimpleMotion::limitWalkTilt(double& roll,double& pitch) const {
-  if(steered_)return projectWalkTilt(kSteerTilt,roll,pitch);
-  return stride_==2?projectWalkTilt(kWalkTilt60,roll,pitch):projectWalkTilt(kWalkTilt45,roll,pitch);
+const char* SimpleMotion::selectWalkMode(WalkMode m){
+  // A walk that follows the selection must have the mode's drive accepted by
+  // the servos: never above the verified register 85.
+  if(walkModeLive()&&walkModeSpec(m).drive.acc>input_.accCeiling)return "SERVO_ACC_CEILING_BELOW_DRIVE";
+  selectedMode_=m;return nullptr;
+}
+// One release of a WALK mode change (SimpleMotion.h, kWalkModeRateSlope): a
+// walk that can change (walkModeLive) takes the selected mode as its target,
+// then every quantity of its law approaches the target's. The body height and
+// sway between the two laws are walked with the faster law's shape (the one
+// designed for the lower body: the kHeight HIP room grows with the height) at
+// the slower law's clock; a slower law's shape only at its own height; a
+// larger sway only with the target's own shape and height; a law's own clock
+// only with its own shape, height and sway. Nothing
+// here changes the gait phase: the clock is re-based at this release's cycle.
+void SimpleMotion::stepWalkMode(double eased){
+  const double dt=eased-modeEased_,dc=dt/walkPeriod_;modeEased_=eased;
+  if(!walkModeLive())return;
+  if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling){
+    walkTarget_=selectedMode_;requestedHeight_=walkModeSpec(walkTarget_).heightM;}
+  const auto& from=walkModeSpec(walkMode_);const auto& to=walkModeSpec(walkTarget_);
+  const bool shaped=walkMode_==walkTarget_;
+  if(shaped&&walkPeriod_==to.periodS&&walkHeight_==to.heightM&&gait_.swayYM==to.swayYM&&(joystick_||gait_.advanceXM==to.strideM[stride_])){
+    walkDrive_=to.drive;return;}  // settled: the mode's own law
+  if(cycles_<kWalkStartCycles)return;  // after the start ramp
+  auto approach=[](double x,double goal,double step){return std::abs(goal-x)<=step?goal:x+std::copysign(step,goal-x);};
+  // Clock rate (cycles per eased second): the slower law's, never faster than
+  // now, until the law is the target's own (shape, height, sway); then the target's.
+  const double slowPeriod=std::fmax(from.periodS,to.periodS);
+  const double goalPeriod=shaped&&walkHeight_==to.heightM&&gait_.swayYM==to.swayYM?to.periodS:std::fmax(walkPeriod_,slowPeriod);
+  if(walkPeriod_!=goalPeriod){
+    const double f=approach(1/walkPeriod_,1/goalPeriod,kWalkModeRateSlope*dt);
+    clockCycles_=cycles_;clockEased_=eased;walkPeriod_=f==1/goalPeriod?goalPeriod:1/f;}
+  // Drive: the faster mode's while the law moves, the target's once the clock has its rate.
+  walkDrive_=shaped&&walkPeriod_==to.periodS?to.drive:walkDrive_.acc>=to.drive.acc?walkDrive_:to.drive;
+  // WALK presets: the target's stride, within the slower law's until the shape
+  // changes (joystick: joystickGoal), on the joystick's fore/aft ramps.
+  auto next=gait_;
+  if(!joystick_){
+    const double goal=shaped?to.strideM[stride_]:std::fmin(from.strideM[stride_],to.strideM[stride_]);
+    const double rate=kStrideM[2]/(goal<gait_.advanceXM?kJoystickFrontalDecelCycles:kJoystickFrontalRampCycles);
+    next.advanceXM=approach(gait_.advanceXM,goal,rate*dc);track_.goal[0]=goal;track_.goalRate[0]=rate;}
+  // Height: with the faster law's shape at the slower law's clock (body height
+  // only: planted feet keep their world anchors, a swing its world path).
+  // Lateral sway, four feet down only (as steerWalk): a smaller one at once
+  // (it gives HIP room), a larger one with the target's own shape and height.
+  const bool geometry=from.periodS<=to.periodS&&walkPeriod_>=slowPeriod;
+  bool fourDown=true;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
+  if(fourDown&&(to.swayYM<gait_.swayYM||(shaped&&walkHeight_==to.heightM)))next.swayYM=approach(gait_.swayYM,to.swayYM,kWalkModeSwayRate*dc);
+  if((next.advanceXM!=gait_.advanceXM||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_))gait_=next;
+  const double h=geometry?approach(walkHeight_,to.heightM,kWalkModeHeightRate*dt):walkHeight_;
+  if(h!=walkHeight_){walkHeight_=plannedHeight_=h;gait_.heightM=baseLinkHeightFromNominalM(h);}
+  // Law shape (duty, swing profile, lift): at the first release of a
+  // four-contact window, where no foot is in flight under either duty, the
+  // clock at the slower rate, the stride inside the target's, a slower target
+  // at its own height, the applied correction inside the target's envelope (as
+  // regimeHandover).
+  if(shaped||walkPeriod_<slowPeriod||std::abs(gait_.advanceXM)>to.strideM[joystick_?2:stride_]+1e-12)return;
+  if(to.periodS>from.periodS&&walkHeight_!=to.heightM)return;
+  const double since=cycles_-std::floor(cycles_*4)/4;
+  if(since>dc||since>=std::fmin(from.duty,to.duty)-.75)return;
+  auto shape=walkGait(joystick_?2:stride_,walkTarget_);if(joystick_&&walkTarget_==WalkMode::SLOW)shape.edgeTiltRad=kEdgeContactMaxTiltRad;
+  for(unsigned l=0;l<4;++l)if(!legPhase(gait_,static_cast<LegId>(l),cycles_).stance||!legPhase(shape,static_cast<LegId>(l),cycles_).stance)return;
+  const auto& b=walkPrevious_.cartesian.body;const double c=b.rotation[0][0],s=b.rotation[1][0];
+  const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;double rb=c*r+s*p,pb=-s*r+c*p;
+  if(projectWalkTilt(stride_==2?*to.tiltTop:*to.tiltShort,rb,pb))return;
+  gait_.duty=shape.duty;gait_.liftM=shape.liftM;gait_.swingRamp=shape.swingRamp;gait_.swingRampEnd=shape.swingRampEnd;gait_.edgeTiltRad=shape.edgeTiltRad;
+  walkMode_=walkTarget_;
+}
+bool SimpleMotion::regimeHandover(bool toSteered) const {
+  const collision::Box& box=toSteered?collision::kSteer:kWalkBox;
+  JointTargetFrame q;q.valid=true;
+  for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(q,i)))return false;
+  if(!pointSafe(q)||!contains(box,q))return false;
+  const auto& b=walkPrevious_.cartesian.body;const double c=b.rotation[0][0],s=b.rotation[1][0];
+  const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;
+  double rb=c*r+s*p,pb=-s*r+c*p;
+  return toSteered?!projectWalkTilt(kSteerTilt,rb,pb):!projectWalkTilt(kWalkTilt100,rb,pb);
+}
+const TiltPolygon& SimpleMotion::pendingWalkTilt() const {
+  // The joystick starts in its mode's fore/aft regime (SLOW: kWalkTilt100, inside kSteerTilt).
+  if(joystick_)return *walkModeSpec(pendingMode_).tiltTop;
+  const auto& m=walkModeSpec(pendingMode_);return requestedStride_==2?*m.tiltTop:*m.tiltShort;
+}
+bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) const {
+  // Fore/aft regime: its envelope, also in the heading frame (a joystick walk
+  // may have turned; identity heading keeps roll/pitch bit for bit). A steered
+  // walk whose lateral, yaw and sway are retired for a fore/aft demand already
+  // limits to it: the applied correction slews inside, then the regime hands over.
+  // During a WALK mode change, inside the target's envelope too until the law has its shape.
+  if(!steeredEnvelope()){const auto& mode=walkModeSpec(walkMode_);const auto& poly=stride_==2?*mode.tiltTop:*mode.tiltShort;
+    const bool change=walkTarget_!=walkMode_;const auto& target=walkModeSpec(walkTarget_);const auto& next=stride_==2?*target.tiltTop:*target.tiltShort;
+    if(c==1&&s==0){const bool limited=projectWalkTilt(poly,roll,pitch);return (change&&projectWalkTilt(next,roll,pitch))||limited;}
+    double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;bool limited=projectWalkTilt(poly,rb,pb);limited=(change&&projectWalkTilt(next,rb,pb))||limited;
+    if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;}
+  // The steered envelope bounds the hip roll and fillet tilt the correction
+  // loads on the stance legs, a body-frame quantity, while the fitted tilt and
+  // headed() live in the support frame. Take the tilt vector into the heading
+  // frame (R_z(theta)^T), project it on the certified polygon there and take it
+  // back; identity heading keeps roll/pitch bit for bit. Review 2026-11-08:
+  // projected in the support frame, a continuous full-scale turn past ~0.9 rad
+  // of heading reached the 12 deg fillet limit on the pitch-up boundary ray
+  // (WALK_IK_OR_WORKSPACE in the firmware), unseen by the 4-cycle gate.
+  double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(kSteerTilt,rb,pb);
+  if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;
 }
 JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
   timing::count(timing::SOLVES);
@@ -902,48 +1145,48 @@ JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const
   return q;
 }
 bool SimpleMotion::compensationSafe(const JointTargetFrame& q,const collision::Box& box,bool stopProof) const {
-  if(!pointSafe(q)||!contains(box,q))return false;
+  auto refuse=[this](uint8_t check){safeRefusal_=check;return false;};
+  if(!pointSafe(q)||!contains(box,q))return refuse(1);
   // The same gen-1 conversion as TX/readback; an in-box floating point IK
   // solution alone is insufficient at a box edge after RAW quantization.
   auto decoded=q;
-  for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return false;}
-  if(!pointSafe(decoded)||!contains(box,decoded))return false;
+  for(unsigned i=0;i<12;++i){uint16_t raw=0;if(!port_->resolve(i,jointSlot(q,i),raw)||!port_->decodeRaw(i,raw,jointSlot(decoded,i)))return refuse(2);}
+  if(!pointSafe(decoded)||!contains(box,decoded))return refuse(3);
   const collision::Box* arrestBox=&box;
   if(phase_!=Phase::WALK){
     // Keep the measured static-load residual when checking the next small
     // HOLD step. A goal alone being in-box is insufficient: the recorded
     // loaded pose must retain a common certified region with its reference.
     auto loaded=decoded;double lagRoom[12];const uint64_t at=esp_timer_get_time();
-    for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
+    for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return refuse(2);
       jointSlot(loaded,i)+=fb_[i].q-old;
       // Feedback is staggered across a population. Reserve the proposed RAW
       // step over its age plus this release, rather than treating it as a
       // simultaneous observation of the current reference under static load.
       lagRoom[i]=std::abs(jointSlot(decoded,i)-old)*(1+double(at>=fb_[i].stampUs?at-fb_[i].stampUs:0)/kPeriodUs);
-      if(jointSlot(loaded,i)-lagRoom[i]<input_.minRad[i]||jointSlot(loaded,i)+lagRoom[i]>input_.maxRad[i])return false;}
+      if(jointSlot(loaded,i)-lagRoom[i]<input_.minRad[i]||jointSlot(loaded,i)+lagRoom[i]>input_.maxRad[i])return refuse(4);}
     auto loadedInside=[&](const collision::Box& b){for(unsigned i=0;i<12;++i)
       if(jointSlot(loaded,i)-lagRoom[i]<b.lo[i]||jointSlot(loaded,i)+lagRoom[i]>b.hi[i])return false;return true;};
     const auto actual=measured();
     if(!contains(box,actual)||!loadedInside(box)){
-      if(!contains(collision::kLift,decoded)||!contains(collision::kLift,actual)||!loadedInside(collision::kLift))return false;
+      if(!contains(collision::kLift,decoded)||!contains(collision::kLift,actual)||!loadedInside(collision::kLift))return refuse(5);
       arrestBox=&collision::kLift;
     }
-    if(!pointSafe(loaded))return false;
+    if(!pointSafe(loaded))return refuse(6);
   }
   if(!stopProof)return true;
   // A reachable boundary is not necessarily stoppable from its sampled RAW
   // rate. Reuse STOP's own proof before issuing a new levelled reference;
   // no second trajectory law, relaxed limit or retained cache is introduced.
   const uint64_t at=esp_timer_get_time();
-  if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return false;
-  const Drive drive=phase_==Phase::WALK?kWalkDrive:kStandDrive;
+  if(!issuedUs_||at<=issuedUs_||at-issuedUs_>100000)return refuse(7);
+  const Drive drive=phase_==Phase::WALK?walkDrive_:kStandDrive;
   // Same secant STOP would take after this send: both samples on the reference clock.
-  if(nowUs_<=issuedUs_)return false;
-  StopPlan arrest;double lo[12],hi[12];const double dt=(nowUs_-issuedUs_)/1e6;
-  for(unsigned i=0;i<12;++i){double old=0;if(!port_->decodeRaw(i,commandedRaw_[i],old))return false;
-    arrest.q[i]=jointSlot(decoded,i);arrest.v[i]=std::clamp((arrest.q[i]-old)/dt,-drive.speed*kTickRad,drive.speed*kTickRad);
-    lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
-  return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,drive.speed*kTickRad,drive.acc*100*kTickRad);
+  if(nowUs_<=issuedUs_)return refuse(7);
+  StopPlan arrest;double lo[12],hi[12];
+  for(unsigned i=0;i<12;++i){arrest.q[i]=jointSlot(decoded,i);lo[i]=std::fmax(arrestBox->lo[i],input_.minRad[i]);hi[i]=std::fmin(arrestBox->hi[i],input_.maxRad[i]);}
+  if(!rateFromHistory(arrest.q,nowUs_,0,stopSpeedRadS(drive),arrest.v))return refuse(8);  // same estimate beginStop would take after this send
+  return arrest.build(arrest.q,arrest.v,arrest.a,lo,hi,stopSpeedRadS(drive),stopAccelerationRadS2(drive))||refuse(9);
 }
 // One slew step per Motion release, scaled by the physical time since the last
 // one: a group boundary regenerates the reference in the same release and must
@@ -955,9 +1198,10 @@ double SimpleMotion::slewStep(uint64_t now,uint64_t maxDtUs){
 void SimpleMotion::rememberCorrection(const JointTargetFrame& accepted,const JointTargetFrame& nominal,uint64_t now){
   reuseOffset_.valid=accepted.valid&&nominal.valid;
   for(unsigned i=0;i<12;++i)jointSlot(reuseOffset_,i)=jointSlot(accepted,i)-jointSlot(nominal,i);
-  reusePhase_=phase_;reuseUs_=now;reuseGait_[0]=gait_.advanceXM;reuseGait_[1]=gait_.advanceYM;reuseGait_[2]=gait_.yawRad;
+  reusePhase_=phase_;reuseUs_=now;
 }
 void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t now,bool unwind){
+  safeRefusal_=0;  // diagnostics: the refusals of this release only
   const bool walk=phase_==Phase::WALK;
   const collision::Box& safeBox=(walk||phase_==Phase::WALK_HOLD)?walkBox():collision::kHeight;
   // T1 light release (dev.7 WALK budget, restored for WALK and HOLD): while
@@ -965,9 +1209,19 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // every other release keeps it as a joint offset on the new nominal target.
   // Same limits, boxes, RAW, loaded and STOP proof; any slew, phase, gait,
   // IMU, unwind or recovery change forces the full solve.
+  // T2 balance: in WALK the light compensation is taken on the releases that
+  // paid the nominal IK solve, so the look-ahead release (no nominal solve)
+  // carries the full compensation and no release carries both.
+  // T1b (motion-perf-next): a steerWalk retarget of the displacement per cycle
+  // no longer forces the full solve. The accepted correction is a body
+  // attitude offset expressed on the nominal of the previous release; the
+  // rate-limited retarget moves that nominal by less than one release of the
+  // same law does, and the reused frame still passes compensationSafe here.
+  // Offline, with the random joystick runs of run_motion_frame_digest.sh, the
+  // light fraction rises from 8 % to 40 % with the same shadow error (1.2 tick).
   const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&!walkRecover_&&reusePhase_==phase_&&
-    (phase_==Phase::WALK||phase_==Phase::HOLD)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
-    !(up.x==0&&up.y==0&&up.z==0)&&reuseGait_[0]==gait_.advanceXM&&reuseGait_[1]==gait_.advanceYM&&reuseGait_[2]==gait_.yawRad;
+    (phase_==Phase::WALK||phase_==Phase::HOLD)&&(phase_!=Phase::WALK||nominalSolved_)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
+    !(up.x==0&&up.y==0&&up.z==0);
   if(reusable){
     auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(reuseOffset_,i);
     if(compensationSafe(q,safeBox,true)){
@@ -982,9 +1236,13 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
       f.target=q;reuseLight_=true;++reuseStats_.light;return;}
     ++reuseStats_.rejected;
   }
-  // A full solve after a light release steps at most one period: never more
-  // than dev.15's per-release step from the same accepted correction.
+  // A full solve after a light release steps at most one period, and no more
+  // than the wall time since the last issued reference: the correction's rate
+  // between consecutive references stays <= kImuSlewRadS, so the RAW secant
+  // the STOP proof reads over a short release interval is not inflated by a
+  // correction step accumulated over the light release (review 2026-11-08).
   const bool afterLight=reuseLight_;reuseLight_=false;++reuseStats_.full;
+  const uint64_t sinceIssuedUs=issuedUs_&&now>issuedUs_?now-issuedUs_:kPeriodUs;
   const double oldRoll=rollCorrection_,oldPitch=pitchCorrection_;
   const JointTargetFrame nominal=f.target;
   // Angles are the accepted body orientation in the existing support frame,
@@ -1004,10 +1262,14 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   timing::count(timing::FK,unwind?0:3);
   imuLimited_=!fitted;imuReason_=fitted?"OK":up.x==0&&up.y==0&&up.z==0?"IMU_STALE":"SUPPORT_FIT";
   if(!fitted){wantedRoll=rollCorrection_;wantedPitch=pitchCorrection_;}
-  if(walk&&limitWalkTilt(wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
+  if(walk&&limitWalkTilt(wantedRoll,wantedPitch,f.cartesian.body.rotation[0][0],f.cartesian.body.rotation[1][0])){imuLimited_=true;imuReason_="ENVELOPE";}
+  else if(phase_==Phase::HOLD&&walkRequested_&&projectWalkTilt(pendingWalkTilt(),wantedRoll,wantedPitch)){imuLimited_=true;imuReason_="ENVELOPE";}
   imuWanted_[0]=wantedRoll;imuWanted_[1]=wantedPitch;
-  const double slew=slewStep(now,afterLight?kPeriodUs:kImuSlewMaxDtUs);
-  auto step=[&](double old,double wanted){return !unwind&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
+  const double slew=slewStep(now,afterLight?std::min<uint64_t>(kPeriodUs,sinceIssuedUs):kImuSlewMaxDtUs);
+  // No 1 mrad dead band while a walk waits for its envelope: it would park the
+  // correction up to 1 mrad outside and hold the start (WALK_IMU_SETTLING).
+  const bool exact=unwind||(phase_==Phase::HOLD&&walkRequested_);
+  auto step=[&](double old,double wanted){return !exact&&std::abs(wanted-old)<.001?old:old+std::clamp(wanted-old,-slew,slew);};
   double roll=step(rollCorrection_,wantedRoll),pitch=step(pitchCorrection_,wantedPitch);
   if(walk){const double dr=wantedRoll-rollCorrection_,dp=wantedPitch-pitchCorrection_;
     const double distance=std::fmax(std::abs(dr),std::abs(dp)),fraction=distance>.001?std::fmin(1.,slew/distance):0;
@@ -1021,13 +1283,35 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
   // Large edge-biased roll solutions do not preserve this model's nominal
   // support strip. Keep its existing contact domain, not a new IMU-angle cap.
-  const auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:0);
+  // A HEIGHT/PRONE_HEIGHT unwind retires a correction that a steered
+  // WALK_SETTLE may have accepted in the fillet edge model (up to
+  // kEdgeContactMaxTiltRad): its steps are solved in that model. Inside the
+  // nominal strip it gives the same joints (zero fillet lift); beyond it the
+  // strip refused every step and the deadline ended the move (H1-RCA
+  // 2026-11-08: +63.7/-66.5 mrad, NATIVE_TARGET_NOT_REACHED). Every other
+  // check of compensationSafe is unchanged.
+  const double edgeTilt=walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:unwind?kEdgeContactMaxTiltRad:0;
+  auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
   if(compensationSafe(q,safeBox,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{
     // Retain the accepted pose at the real workspace boundary. The desired
     // geometric orientation is re-estimated next release, so reversal leaves
     // saturation immediately; there is no accumulated integral to unwind.
+    // WALK (dev.6 consolidation): a refused slew step is retried once at the
+    // accepted correction, the constant-tilt motion the WALK envelopes certify
+    // (walk_tilt_envelope_check: T2 midpoints, sub-period phases); the same
+    // compensationSafe decides. Rig: at the WALK100 swing end a 0.8 mrad step
+    // added one tick to the STOP secant (STOP_PLAN, then WALK_IK_OR_WORKSPACE).
+    if(walk&&!unwind&&(roll!=oldRoll||pitch!=oldPitch)){
+      const uint8_t refused=safeRefusal_;  // the refused step stays the recorded cause
+      if(oldRoll!=0||oldPitch!=0){body=headed(f.cartesian.body,oldRoll,oldPitch);  // locals reused: loop-task stack
+        body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
+        q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);}else q=nominal;
+      if(q.valid&&compensationSafe(q,safeBox,!walkRecover_)){
+        safeRefusal_=refused;f.target=q;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=true;imuLimited_=true;imuReason_="WORKSPACE";return;}
+      safeRefusal_=refused;
+    }
     if(walk){fault("WALK_IK_OR_WORKSPACE");return;}
     if(goal_.valid){f.target=goal_;rememberCorrection(goal_,nominal,now);}imuLimited_=true;imuReason_="WORKSPACE";reuseSettled_=true;
   }
@@ -1091,9 +1375,106 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // If no in-workspace correction exists, the nominal safe target survives.
   rollCorrection_=pitchCorrection_=0;correctionScale_=0;imuLimited_=true;imuReason_="WORKSPACE";
 }
+namespace {
+// Fields of the law other than the steered displacement per cycle and the
+// steered sway: a change of these is structural (new walk, WALK STOP terminal,
+// the shape step of a WALK mode change); advance, lateral, yaw and sway
+// amplitude change through gaitRetarget by rate-limited steps that keep the
+// body pose continuous. Nor is the body height: a WALK mode change moves it by
+// 0.04 mm per release (kWalkModeHeightRate), interpolated like a retarget.
+bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
+  return a.type==b.type&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&
+    a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition&&
+    a.comShiftXM==b.comShiftXM&&a.swingRamp==b.swingRamp&&a.swingRampEnd==b.swingRampEnd&&a.settleCycles==b.settleCycles;
+}
+}
+// T2: the reference at the release clock, linear in joint space between the
+// exact solutions at walkExactUs_ and walkAheadUs_ (u in [0,1)). Branches
+// and conditioning are those of the look-ahead. The Cartesian sample used by
+// the IMU compensation is rebuilt for this clock: planted feet keep their
+// anchors (the solution on the planted side of a lift-off/touchdown inside
+// the bracket), a swinging foot is the contact reference of the interpolated
+// joints (the fillet lift the steered IK added is removed again), the body
+// pose is interpolated in translation and yaw, the phases are the law's.
+void SimpleMotion::lerpFrame(LocomotionFrame& f,double u,const GaitParameters& g,double terminal) const {
+  const LocomotionFrame& a=walkExact_;const LocomotionFrame& b=walkAhead_;
+  f.status=b.status;f.failedLeg=b.failedLeg;f.minJointMarginRad=std::fmin(a.minJointMarginRad,b.minJointMarginRad);f.maxResidualM=std::fmax(a.maxResidualM,b.maxResidualM);
+  for(unsigned l=0;l<4;++l){f.branches[l]=b.branches[l];f.condition[l]=std::fmax(a.condition[l],b.condition[l]);}
+  f.target.valid=true;
+  for(unsigned i=0;i<12;++i)jointSlot(f.target,i)=jointSlot(a.target,i)+(jointSlot(b.target,i)-jointSlot(a.target,i))*u;
+  auto& s=f.cartesian;s.valid=true;s.cycles=cycles_;
+  const auto& ta=a.cartesian.body.translationM;const auto& tb=b.cartesian.body.translationM;
+  s.body.translationM={ta.x+(tb.x-ta.x)*u,ta.y+(tb.y-ta.y)*u,ta.z+(tb.z-ta.z)*u};
+  const double ya=std::atan2(a.cartesian.body.rotation[1][0],a.cartesian.body.rotation[0][0]),yb=std::atan2(b.cartesian.body.rotation[1][0],b.cartesian.body.rotation[0][0]);
+  double dy=yb-ya;if(dy>3.14159265358979323846)dy-=2*3.14159265358979323846;else if(dy<-3.14159265358979323846)dy+=2*3.14159265358979323846;
+  const double yaw=ya+dy*u,cy=std::cos(yaw),sy=std::sin(yaw);
+  s.body.rotation[0][0]=cy;s.body.rotation[0][1]=-sy;s.body.rotation[1][0]=sy;s.body.rotation[1][1]=cy;
+  for(unsigned l=0;l<4;++l){
+    auto phase=legPhase(g,static_cast<LegId>(l),cycles_);
+    if(terminal>=0&&cycles_>=terminal&&!phase.stance){phase.stance=phase.boundary=true;phase.swingProgress=0;}
+    s.phases[l]=phase;
+    if(phase.stance){s.feet[l]=a.cartesian.phases[l].stance?a.cartesian.feet[l]:b.cartesian.feet[l];continue;}
+    const auto c=contactForwardKinematics(static_cast<LegId>(l),f.target.legs[l]);
+    Vector3 w{};if(c.status!=ContactStatus::OK||!pointToWorld(s.body,c.referenceM,w)){f.target.valid=false;return;}
+    if(g.edgeTiltRad>0)w.z-=edgeContactLiftM(c.axisTiltRad);
+    s.feet[l]=w;
+  }
+}
+// T2: the nominal frame of this release, written into the caller's frame
+// (target.valid false when a solve failed; the caller faults
+// WALK_IK_OR_WORKSPACE as before). Positions only (A1).
+void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,double terminal,bool clockDone){
+  // The eased recovery clock and the terminal frame are solved exactly at the
+  // release clock, as before T2; the terminal frame also ends the look-ahead.
+  if(walkRecover_||clockDone){
+    resetLookahead();++lookaheadStats_.exact;
+    solveGaitInto(f,g,gaitTrackCartesian(track_,g,cycles_,0,0,terminal),&walkPrevious_,false);return;
+  }
+  // Exact solutions live on the release grid (update() advanced nextUs_
+  // before this release): the law's track is sampled in order, two periods
+  // at a time, and every release clock falls inside [exact, ahead).
+  const uint64_t gridUs=nextUs_-kPeriodUs;
+  auto cyc=[&](uint64_t us){return clockCycles_+(walkClock(double(us-walkStartUs_)/1e6)-clockEased_)/walkPeriod_;};
+  const bool shape=walkExactUs_&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g);
+  if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkExactGridUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
+  if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactGridUs_+2*kPeriodUs)){
+    // Start, missed release or structural change: exact solution at this
+    // release's own clock (the law at `now`, as v1.0.1), sent as it is, the
+    // bracket anchored to its grid point; the look-ahead is solved by the next
+    // release so that no release ever carries two nominal solves. Solving the
+    // grid point of a late release sent a frame behind `now` by the lateness,
+    // and the next release then carried that lateness plus a period of law in
+    // one frame (an inflated STOP secant).
+    solveGaitInto(walkExact_,g,gaitTrackCartesian(track_,g,cyc(nowUs_),0,0,terminal),&walkPrevious_,false);
+    walkExactUs_=nowUs_;walkExactGridUs_=gridUs;walkExactTerminal_=terminal;walkExactGait_=g;walkAheadValid_=false;nominalSolved_=true;++lookaheadStats_.resync;
+    f=walkExact_;return;
+  }
+  bool solved=false;
+  if(!walkAheadValid_){
+    const double ca=cyc(walkExactGridUs_+2*kPeriodUs);
+    if(terminal<0||ca<=terminal+gaitSettleCycles(g)){
+      solveGaitInto(walkAhead_,g,gaitTrackCartesian(track_,g,ca,0,0,terminal),&walkExact_,false);solved=true;
+      if(walkAhead_.target.valid){walkAheadUs_=walkExactGridUs_+2*kPeriodUs;walkAheadGait_=g;walkAheadValid_=true;}
+    }
+  }
+  nominalSolved_=solved;if(solved)++lookaheadStats_.exact;else ++lookaheadStats_.interp;
+  if(!walkAheadValid_){f=walkExact_;return;}  // no look-ahead inside the law (terminal zone): the grid-point solution
+  const double u=std::clamp(double(nowUs_-walkExactUs_)/double(walkAheadUs_-walkExactUs_),0.,1.);
+  lerpFrame(f,u,g,terminal);
+#ifdef MATDOG_T2_SHADOW
+  // Exact solve at the release clock on a track sampled every release. Compared
+  // only while the law has not been retargeted since the bracket's exact
+  // sample: after a retarget the two tracks plan a lift-off at different
+  // instants with different goals, so "the exact reference" is not unique.
+  {const auto exact=solveGait(g,gaitTrackCartesian(shadowTrack_,g,cycles_,0,0,terminal),&walkPrevious_,false);
+   const bool sameLaw=walkExactGait_.advanceXM==g.advanceXM&&walkExactGait_.advanceYM==g.advanceYM&&walkExactGait_.yawRad==g.yawRad;
+   if(sameLaw&&exact.target.valid&&f.target.valid)for(unsigned i=0;i<12;++i)lookaheadStats_.maxShadowRad=std::fmax(lookaheadStats_.maxShadowRad,std::abs(jointSlot(exact.target,i)-jointSlot(f.target,i)));}
+#endif
+}
 void SimpleMotion::generateWalk(uint64_t now){
   timing::Section section(timing::NOMINAL);
-  // One constant gait clock. Start and WALK STOP are geometric C2 stride
+  // One gait clock (its rate moves only in a WALK mode change, stepWalkMode,
+  // which re-bases it without a phase step). Start and WALK STOP are geometric C2 stride
   // ramps inside the gait law, so the body leaves and reaches rest with zero
   // velocity and acceleration; the last window recentres with four feet down.
   double fade=0;const bool firstRecovery=walkRecover_&&!recoverUs_;
@@ -1104,19 +1485,20 @@ void SimpleMotion::generateWalk(uint64_t now){
       // Recheck the actual pose after I/O in the same certified WALK box.
       if(!pointSafe(measured())||!contains(walkBox(),measured())){fault("STOP_RECOVERY_PATH_NOT_CLEAR");return;}
       recoverUs_=now;}
-    // Same C2 ease as the WALK start ramp: gait rate 0->1 over one second.
-    const double t=(now-recoverUs_)/1e6,u=std::fmin(1.,t);
-    cycles_=recoverCycles_+(t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5)/kWalkPeriodS;
-    fade=1-quinticTimeLaw(u,1).progress;
-  }else cycles_=(now-walkStartUs_)/1e6/kWalkPeriodS;
+    // The walk start clock: gait rate 0->1 over one second.
+    const double t=(now-recoverUs_)/1e6;
+    cycles_=recoverCycles_+walkClockS(t)/period();
+    fade=1-quinticTimeLaw(std::fmin(1.,t),1).progress;
+  }else cycles_=clockCycles_+(walkClock((now-walkStartUs_)/1e6)-clockEased_)/walkPeriod_;
   steerWalk(now);
+  if(!walkRecover_)stepWalkMode(walkClock((now-walkStartUs_)/1e6));
   const auto g=gait_;
   const double terminal=walkStopping_?stopCycle_+g.stopCycles:-1,end=terminal+gaitSettleCycles(g);
   const bool clockDone=walkStopping_&&cycles_>=end;if(clockDone)cycles_=end;
   // A STOP in WALK_SETTLE can restart at the terminal clock itself. Finish
   // the existing held-RAW bridge before handing off, even with no gait left.
   const bool done=clockDone&&(!walkRecover_||now-recoverUs_>=1000000);
-  auto f=solveGait(g,gaitTrackCartesian(track_,g,cycles_,clockDone?0:1/kWalkPeriodS,0,terminal),&walkPrevious_,false);
+  LocomotionFrame f;nominalRelease(f,g,terminal,clockDone);
   if(!f.target.valid||!contains(walkBox(),f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}
   walkPrevious_=f;compensate(f,now);
   if(offPending_)return;
@@ -1125,12 +1507,12 @@ void SimpleMotion::generateWalk(uint64_t now){
   if(fade>0){for(unsigned i=0;i<12;++i)jointSlot(f.target,i)+=fade*jointSlot(recoverOffset_,i);
     if(!contains(walkBox(),f.target)||!pointSafe(f.target)){fault("WALK_IK_OR_WORKSPACE");return;}}
   if(walkRecover_&&!compensationSafe(f.target,walkBox())){fault("WALK_IK_OR_WORKSPACE");return;}
-  if(!send(f.target,kWalkDrive,now))return;
+  if(!send(f.target,walkDrive_,now))return;
   if(done){
     walkRecover_=false;state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
     // correction and a fixed completion deadline. Reuse the same generator.
-    beginNative(Phase::WALK_HOLD,walkPrevious_.target,walkBox(),now,0,0,baseLinkHeightFromNominalM(kWalkHeightM));
+    beginNative(Phase::WALK_HOLD,walkPrevious_.target,walkBox(),now,0,0,baseLinkHeightFromNominalM(walkHeightM()));
   }
 }
 void SimpleMotion::update(uint64_t now){
@@ -1141,7 +1523,8 @@ void SimpleMotion::update(uint64_t now){
   // Electrical supervision is not gated by the 20 ms trajectory release.
   if(engaged()&&!input_.powerOk){fault(input_.powerReason);serviceOff();return;}
   if(!engaged()&&state_==State::READY&&(!input_.ready||!input_.powerOk||!input_.imuValid)){state_=State::STOPPED;reason_=input_.refusal;}
-  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_){state_=State::READY;reason_=proneRest_?"PRONE_REST":"READY";}
+  if(state_==State::STOPPED&&input_.ready&&input_.powerOk&&input_.imuValid&&offVerified()&&!operatorStopped_&&
+     (!entryRefused_||entryReadmitted(now))){state_=State::READY;reason_=proneRest_?"PRONE_REST":"READY";entryRefused_=false;}
   if(!input_.ready&&!engaged())return;
   if(!nextUs_)nextUs_=now;
   if(now<nextUs_)return;
@@ -1189,7 +1572,10 @@ void SimpleMotion::update(uint64_t now){
     if(f.torque!=0||f.status||f.temp>=70||f.voltage<40||f.voltage>140||magnitude(f.speed)>50){fault("INITIAL_SERVO_NOT_READY");return;}
     if(++acquire_==12){
       reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-      if(!fresh(esp_timer_get_time())||!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+      // Stale feedback is a bus condition and stays a latched fault; a fresh
+      // pose outside every certified region is a recoverable entry refusal.
+      if(!fresh(esp_timer_get_time())){fault("SERVO_FEEDBACK_STALE");return;}
+      if(!planInitialReference()){refuseEntry();return;}
       phase_=Phase::REFERENCE;
     }
     return;
@@ -1197,7 +1583,7 @@ void SimpleMotion::update(uint64_t now){
   if(phase_==Phase::REFERENCE){
     // Write the real measured reference with torque OFF before enabling.
     reference_.valid=true;for(unsigned i=0;i<12;++i)jointSlot(reference_,i)=fb_[i].q;
-    if(!planInitialReference()){fault("INITIAL_POSE_OUTSIDE_SAFE_ENTRY");return;}
+    if(!planInitialReference()){refuseEntry();return;}
     // ST-3215-C018 position-profile writes can arm torque (QC V6.1).
     // Restore OFF immediately; ENABLE independently verifies it per joint.
     energized_=true;offMask_=0; // even an uncertain reference TX may have armed
@@ -1330,6 +1716,7 @@ void SimpleMotion::update(uint64_t now){
     // changes. Do not solve the same nominal IK and differential every 20 ms.
     auto f=holdNominal_;
     if(f.target.valid){compensate(f,now);send(f.target,kStandDrive,now);}
+    if(walkRequested_&&phase_==Phase::HOLD&&!offPending_&&!stop_.load())startWalk(now);  // a start held by WALK_IMU_SETTLING
   }
 }
 } }

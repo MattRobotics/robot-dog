@@ -34,6 +34,14 @@ struct StopReferenceProbe {
   static double stride(const SimpleMotion& m){return m.gait_.advanceXM;}
   static const motion::GaitParameters& gait(const SimpleMotion& m){return m.gait_;}
   static const collision::Box& box(const SimpleMotion& m){return m.walkBox();}
+  // STOP reference history (read-only): issue instants and the built plan.
+  static uint64_t issuedUs(const SimpleMotion& m){return m.issuedUs_;}
+  static uint64_t previousUs(const SimpleMotion& m){return m.previousUs_;}
+  static uint64_t previous2Us(const SimpleMotion& m){return m.previous2Us_;}
+  static const StopPlan& stopPlan(const SimpleMotion& m){return m.stopPlan_;}
+  static const uint16_t* commandedRaw(const SimpleMotion& m){return m.commandedRaw_;}
+  static const uint16_t* previous2Raw(const SimpleMotion& m){return m.previous2Raw_;}
+  static bool limitWalkTilt(const SimpleMotion& m,double& roll,double& pitch,double c,double s){return m.limitWalkTilt(roll,pitch,c,s);}
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -72,7 +80,17 @@ struct ScriptedObservationPort: simple::ServoPort {
   }
   bool resolve(unsigned,double q,uint16_t& raw) override{raw=2048+std::lround(q/simple::kTickRad);return raw<4096;}
   bool decodeRaw(unsigned,uint16_t raw,double& q) override {q=(int(raw)-2048)*simple::kTickRad;return raw<4096;}
+  // Every frame of every scenario carries a drive of the Controller's table:
+  // the RAM pairs ServoBus::setOperationalDrive admits (test_preenable_bus keeps
+  // the two lists equal; trace 44: a pair outside the gate is SYNC_WRITE_FAILED).
+  static bool tableDrive(simple::Drive d){
+    auto same=[&](simple::Drive t){return d.speed==t.speed&&d.acc==t.acc;};
+    if(same(simple::kStandDrive))return true;
+    for(unsigned m=0;m<3;++m)if(same(simple::walkModeSpec(static_cast<simple::WalkMode>(m)).drive))return true;
+    return false;
+  }
   bool frame(const uint16_t raw[12],simple::Drive d) override{
+    assert(tableDrive(d));
     assert(!motion||!motion->stopping()||motion->stopFrameAuthorized(raw,d));if(failFrame)return false;++frames;drive=d;test_clock_us+=frameDelayUs;
     {std::array<uint16_t,12> f;unsigned on=0;for(unsigned i=0;i<12;++i){f[i]=raw[i];on+=observed[i].torque==1;}sent.push_back(f);sentDrive.push_back(d);sentTorqueOn.push_back(on);}
     const bool drop=dropFrames>0;if(drop)--dropFrames;
@@ -90,7 +108,7 @@ struct ScriptedObservationPort: simple::ServoPort {
 };
 struct Rig {
   simple::SimpleMotion m;ScriptedObservationPort p;simple::Inputs in;
-  Rig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";
+  Rig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.accCeiling=220;in.refusal="READY";
     const double lo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
     const double hi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981};
     for(unsigned i=0;i<12;++i){in.minRad[i]=lo[i];in.maxRad[i]=hi[i];}
@@ -318,8 +336,8 @@ static void standHoldTilt(){
 // production's use of the other three settled references. This models slow
 // planar/no-slip contact, not impact, friction, COM or physical stability.
 struct WalkBoardPlant {
-  Rig& r;motion::BodyPose actual{};double q[12]{};unsigned maxRawStep=0;double maxSteadyError=0;
-  explicit WalkBoardPlant(Rig& rig):r(rig){assert(r.m.state()==simple::State::WALKING);for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;}
+  Rig& r;motion::BodyPose actual{};double q[12]{};unsigned maxRawStep=0;double maxSteadyError=0;uint64_t lastUs=0;
+  explicit WalkBoardPlant(Rig& rig):r(rig),lastUs(rig.p.now){assert(r.m.state()==simple::State::WALKING);for(unsigned i=0;i<12;++i)q[i]=r.p.observed[i].q;}
   motion::BodyPose measuredBody(){
     const auto& f=simple::StopReferenceProbe::walkNominal(r.m);assert(f.target.valid);bool stance[4];unsigned count=0,newest=0;
     for(unsigned l=0;l<4;++l){stance[l]=f.cartesian.phases[l].stance;if(stance[l]){++count;if(f.cartesian.phases[l].phase<f.cartesian.phases[newest].phase)newest=l;}}
@@ -336,12 +354,16 @@ struct WalkBoardPlant {
     std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
     for(unsigned i=0;i<12;++i){const double target=(int(r.p.target[i])-2048)*simple::kTickRad;q[i]+=.2*(target-q[i]);r.p.observed[i].raw=2048+std::lround(q[i]/simple::kTickRad);r.p.observed[i].q=(int(r.p.observed[i].raw)-2048)*simple::kTickRad;}
     const auto world=LevelBoardPlant::multiply(motion::bodyPoseFromRollPitch({},boardRoll,boardPitch),measuredBody());LevelBoardPlant::quaternion(world,r.in.quaternion);r.tick(false);
+    // A late or missed release carries the law over the whole time since the
+    // last frame that changed the goals: the drive bound is per elapsed time.
+    const uint64_t intervalUs=std::max<uint64_t>(r.p.now-lastUs,simple::kPeriodUs);
+    if(!std::equal(previous.begin(),previous.end(),r.p.target))lastUs=r.p.now;
     if(r.m.state()==simple::State::FAULT){std::printf("WALK board fault=%s phase=%s board=%.6f,%.6f accepted=%.6f,%.6f cycles=%.6f\n",r.m.reason(),r.m.phase(),boardRoll,boardPitch,simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m),r.m.walkCycles());std::fflush(stdout);}assert(r.m.state()!=simple::State::FAULT);
     for(unsigned i=0;i<12;++i){const double target=motion::jointSlot(r.m.target(),i),decoded=(int(r.p.target[i])-2048)*simple::kTickRad;
       assert(target>=r.in.minRad[i]&&target<=r.in.maxRad[i]&&decoded>=r.in.minRad[i]&&decoded<=r.in.maxRad[i]);
       const auto& box=simple::StopReferenceProbe::box(r.m);  // the walk's own certified box
       assert(target>=box.lo[i]&&target<=box.hi[i]&&decoded>=box.lo[i]&&decoded<=box.hi[i]);
-      const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*simple::kPeriodUs/1e6))+1);}
+      const auto n=unsigned(std::abs(int(r.p.target[i])-int(previous[i])));maxRawStep=std::max(maxRawStep,n);assert(n<=unsigned(std::ceil(simple::kWalkDrive.speed*intervalUs/1e6))+1);}
     const auto frames=r.p.frames;const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m);r.m.update(r.p.now);
     assert(r.p.frames==frames&&simple::StopReferenceProbe::roll(r.m)==roll&&simple::StopReferenceProbe::pitch(r.m)==pitch);return world;
   }
@@ -356,9 +378,9 @@ struct WalkBoardPlant {
     for(unsigned n=1;n<=count;++n)step(fromRoll+(toRoll-fromRoll)*n/count,fromPitch+(toPitch-fromPitch)*n/count);}
   void holdLimited(double pitch,unsigned count=1000){double minimum=10,maximum=0;unsigned limited=0;const unsigned cycle=unsigned(std::ceil(simple::kWalkPeriodS*1e6/simple::kPeriodUs));
     for(unsigned n=0;n<count;++n){const auto world=step(0,pitch);if(n+cycle>=count){const double e=LevelBoardPlant::error(world);minimum=std::fmin(minimum,e);maximum=std::fmax(maximum,e);limited+=r.m.stabilizationLimited();}}
-    // Positive board pitch reaches the real front-joint/STOP boundary sooner.
-    // Outside that demonstrated domain require a declared bounded residual,
-    // rather than calling a non-level body fully compensated.
+    // Past the stride's tilt envelope (kWalkTilt75/kWalkTilt100) require a
+    // declared bounded residual, rather than calling a non-level body fully
+    // compensated.
     assert(limited>cycle/2&&minimum>.25*3.14159265358979323846/180&&maximum<std::abs(pitch));
     assert(pitch*simple::StopReferenceProbe::pitch(r.m)<0&&std::abs(simple::StopReferenceProbe::pitch(r.m))>.001);
     std::printf("WALK board bounded pitch=%.3fdeg residual=[%.6f,%.6f]deg limited_tail=%u/%u\n",pitch*180/3.14159265358979323846,minimum*180/3.14159265358979323846,maximum*180/3.14159265358979323846,limited,cycle);}
@@ -374,14 +396,17 @@ static void walkLevelBoard(){
     assert(entry&&r.m.state()==simple::State::WALKING&&r.m.requestedHeightM()==simple::kWalkHeightM&&r.p.enables==enables&&r.p.offCalls==off);
     for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(before[i]))<=1);
     WalkBoardPlant plant(r);plant.hold(0,0,650);
-    for(double pitch:{(stride==1?2.:.3)*degree,-2*degree,-4*degree}){plant.ramp(0,0,0,pitch);plant.hold(0,pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
-    for(double pitch:{2*degree,4*degree}){if(stride==1&&pitch==2*degree)continue;plant.ramp(0,0,0,pitch);plant.holdLimited(pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    // Board pitch inside / past the stride's envelope: the correction is about
+    // minus the board pitch, kWalkTilt75 +3.8/-4.7 deg, kWalkTilt100 +2.2/-1.07 deg.
+    const std::vector<double> feasible=stride==1?std::vector<double>{2,-2,4}:std::vector<double>{.3,-2},bounded=stride==1?std::vector<double>{-5,6}:std::vector<double>{2,4,-4};
+    for(double pitch:feasible){pitch*=degree;plant.ramp(0,0,0,pitch);plant.hold(0,pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
+    for(double pitch:bounded){pitch*=degree;plant.ramp(0,0,0,pitch);plant.holdLimited(pitch);plant.ramp(0,pitch,0,0);plant.hold(0,0,650);}
     for(double sign:{1.,-1.}){plant.ramp(0,0,sign*.25*degree,0);plant.hold(sign*.25*degree,0,650);plant.ramp(sign*.25*degree,0,sign*.25*degree,-2*degree);plant.hold(sign*.25*degree,-2*degree);plant.ramp(sign*.25*degree,-2*degree,0,0);plant.hold(0,0,650);}
     plant.ramp(0,0,.25*degree,-2*degree);plant.hold(.25*degree,-2*degree);r.m.walkStop();
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING;++n)plant.step(.25*degree,-2*degree);
     assert(r.m.state()==simple::State::STANDING&&!std::strcmp(r.m.reason(),"STAND_REACHED")&&r.m.requestedHeightM()==simple::kWalkHeightM);plant.hold(.25*degree,-2*degree,650);
     assert(r.p.enables==enables&&r.p.offCalls==off);
-    std::printf("WALK%u closed-loop movingboard feasible pitch %.1f/-2/-4deg, bounded +4%s, roll+/-0.25deg/combined, HOLD%.0f reached; max_RAW=%u max_steady_error=%.6fdeg\n",unsigned(simple::kStrideM[stride]*1000),stride==1?2.:.3,stride==2?"/+2":"",simple::kWalkHeightM*1000,plant.maxRawStep,plant.maxSteadyError/degree);
+    std::printf("WALK%u closed-loop movingboard feasible pitch %s deg, bounded %s deg, roll+/-0.25deg/combined, HOLD%.0f reached; max_RAW=%u max_steady_error=%.6fdeg\n",unsigned(simple::kStrideM[stride]*1000),stride==1?"+2/-2/+4":"+0.3/-2",stride==1?"-5/+6":"+2/+4/-4",simple::kWalkHeightM*1000,plant.maxRawStep,plant.maxSteadyError/degree);
   }
   for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const auto enables=r.p.enables,off=r.p.offCalls;assert(!r.m.walk(stride,r.p.now));for(unsigned n=0;n<10;++n)r.tick();assert(r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.phase(),"HEIGHT"));
     r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized()&&r.p.enables==enables&&r.p.offCalls==off);
@@ -422,8 +447,11 @@ static void walkTxLatency(){
 // law, the ESP clock deadline, the fore/aft leg order latched per walk.
 // Scripted observation and a kinematic board plant: no motor or contact model.
 static void joystickWalk(){
-  constexpr double degree=3.14159265358979323846/180,T=simple::kWalkPeriodS;
+  constexpr double degree=3.14159265358979323846/180,T=simple::kJoystickPeriodS,TW=simple::kWalkPeriodS;
+  // lim: the steered law; pub: the published ellipsoid (fore/aft at the WALK
+  // STANDARD 100 speed); back: the fore/aft backward stride (dev.5).
   const double lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  const double pub[3]={simple::kStrideM[2]/TW,lim[1],lim[2]},back=simple::kJoystickBackM/TW;
   using V3=std::array<double,3>;
   auto drive=[](Rig& r,V3 v){return r.m.drive(v[0],v[1],v[2],r.p.now);};
   auto walkTo=[&](Rig& r,V3 v){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)drive(r,v);r.tick();assert(r.m.state()!=simple::State::FAULT);}
@@ -431,23 +459,27 @@ static void joystickWalk(){
   auto hold=[&](Rig& r,V3 v,unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)assert(!drive(r,v));r.tick();assert(r.m.state()==simple::State::WALKING);}};
   auto pose=[](const Rig& r){const auto& b=simple::StopReferenceProbe::walkNominal(r.m).cartesian.body;return V3{b.translationM.x,b.translationM.y,std::atan2(b.rotation[1][0],b.rotation[0][0])};};
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());std::array<uint16_t,12> held;std::copy(r.p.target,r.p.target+12,held.begin());
-    assert(!std::strcmp(drive(r,{.8*lim[0],.8*lim[1],0}),"JOYSTICK_VELOCITY_RANGE"));  // outside the ellipsoid
-    for(unsigned j=0;j<3;++j){V3 v{0,0,0};v[j]=1.001*lim[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));v[j]=-v[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));}
+    assert(!std::strcmp(drive(r,{.8*pub[0],.8*pub[1],0}),"JOYSTICK_VELOCITY_RANGE"));  // outside the ellipsoid
+    for(unsigned j=0;j<3;++j){V3 v{0,0,0};v[j]=1.001*pub[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));v[j]=-v[j];assert(!std::strcmp(drive(r,v),"JOYSTICK_VELOCITY_RANGE"));}
     assert(!std::strcmp(drive(r,{NAN,0,0}),"JOYSTICK_VELOCITY_RANGE"));assert(!std::strcmp(drive(r,{0,0,INFINITY}),"JOYSTICK_VELOCITY_RANGE"));
     for(unsigned n=0;n<50;++n)r.tick();assert(r.m.state()==simple::State::STANDING&&!r.m.joystickActive());
     assert(std::equal(held.begin(),held.end(),r.p.target));}  // refusals move nothing
   // Sign and proportionality on all three axes: over two whole cycles the body
   // moves by exactly the SE(2) exponential of 2 x (vx, vy, yaw_rate) x period.
   // +x forward, +y left, +yaw counter-clockwise; backward takes the reversed order.
-  const V3 cases[]={{lim[0],0,0},{lim[0]/2,0,0},{-lim[0],0,0},{-lim[0]/3,0,0},{0,lim[1],0},{0,-lim[1]/2,0},{0,0,lim[2]},{0,0,-lim[2]/2},
+  // dev.5: fore/aft alone walks the WALK STANDARD law (period TW), the rest the steered law (T).
+  const V3 cases[]={{pub[0],0,0},{pub[0]/2,0,0},{-back,0,0},{-back/3,0,0},{0,lim[1],0},{0,-lim[1]/2,0},{0,0,lim[2]},{0,0,-lim[2]/2},
                     {lim[0]/2,lim[1]/2,lim[2]/2},{-lim[0]/2,-lim[1]/2,-lim[2]/2}};
   for(const auto& v:cases){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,v);
+    const bool frontal=v[1]==0&&v[2]==0;const double T=frontal?TW:simple::kJoystickPeriodS;
+    assert(&simple::StopReferenceProbe::box(r.m)==(frontal?&simple::kWalkBox:&simple::collision::kSteer));
+    assert(!frontal||(simple::StopReferenceProbe::gait(r.m).swayYM==simple::kWalkSwayYM&&simple::StopReferenceProbe::gait(r.m).comShiftXM==simple::kWalkComShiftXM));
     assert(simple::StopReferenceProbe::reverse(r.m)==(v[0]<0)&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK")&&r.m.joystickActive());
     int first=-1;for(unsigned n=0;n<400&&first<0;++n){if(n%12==0)drive(r,v);r.tick();const auto& f=simple::StopReferenceProbe::walkNominal(r.m);
       for(unsigned l=0;l<4;++l)if(!f.cartesian.phases[l].stance)first=int(l);}
     assert(first==(v[0]<0?3:2));  // first swing: LH backward, RH otherwise
     while(r.m.walkCycles()<1.5)hold(r,v,1);
-    const auto a=pose(r);hold(r,v,650);const auto b=pose(r);
+    const auto a=pose(r);hold(r,v,unsigned(std::lround(2*T/.02)));const auto b=pose(r);  // two whole cycles
     const double w=2*v[2]*T,si=w!=0?std::sin(w)/(v[2]*T):2,co=w!=0?(1-std::cos(w))/(v[2]*T):0;
     const double dx=v[0]*T*si-v[1]*T*co,dy=v[0]*T*co+v[1]*T*si;
     // The body sway (<= 18 mm, body frame) turns with the heading: |R(w)-I| x sway.
@@ -502,10 +534,21 @@ static void joystickWalk(){
       r.tick();stood|=r.m.state()==simple::State::STANDING;assert(r.m.state()!=simple::State::FAULT);}
     assert(stood&&r.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(r.m)&&r.m.walkCycles()<1);
     r.m.walkStop();assert(r.reachStand());}
+  // Pre-flash (dev.17 HW: a sideways stick a hair behind centre stopped the
+  // walk): a demand mainly lateral or at most 45 deg behind keeps the forward
+  // walk, its contrary fore/aft held at zero; only a mostly backward one reverses.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 start{lim[0],.3*lim[1],0};walkTo(r,start);hold(r,start,300);  // steered walk
+    const V3 side{-.1*lim[0],-.99*lim[1],0},diagonal{-.55*lim[0],-.6*lim[1],0},backward{-.8*lim[0],-.6*lim[1],0};
+    assert(!drive(r,side)&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK")&&r.m.joystickActive());
+    hold(r,side,unsigned(2.5*T/.02));
+    assert(simple::StopReferenceProbe::gait(r.m).advanceXM==0&&r.m.walkVelocityY()<0&&!simple::StopReferenceProbe::reverse(r.m));
+    hold(r,diagonal,unsigned(T/.02));assert(simple::StopReferenceProbe::gait(r.m).advanceXM==0&&r.m.joystickActive());
+    assert(!drive(r,backward));assert(!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING")&&!r.m.joystickActive());
+    assert(r.reachStand());}
   // Steps on every axis: each follows at its limited rate, fore/aft never crosses
   // zero inside a walk, every RAW step stays below the WALK drive per release.
-  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{lim[0],0,0});hold(r,{lim[0],0,0},300);
-    double prev[3]={simple::StopReferenceProbe::stride(r.m),0,0},maxD[3]{};std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 start{lim[0],.3*lim[1],0};walkTo(r,start);hold(r,start,800);  // steered walk
+    double prev[3]={simple::StopReferenceProbe::stride(r.m),simple::StopReferenceProbe::gait(r.m).advanceYM,0},maxD[3]{};std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
     const V3 seq[]={{lim[0]/5,lim[1]*.9,0},{lim[0]*.6,-lim[1]*.6,lim[2]*.5},{1e-9,0,-lim[2]},{lim[0],0,0}};
     for(unsigned n=0;n<3200;++n){const V3 v=seq[std::min(3u,n/700)];if(n%12==0)assert(!drive(r,v));r.tick();assert(r.m.state()==simple::State::WALKING);
       const auto& g=simple::StopReferenceProbe::gait(r.m);const double now[3]={g.advanceXM,g.advanceYM,g.yawRad};
@@ -532,6 +575,101 @@ static void joystickWalk(){
     go(0,2*degree,.25*degree,-2*degree,650,{lim[0]/2,-lim[1]/2,lim[2]/2});go(.25*degree,-2*degree,0,0,650,{lim[0],0,0});
     r.m.walkStop();for(unsigned k=0;k<3000&&r.m.state()!=simple::State::STANDING;++k)plant.step(0,0);assert(r.m.state()==simple::State::STANDING);
     std::printf("JOYSTICK closed-loop movingboard pitch +2/-2deg roll 0.25deg, lateral/turn/combined: no fault, max_RAW=%u\n",plant.maxRawStep);}
+  // dev.5 fore/aft JOYSTICK on the WALK STANDARD law. Ground HW 08/11 (dev.4):
+  // a forward stick carried 0.1-0.4 mm/s of lateral (3-13 % of the range) and
+  // took the 14 mm steered sway (28 mm p-p of foot excursion measured).
+  using P=simple::StopReferenceProbe;
+  // A. That recorded jitter, alternating sides, three cycles: the WALK STANDARD
+  // law throughout (kHeight box, 1.5 mm sway, no lateral or yaw advance), no WALK STOP.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double jit[]={.0001,.0002,-.0003,.0004,-.0001,.0003};unsigned k=0;
+    walkTo(r,{.0069,.0002,0});double maxY=0;
+    for(unsigned n=0;n<unsigned(3*TW/.02);++n){if(n%12==0)assert(!drive(r,{.0069,jit[k++%6],0}));r.tick();
+      const auto& g=P::gait(r.m);assert(r.m.state()==simple::State::WALKING&&&P::box(r.m)==&simple::kWalkBox&&g.swayYM==simple::kWalkSwayYM&&g.advanceYM==0&&g.yawRad==0&&!std::strcmp(r.m.reason(),"WALK_JOYSTICK"));
+      maxY=std::fmax(maxY,std::abs(P::walkNominal(r.m).cartesian.body.translationM.y));}
+    assert(maxY<=simple::kWalkSwayYM+1e-9&&std::abs(r.m.walkVelocityX()-.0069)<1e-12);r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK fore/aft with the recorded touch jitter: WALK STANDARD law, body lateral excursion %.2f mm (sway %.1f mm), no WALK STOP\n",maxY*1e3,simple::kWalkSwayYM*1e3);}
+  // B. dev.6 one law: a steering demand during a fore/aft walk never stops it.
+  // The stride retires to the steered range first (no lateral before the
+  // regime handover), then lateral grows; every RAW step stays inside the drive.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{pub[0],0,0});hold(r,{pub[0],0,0},400);
+    const V3 steer{pub[0]/2,.5*lim[1],0};std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0,handover=0;
+    for(unsigned n=0;n<1500;++n){if(n%12==0)assert(!drive(r,steer));r.tick();assert(r.m.state()==simple::State::WALKING&&r.m.joystickActive());
+      const auto& g=P::gait(r.m);if(&P::box(r.m)!=&simple::collision::kSteer)assert(g.advanceYM==0);else if(!handover)handover=n;
+      if(g.advanceYM!=0)assert(std::abs(g.advanceXM)<=simple::kJoystickStrideM+1e-12);
+      for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
+    assert(handover>0&&&P::box(r.m)==&simple::collision::kSteer&&r.m.walkVelocityY()>0&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    std::printf("JOYSTICK fore/aft -> steered without WALK STOP: regime handover after %.2f s, max RAW step %u ticks/release\n",handover*.02,maxRaw);
+    r.m.walkStop();assert(r.reachStand());}
+  // C. The full backward stick walks kJoystickBackM per cycle (the reversed v2 law).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{-pub[0],0,0});while(r.m.walkCycles()<1.5)hold(r,{-pub[0],0,0},1);
+    assert(P::reverse(r.m)&&std::abs(r.m.walkVelocityX()+back)<1e-12&&&P::box(r.m)==&simple::kWalkBox);r.m.walkStop();assert(r.reachStand());}
+  // D. Fore/aft stride increases follow kJoystickFrontalRampCycles for the full
+  // 100 mm, forward decreases kJoystickFrontalDecelCycles; every RAW step stays
+  // below the WALK drive per release.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());walkTo(r,{.2*pub[0],0,0});hold(r,{.2*pub[0],0,0},300);
+    double prev=P::stride(r.m),maxD=0,maxDown=0;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());unsigned maxRaw=0;
+    const double seq[]={pub[0],.1*pub[0],.7*pub[0]};
+    for(unsigned n=0;n<2100;++n){const double vx=seq[n/700];if(n%12==0)assert(!drive(r,{vx,0,0}));r.tick();assert(r.m.state()==simple::State::WALKING);
+      const double d=P::stride(r.m)-prev;if(d>0)maxD=std::fmax(maxD,d);else maxDown=std::fmax(maxDown,-d);prev=P::stride(r.m);
+      for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
+    const double perRelease=simple::kStrideM[2]/simple::kJoystickFrontalRampCycles*simple::kPeriodUs/1e6/TW;
+    const double perReleaseDown=perRelease*simple::kJoystickFrontalRampCycles/simple::kJoystickFrontalDecelCycles;
+    assert(maxD<=perRelease*(1+1e-6)&&maxDown<=perReleaseDown*(1+1e-6)&&std::abs(prev-.7*pub[0]*TW)<1e-12&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK fore/aft stride changes: +%.6f m (limit %.6f) / -%.6f m (limit %.6f) per release, max RAW step %u ticks/release\n",maxD,perRelease,maxDown,perReleaseDown,maxRaw);}
+  // E. STOP at five instants of a fore/aft walk: verified arrest with torque,
+  // then STAND completes the interrupted WALK STANDARD gait to STANDING.
+  for(unsigned when=0;when<250;when+=50){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 v{pub[0],0,0};walkTo(r,v);hold(r,v,300+when);
+    r.m.stop();for(unsigned n=0;n<150&&!r.m.stopVerified();++n){if(n%12==0)assert(drive(r,v));r.tick();}
+    assert(r.m.stopVerified()&&r.m.energized()&&!r.m.joystickActive());
+    assert(!r.m.stand(.12,r.p.now)&&!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK"));assert(r.reachStand());}
+  // F. Held stick FORWARD -> DIAGONAL -> RIGHT -> ROTATION -> RIGHT-BACK ->
+  // BACK-RIGHT -> FORWARD in one press (dev.6 one law): WALK STOP only at the
+  // two fore/aft reversals, no fault over the whole trajectory, every RAW step
+  // inside the drive, the regime follows the demand and the final fore/aft
+  // walk is back in the WALK STANDARD regime (kHeight, 1.5 mm sway) at its full
+  // speed. dev.6 2c53ecf: a WALK STOP at the first steering demand and a final
+  // steered walk at 6.9 mm/s.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    struct Seg{const char* name;V3 v;unsigned releases;} seg[]={{"FORWARD",{pub[0],0,0},1500},{"DIAGONAL",{.7071*pub[0],-.7071*lim[1],0},1500},{"RIGHT",{0,-lim[1],0},1500},
+      {"ROTATION",{0,0,lim[2]},1500},{"RIGHT-BACK",{-.5*lim[0],-.7*lim[1],0},1500},{"BACK-RIGHT",{-.7*lim[0],-.5*lim[1],0},2000},{"FORWARD",{pub[0],0,0},4000}};
+    unsigned stops=0,maxRaw=0;bool walking=false;std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());
+    for(const auto& s:seg){double t=0,handover=-1;const bool was=&P::box(r.m)==&simple::collision::kSteer;
+      for(unsigned n=0;n<s.releases;++n){if(n%12==0)drive(r,s.v);r.tick();t+=.02;assert(r.m.state()!=simple::State::FAULT);
+        const bool w=r.m.state()==simple::State::WALKING;if(walking&&!w)++stops;walking=w;
+        if(w){for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));}}
+        for(unsigned i=0;i<12;++i)raw[i]=r.p.target[i];
+        if(handover<0&&(&P::box(r.m)==&simple::collision::kSteer)!=was)handover=t;}
+      std::printf("JOYSTICK held %-10s regime=%s handover=%5.1f s sway=%.1f mm vx=%.2f vy=%.2f mm/s yaw=%.2f deg/s state=%s\n",s.name,&P::box(r.m)==&simple::collision::kSteer?"STEERED":"FORE/AFT",handover,
+        P::gait(r.m).swayYM*1e3,r.m.walkVelocityX()*1e3,r.m.walkVelocityY()*1e3,r.m.walkYawRate()*180/M_PI,simple::name(r.m.state()));}
+    // RIGHT-BACK (lateral above fore/aft) walks right with the backward part held
+    // at zero; BACK-RIGHT and the final FORWARD reverse the leg order: the two
+    // WALK STOPs the leg order still needs, nothing else stops.
+    assert(stops==2&&&P::box(r.m)==&simple::kWalkBox&&P::gait(r.m).swayYM==simple::kWalkSwayYM&&r.m.walkVelocityX()>.95*pub[0]&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);
+    std::printf("JOYSTICK held sequence: %u WALK STOP (the two reversals), max RAW step %u ticks/release, final fore/aft %.2f mm/s in the WALK STANDARD regime\n",stops,maxRaw,r.m.walkVelocityX()*1e3);
+    r.m.walkStop();assert(r.reachStand());}
+  // H. Review 09/11 defect of 3afe6ce: after steering, a forward stick with the
+  // recorded touch jitter kept the steered 14 mm sway (11.9-14 mm offline, the
+  // dev.4 ground defect). Now the jitter is fore/aft noise in either law: the
+  // lateral advance retires and the sway returns to the 2 mm base.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const V3 diag{.7*pub[0],.7*lim[1],0};walkTo(r,diag);hold(r,diag,1000);
+    const double jit[]={.0001,.0002,-.0003,.0004,-.0001,.0003};unsigned k=0;double maxSway=0;
+    for(unsigned n=0;n<4000;++n){if(n%12==0)assert(!drive(r,{.95*pub[0],jit[k++%6],0}));r.tick();assert(r.m.state()==simple::State::WALKING);
+      if(n>2500)maxSway=std::fmax(maxSway,P::gait(r.m).swayYM);}
+    assert(&P::box(r.m)==&simple::kWalkBox&&P::gait(r.m).advanceYM==0&&maxSway==simple::kJoystickSwayBaseYM);r.m.walkStop();assert(r.reachStand());  // back in the fore/aft regime (dev.6)
+    std::printf("JOYSTICK forward after steering with the recorded jitter: sway %.1f mm over the last 30 s (3afe6ce: 11.9-14 mm)\n",maxSway*1e3);}
+  // G. Fore/aft band sensitivity: a walk started at 19 % of lateral stays in the
+  // fore/aft regime; demands alternating 18/22 % every 240 ms for 120 s never
+  // stop or fault the walk, the RAW steps stay inside the drive and the regime
+  // changes a bounded number of times (handovers need retired lateral and sway).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double vx=.9*pub[0];
+    walkTo(r,{vx,.19*lim[1],0});assert(&P::box(r.m)==&simple::kWalkBox);unsigned stops=0,changes=0,maxRaw=0;bool w=true,steered=false;
+    std::array<uint16_t,12> raw;std::copy(r.p.target,r.p.target+12,raw.begin());
+    for(unsigned n=0;n<6000;++n){if(n%12==0)drive(r,{vx,(n/12%2?.22:.18)*lim[1],0});r.tick();const bool now=r.m.state()==simple::State::WALKING;stops+=w&&!now;w=now;
+      const bool s=&P::box(r.m)==&simple::collision::kSteer;changes+=s!=steered;steered=s;
+      for(unsigned i=0;i<12;++i){maxRaw=std::max(maxRaw,unsigned(std::abs(int(r.p.target[i])-int(raw[i]))));raw[i]=r.p.target[i];}}
+    assert(stops==0&&w&&changes<=4&&maxRaw<=simple::kWalkDrive.speed*simple::kPeriodUs/1000000);r.m.walkStop();assert(r.reachStand());
+    std::printf("JOYSTICK band: 19 %% stays fore/aft; 18/22 %% alternating every 240 ms for 120 s: 0 WALK STOP, %u regime changes, max RAW step %u ticks\n",changes,maxRaw);}
   // Contract: BASE_VELOCITY gait JOYSTICK through the JSON parser and MotionService.
   {Rig api;core::MotionService service;service.begin(&api.m,nullptr,nullptr);service.setReady(true,"READY");assert(!api.m.stand(.15,api.p.now));assert(api.reachStand());
     unsigned seq=0;auto send=[&](const char* params){char json[400];const int n=std::snprintf(json,sizeof json,
@@ -546,13 +684,83 @@ static void joystickWalk(){
     for(unsigned n=0;n<3000&&api.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED||api.m.state()==simple::State::MOVING);api.tick();}
     assert(api.m.state()==simple::State::WALKING&&simple::StopReferenceProbe::reverse(api.m));
     for(unsigned n=0;n<200;++n){if(n%12==0)assert(send(p).outcome==motion::CommandOutcome::ACCEPTED);api.tick();}
-    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/T);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
+    std::snprintf(p,sizeof p,"{\"vx\":%.12f,\"vy\":0,\"yaw_rate\":0}",simple::kStrideM[1]/simple::kWalkPeriodS);assert(!std::strcmp(send(p).reason,"ALREADY_WALKING"));
     test_clock_us=api.p.now;service.update();char status[core::kMotionStatusJsonBytes]{};assert(service.statusJson(status,sizeof(status)-640,api.p.now/1000));
-    assert(std::strstr(status,"\"walk_velocity\":{\"vx_m_s\":-0.00415,\"vy_m_s\":-0.00154,\"yaw_rate_rad_s\":0.01538,\"joystick\":true}"));
-    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));assert(std::strstr(caps,"\"joystick\":{\"vx_max_m_s\":0.00692,\"vy_max_m_s\":0.00308,\"yaw_rate_max_rad_s\":0.03077,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000"));
+    char want[256];std::snprintf(want,sizeof want,"\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":true}",-lim[0]*.6,-lim[1]*.5,lim[2]*.5);assert(std::strstr(status,want));
+    char caps[2048];assert(service.capabilitiesJson(caps,sizeof caps));
+    std::snprintf(want,sizeof want,"\"joystick\":{\"vx_max_m_s\":%.5f,\"vy_max_m_s\":%.5f,\"yaw_rate_max_rad_s\":%.5f,\"envelope\":\"ELLIPSOID\",\"timeout_ms\":1000,\"ramp_cycles\":2,\"vx_back_max_m_s\":%.5f,\"frontal_band\":%.2f,\"vx_steered_max_m_s\":%.5f}",
+                  pub[0],pub[1],pub[2],back,simple::kJoystickFrontalBand,lim[0]);if(!std::strstr(caps,want))std::printf("caps %s\nwant %s\n",caps,want);assert(std::strstr(caps,want));
     ack=send("{\"vx\":0,\"vy\":0,\"yaw_rate\":0,\"gait\":\"JOYSTICK\"}");assert(ack.outcome==motion::CommandOutcome::ACCEPTED&&!std::strcmp(api.m.reason(),"WALK_STOPPING"));
     assert(api.reachStand());std::printf("JOYSTICK API status %zu bytes, capabilities %zu bytes\n",std::strlen(status),std::strlen(caps));}
-  std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
+  std::puts("JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP only when mostly backward, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION");
+}
+
+// H1-RCA 2026-11-08 (hardware, twice): on the fixture a steered WALK_SETTLE
+// ended with +63.7/-66.5 mrad of level correction, accepted in the fillet edge
+// model; the HEIGHT unwind of the joystick restart solved its steps in the
+// nominal strip, every one invalid, until NATIVE_TARGET_NOT_REACHED. Plant:
+// the commanded pose minus the sag of the hardware exit snapshot (exit_j, with
+// its loads), servo speed in sign-magnitude, a servo whose goal moved this
+// release reporting motion (the hardware WALK_SETTLE lasted until the growth
+// stopped), IMU held by the fixture (open loop). Routes: (0) forward ->
+// lateral -> full reversal -> restart through HEIGHT -> backward walk ->
+// release -> STOP -> STAND -> PRONE; (1) reversal -> release -> PRONE. Every
+// HEIGHT/PRONE_HEIGHT unwind release must retire the correction (the whole
+// compensationSafe chain accepts the step), at the stand drive, inside the
+// certified boxes; no fault and every state completes.
+static void steeredSettleUnwind(){
+  constexpr double degree=3.14159265358979323846/180,T=simple::kJoystickPeriodS;
+  static const int err[12]={-2,-1,-1,0,2,3,3,-4,-1,7,5,2},load[12]={24,0,0,0,1048,1056,1056,40,0,1088,1072,1048};
+  const double hp=3.9*degree/2,hr=-3.4*degree/2;
+  for(unsigned route=0;route<2;++route){
+    Rig r;bool plant=false;unsigned unwinds=0,settles=0;double settled=0;
+    auto boxed=[](const simple::collision::Box& b,const uint16_t* raw){for(unsigned i=0;i<12;++i){const double q=(int(raw[i])-2048)*simple::kTickRad;if(q<b.lo[i]||q>b.hi[i])return false;}return true;};
+    auto tick=[&]{
+      r.in.quaternion[0]=std::cos(hr)*std::cos(hp);r.in.quaternion[1]=std::sin(hr)*std::cos(hp);r.in.quaternion[2]=std::cos(hr)*std::sin(hp);r.in.quaternion[3]=-std::sin(hr)*std::sin(hp);
+      const bool on=plant&&r.m.energized();
+      for(unsigned i=0;i<12;++i){auto& o=r.p.observed[i];const int raw=int(r.p.target[i])-(on?err[i]:0),v=raw-int(o.raw);
+        o.speed=on&&v?std::max(51,std::abs(v)*50)|(v<0?0x8000:0):0;o.raw=uint16_t(raw);o.q=(raw-2048)*simple::kTickRad;o.load=on?load[i]:0;}
+      const bool unwinding=r.m.state()==simple::State::MOVING&&(!std::strcmp(r.m.phase(),"HEIGHT")||!std::strcmp(r.m.phase(),"PRONE_HEIGHT"))&&
+                           (simple::StopReferenceProbe::roll(r.m)!=0||simple::StopReferenceProbe::pitch(r.m)!=0);
+      const double before=std::fmax(std::abs(simple::StopReferenceProbe::roll(r.m)),std::abs(simple::StopReferenceProbe::pitch(r.m)));
+      std::array<uint16_t,12> previous;std::copy(r.p.target,r.p.target+12,previous.begin());
+      const bool settling=!std::strcmp(r.m.phase(),"WALK_SETTLE");
+      r.tick(false);assert(r.m.state()!=simple::State::FAULT);
+      using namespace simple::collision;
+      assert(boxed(kEntry,r.p.target)||boxed(kWalk,r.p.target)||boxed(kHeight,r.p.target)||boxed(kDeploy,r.p.target)||boxed(kLift,r.p.target)||boxed(kSteer,r.p.target));
+      if(settling&&std::strcmp(r.m.phase(),"WALK_SETTLE")){++settles;settled=std::fmax(settled,before);}
+      if(unwinding&&!std::strcmp(r.m.imuReason(),"WORKSPACE")){std::printf("unwind refused: phase=%s corr=%.6f,%.6f\n",r.m.phase(),simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m));std::fflush(stdout);}
+      if(unwinding&&r.m.state()==simple::State::MOVING&&!std::strcmp(r.m.imuReason(),"SLEW")){  // a retired step, never a retained one
+        const double after=std::fmax(std::abs(simple::StopReferenceProbe::roll(r.m)),std::abs(simple::StopReferenceProbe::pitch(r.m)));
+        assert(after<before);++unwinds;
+        for(unsigned i=0;i<12;++i)assert(std::abs(int(r.p.target[i])-int(previous[i]))<=int(simple::kStandDrive.speed*simple::kPeriodUs/1000000));}
+      if(unwinding)assert(std::strcmp(r.m.imuReason(),"WORKSPACE"));};
+    auto until=[&](auto done,unsigned n){for(unsigned k=0;k<n&&!done();++k)tick();return done();};
+    auto drive=[&](double fx,double ly){return r.m.drive(fx*simple::kJoystickStrideM/T,ly*simple::kJoystickLateralM/T,0,r.p.now);};
+    auto hold=[&](double fx,double ly,double seconds){for(unsigned k=0;k<unsigned(seconds/.02);++k){if(k%12==0)assert(!drive(fx,ly));tick();}};
+    assert(!r.m.stand(.12,r.p.now));assert(until([&]{return r.m.state()==simple::State::STANDING;},4000));plant=true;
+    for(unsigned k=0;k<100;++k)tick();
+    // dev.5: fore/aft alone would walk the WALK STANDARD law; the hardware route
+    // is steered from its first step here (25 % right, above the fore/aft band).
+    for(unsigned k=0;k<4000&&r.m.state()!=simple::State::WALKING;++k){if(k%12==0)drive(1,-.25);tick();}
+    hold(1,-.25,1.5*T);hold(std::sqrt(.5),-std::sqrt(.5),T);hold(0,-1,T);hold(-.5,-.866,T);
+    assert(!drive(-1,0)&&!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING"));
+    assert(until([&]{return r.m.state()==simple::State::STANDING;},6000));
+    const double corr[2]={simple::StopReferenceProbe::roll(r.m),simple::StopReferenceProbe::pitch(r.m)};
+    assert(corr[0]>.05&&corr[1]<-.05);  // the H1 condition: beyond the 2 deg nominal strip
+    for(unsigned k=0;k<20;++k)tick();
+    if(route==0){
+      for(unsigned k=0;k<3000&&!(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>1);++k){if(k%12==0)assert(!drive(-1,0));tick();}
+      assert(r.m.state()==simple::State::WALKING&&r.m.walkVelocityX()<0);
+      r.m.walkStop();assert(until([&]{return r.m.state()==simple::State::STANDING;},6000));
+      r.m.stop();assert(until([&]{return r.m.stopVerified();},400));
+      assert(!r.m.stand(.12,r.p.now));assert(until([&]{return r.m.state()==simple::State::STANDING;},4000));
+    }else{r.m.walkStop();for(unsigned k=0;k<50;++k)tick();}
+    assert(!r.m.prone(r.p.now));assert(until([&]{return r.m.proneRest();},6000));
+    assert(unwinds>=40);
+    std::printf("H1 steered settle unwind route %u: settle correction %+.4f/%+.4f rad (max over %u settles %.4f), %u retired unwind steps, PRONE_REST\n",
+                route,corr[0],corr[1],settles,settled,unwinds);
+  }
 }
 
 // IMU level slew in physical time (dev.15): a regular release moves the
@@ -684,8 +892,9 @@ static void proneRest(){
     r.p.holdObservation=true;auto& f=r.p.observed[1];f.q+=.6;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));
     for(unsigned k=0;k<20;++k)r.tick();assert(!std::strcmp(r.m.poseRegion(r.p.now),"OUTSIDE_CERTIFIED"));
     const auto enables=r.p.enables,frames=r.p.frames;assert(!r.m.stand(.10,r.p.now));
-    for(unsigned k=0;k<200&&r.m.state()!=simple::State::FAULT;++k)r.tick();
-    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.enables==enables&&r.p.frames==frames&&!r.m.energized());}
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k)r.tick();
+    // dev.5: a pre-actuation refusal, not a latched fault (entryRecovery below).
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.enables==enables&&r.p.frames==frames&&!r.m.energized());}
   std::puts("PRONE REST PASS: automatic torque OFF only after the verified terminal, STOP latch kept, STAND from the settled pose through ACQUIRE/ENABLE; passive support NOT validated");
 }
 
@@ -769,26 +978,545 @@ static void stopThenWalk(){
     const char* w=r.m.walk(1,r.p.now);assert(w);std::printf("WALK after a fault refused: %s\n",w);}
   std::puts("STOP->WALK: STOP in WALK/HOLD/HEIGHT then WALK STANDARD through the STAND-after-STOP admission and resume routes, stride applied at HOLD, refusals unchanged PASS (offline)");
 }
-int main(){proneRest();temperatureChecks();standHoldTilt();
+// T2 (motion-perf-next): look-ahead nominal gait on alternate WALK releases.
+// Alternation engages in WALK STANDARD and in steered walks, every sent
+// midpoint stays within one RAW tick of the exact solution (MATDOG_T2_SHADOW),
+// the T1 light compensation falls only on releases that solved the nominal,
+// a WALK STOP and a missed release re-synchronise with an exact solve, STOP
+// during either release kind arrests, and a release without a nominal solve
+// never skips the WALK box/pointSafe/STOP proofs (a far target faults).
+static void lookaheadWalk(){
+  constexpr double degree=3.14159265358979323846/180;
+  auto tilt=[](Rig& r,double roll,double pitch){const double cr=std::cos(roll/2),sr=std::sin(roll/2),cp=std::cos(pitch/2),sp=std::sin(pitch/2);
+    r.in.quaternion[0]=cr*cp;r.in.quaternion[1]=sr*cp;r.in.quaternion[2]=cr*sp;r.in.quaternion[3]=-sr*sp;};
+  for(unsigned stride:{1u,2u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(stride,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);
+    const auto s0=r.m.lookaheadStats();for(unsigned n=0;n<400;++n)r.tick();const auto s1=r.m.lookaheadStats();
+    // Strict alternation after the first exact release: 200/200 of 400.
+    assert(s1.exact-s0.exact>=199&&s1.interp-s0.interp>=199&&s1.resync-s0.resync<=1);
+    const auto t1=r.m.reuseStats();assert(t1.light>0&&t1.light<t1.full+t1.light);
+    // A missed release (one period skipped) re-synchronises once, then alternates again.
+    r.p.now+=simple::kPeriodUs;const auto s2=r.m.lookaheadStats();for(unsigned n=0;n<40;++n)r.tick();const auto s3=r.m.lookaheadStats();
+    assert(s3.resync-s2.resync<=1&&s3.interp-s2.interp>=19);  // the bracket moves on or is rebuilt once
+    // WALK STOP changes the terminal: one re-sync, then alternation to STAND.
+    r.m.walkStop();const auto s4=r.m.lookaheadStats();assert(r.reachStand());const auto s5=r.m.lookaheadStats();
+    assert(s5.resync-s4.resync>=1&&s5.interp-s4.interp>50&&s5.exact-s4.exact>50);
+#ifdef MATDOG_T2_SHADOW
+    assert(s5.maxShadowRad>0&&s5.maxShadowRad<simple::kTickRad);  // below one RAW tick on every interpolated release
+#endif
+  }
+  // STOP on an interpolated and on an exact release: both arrest with torque.
+  for(unsigned extra:{0u,1u}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(1,r.p.now));
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();for(unsigned n=0;n<300+extra;++n)r.tick();
+    r.m.stop();for(unsigned n=0;n<200&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified()&&r.m.energized());}
+  // Steered walk with a rate-limited retarget every 12 releases: alternation continues (retargets are tolerated).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());const double T=simple::kJoystickPeriodS;double v[3]={.5*simple::kJoystickStrideM/T,.2*simple::kJoystickLateralM/T,.1*simple::kJoystickYawRad/T};
+    for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
+    const auto s0=r.m.lookaheadStats();
+    for(unsigned n=0;n<600;++n){if(n%12==0){v[1]=(n%24?.3:-.3)*simple::kJoystickLateralM/T;assert(!r.m.drive(v[0],v[1],v[2],r.p.now));}r.tick();assert(r.m.state()==simple::State::WALKING);}
+    const auto s1=r.m.lookaheadStats();assert(s1.interp-s0.interp>=299&&s1.resync-s0.resync<=1);
+    r.m.walkStop();assert(r.reachStand());}
+  std::puts("T2 look-ahead: alternation, missed-release and WALK STOP re-sync, STOP on both release kinds, retarget tolerance PASS (software only)");
+}
+// P1 (review 2026-11-08): the STOP reference rate is a secant over at least
+// one release period whenever the 3-deep reference history allows it. On the
+// release grid (lateness < one period, skipped periods only widen the spans)
+// the reference two entries back is always >= one period older, so the
+// "oldest available" fallback can only act when fewer than three grid
+// references exist or an off-grid reference was recorded (STAND resume after
+// STOP). Direct cases: jitter 0-19 ms with a skipped release and a retarget
+// every release; STOP on both release kinds; identical RAW (zero rate); stale
+// history (fail closed); STOP on the first references after ENABLE; STOP at
+// the first release of a STAND resume whose preceding hold release was late.
+static void stopRateHistory(){
+  using P=simple::StopReferenceProbe;
+  struct Lcg{uint64_t s;double next(){s=s*6364136223846793005ull+1442695040888963407ull;return double(s>>11)/9007199254740992.0;}};
+  auto release=[](Rig& r,uint64_t now){r.p.now=now;r.in.imuStampUs=now;r.m.inputs(r.in);r.p.publishCommandedPose();test_clock_us=now;r.m.update(now);r.m.updateTelemetry(now);};
+  // The span beginStop's selection takes at the current reference (skip 1).
+  auto stopSpan=[](const Rig& r){const uint64_t t[3]={P::issuedUs(r.m),P::previousUs(r.m),P::previous2Us(r.m)};uint64_t span=0;
+    for(unsigned k=1;k<3;++k){if(!t[k]||t[0]<=t[k])break;span=t[0]-t[k];if(span>=simple::kPeriodUs)break;}return span;};
+  auto maxPlanV=[](const Rig& r){double v=0;for(double x:P::stopPlan(r.m).v)v=std::fmax(v,std::abs(x));return v;};
+  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
+  // The law's joint speed stays below 0.82 rad/s (walk tilt envelope check);
+  // one RAW tick of quantization over one period adds 0.077 rad/s.
+  constexpr double kLawRateBound=1.0;
+  // A. Jitter, skipped releases, retargets: the selected span is never below
+  // one period and a STOP at a random release plans a law-plausible rate.
+  {uint64_t minSpan=~0ull;unsigned spans=0;double maxV=0;
+    for(uint64_t seed:{21ull,22ull,23ull,24ull,25ull,26ull}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());Lcg g{seed};double v[3]={lim[0]*.5,lim[1]*.5,0};  // steered from the start (dev.5: fore/aft alone walks WALK STANDARD)
+      for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();}
+      uint64_t grid=r.p.now;const unsigned stopAt=300+unsigned(g.next()*400);
+      for(unsigned n=0;n<stopAt;++n){
+        for(unsigned j=0;j<3;++j)v[j]+=lim[j]*.1*(2*g.next()-1);if(v[0]<lim[0]*.05)v[0]=lim[0]*.05;
+        double norm=0;for(unsigned j=0;j<3;++j)norm+=(v[j]/lim[j])*(v[j]/lim[j]);if(norm>.9)for(unsigned j=0;j<3;++j)v[j]*=std::sqrt(.9/norm);
+        r.m.drive(v[0],v[1],v[2],r.p.now);
+        if(n%97==96)grid+=simple::kPeriodUs;grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));assert(r.m.state()==simple::State::WALKING);
+        if(P::previous2Us(r.m)){const uint64_t s=stopSpan(r);minSpan=std::min(minSpan,s);++spans;assert(s>=simple::kPeriodUs);}}
+      r.m.stop();grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));assert(r.m.stopActive());maxV=std::fmax(maxV,maxPlanV(r));assert(maxPlanV(r)<kLawRateBound);
+      for(unsigned n=0;n<300&&!r.m.stopVerified();++n){grid+=simple::kPeriodUs;release(r,grid+uint64_t(g.next()*19000));}assert(r.m.stopVerified()&&r.m.energized());}
+    std::printf("P1-A jitter/skip/retarget: %u releases, min STOP span %.1f ms (>= 20), max planned rate %.3f rad/s\n",spans,minSpan/1e3,maxV);}
+  // B. Identical RAW references (HOLD): zero rate, shortest plan.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());for(unsigned n=0;n<30;++n)r.tick();
+    assert(stopSpan(r)>=simple::kPeriodUs);r.m.stop();r.tick();assert(r.m.stopActive()&&maxPlanV(r)==0&&P::stopPlan(r.m).duration==.04);
+    for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+  // C. Stale history (no release for 150 ms): fail closed, torque released.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());for(unsigned n=0;n<30;++n)r.tick();
+    r.m.stop();release(r,r.p.now+150000);assert(r.m.state()==simple::State::FAULT&&!r.m.stopActive());
+    assert(!std::strcmp(r.m.reason(),"MOTION_DEADLINE_LOST")||!std::strcmp(r.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));
+    for(unsigned n=0;n<40&&!r.m.offVerified();++n)r.tick(false);assert(r.m.offVerified()&&!r.m.energized());}
+  // D. STOP on each of the first six references after ENABLE (two entries,
+  // then three): either a plan with a law-plausible rate or fail closed.
+  {unsigned planned=0,closed=0;
+    for(unsigned k=1;k<=6;++k){Rig r;assert(!r.m.stand(.15,r.p.now));
+      for(unsigned n=0;n<3000&&r.p.enables<12;++n)r.tick();assert(r.p.enables==12);  // the k-th release after the last ENABLE
+      for(unsigned n=1;n<k;++n)r.tick();assert(r.m.state()==simple::State::MOVING);
+      const uint64_t span=stopSpan(r);const char* phase=r.m.phase();r.m.stop();r.tick();
+      if(r.m.stopActive()){++planned;assert(span>=simple::kPeriodUs&&maxPlanV(r)<kLawRateBound);for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+      else{++closed;assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"STOP_REFERENCE_UNAVAILABLE"));  // native move: endpoint only, no in-flight reference (unchanged rule)
+        if(k==1||k==6)std::printf("P1-D STOP on release %u after ENABLE in %s: %s -> SAFE_OFF\n",k,phase,r.m.reason());}}
+    std::printf("P1-D STOP on the first 6 releases after ENABLE: planned=%u fail-closed=%u\n",planned,closed);}
+  // E. STAND resume after STOP in WALK whose preceding hold release ran 19 ms
+  // late, then STOP at the first recovery release: the only fallback case.
+  {Rig r;assert(!r.m.walk(1,r.p.now));for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n)r.tick();for(unsigned n=0;n<200;++n)r.tick();
+    r.m.stop();for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());for(unsigned n=0;n<50;++n)r.tick();
+    uint64_t grid=r.p.now;release(r,grid+simple::kPeriodUs+19000);  // late hold release
+    const uint64_t at=grid+simple::kPeriodUs+19500;r.p.now=at;test_clock_us=at;assert(!r.m.stand(.15,at));
+    release(r,grid+2*simple::kPeriodUs);  // first recovery release, 1 ms after the late one
+    assert(!std::strcmp(r.m.reason(),"STAND_FROM_STOPPED_WALK")&&r.m.state()==simple::State::MOVING);
+    const uint64_t span=stopSpan(r);unsigned step=0;for(unsigned i=0;i<12;++i)step=std::max(step,unsigned(std::abs(int(P::commandedRaw(r.m)[i])-int(P::previous2Raw(r.m)[i]))));
+    r.m.stop();release(r,grid+3*simple::kPeriodUs);
+    std::printf("P1-E resume then STOP: selected span %.1f ms, RAW step %u tick, %s, planned rate %.3f rad/s, duration %.2f s\n",span/1e3,step,
+      r.m.stopActive()?"plan built":r.m.reason(),r.m.stopActive()?maxPlanV(r):0.,r.m.stopActive()?P::stopPlan(r.m).duration:0.);
+    // The fallback is reached (span < one period) and is exact: every resume
+    // route starts from the held RAW (recovery fade, HEIGHT from held), so the
+    // secant is zero whatever its span. A non-zero step here would be the
+    // first divergence that justifies a floor on the fallback span.
+    assert(span<simple::kPeriodUs&&step==0&&r.m.stopActive()&&maxPlanV(r)==0);
+    for(unsigned n=0;n<300&&!r.m.stopVerified();++n)r.tick();assert(r.m.stopVerified());}
+  std::puts("P1 STOP rate history: span >= one period on the grid, zero rate on identical RAW, fail-closed on stale history, first references, STAND resume fallback PASS (software only)");
+}
+// Steered sway map (motion-perf-next) inside a steered walk: from the full
+// 14 mm, 1 % takes the low band (<= 5 mm), 2.9 % stays there, 3.3 % takes the
+// full amplitude again and keeps it until the demand falls under 1.5 %; the
+// amplitude changes only while all four feet are down. dev.5: a NEW walk under
+// kJoystickFrontalBand (ground HW: 3-13 % of touch jitter) is fore/aft and
+// walks the WALK STANDARD law with its 1.5 mm sway; at the band it is steered.
+static void swayMap(){
+  using P=simple::StopReferenceProbe;const double T=simple::kJoystickPeriodS,vx=.8*simple::kJoystickStrideM/T,lat=simple::kJoystickLateralM/T;
+  auto walking=[](Rig& r,double vx,double vy){for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)assert(!r.m.drive(vx,vy,0,r.p.now));r.tick();}assert(r.m.state()==simple::State::WALKING);};
+  auto hold=[&](Rig& r,double vy,unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)assert(!r.m.drive(vx,vy*lat,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING);}};
+  // The map itself (the steered retarget feeds it its rate-limited lateral/yaw).
+  {using simple::joystickSwayYM;const double L=simple::kJoystickLateralM,B=simple::kJoystickSwayBaseYM,F=simple::kJoystickSwayYM,Lo=simple::kJoystickSwayLowM;
+    assert(joystickSwayYM(0,0,B)==B&&joystickSwayYM(.029*L,0,B)>B&&joystickSwayYM(.029*L,0,B)<=Lo+1e-12&&joystickSwayYM(.033*L,0,B)==F);
+    assert(joystickSwayYM(.025*L,0,F)==F&&joystickSwayYM(.01*L,0,F)<Lo);}
+  // In a steered walk (review 09/11): a demand under kJoystickFrontalBand is
+  // fore/aft, its lateral retired: the sway returns to the base through
+  // four-contact windows only; at the band the full amplitude comes back.
+  {Rig r;walking(r,vx,.5*lat);assert(&P::box(r.m)==&simple::collision::kSteer);hold(r,.5,1300);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
+    double last=P::gait(r.m).swayYM;unsigned changes=0,changesWithSwing=0;
+    for(unsigned n=0;n<2600;++n){if(n%12==0)assert(!r.m.drive(vx,.19*lat,0,r.p.now));
+      bool four=true;for(const auto& ph:P::walkNominal(r.m).cartesian.phases)four=four&&ph.stance;r.tick();assert(r.m.state()==simple::State::WALKING);
+      const double s=P::gait(r.m).swayYM;if(s!=last){++changes;if(!four)++changesWithSwing;last=s;}}
+    // dev.6: retired lateral and sway hand the walk back to the fore/aft regime (no WALK STOP).
+    assert(changes>0&&changesWithSwing==0&&P::gait(r.m).advanceYM==0&&std::abs(last-simple::kJoystickSwayBaseYM)<1e-12&&&P::box(r.m)==&simple::kWalkBox);
+    hold(r,.21,1300);assert(std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);
+    r.m.walkStop();assert(r.reachStand());}
+  // A new walk: just under the band it is fore/aft, WALK STANDARD sway and box,
+  // its lateral demand ignored; at the band it is steered with the full sway.
+  const double band=simple::kJoystickFrontalBand;
+  {Rig r;walking(r,vx,.999*band*lat);assert(&P::box(r.m)==&simple::kWalkBox&&P::gait(r.m).swayYM==simple::kWalkSwayYM&&P::gait(r.m).advanceYM==0);
+    for(unsigned n=0;n<1300;++n){if(n%12==0)assert(!r.m.drive(vx,.999*band*lat,0,r.p.now));r.tick();assert(r.m.state()==simple::State::WALKING&&P::gait(r.m).swayYM==simple::kWalkSwayYM);}
+    assert(std::abs(r.m.walkVelocityX()-vx)<1e-12&&r.m.walkVelocityY()==0);r.m.walkStop();assert(r.reachStand());}
+  {Rig r;walking(r,vx,band*lat);assert(&P::box(r.m)==&simple::collision::kSteer&&std::abs(P::gait(r.m).swayYM-simple::kJoystickSwayYM)<1e-12);r.m.walkStop();assert(r.reachStand());}
+  std::puts("steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %; in a steered walk a demand under the fore/aft band returns to the base sway through four-contact windows only; new walk under the band = WALK STANDARD sway PASS (software only)");
+}
+// Steered tilt envelope in the heading frame (review 2026-11-08): with
+// identity heading the limit is bit for bit the old one; at a 90 deg heading
+// a support-frame pitch at the polygon's pitch-up vertex is a body roll and is
+// limited to the roll vertex, taken back into the support frame.
+static void steeredEnvelopeHeading(){
+  Rig r;const double T=simple::kJoystickPeriodS,vy=.5*simple::kJoystickLateralM/T;assert(!r.m.drive(.5*simple::kJoystickStrideM/T,vy,0,r.p.now));  // steered (dev.5)
+  for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.5*simple::kJoystickStrideM/T,vy,0,r.p.now);r.tick();}assert(r.m.state()==simple::State::WALKING);
+  double roll=.0,pitch=.05;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&pitch==.05);           // inside, identity heading, untouched
+  roll=.0;pitch=.10;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,1,0)&&roll==0&&std::abs(pitch-simple::kSteerTilt[1].pitch)<1e-12);     // pitch-up vertex, identity heading
+  roll=.0;pitch=.05;assert(simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&std::abs(roll)<1e-12&&std::abs(pitch-.0245)<1e-12);  // heading 90 deg: a body roll, roll vertex
+  roll=.0;pitch=.02;assert(!simple::StopReferenceProbe::limitWalkTilt(r.m,roll,pitch,0,1)&&roll==0&&pitch==.02);                    // inside at 90 deg too
+  r.m.walkStop();assert(r.reachStand());
+  std::puts("steered tilt envelope: heading-frame projection, identity bit for bit, 90 deg heading maps pitch to the roll vertex PASS (software only)");
+}
+// dev.5 entry recovery (ground HW 08/11/2026, dev.4): a STAND150 refused with
+// INITIAL_POSE_OUTSIDE_SAFE_ENTRY latched a FAULT that STOP could not clear;
+// the robot was repositioned by hand and only KEY OFF/ON made STAND possible,
+// from a pose identical (+/-1 tick) to the repositioned one. Here the refusal
+// is a pre-actuation STOPPED state: torque stays OFF, nothing is written, and
+// READY returns by itself only when the same ACQUIRE evidence (12 fresh
+// positions in a certified region, at rest, no alarm, torque OFF read again on
+// every servo) holds for one full control-read cycle. The aborted STAND never
+// runs again; a new explicit STAND re-acquires the pose. Software only.
+static void entryRecovery(){
+  // Boot-1 repositioned pose, trace matdog-motion-trace.json @116.6 s (rad,
+  // slot order LF RF RH LH x hip/upper/lower): PRONE_ENTRY, accepted after reboot.
+  const double placed[12]={-0.049087,1.417398,-1.59534,0.01534,1.415864,-1.583068,0.02301,1.411262,-1.596874,-0.029146,1.425068,-1.59534};
+  // Rear raised (operator note): both rear UPPER 60 mrad under the entry box.
+  double raised[12];std::copy(placed,placed+12,raised);
+  for(unsigned s:{7u,10u})raised[s]=simple::collision::kEntry.lo[s]-.060;
+  auto pose=[](Rig& r,const double* q){for(unsigned i=0;i<12;++i){auto& f=r.p.observed[i];f.q=q[i];f.raw=uint16_t(2048+std::lround(q[i]/simple::kTickRad));f.speed=0;}};
+  auto ack=[](Rig& r,core::MotionService& service){test_clock_us=r.p.now;service.update();static char status[core::kMotionStatusJsonBytes];
+    assert(service.statusJson(status,sizeof status,r.p.now/1000));const char* a=std::strstr(status,"\"active_command\":{");assert(a);return std::string(a,std::strcspn(a,"}"));};
+  auto refused=[&](Rig& r,core::MotionService* service=nullptr){
+    r.p.holdObservation=true;pose(r,raised);for(unsigned k=0;k<20;++k)r.tick();
+    assert(!std::strcmp(r.m.poseRegion(r.p.now),"OUTSIDE_CERTIFIED")&&r.m.state()==simple::State::READY);
+    if(service){motion::MotionCommand c;c.owner=motion::ClientOwner::DASHBOARD;c.intent=motion::Intent::STAND;c.target_height_m=.15;c.sequence=1;
+      c.issued_at_ms=r.p.now/1000;c.ttl_ms=1000;std::strcpy(c.id,"entry-1");test_clock_us=r.p.now;assert(service->command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);}
+    else assert(!r.m.stand(.15,r.p.now));
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k){r.tick();if(service){test_clock_us=r.p.now;service->update();}}
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.m.offVerified()&&!r.m.energized());
+    assert(r.p.frames==0&&r.p.enables==0);for(const auto& f:r.p.observed)assert(f.torque==0);};
+  // Releases until READY (bounded); 0 if it never came.
+  auto readyAfter=[](Rig& r,unsigned n){for(unsigned k=1;k<=n;++k){r.tick();assert(r.p.frames==0&&r.p.enables==0);if(r.m.state()==simple::State::READY)return k;}return 0u;};
+  constexpr unsigned cycle=72;  // one control read per 6 releases, 12 servos
+  // 1. The field sequence: refusal, the pose stays outside, STOP pressed, repositioned.
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");
+    refused(r,&service);
+    const auto a=ack(r,service);assert(a.find("\"outcome\":\"ABORTED\",\"reason\":\"INITIAL_POSE_OUTSIDE_SAFE_ENTRY\",\"id\":\"entry-1\"")!=std::string::npos);
+    // dev.5 diagnostics: the status names the joint farthest outside the entry region.
+    auto status=[&]{test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s-640,r.p.now/1000));return std::string(s);};  // inside the bounded budget
+    // (SAFE_OFF verification pauses the fast reads: one population of fresh reads first)
+    for(unsigned k=0;k<12;++k)r.tick();
+    assert(status().find("\"entry_violation\":{\"joint\":\"RH_UPPER\",\"outside_mrad\":-60}")!=std::string::npos);
+    for(unsigned k=0;k<500;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    assert(!std::strcmp(r.m.stand(.15,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.m.state()==simple::State::STOPPED);
+    assert(!std::strcmp(r.m.drive(.005,0,0,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&!std::strcmp(r.m.walk(2,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));
+    const auto offs=r.p.offCalls;r.m.stop();for(unsigned k=0;k<40;++k)r.tick();  // STOP only re-verifies the OFF
+    assert(r.p.offCalls>offs&&r.m.offVerified()&&r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));
+    pose(r,placed);const unsigned k=readyAfter(r,3*cycle);
+    assert(k>=cycle&&k<=2*cycle+20&&!std::strcmp(r.m.reason(),"READY")&&!std::strcmp(r.m.poseRegion(r.p.now),"PRONE_ENTRY"));
+    for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()==simple::State::READY&&r.p.frames==0&&r.p.enables==0);}  // the aborted STAND never runs
+    assert(ack(r,service)==a&&status().find("entry_violation")==std::string::npos);
+    // A NEW explicit STAND re-acquires the placed pose and stands.
+    assert(!r.m.stand(.15,r.p.now)&&!std::strcmp(r.m.reason(),"ACQUIRING_REAL_POSE"));
+    for(unsigned n=0;n<200&&r.p.frames==0;++n)r.tick();
+    assert(r.p.frames==1&&r.p.sentTorqueOn[0]==0);for(unsigned i=0;i<12;++i)assert(r.p.sent[0][i]==r.p.observed[i].raw);  // REFERENCE = placed RAW, torque OFF
+    r.p.holdObservation=false;assert(r.reachStand()&&r.p.enables==12);
+    std::printf("entry recovery: refusal -> STOPPED (no frame, no enable, torque OFF), ACK ABORTED, STOP keeps it, repositioned HW pose READY after %u releases, aborted STAND not run, new STAND reaches STANDING\n",k);}
+  // 2. No STOP, refusal at REFERENCE (the pose moves after ACQUIRE): same state.
+  {Rig r;r.p.holdObservation=true;pose(r,placed);for(unsigned k=0;k<20;++k)r.tick();
+    assert(!r.m.stand(.15,r.p.now));for(unsigned n=0;n<40&&std::strcmp(r.m.phase(),"REFERENCE");++n)r.tick();
+    assert(!std::strcmp(r.m.phase(),"REFERENCE")&&r.p.frames==0);pose(r,raised);
+    for(unsigned k=0;k<200&&!(r.m.state()==simple::State::STOPPED&&r.m.offVerified());++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&r.p.frames==0&&r.p.enables==0);
+    pose(r,placed);assert(readyAfter(r,3*cycle));}
+  // 3. Negative cases: each blocks READY while it lasts; READY follows once it ends.
+  struct Case {const char* name;void (*on)(ScriptedObservationPort&);void (*off)(ScriptedObservationPort&);};
+  const Case cases[]={
+    {"feedback lost",[](ScriptedObservationPort& p){p.missing=true;},[](ScriptedObservationPort& p){p.missing=false;}},
+    {"one joint 2 ticks outside kEntry",[](ScriptedObservationPort& p){auto& f=p.observed[11];f.q=simple::collision::kEntry.lo[11]-2*simple::kTickRad;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));},
+      [](ScriptedObservationPort& p){auto& f=p.observed[11];f.q=-1.59534;f.raw=uint16_t(2048+std::lround(f.q/simple::kTickRad));}},
+    {"servo still moving",[](ScriptedObservationPort& p){p.observed[4].speed=60;},[](ScriptedObservationPort& p){p.observed[4].speed=0;}},
+    {"moving backwards (sign bit)",[](ScriptedObservationPort& p){p.observed[4].speed=0x8000|51;},[](ScriptedObservationPort& p){p.observed[4].speed=0x8000;}},
+    {"unexpected torque",[](ScriptedObservationPort& p){p.observed[8].torque=1;},[](ScriptedObservationPort& p){p.observed[8].torque=0;}},
+    {"servo status alarm",[](ScriptedObservationPort& p){p.observed[2].status=8;},[](ScriptedObservationPort& p){p.observed[2].status=0;}},
+    {"servo 70 C",[](ScriptedObservationPort& p){p.observed[9].temp=70;},[](ScriptedObservationPort& p){p.observed[9].temp=30;}},
+    {"voltage 3.9 V",[](ScriptedObservationPort& p){p.observed[0].voltage=39;},[](ScriptedObservationPort& p){p.observed[0].voltage=120;}}};
+  for(const auto& c:cases){Rig r;refused(r);pose(r,placed);c.on(r.p);
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED&&r.p.frames==0&&r.p.enables==0);}
+    c.off(r.p);const unsigned k=readyAfter(r,3*cycle);
+    if(!k)std::printf("entry case %s: no READY after the condition ended\n",c.name);assert(k>=cycle/2);  // READY needs fresh evidence again
+    std::printf("entry recovery negative '%s': STOPPED for %u releases, READY %u releases after it ended\n",c.name,4*cycle,k);}
+  // 4. A pose crossing an uncertified region while being placed: no READY on
+  // the way, and a brief pass through PRONE_ENTRY shorter than one control
+  // cycle is not enough; the final placement then needs its own full cycle.
+  {Rig r;refused(r);
+    double mid[12];for(unsigned i=0;i<12;++i)mid[i]=.5*(placed[i]+raised[i]);mid[1]=1.0;  // LF_UPPER far outside every box
+    pose(r,mid);for(unsigned k=0;k<cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,placed);for(unsigned k=0;k<cycle/2;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,raised);for(unsigned k=0;k<cycle;++k){r.tick();assert(r.m.state()==simple::State::STOPPED);}
+    pose(r,placed);const unsigned k=readyAfter(r,3*cycle);assert(k>=cycle);
+    std::printf("entry recovery: crossing an uncertified region and a %u-release pass through PRONE_ENTRY never READY; final placement READY after %u releases\n",cycle/2,k);}
+  // 5. A different physical fault stays latched; a stale ACQUIRE stays a fault.
+  {Rig r;refused(r);r.m.fault("SERVO_COMMUNICATION_LOST");pose(r,placed);
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"SERVO_COMMUNICATION_LOST"));}
+    assert(!std::strcmp(r.m.stand(.15,r.p.now),"FAULT_STOP_REQUIRED"));}
+  {Rig r;r.p.holdObservation=true;pose(r,placed);r.p.observed[3].torque=1;for(unsigned k=0;k<20;++k)r.tick();assert(!r.m.stand(.15,r.p.now));
+    for(unsigned k=0;k<60&&r.m.state()!=simple::State::FAULT;++k)r.tick();
+    assert(r.m.state()==simple::State::FAULT&&!std::strcmp(r.m.reason(),"INITIAL_SERVO_NOT_READY"));r.p.observed[3].torque=0;
+    for(unsigned k=0;k<4*cycle;++k){r.tick();assert(r.m.state()==simple::State::FAULT);}}
+  // 6. SAFE_OFF requested in the refused state behaves like STOP: no operator latch.
+  {Rig r;refused(r);r.m.safeOff();for(unsigned k=0;k<40;++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));pose(r,placed);assert(readyAfter(r,3*cycle));}
+  // 7. Unchanged: STOP after a re-admitted READY (or at boot READY) is the ordinary SAFE_OFF latch.
+  {Rig r;refused(r);pose(r,placed);assert(readyAfter(r,3*cycle));r.m.stop();for(unsigned k=0;k<60;++k)r.tick();
+    assert(r.m.state()==simple::State::STOPPED&&!std::strcmp(r.m.stand(.15,r.p.now),"SAFE_OFF_STAND_REFUSED"));}
+  // 8. dev.5 diagnostics: a level correction beyond the HOLD box saturates
+  // (WORKSPACE) and the status names the compensationSafe check that refused.
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    const double roll=.20;r.in.quaternion[0]=std::cos(roll/2);r.in.quaternion[1]=std::sin(roll/2);r.in.quaternion[2]=r.in.quaternion[3]=0;
+    for(unsigned k=0;k<400&&std::strcmp(r.m.imuReason(),"WORKSPACE");++k)r.tick();
+    assert(!std::strcmp(r.m.imuReason(),"WORKSPACE")&&r.m.imuRefusedBy()>0&&r.m.imuRefusedBy()<std::size(simple::kSafeChecks));
+    test_clock_us=r.p.now;service.update();static char s[core::kMotionStatusJsonBytes];assert(service.statusJson(s,sizeof s-640,r.p.now/1000));  // inside the bounded budget
+    std::printf("refusal diagnostics: status %zu bytes (bounded budget %zu)\n",std::strlen(s),sizeof s-640);
+    const std::string want=std::string("\"refused_by\":\"")+simple::kSafeChecks[r.m.imuRefusedBy()]+"\"";assert(std::strstr(s,want.c_str()));
+    std::printf("refusal diagnostics: HOLD 150 under 0.2 rad of board roll, WORKSPACE refused_by %s\n",simple::kSafeChecks[r.m.imuRefusedBy()]);}
+  std::puts("ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged");
+}
+// dev.6 consolidation: WALK STANDARD 100 and the fore/aft joystick at 100 mm
+// faulted WALK_IK_OR_WORKSPACE (refused_by STOP_PLAN) at release 4993, cycle
+// 19.46, of a long walk on this rig (dev.4..dev.6): the T2 chord-midpoint
+// reference at the swing end made the STOP secant one tick faster than the
+// old kWalkTilt100 had been proved for (the level correction on its
+// pitch-down boundary, as on the dev.4 ground WALK100). 160 s of each walk.
+static void longWalk100(){
+  const double vx=simple::kStrideM[2]/simple::kWalkPeriodS;
+  for(int mode=0;mode<3;++mode){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    if(mode)assert(!r.m.walk(mode==1?2:1,r.p.now));
+    for(unsigned n=0;n<8000;++n){if(!mode&&n%12==0)assert(!r.m.drive(vx,0,0,r.p.now));r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::WALKING&&r.m.walkCycles()>31);r.m.walkStop();assert(r.reachStand());}
+  std::puts("long walk: JOYSTICK 100 mm, WALK STANDARD 100 and 75, 8000 releases (160 s) each without fault PASS (software only)");
+}
+// Walk modes (2026-11-09): the selection is latched by walk(); a WALK STOP
+// and a STOP recovery keep their law (a selection changes a forward walk in
+// progress: walkModeChange); each walk runs its mode's period, height and RAM
+// drive; STOP brakes at most at kStopBrakeAcc; the joystick walks forward on
+// the selected mode. Ideal tracking (scripted port).
+static void walkModes(){
+  using simple::WalkMode;
+  for(WalkMode mode:{WalkMode::STANDARD,WalkMode::FAST}){
+    const auto& w=simple::walkModeSpec(mode);Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+    r.m.selectWalkMode(mode);assert(r.m.selectedWalkMode()==mode&&r.m.walkMode()==WalkMode::SLOW);
+    assert(!r.m.walk(2,r.p.now));  // every preset is valid in every mode (its own strideM)
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode&&r.m.period()==w.periodS&&std::abs(r.m.requestedHeightM()-w.heightM)<1e-12);
+    const uint64_t start=r.p.now;
+    // The selection unchanged: the walk keeps its own law (the change inside a walk: walkModeChange).
+    for(unsigned n=0;n<6000;++n){r.tick();assert(r.m.state()==simple::State::WALKING);
+      assert(r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc&&r.m.walkMode()==mode);}
+    assert(std::abs(r.m.walkCycles()-simple::walkClockS((r.p.now-start)/1e6)/w.periodS)<.02);
+    assert(std::abs(r.m.walkVelocityX()-w.strideM[2]/w.periodS)<1e-12);
+    // STOP at eight instants of one cycle (swing and four-contact phases): the
+    // arrest is proved at min(ACC, kStopBrakeAcc), the resumed walk keeps the
+    // mode of the stopped one whatever is selected.
+    const unsigned cycleReleases=static_cast<unsigned>(w.periodS/.02);
+    for(unsigned k=0;k<8;++k){
+      for(unsigned n=0;n<cycleReleases/8+3;++n)r.tick();
+      r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.stopVerified());const auto& plan=simple::StopReferenceProbe::stopPlan(r.m);
+      assert(plan.duration>0&&r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc);
+      r.m.selectWalkMode(k%2?WalkMode::FAST:WalkMode::SLOW);
+      assert(!r.m.walk(2,r.p.now));r.m.selectWalkMode(mode);  // the resume is latched; then no mode change (walkModeChange)
+      for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+      assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==mode);}
+    // WALK STOP, then the selected mode for the next walk (height change at HOLD).
+    r.m.selectWalkMode(mode==WalkMode::FAST?WalkMode::STANDARD:WalkMode::FAST);r.m.walkStop();assert(r.reachStand());
+    const auto next=r.m.selectedWalkMode();assert(!r.m.walk(1,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    assert(r.m.walkMode()==next&&std::abs(r.m.requestedHeightM()-simple::walkModeSpec(next).heightM)<1e-12);
+    for(unsigned n=0;n<2000;++n){r.tick();assert(r.m.state()==simple::State::WALKING);}
+    r.m.walkStop();assert(r.reachStand());
+    // The joystick walks forward on the selected mode's law (2026-11-10).
+    const auto& nw=simple::walkModeSpec(next);
+    assert(!r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    for(unsigned n=0;n<24;++n){if(n%12==0)r.m.drive(simple::kStrideM[2]/simple::kWalkPeriodS,0,0,r.p.now);r.tick();}  // first WALK frames
+    assert(r.m.walkMode()==next&&r.m.period()==nw.periodS&&r.p.drive.acc==nw.drive.acc);
+    r.m.walkStop();assert(r.reachStand());
+    std::printf("walk mode %s: %.0f mm stride, %.2f s, %.0f mm, drive %u/%u, STOP braking ACC %u, 8 STOP+resume keep the mode, next walk takes the selection, joystick on the selected mode PASS (software only)\n",
+      w.name,w.strideM[2]*1e3,w.periodS,w.heightM*1e3,unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(std::min<unsigned>(w.drive.acc,simple::kStopBrakeAcc)));}
+  // SLOW is the dev.4 law bit for bit; the STOP braking rule leaves it and STAND unchanged.
+  const auto a=simple::walkGait(2),b=simple::walkGait(2,WalkMode::SLOW);
+  assert(a.duty==simple::kWalkDuty&&b.swingRampEnd==0&&a.swingRamp==b.swingRamp&&a.heightM==b.heightM&&a.liftM==simple::kWalkLiftM);
+  for(unsigned i=0;i<3;++i)assert(simple::walkGait(i).advanceXM==simple::kStrideM[i]);
+  assert(simple::stopAccelerationRadS2(simple::kWalkDrive)==simple::kWalkDrive.acc*100*simple::kTickRad&&
+         simple::stopAccelerationRadS2(simple::kStandDrive)==simple::kStandDrive.acc*100*simple::kTickRad&&
+         simple::stopAccelerationRadS2({1850,150})==simple::kStopBrakeAcc*100*simple::kTickRad);
+  simple::WalkMode m;assert(simple::parseWalkMode("FAST",m)&&m==WalkMode::FAST&&!simple::parseWalkMode("fast",m)&&!simple::parseWalkMode("TROT",m));
+  // Final dev.6 RCA: whatever correction HOLD carries at the WALK height
+  // (here a 30 mrad board roll during a STOP recovery; STANDARD roll limit ~9
+  // mrad), the walk starts only inside its own envelope (WALK_IMU_SETTLING
+  // while the slew brings it in) and runs without fault.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(WalkMode::STANDARD);assert(!r.m.walk(1,r.p.now));
+   for(unsigned n=0;n<2500;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}assert(r.m.state()==simple::State::WALKING);
+   const double hr=.015;r.in.quaternion[0]=std::cos(hr);r.in.quaternion[1]=std::sin(hr);r.in.quaternion[2]=r.in.quaternion[3]=0;
+   r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}assert(r.m.stopVerified());
+   assert(!r.m.walk(1,r.p.now));bool settling=false;double maxHeld=0;
+   for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);settling|=!std::strcmp(r.m.reason(),"WALK_IMU_SETTLING");
+     maxHeld=std::fmax(maxHeld,std::abs(simple::StopReferenceProbe::roll(r.m)));}
+   const double cr=simple::StopReferenceProbe::roll(r.m),cp=simple::StopReferenceProbe::pitch(r.m);
+   double rmax=0,pmin=0,pmax=0;for(const auto& v:simple::kStandardTilt){rmax=std::fmax(rmax,std::abs(v.roll));pmin=std::fmin(pmin,v.pitch);pmax=std::fmax(pmax,v.pitch);}
+   assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==WalkMode::STANDARD&&std::abs(cr)<=rmax+1e-9&&cp>=pmin-1e-9&&cp<=pmax+1e-9);  // inside the envelope's bounding box
+   for(unsigned n=0;n<1500;++n){r.tick();assert(r.m.state()==simple::State::WALKING);}
+   std::printf("walk recovery from a 30 mrad board roll: held up to %.1f mrad, WALK_IMU_SETTLING %s, STANDARD starts at %.1f/%.1f mrad inside its envelope, 1500 releases without fault PASS (software only)\n",maxHeld*1e3,settling?"seen":"not needed",cr*1e3,cp*1e3);}
+}
+// Trace 45: the servo stores min(ACC, register 85). Motion gets the lowest
+// value read back at the activation. 50 (a write that failed leaves the factory
+// value): STAND and SLOW only; STANDARD/FAST refused before any change (no
+// ENABLE, the HOLD goes on) and refused as a selection during the SLOW walk.
+// 0 (not verified): nothing starts. An earlier refusal keeps its own reason.
+static void accCeilingGate(){
+  using simple::WalkMode;
+  const double v=simple::kStrideM[2]/simple::kWalkPeriodS;
+  {Rig r;r.in.accCeiling=50;r.m.inputs(r.in);assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+   for(WalkMode mode:{WalkMode::STANDARD,WalkMode::FAST}){
+     r.m.selectWalkMode(mode);const auto enables=r.p.enables;const size_t sent=r.p.sentDrive.size();
+     assert(!std::strcmp(r.m.walk(2,r.p.now),"SERVO_ACC_CEILING_BELOW_DRIVE")&&!std::strcmp(r.m.drive(.5*v,0,0,r.p.now),"SERVO_ACC_CEILING_BELOW_DRIVE"));
+     for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()==simple::State::STANDING&&!std::strcmp(r.m.phase(),"HOLD"));}
+     assert(r.p.enables==enables);for(size_t i=sent;i<r.p.sentDrive.size();++i)assert(r.p.sentDrive[i].acc<=50);}
+   r.m.selectWalkMode(WalkMode::SLOW);assert(!r.m.walk(2,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){r.tick();assert(r.m.state()!=simple::State::FAULT);}
+   assert(!std::strcmp(r.m.selectWalkMode(WalkMode::FAST),"SERVO_ACC_CEILING_BELOW_DRIVE")&&r.m.selectedWalkMode()==WalkMode::SLOW);
+   for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()==simple::State::WALKING&&r.m.walkTarget()==WalkMode::SLOW&&r.p.drive.acc==simple::kWalkDrive.acc);}
+   r.m.walkStop();assert(r.reachStand());
+   assert(!r.m.drive(v,0,0,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v,0,0,r.p.now);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+   for(unsigned n=0;n<24;++n){if(n%12==0)r.m.drive(v,0,0,r.p.now);r.tick();}
+   assert(r.m.state()==simple::State::WALKING&&r.m.walkMode()==WalkMode::SLOW&&r.p.drive.acc==simple::kWalkDrive.acc);
+   r.m.walkStop();assert(r.reachStand());}
+  {Rig r;r.in.accCeiling=0;r.m.inputs(r.in);const auto enables=r.p.enables;
+   assert(!std::strcmp(r.m.stand(.15,r.p.now),"SERVO_ACC_CEILING_UNVERIFIED")&&!std::strcmp(r.m.walk(2,r.p.now),"SERVO_ACC_CEILING_UNVERIFIED")&&
+          !std::strcmp(r.m.drive(v,0,0,r.p.now),"SERVO_ACC_CEILING_UNVERIFIED"));
+   r.in.powerOk=false;r.tick();assert(!std::strcmp(r.m.stand(.15,r.p.now),"POWER_NOT_READY"));
+   for(unsigned n=0;n<300;++n){r.tick();assert(r.m.state()!=simple::State::MOVING);}assert(r.p.enables==enables);}
+  std::printf("ACC ceiling 50: STANDARD/FAST refused SERVO_ACC_CEILING_BELOW_DRIVE before any change (HOLD, no ENABLE, every frame ACC <= 50) and as a selection during the SLOW walk, SLOW and joystick walk at ACC %u; 0 refuses STAND, WALK, joystick; POWER_NOT_READY not masked PASS (software only)\n",
+    unsigned(simple::kWalkDrive.acc));
+}
+// WALK mode change inside a walk (2026-11-10, SimpleMotion::stepWalkMode).
+// Every release of a changing walk: still WALKING, no STOP, no ENABLE, no
+// SAFE_OFF, 12 servos ON in every frame, the gait clock never steps back nor
+// faster than the fastest law, the law speed and every RAW step bounded, the
+// clock never faster than the mode whose drive is sent nor than the law
+// shape's own, a shape never below its own height, a height between two modes
+// never at a clock faster than the higher one's. Software only: the rig
+// tracks every frame; it is neither a motor nor a ground model.
+namespace {
+using simple::WalkMode;
+double topSpeed(WalkMode m){const auto& w=simple::walkModeSpec(m);return w.strideM[2]/w.periodS;}
+WalkMode driveMode(simple::Drive d){for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<WalkMode>(i));if(w.drive.speed==d.speed&&w.drive.acc==d.acc)return static_cast<WalkMode>(i);}assert(false);return WalkMode::SLOW;}
+struct Watch {
+  Rig& r;double cycles,v,maxDv=0,maxV=0;unsigned enables,offs,releases=0;size_t frames;int maxStep=0;
+  explicit Watch(Rig& rig):r(rig),cycles(rig.m.walkCycles()),v(rig.m.walkVelocityX()),enables(rig.p.enables),offs(rig.p.offCalls),frames(rig.p.sent.size()){}
+  void tick(){
+    const WalkMode shape=r.m.walkMode();r.tick();++releases;
+    assert(r.m.state()==simple::State::WALKING&&!r.m.stopActive()&&r.p.enables==enables&&r.p.offCalls==offs);
+    const double c=r.m.walkCycles(),dc=c-cycles;assert(dc>=0&&dc<=.02/simple::walkModeSpec(WalkMode::FAST).periodS*(1+1e-9));cycles=c;
+    const double nv=r.m.walkVelocityX();maxDv=std::fmax(maxDv,std::abs(nv-v));maxV=std::fmax(maxV,nv);v=nv;
+    assert(r.m.period()>=simple::walkModeSpec(driveMode(r.p.drive)).periodS-1e-12);
+    // Never faster than the law shape's own clock. A height or sway other than
+    // the shape's own: never below its own height, and the clock never faster
+    // than that of the next mode designed for that height or a higher one.
+    const auto& own=simple::walkModeSpec(r.m.walkMode());assert(r.m.period()>=own.periodS-1e-12);
+    if(r.m.walkHeightM()!=own.heightM||simple::StopReferenceProbe::gait(r.m).swayYM!=own.swayYM){
+      assert(r.m.walkHeightM()>=own.heightM-1e-12);double slowest=1e9;
+      for(unsigned k=0;k<3;++k){const auto& w=simple::walkModeSpec(static_cast<WalkMode>(k));if(w.heightM>=r.m.walkHeightM()-1e-12)slowest=std::fmin(slowest,w.periodS);}
+      assert(r.m.period()>=slowest-1e-12);}
+    // The law shape changes only with four feet down.
+    if(r.m.walkMode()!=shape)for(const auto& ph:simple::StopReferenceProbe::walkNominal(r.m).cartesian.phases)assert(ph.stance);
+    for(;frames<r.p.sent.size();++frames){assert(r.p.sentTorqueOn[frames]==12);
+      if(frames)for(unsigned i=0;i<12;++i)maxStep=std::max(maxStep,std::abs(int(r.p.sent[frames][i])-int(r.p.sent[frames-1][i])));}
+  }
+};
+bool settled(const Rig& r,WalkMode m,double speed){const auto& w=simple::walkModeSpec(m);
+  return r.m.walkMode()==m&&r.m.walkTarget()==m&&r.m.period()==w.periodS&&r.m.walkHeightM()==w.heightM&&
+         r.p.drive.speed==w.drive.speed&&r.p.drive.acc==w.drive.acc&&std::abs(r.m.walkVelocityX()-speed)<1e-9;}
+// Walking on `m` from SAFE_OFF: a WALK preset, or the joystick at `joy` of the mode's top speed.
+void startIn(Rig& r,WalkMode m,double joy=0){
+  assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(m);
+  if(joy>0)assert(!r.m.drive(joy*topSpeed(m),0,0,r.p.now));else assert(!r.m.walk(2,r.p.now));
+  for(unsigned n=0;n<6000&&!settled(r,m,(joy>0?joy:1)*topSpeed(m));++n){if(joy>0&&n%12==0)r.m.drive(joy*topSpeed(m),0,0,r.p.now);r.tick();assert(r.m.state()!=simple::State::FAULT);}
+  assert(r.m.state()==simple::State::WALKING&&settled(r,m,(joy>0?joy:1)*topSpeed(m)));
+  // Past the start ramp (the law changes only after kWalkStartCycles): a walk in progress.
+  for(unsigned n=0;n<unsigned(simple::walkModeSpec(m).periodS*1.5/.02);++n){if(joy>0&&n%12==0)r.m.drive(joy*topSpeed(m),0,0,r.p.now);r.tick();assert(r.m.state()==simple::State::WALKING);}}
+// Select `to` and run until its own law, at `speed`; the joystick refreshes `joy` of the selected top speed.
+unsigned changeTo(Watch& w,WalkMode to,double joy=0,unsigned limit=4000){
+  Rig& r=w.r;assert(!r.m.selectWalkMode(to)&&r.m.walkModeLive());const double peak=std::fmax(w.v,(joy>0?joy:1)*topSpeed(to));unsigned n=0;
+  for(;n<limit&&!settled(r,to,(joy>0?joy:1)*topSpeed(to));++n){if(joy>0&&n%12==0)assert(!r.m.drive(joy*topSpeed(to),0,0,r.p.now));w.tick();assert(w.v<=peak+1e-9);}
+  assert(n<limit);return n;}
+}
+static void walkModeChange(){
+  using simple::State;
+  // Steady walks: the largest RAW step per release each law asks by itself.
+  int steady[3]{};
+  for(unsigned m=0;m<3;++m){Rig r;startIn(r,static_cast<WalkMode>(m));Watch w(r);for(unsigned n=0;n<unsigned(3*simple::walkModeSpec(static_cast<WalkMode>(m)).periodS/.02);++n)w.tick();steady[m]=w.maxStep;}
+  const int bound=*std::max_element(steady,steady+3);
+  // WALK presets: SLOW -> STANDARD -> FAST up, FAST -> SLOW down, close selections.
+  {Rig r;startIn(r,WalkMode::SLOW);Watch w(r);
+   const unsigned up1=changeTo(w,WalkMode::STANDARD),up2=changeTo(w,WalkMode::FAST);const double upDv=w.maxDv;
+   for(unsigned n=0;n<200;++n)w.tick();
+   const unsigned down=changeTo(w,WalkMode::SLOW);
+   r.m.selectWalkMode(WalkMode::FAST);for(unsigned n=0;n<40;++n)w.tick();r.m.selectWalkMode(WalkMode::STANDARD);for(unsigned n=0;n<40;++n)w.tick();
+   r.m.selectWalkMode(WalkMode::SLOW);for(unsigned n=0;n<25;++n)w.tick();const unsigned close=changeTo(w,WalkMode::FAST);
+   assert(w.maxStep<=bound&&w.maxDv<=5e-4);
+   std::printf("WALK mode change, presets: SLOW->STANDARD %.2f s, STANDARD->FAST %.2f s, FAST->SLOW %.2f s, SLOW->FAST->STANDARD->SLOW->FAST %.2f s; WALKING throughout, torque ON 12/12, no STOP/SAFE_OFF/ENABLE; law speed step <= %.3f mm/s per release (up %.3f), peak %.1f mm/s; RAW step <= %d ticks (steady laws: SLOW %d, STANDARD %d, FAST %d) PASS (software only)\n",
+     up1*.02,up2*.02,down*.02,close*.02,w.maxDv*1e3,upDv*1e3,w.maxV*1e3,w.maxStep,steady[0],steady[1],steady[2]);}
+  // Joystick at 50 % and 100 % of each mode's top speed, up and down, then centre (WALK STOP).
+  for(unsigned m=0;m<3;++m){const WalkMode mode=static_cast<WalkMode>(m);Rig r;startIn(r,mode,.5);Watch w(r);
+    const unsigned up=changeTo(w,mode,1.),down=changeTo(w,mode,.5);
+    assert(r.m.walkMode()==mode&&r.m.period()==simple::walkModeSpec(mode).periodS&&w.maxStep<=bound);
+    // Centre: the page sends a zero BASE_VELOCITY, MotionService walkStop(): the
+    // law's own C2 stride ramp to rest, then the four-contact recentring.
+    r.m.walkStop();bool ramp=false;unsigned n=0;
+    for(;n<6000&&r.m.state()!=State::STANDING;++n){r.tick();assert(r.m.state()!=State::FAULT&&!r.m.stopActive());ramp|=!std::strcmp(r.m.reason(),"WALK_STOPPING");}
+    assert(r.m.state()==State::STANDING&&ramp&&r.p.enables==w.enables&&r.p.offCalls==w.offs);
+    std::printf("joystick %s: 50%% %.1f mm/s, 100%% %.1f mm/s (%.2f s up, %.2f s down, speed step <= %.3f mm/s), centre: WALK STOP ramp to STANDING in %.2f s PASS (software only)\n",
+      simple::walkModeSpec(mode).name,.5*topSpeed(mode)*1e3,topSpeed(mode)*1e3,up*.02,down*.02,w.maxDv*1e3,n*.02);}
+  // Selector moved with the joystick held at full scale: the new top speed, no stop.
+  {Rig r;startIn(r,WalkMode::SLOW,1.);Watch w(r);
+   const unsigned up=changeTo(w,WalkMode::FAST,1.),down=changeTo(w,WalkMode::STANDARD,1.),back=changeTo(w,WalkMode::SLOW,1.);
+   assert(w.maxStep<=bound&&w.maxDv<=5e-4);
+   std::printf("joystick held at 100%%: SLOW->FAST %.2f s, FAST->STANDARD %.2f s, STANDARD->SLOW %.2f s, WALKING throughout, speed step <= %.3f mm/s, RAW step <= %d ticks PASS (software only)\n",
+     up*.02,down*.02,back*.02,w.maxDv*1e3,w.maxStep);}
+  // Steering and backward exist on SLOW only.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(WalkMode::FAST);
+   assert(!std::strcmp(r.m.drive(0,.8*simple::kJoystickLateralM/simple::kJoystickPeriodS,0,r.p.now),"JOYSTICK_STEERING_SLOW_ONLY")&&
+          !std::strcmp(r.m.drive(-.005,0,0,r.p.now),"JOYSTICK_BACKWARD_SLOW_ONLY"));}
+  // STOP at six instants of each change: verified, no fault.
+  unsigned stops=0;
+  for(auto pair:{std::pair<WalkMode,WalkMode>{WalkMode::SLOW,WalkMode::FAST},{WalkMode::FAST,WalkMode::SLOW},{WalkMode::STANDARD,WalkMode::FAST}})
+    for(unsigned k=0;k<6;++k)for(double joy:{0.,1.}){Rig r;startIn(r,pair.first,joy);assert(!r.m.selectWalkMode(pair.second));
+      for(unsigned n=0;n<40+k*60;++n){if(joy>0&&n%12==0)r.m.drive(joy*topSpeed(pair.second),0,0,r.p.now);r.tick();assert(r.m.state()==State::WALKING);}
+      r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=State::FAULT);}
+      assert(r.m.stopVerified()&&simple::StopReferenceProbe::stopPlan(r.m).duration>0);++stops;}
+  // WALK STOP during a change: STANDING at the selected mode's height, ready for its walk.
+  {Rig r;startIn(r,WalkMode::SLOW);r.m.selectWalkMode(WalkMode::FAST);for(unsigned n=0;n<200;++n)r.tick();
+   r.m.walkStop();assert(r.reachStand());assert(std::abs(r.m.requestedHeightM()-simple::walkModeSpec(WalkMode::FAST).heightM)<1e-12);
+   assert(!r.m.walk(2,r.p.now));for(unsigned n=0;n<4000&&!settled(r,WalkMode::FAST,topSpeed(WalkMode::FAST));++n){r.tick();assert(r.m.state()!=State::FAULT);}
+   assert(settled(r,WalkMode::FAST,topSpeed(WalkMode::FAST)));}
+  std::printf("STOP during WALK mode changes: %u STOPs (SLOW->FAST, FAST->SLOW, STANDARD->FAST; preset and joystick; six instants) verified without fault; WALK STOP mid-change stands at the selected height and walks it PASS (software only)\n",stops);
+}
+// dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
+// law, applied/wanted IMU correction, the release's compensationSafe check):
+// enterOff resets the correction right after, a later STOP keeps the record.
+static void exitCause(){
+  Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.walk(2,r.p.now));
+  for(unsigned n=0;n<1500;++n)r.tick();assert(r.m.state()==simple::State::WALKING);
+  const double roll=simple::StopReferenceProbe::roll(r.m),pitch=simple::StopReferenceProbe::pitch(r.m),cycles=r.m.walkCycles();assert(pitch!=0);
+  r.m.fault("SERVO_COMMUNICATION_LOST");r.m.stop();for(unsigned n=0;n<20;++n)r.tick();
+  const auto& e=r.m.exitSnapshot();
+  assert(e.valid&&e.fault&&!std::strcmp(e.reason,"SERVO_COMMUNICATION_LOST")&&!std::strcmp(e.phase,"WALK_STANDARD")&&e.cycles==cycles&&e.roll==roll&&e.pitch==pitch&&
+         e.refusedBy==0&&e.advance[0]==simple::kStrideM[2]&&!e.steered&&simple::StopReferenceProbe::pitch(r.m)==0);
+  std::printf("exit cause: WALK fault at cycle %.3f keeps correction %.1f/%.1f mrad, refused_by %u, law %.0f mm fore/aft after STOP PASS (software only)\n",e.cycles,e.roll*1e3,e.pitch*1e3,unsigned(e.refusedBy),e.advance[0]*1e3);
+}
+int main(){walkModes();accCeilingGate();walkModeChange();exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();
   joystickWalk();
+  steeredSettleUnwind();
   walkLevelBoard();
   walkTxLatency();
   proneHandoverWait();
   // Exercise the production gait + IK across every join: swing lift-off and
   // touchdown, four-contact sway windows, end of the start ramp, decel start,
   // terminal touchdown and recentring end, for each stride and quarter stop.
-  for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
-    motion::GaitParameters g;g.heightM=simple::baseLinkHeightFromNominalM(simple::kWalkHeightM);g.liftM=simple::kWalkLiftM;g.duty=simple::kWalkDuty;g.advanceXM=simple::kStrideM[stride];
-    g.swayXM=simple::kWalkSwayXM;g.swayYM=simple::kWalkSwayYM;g.startCycles=simple::kWalkStartCycles;g.stopCycles=simple::kWalkStopCycles;
+  // Velocity is continuous everywhere (C1); acceleration too (C2) except the
+  // swinging foot's own lift-off/touchdown with the trapezoidal swing, whose
+  // velocity ramps start and end there by design (Gait.h swingRamp).
+  for(unsigned mode=0;mode<3;++mode)for(unsigned stride=0;stride<3;++stride)for(double stop : {1.,1.25,1.5,1.75,2.}){
+    const auto g=simple::walkGait(stride,static_cast<simple::WalkMode>(mode));const double rate=1./simple::walkModeSpec(static_cast<simple::WalkMode>(mode)).periodS;
     const double terminal=stop+g.stopCycles,w=motion::gaitSettleCycles(g);
     for(double base=0;base<terminal+1;base+=.25)for(double event : {0.,w}){  // quarter touchdown and four-contact window end
       const double c=base+event;if(c<=1e-6||c>=terminal+w-1e-6)continue;
       const double term=c>stop?terminal:-1;
-      auto a=motion::solveGait(g,motion::gaitCartesian(g,c-1e-7,1./simple::kWalkPeriodS,0,term));
-      auto b=motion::solveGait(g,motion::gaitCartesian(g,c+1e-7,1./simple::kWalkPeriodS,0,term));
+      auto a=motion::solveGait(g,motion::gaitCartesian(g,c-1e-7,rate,0,term));
+      auto b=motion::solveGait(g,motion::gaitCartesian(g,c+1e-7,rate,0,term));
       const auto native=motion::solveGait(g,b.cartesian,nullptr,false);
       assert(native.status==b.status&&native.target.valid==b.target.valid);
       for(unsigned l=0;l<4;++l)assert(native.condition[l]==b.condition[l]);
@@ -797,12 +1525,13 @@ int main(){proneRest();temperatureChecks();standHoldTilt();
       for(unsigned l=0;l<4;++l){
         const auto av=a.velocityRadS[l],bv=b.velocityRadS[l],aa=a.accelerationRadS2[l],ba=b.accelerationRadS2[l];
         assert(std::abs(av.hip-bv.hip)<1e-4&&std::abs(av.upper-bv.upper)<1e-4&&std::abs(av.lower-bv.lower)<1e-4);
-        assert(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002);
+        const bool corner=g.swingRamp>0&&a.cartesian.phases[l].stance!=b.cartesian.phases[l].stance;
+        assert(corner||(std::abs(aa.hip-ba.hip)<.002&&std::abs(aa.upper-ba.upper)<.002&&std::abs(aa.lower-ba.lower)<.002));
       }
       for(unsigned i=0;i<12;++i)assert(std::abs(motion::jointSlot(a.target,i)-motion::jointSlot(b.target,i))<1e-5);
     }
     // Rest at both ends: zero joint velocity/acceleration in the gait clock.
-    for(double c : {0.,terminal+w}){auto f=motion::solveGait(g,motion::gaitCartesian(g,c,1./simple::kWalkPeriodS,0,c>0?terminal:-1));assert(f.target.valid);
+    for(double c : {0.,terminal+w}){auto f=motion::solveGait(g,motion::gaitCartesian(g,c,rate,0,c>0?terminal:-1));assert(f.target.valid);
       for(unsigned l=0;l<4;++l){const auto v=f.velocityRadS[l],a=f.accelerationRadS2[l];
         assert(std::abs(v.hip)+std::abs(v.upper)+std::abs(v.lower)<1e-9&&std::abs(a.hip)+std::abs(a.upper)+std::abs(a.lower)<1e-9);}}
   }
@@ -946,8 +1675,8 @@ int main(){proneRest();temperatureChecks();standHoldTilt();
   std::printf("API status %zu bytes (%zu B transport, 640 B reserved); JSON=%s\n",std::strlen(status),core::kMotionStatusJsonBytes,status);
   std::strcpy(cmd.id,"new-browser-session-1");cmd.intent=motion::Intent::STATUS;cmd.issued_at_ms=api.p.now/1000;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
   cmd.intent=motion::Intent::STOP;cmd.ttl_ms=0;cmd.issued_at_ms=0;assert(service.command(cmd,api.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);api.tick(false);assert(api.m.stopping());
-  Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()!=simple::State::FAULT;++i)unsafe.tick(false);
-  assert(unsafe.m.state()==simple::State::FAULT&&unsafe.p.enables==0);
+  Rig unsafe;unsafe.p.observed[0].q=.7;assert(!unsafe.m.stand(.15,unsafe.p.now));for(unsigned i=0;i<30&&unsafe.m.state()==simple::State::MOVING;++i)unsafe.tick(false);
+  assert(unsafe.m.state()==simple::State::STOPPED&&!std::strcmp(unsafe.m.reason(),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY")&&unsafe.p.enables==0&&unsafe.p.frames==0);
   Rig off;off.p.verify=false;off.m.stop();for(unsigned i=0;i<30;++i)off.tick(false);assert(!off.m.offVerified()&&off.m.stopping());
   // PRONE -> STAND50: one DEPLOY and one LIFT reference, no HEIGHT move and
   // so no STAND150 detour. The rig IMU stays level while the route nominal is

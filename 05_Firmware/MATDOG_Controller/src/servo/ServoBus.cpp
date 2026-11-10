@@ -478,15 +478,25 @@ bool ServoBus::readPositionOffset(int id, int16_t* out) {
   return true;
 }
 
-bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out) {
+bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
+                                   diagnostics::ReadCapture* capture) {
   if (id < 0 || id > 253 || out == nullptr) return false;
   if (width != 1 && width != 2) return false;  // refuse, never guess
 
   BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs), us(kDiagnosticTimeoutMs), false);
   if (!guard.ok()) return false;
 
-  const int raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
-                               : st_.readWord(static_cast<uint8_t>(id), address);
+  int raw = -1;
+  if (capture != nullptr) {
+    // readByte()/readWord() run exactly this ReadCaptured (ID, length, status,
+    // checksum, deadline); the capture only keeps a copy of the reply.
+    uint8_t data[2] = {0, 0};
+    if (st_.ReadCaptured(static_cast<uint8_t>(id), address, data, width, capture) == width)
+      raw = (width == 1) ? data[0] : (data[0] | (data[1] << 8));
+  } else {
+    raw = (width == 1) ? st_.readByte(static_cast<uint8_t>(id), address)
+                       : st_.readWord(static_cast<uint8_t>(id), address);
+  }
   guard.result(raw >= 0);
   if (raw < 0) {
     last_detected_ = core::DetectedState::NO_RESPONSE;
@@ -495,6 +505,64 @@ bool ServoBus::readProfileRegister(int id, uint8_t address, uint8_t width, int32
   last_detected_ = core::DetectedState::ONLINE;
   *out = raw;
   return true;
+}
+
+uint8_t ServoBus::configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target) {
+  if (ids == nullptr || count == 0 || target < 1 || target > 254) return 0;
+  int32_t ceiling = target;  // lowest 85 left on a servo
+  bool wrote = false;
+  unsigned long last_write_ms = 0;
+  for (unsigned i = 0; i < count; ++i) {
+    int32_t current = -1, lock = -1;
+    if (st_.bus.preemptRequested() || !readProfileRegister(ids[i], kAccDiagMaxAcc, 1, &current)) return 0;
+    if (current == target) continue;
+    // An open Lock would let the write reach EEPROM: that servo keeps its own 85.
+    if (!readProfileRegister(ids[i], kAccDiagLock, 1, &lock) || lock != 1) {
+      if (current < ceiling) ceiling = current;
+      continue;
+    }
+    const AccDiagWrite w = writeAccDiagnosticByte(ids[i], kAccDiagMaxAcc, target);
+    if (w.refused || w.torque_after != 0) return 0;  // torque not read OFF (the writer issued safeOff())
+    wrote = true;
+    last_write_ms = millis();
+  }
+  if (!wrote) return static_cast<uint8_t>(ceiling);
+  while (millis() - last_write_ms < kAccCeilingSettleMs) {
+    if (st_.bus.preemptRequested()) return 0;
+    delay(1);
+  }
+  ceiling = target;
+  for (unsigned i = 0; i < count; ++i) {
+    int32_t settled = -1;
+    if (st_.bus.preemptRequested() || !readProfileRegister(ids[i], kAccDiagMaxAcc, 1, &settled)) return 0;
+    if (settled < ceiling) ceiling = settled;
+  }
+  return static_cast<uint8_t>(ceiling);
+}
+
+ServoBus::AccDiagWrite ServoBus::writeAccDiagnosticByte(int id, uint8_t address, uint8_t value) {
+  AccDiagWrite r;
+  const bool allowed = (address == kAccDiagAcc && value >= 1 && value <= 254) ||
+                       (address == kAccDiagLock && value <= 1) ||
+                       (address == kAccDiagMaxAcc && value >= 1 && value <= 254);
+  if (id < 0 || id > 253 || !allowed) return r;
+  {
+    // Four replies: TorqueEnable, the write's ACK, the readback, TorqueEnable.
+    BusGuard guard(st_.bus, us(kDiagnosticTimeoutMs, 4), us(kDiagnosticTimeoutMs), false);
+    if (!guard.ok()) return r;
+    if (st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE) != 0) return r;
+    r.refused = false;
+    st_.writeByte(static_cast<uint8_t>(id), address, value);  // ACK informational only
+    r.readback = st_.readByte(static_cast<uint8_t>(id), address);
+    r.torque_after = st_.readByte(static_cast<uint8_t>(id), SMS_STS_TORQUE_ENABLE);
+    r.verify = classifyServoWriteVerify(r.readback, value);
+    guard.result(r.readback >= 0 && r.torque_after >= 0);
+  }
+  if (r.torque_after != 0) {  // armed or unknown: never leave it so
+    r.safe_off_issued = true;
+    r.safe_off = safeOff(id);
+  }
+  return r;
 }
 
 }  // namespace servo

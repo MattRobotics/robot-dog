@@ -1,0 +1,22 @@
+ROOT loop() worst static path 11248 B
+     32 B  static   loop()
+    144 B  static   matdog::core::Controller::update(unsigned long)
+     80 B  static   matdog::core::CommandRouter::update(unsigned long)
+   2560 B  static   matdog::core::CommandRouter::handleLine(String)
+    192 B  static   matdog::core::MotionService::command(matdog::motion::MotionCommand const&, unsigned long)
+    192 B  static   matdog::simple::SimpleMotion::walk(unsigned int, unsigned long long)
+     32 B  static   matdog::simple::SimpleMotion::stand(double, unsigned long long)
+    752 B  static   src/simple/Simpl
+   1872 B  static   matdog::simple::SimpleMotion::nextStand(unsigned long long)
+    288 B  static   matdog::simple::SimpleMotion::beginProne(matdog::simple::SimpleMotion::Phase, unsigned long long)
+    224 B  static   matdog::simple::SimpleMotion::beginPlan(matdog::simple::SimpleMotion::Phase, matdog::simple::collision::Box const&, unsigned long 
+   1376 B  static   matdog::simple::SimpleMotion::generateStand(unsigned long long)
+    432 B  static   matdog::simple::SimpleMotion::compensate(matdog::motion::LocomotionFrame&, unsigned long long)
+    800 B  static   matdog::simple::SimpleMotion::compensateLevel(matdog::motion::LocomotionFrame&, matdog::motion::Vector3 const&, unsigned long long
+    432 B  static   matdog::simple::SimpleMotion::compensationTarget(matdog::motion::LocomotionFrame const&, matdog::motion::BodyPose const&, matdog::
+     80 B  static   matdog::motion::worldEdgeContactInverseKinematicsTilted(matdog::motion::LegId, matdog::motion::Vector3 const&, matdog::motion::Bod
+    384 B  static   matdog::motion::worldContactInverseKinematicsTilted(matdog::motion::LegId, matdog::motion::Vector3 const&, matdog::motion::BodyPos
+    864 B  static   matdog::motion::contactInverseKinematicsGroundNormal(matdog::motion::LegId, matdog::motion::Vector3 const&, matdog::motion::Vector
+    272 B  static   matdog::motion::contactForwardKinematics(matdog::motion::LegId, matdog::motion::LegJointAngles const&, matdog::motion::Vector3)
+     32 B  static   matdog::motion::forwardKinematics(matdog::motion::LegId, matdog::motion::LegJointAngles const&)
+    208 B  static   matdog::motion::detail::forwardWithModel(matdog::motion::LegModel const&, matdog::motion::LegJointAngles const&, double)

@@ -1,0 +1,37 @@
+base min support 1.43 (random_4) min clearance 2.18 (octant_ppm)
+base scenarios STANDING: 19
+base min box_margin=14.2
+L25 min support 1.36 (random_4) min clearance 2.16 (octant_ppm)
+L25 scenarios STANDING: 19
+L25 random_2 box_margin=39.6 mrad tilt_margin=32.3 mrad tilt_fail=1 compensated=10.36/11.95 max_target_step=0.01793 end=STANDING STAND_REACHED 
+L25 min box_margin=14.2
+L30 min support 1.23 (random_3) min clearance 2.13 (octant_ppm)
+L30 scenarios STANDING: 15
+L30 octant_ppm box_margin=33.1 mrad tilt_margin=24.7 mrad tilt_fail=161 compensated=10.60/11.95 max_target_step=0.01820 end=FAULT WALK_IK_OR_WORKSPACE 
+L30 octant_pmp box_margin=34.8 mrad tilt_margin=26.2 mrad tilt_fail=66 compensated=10.58/11.95 max_target_step=0.01801 end=FAULT WALK_IK_OR_WORKSPACE 
+L30 octant_mpm box_margin=36.4 mrad tilt_margin=27.7 mrad tilt_fail=18 compensated=10.29/11.95 max_target_step=0.01703 end=FAULT WALK_IK_OR_WORKSPACE 
+L30 min box_margin=14.2
+P50 min support 0.32 (random_3) min clearance 2.19 (octant_ppm)
+P50 scenarios STANDING: 13
+P50 min box_margin=14.2
+P55 min support 0.39 (random_3) min clearance 2.19 (octant_ppm)
+P55 scenarios STANDING: 18
+P55 min box_margin=14.2
+R1 min support -1.19 (random_2) min clearance 2.14 (random_3)
+R1 scenarios STANDING: 17
+R1 random_2 box_margin=28.7 mrad tilt_margin=21.6 mrad tilt_fail=584 compensated=11.03/11.96 max_target_step=0.01785 end=FAULT WALK_IK_OR_WORKSPACE 
+R1 random_3 box_margin=4.5 mrad tilt_margin=-4.5 mrad tilt_fail=321 compensated=11.44/11.95 max_target_step=0.01833 end=FAULT WALK_IK_OR_WORKSPACE 
+R1 random_4 box_margin=14.2 mrad tilt_margin=12.7 mrad tilt_fail=2 compensated=10.40/11.96 max_target_step=0.01825 end=STANDING STAND_REACHED 
+R1 min box_margin=4.5
+Y25 min support 0.40 (random_4) min clearance 2.16 (octant_ppm)
+Y25 scenarios STANDING: 16
+Y25 ccw box_margin=34.0 mrad tilt_margin=26.2 mrad tilt_fail=93 compensated=10.65/11.96 max_target_step=0.01669 end=FAULT WALK_IK_OR_WORKSPACE 
+Y25 cw box_margin=32.2 mrad tilt_margin=24.7 mrad tilt_fail=70 compensated=10.58/11.95 max_target_step=0.01661 end=FAULT WALK_IK_OR_WORKSPACE 
+Y25 octant_ppm box_margin=36.5 mrad tilt_margin=27.7 mrad tilt_fail=26 compensated=10.36/11.95 max_target_step=0.01791 end=STANDING STAND_REACHED 
+Y25 min box_margin=14.2
+Y30 min support -0.02 (random_1) min clearance 2.15 (random_3)
+Y30 scenarios STANDING: 11
+Y30 ccw box_margin=34.3 mrad tilt_margin=24.7 mrad tilt_fail=10 compensated=10.34/11.95 max_target_step=0.01660 end=FAULT WALK_IK_OR_WORKSPACE 
+Y30 cw box_margin=18.0 mrad tilt_margin=10.9 mrad tilt_fail=482 compensated=11.55/11.96 max_target_step=0.01652 end=FAULT WALK_IK_OR_WORKSPACE 
+Y30 octant_ppm box_margin=33.4 mrad tilt_margin=24.7 mrad tilt_fail=93 compensated=10.70/11.96 max_target_step=0.01780 end=FAULT WALK_IK_OR_WORKSPACE 
+Y30 min box_margin=5.9

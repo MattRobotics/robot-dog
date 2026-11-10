@@ -17,7 +17,7 @@ struct LimitPort: ScriptedObservationPort {
 };
 struct DiagRig {
   simple::SimpleMotion m;LimitPort p;simple::Inputs in;
-  DiagRig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";
+  DiagRig(){m.begin(&p);p.motion=&m;in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.accCeiling=220;in.refusal="READY";
     for(unsigned i=0;i<12;++i){in.minRad[i]=-3;in.maxRad[i]=3;}
     for(unsigned i=0;i<15;++i)tick(false);assert(m.offVerified());}
   void tick(bool publish=true){p.now+=simple::kPeriodUs;in.imuStampUs=p.now;m.inputs(in);if(publish)p.publishCommandedPose();test_clock_us=p.now;m.update(p.now);m.updateTelemetry(p.now);}

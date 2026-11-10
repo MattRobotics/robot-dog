@@ -104,10 +104,15 @@ async function boot(initialStatus = fx.status_ready) {
   assert.strictEqual(q('#simple-motion h2').textContent, 'MATDOG — Motion Cockpit');
   assert(joystick && q('#joy-pad') && joystick.textContent.includes('Rotazione') && !joystick.querySelector('.joystick-badge') &&
     !/VERIFICATO SU HARDWARE|mm\/s|Trascinare/.test(joystick.textContent.replace(q('#joy-state').textContent, '')), 'compact joystick: no badge, no prose');
-  assert(/Joystick \(verificato su hardware in dev\.15\): trascinare/.test(q('#simple-diagnostics').textContent) &&
-    /🐢 30, 45 o 🐇 60 mm è il passo per ciclo/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
+  // 2026-11-10: the guide says the joystick's full scale is the selected mode's top speed, steering SLOW only,
+  // and the selector changes a forward walk in progress; the presets belong to the mode; no stale 6.5 s.
+  assert(/fondo corsa in avanti è la velocità massima della modalità WALK scelta/.test(q('#simple-diagnostics').textContent) &&
+    /Sterzo, laterale e retromarcia solo in SLOW/.test(q('#simple-diagnostics').textContent) &&
+    /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
+    /Durante un WALK in avanti il selettore cambia la modalità del passo in corso/.test(q('#simple-diagnostics').textContent) &&
+    !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
   {
-    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); stride: 🐢 30 / 45 / 🐇 60 mm per cycle.
+    // STAND height: 50-150 mm in 5 mm steps (slider + stepper); one WALK speed selector.
     // Choosing a value sends nothing: only STAND or WALK sends, and the Controller may refuse.
     const h = q('#simple-height'), before = p.calls.filter(c => c.url === '/api/motion/command').length;
     assert(h.type === 'range' && h.min === '50' && h.max === '150' && h.step === '5' && h.value === '150' && q('#simple-height-value').textContent === '150 mm');
@@ -118,11 +123,14 @@ async function boot(initialStatus = fx.status_ready) {
     assert(h.value === '150', 'stepper clamps at 150 mm');
     h.value = '75'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true })); h.dispatchEvent(new p.dom.window.Event('change', { bubbles: true }));
     assert.strictEqual(q('#simple-height-value').textContent, '75 mm');
-    const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-stride"]')];
-    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.textContent), ['0:🐢 30 mm', '1:45 mm', '2:🐇 60 mm']);
-    assert(radios[1].checked && /passo per ciclo/.test(q('#simple-stride').closest('fieldset').textContent) && /non velocità/.test(q('#simple-stride').getAttribute('aria-label')));
-    radios[2].click(); radios[0].click(); radios[1].click(); await settle();
-    assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a value change');
+    // Final dev.6: one speed selector, no stride selector.
+    const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
+    // Icon and name over the speed (modeLabels updates only the speed element).
+    assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.querySelector('.mode-name').textContent + '|' + r.nextElementSibling.querySelector('.mode-speed').textContent),
+      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|32 mm/s']);
+    assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
+    await settle();
+    assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');
     h.value = '150'; h.dispatchEvent(new p.dom.window.Event('input', { bubbles: true }));
   }
   assert(/rotazione antioraria/.test(q('#joy-left').title) && /rotazione oraria/.test(q('#joy-right').title), 'rotation buttons shipped');
@@ -331,6 +339,10 @@ async function boot(initialStatus = fx.status_ready) {
     await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Ripresa dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
     await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
+    {const e=JSON.parse(JSON.stringify(s));e.reason='INITIAL_POSE_OUTSIDE_SAFE_ENTRY';await refresh(JSON.stringify(e));
+     assert.strictEqual(q('#simple-state').textContent,'POSA D’INGRESSO NON RICONOSCIUTA · COPPIA OFF');
+     assert(q('#simple-state').dataset.tone==='warn'&&q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-reason').textContent.includes('torna PRONTO da solo'), 'dev.5: a refused entry pose is a recoverable STOPPED state with STAND disabled until the Controller reports READY');
+     e.state='READY';e.reason='READY';await refresh(JSON.stringify(e));assert(!q('#simple-stand').disabled, 'READY from the Controller re-enables STAND');}
     s.fault=true;s.state='FAULT';s.reason='SERVO_COMMUNICATION_LOST';s.stale=false;await refresh(JSON.stringify(s));
     assert(q('#simple-state').textContent.startsWith('FAULT') && q('#simple-state').dataset.tone==='bad' && q('#simple-reason').textContent.includes('Comunicazione servo persa'), 'fresh feedback after a fault keeps FAULT red and preserves the original reason');
     const faultStopAck=JSON.parse(fx.ack_stop);faultStopAck.reason='STOP_REQUESTED_FAULT_LATCHED';
@@ -366,13 +378,23 @@ async function boot(initialStatus = fx.status_ready) {
   await send('stand150', () => q('#simple-stand').click(), ok(fx.ack_stand_accepted), 'POSTURE.STAND', { target_height_m: .15 }, 5000);
   assert(/STAND 150 mm/.test(last()));
 
-  // 3. WALK STANDARD presets 30/45/60 mm per 6.5 s cycle.
-  for (const [i, mm] of [[0, 30], [1, 45], [2, 60]]) {
-    await refresh(fx.status_ready);
-    q('input[name="simple-stride"][value="' + i + '"]').click();
-    await send('walk' + mm, () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
-    assert(new RegExp('WALK STANDARD ' + mm + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last());
-  }
+  // 3. WALK: SLOW (default) walks the SLOW preset 2 (100 mm per 5 s).
+  await refresh(fx.status_ready);
+  await send('walk100', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: .100 / 5.0, vy: 0, yaw_rate: 0 }, 1000);
+  assert(/WALK SLOW 100 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last());
+  // 3b. STANDARD then an immediate WALK: GAIT.SELECT first, WALK only after
+  // its ACCEPTED ACK, with STANDARD's top preset (90 mm per 3 s); never before.
+  { await refresh(fx.status_ready); const before = commands().length;
+    device.replies.push(ok(fx.ack_gait_select), ok(fx.ack_walk_accepted));
+    q('input[name="simple-walk-mode"][value="STANDARD"]').click(); q('#simple-walk').click(); await settle();
+    const sent = commands().slice(before).map(c => JSON.parse(c.body));
+    assert.deepStrictEqual(sent.map(b => b.type), ['GAIT.SELECT', 'BASE_VELOCITY'], 'select, then WALK: ' + JSON.stringify(sent.map(b => b.type)));
+    assert.deepStrictEqual(sent[0].params, { gait: 'STANDARD' }); assert.deepStrictEqual(sent[1].params, { vx: .100 / 5.0, vy: 0, yaw_rate: 0 });
+    assert(/WALK STANDARD 90 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last()); sequence += 2;
+    envelopes.push('select_then_walk\t' + commands().at(-2).body, 'select_then_walk_walk\t' + commands().at(-1).body); }
+  // 3c. Back to SLOW for the rest (accepted selection).
+  { const before = commands().length; device.replies.push(ok(fx.ack_gait_select));
+    q('input[name="simple-walk-mode"][value="SLOW"]').click(); await settle(); assert.strictEqual(commands().length, before + 1); sequence += 1; }
   // 4. WALK STOP: zero velocity, available while WALKING.
   await refresh(fx.status_walking);
   assert.strictEqual(q('#simple-state').textContent, 'WALKING');
@@ -383,10 +405,10 @@ async function boot(initialStatus = fx.status_ready) {
   // on release, dead zone silent; disabled over WALK STANDARD and STOP.
   await refresh(fx.status_ready);
   {
-    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5];
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.100 / 5.0, .020 / 5.0, .16 / 5.0], BACK = .050 / 5.0;
     // Pointer ids as a browser gives them: one per finger (pad 1, rotation 2).
     const pointer = (el, type, x, y, id = el === pad ? 1 : 2) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' });
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'joystick operable from READY with a session');
     assert(!q('#joy-left').disabled && !q('#joy-right').disabled, 'rotation buttons enabled with the joystick');
@@ -394,7 +416,7 @@ async function boot(initialStatus = fx.status_ready) {
     pointer(pad, 'pointerdown', 90, 90); pointer(pad, 'pointerup', 90, 90); await settle();
     assert.strictEqual(commands().length, before, 'dead-zone press and release issue no request');
     await send('joystick_forward', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
-    assert(/JOYSTICK avanti 6\.9 mm\/s/.test(last()), last());
+    assert(/JOYSTICK avanti 20\.0 mm\/s/.test(last()), last());
     const tick = p.intervals.filter(i => i.ms === 240).at(-1);
     assert(tick, 'refresh period inside the Controller 1 s deadline');
     await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
@@ -411,7 +433,7 @@ async function boot(initialStatus = fx.status_ready) {
     assert.strictEqual(q('#joy-knob').getAttribute('cy'), '90', 'knob back to neutral');
     // Rotation alone from a held button, then neutral on its release.
     await send('joystick_turn', () => pointer(q('#joy-left'), 'pointerdown', 0, 0), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(0, 0, 1)), 1000);
-    assert(/antiorario 1\.76°\/s/.test(last()), last());
+    assert(/antiorario 1\.83°\/s/.test(last()), last());  // kJoystickYawRad / kJoystickPeriodS (.16 / 5 s)
     await send('', () => pointer(q('#joy-left'), 'pointerup', 0, 0), ok(fx.ack_walk_stop), 'BASE_VELOCITY', { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 1000);
     const released = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
     assert.strictEqual(commands().length, released, 'no refresh after release');
@@ -423,7 +445,7 @@ async function boot(initialStatus = fx.status_ready) {
     const steered = JSON.parse(fx.status_walking); steered.walk_velocity = { vx_m_s: L[0], vy_m_s: 0, yaw_rate_rad_s: 0, joystick: true }; steered.reason = 'WALK_JOYSTICK';
     await refresh(JSON.stringify(steered));
     assert.strictEqual(joyBox.getAttribute('aria-disabled'), 'false', 'Controller joystick walk keeps the joystick operable');
-    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 6\.9 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    assert(/Controller: WALKING · Joystick: passo continuo in corso\. · legge del passo avanti 20\.0 mm\/s/.test(q('#joy-state').textContent), q('#joy-state').textContent);
     await send('', () => pointer(pad, 'pointerdown', 90, 32), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
     // Admission lost while pressed (STOP in progress): one neutral command, then disabled.
     device.replies.push(ok(fx.ack_walk_stop)); const pressed = commands().length;
@@ -441,9 +463,9 @@ async function boot(initialStatus = fx.status_ready) {
   // stuck sender; the Twin's resize waits for the release.
   await refresh(fx.status_ready);
   {
-    const pad = q('#joy-pad'), L = [.045 / 6.5, .020 / 6.5, .20 / 6.5], doc = p.dom.window.document;
+    const pad = q('#joy-pad'), L = [.100 / 5.0, .020 / 5.0, .16 / 5.0], BACK = .050 / 5.0, doc = p.dom.window.document;
     const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
-    const shaped = (f, l, w) => { const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * L[i]); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
     const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
     let rect = { left: 0, top: 0, width: 180, height: 180 };
     pad.getBoundingClientRect = () => ({ ...rect, x: rect.left, y: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height });
@@ -497,6 +519,102 @@ async function boot(initialStatus = fx.status_ready) {
     delete pad.getBoundingClientRect;
     q('#message').click();
   }
+  // 4d. Pre-flash addendum, dynamic joystick (dev.17 HW: a sideways move of the
+  // held stick ended the walk). One press goes forward -> forward-right ->
+  // right a hair behind centre (fore/aft dead band: no backward sign) ->
+  // forward-left with no neutral, real Controller statuses (fixtures) between
+  // the refreshes. Late polls do not end the hold while the Controller accepts
+  // the refreshes; a lost link does. A reversal stays held and silent through
+  // the Controller's WALK STOP and settling and starts the other walk at
+  // STANDING. The Controller's own end of the walk (WALK STOP, deadline) ends
+  // the hold. The named envelopes replay in order through the real parser,
+  // MotionService and SimpleMotion (test_simple_dashboard_contract envelopes).
+  await refresh(fx.status_standing);
+  {
+    const pad = q('#joy-pad'), joyBox = q('#simple-joystick'), L = [.100 / 5.0, .020 / 5.0, .16 / 5.0], BACK = .050 / 5.0;
+    const pointer = (el, type, x, y, id) => { const ev = new p.dom.window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y }); Object.defineProperty(ev, 'pointerId', { value: id }); el.dispatchEvent(ev); };
+    const shaped = (f, l, w) => { f = Math.abs(f) < .12 ? 0 : f; const r = Math.hypot(f, l), k = r < .12 ? 0 : Math.min(1, (r - .12) / (1 - .12)) / r; let n = [f * k, l * k, w]; const m = Math.hypot(n[0], n[1], n[2]); if (m > 1) n = n.map(v => v / m); return n.map((v, i) => v * (i || v >= 0 ? L[i] : BACK)); };
+    const at = (x, y) => { const f = (90 - y) / 58, l = (90 - x) / 58, m = Math.hypot(f, l); return m > 1 ? [f / m, l / m] : [f, l]; };  // pad point, knob travel 58 of 180
+    const body = v => ({ vx: v[0], vy: v[1], yaw_rate: v[2], gait: 'JOYSTICK' }), neutral = { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' };
+    const held = () => joyBox.dataset.active === 'true' && joyBox.getAttribute('aria-disabled') === 'false';
+    const walking = (vx, vy) => { const t = JSON.parse(fx.status_joystick_walking); t.walk_velocity = { ...t.walk_velocity, vx_m_s: vx, vy_m_s: vy }; return JSON.stringify(t); };
+    const ended = reason => { const t = JSON.parse(fx.status_joystick_reversing); t.reason = reason; return JSON.stringify(t); };
+    assert.strictEqual(JSON.parse(fx.status_joystick_walking).walk_velocity.joystick, true, 'fixture: Controller joystick walk');
+    assert(JSON.parse(fx.status_joystick_reversing).reason === 'JOYSTICK_REVERSING' && JSON.parse(fx.status_joystick_reversing).walk_velocity.joystick === false, 'fixture: Controller reversal');
+    assert(JSON.parse(fx.status_walk_settling).state === 'MOVING' && JSON.parse(fx.status_walk_settling).reason === 'WALK_SETTLING', 'fixture: settling');
+    await send('joystick_dynamic_forward', () => pointer(pad, 'pointerdown', 90, 32, 21), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick = p.intervals.filter(i => i.ms === 240).at(-1);
+    await refresh(fx.status_joystick_walking);
+    assert(held(), 'held over the Controller joystick walk');
+    let v = at(131, 49);
+    pointer(pad, 'pointermove', 131, 49, 21);
+    const diagonal = await send('joystick_dynamic_diagonal', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(diagonal.params.vx > 0 && diagonal.params.vy < 0, 'forward-right');
+    await refresh(walking(L[0] * .8, -L[1] * .2));
+    v = at(148, 95);
+    pointer(pad, 'pointermove', 148, 95, 21);
+    const lateral = await send('joystick_dynamic_lateral', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(v[0] < 0 && lateral.params.vx === 0 && lateral.params.vy < 0, 'a sideways stick a hair behind centre carries no backward sign');
+    await refresh(walking(L[0] * .5, -L[1] * .5));
+    v = at(49, 49);
+    pointer(pad, 'pointermove', 49, 49, 21);
+    const left = await send('joystick_dynamic_left', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    assert(left.params.vx > 0 && left.params.vy > 0 && held() && q('#joy-knob').getAttribute('cx') === String(90 - 58 * v[1]), 'forward-left, still held, knob under the finger');
+    // Late polls: the status reads hang for 2.8 s (8 renders, the 1.5 s link
+    // limit passed); the refreshes are accepted, so the hold and the intent go on.
+    device.holdUrl = '/api/motion/status';
+    for (let k = 0; k < 8; ++k) {
+      await p.poll();
+      await send('', () => tick.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    }
+    assert(held() && /FEEDBACK NON FRESCO|COLLEGAMENTO PERSO/.test(q('#simple-state').textContent), 'late polls shown as such, the hold goes on');
+    // Link lost: polls still hang and a refresh fails. 1 s without an accepted
+    // refresh: the Controller deadline has ended the walk; one neutral, released.
+    await send('', () => tick.fn(), 'network', 'BASE_VELOCITY', body(shaped(v[0], v[1], 0)), 1000);
+    device.replies.push(ok(fx.ack_walk_stop)); ++sequence;
+    let count = commands().length;
+    await p.poll(); await p.poll();
+    assert(held() && commands().length === count, 'hold kept inside the Controller deadline');
+    await p.poll();
+    assert(!held() && commands().length === count + 1 && JSON.parse(commands().at(-1).body).params.vx === 0, 'lost link: one neutral, stick released');
+    assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, neutral);
+    device.release(); await settle();
+    // Reversal: the Controller ends the forward walk (JOYSTICK_REVERSING, WALK
+    // STOP); held and silent through the stop and the settling; at STANDING the
+    // held intent starts the backward walk.
+    await refresh(fx.status_joystick_walking);
+    await send('', () => pointer(pad, 'pointerdown', 90, 32, 22), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+    const tick2 = p.intervals.filter(i => i.ms === 240).at(-1);
+    pointer(pad, 'pointermove', 90, 148, 22);
+    assert.strictEqual(JSON.parse(fx.ack_joystick_reversing).reason, 'JOYSTICK_REVERSING', 'fixture: the reversal ACK');
+    await send('joystick_dynamic_back', () => tick2.fn(), ok(fx.ack_joystick_reversing), 'BASE_VELOCITY', body(shaped(-1, 0, 0)), 1000);
+    count = commands().length; tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal ACK: held, silent before the next poll (no refresh into the WALK STOP)');
+    await refresh(fx.status_joystick_reversing);
+    tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal: held, no refresh while the Controller stops the walk');
+    assert(/inversione avanti\/indietro/.test(q('#joy-state').textContent), q('#joy-state').textContent);
+    await refresh(fx.status_walk_settling);
+    tick2.fn(); await settle();
+    assert(held() && commands().length === count, 'reversal: held and silent while settling');
+    await refresh(fx.status_standing);
+    await send('joystick_dynamic_reverse', () => tick2.fn(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(-1, 0, 0)), 1000);
+    assert(held() && q('#joy-knob').getAttribute('cy') === String(90 - 58 * -1), 'the held intent starts the other walk at STANDING');
+    await send('joystick_dynamic_release', () => pointer(pad, 'pointerup', 90, 148, 22), ok(fx.ack_walk_stop), 'BASE_VELOCITY', neutral, 1000);
+    assert(!held() && q('#joy-knob').getAttribute('cy') === '90', 'release: neutral, knob centred');
+    // The Controller's own end of a joystick walk ends the hold: operator WALK
+    // STOP and its deadline (JOYSTICK_TIMEOUT), one neutral each.
+    for (const reason of ['WALK_STOPPING', 'JOYSTICK_TIMEOUT']) {
+      await refresh(fx.status_joystick_walking);
+      await send('', () => pointer(pad, 'pointerdown', 90, 32, 23), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', body(shaped(1, 0, 0)), 1000);
+      device.replies.push(ok(fx.ack_walk_stop)); ++sequence; count = commands().length;
+      await refresh(ended(reason));
+      assert(!held() && commands().length === count + 1, reason + ': one neutral, released');
+      assert.deepStrictEqual(JSON.parse(commands().at(-1).body).params, neutral);
+    }
+    const idle = commands().length; p.intervals.filter(i => i.ms === 240).forEach(i => i.fn()); await settle();
+    assert.strictEqual(commands().length, idle, 'no refresh after the dynamic sequence');
+  }
   // 5. STOP button; 9. admission is not presented as verified arrest.
   await send('stop_button', () => q('#simple-stop').click(), ok(fx.ack_stop), 'MOTION.STOP', {}, 5000);
   { const r = p.dom.window.matdogMotionTrace.commands.at(-1);  // dev.17: STOP input -> request measurable on the phone
@@ -519,11 +637,18 @@ async function boot(initialStatus = fx.status_ready) {
   await refresh(fx.status_stopped);
   assert(values().includes('SAFE_OFF13/13 verificato'), values());
   assert(/STOP_REQUESTED/.test(last()), 'STOP ACK kept until the next command');
-  // dev.17: WALK after STOP is the ordinary WALK STANDARD preset; the Controller admits it.
+  // dev.17: WALK after STOP is the ordinary WALK preset; the Controller admits it.
   await refresh(fx.status_stopped_on);
-  { const i = Number(q('input[name="simple-stride"]:checked').value);
-    await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: [.030, .045, .060][i] / 6.5, vy: 0, yaw_rate: 0 }, 1000);
-    assert(new RegExp('WALK STANDARD ' + [30, 45, 60][i] + ' mm · .* · HTTP 200 · ACCEPTED').test(last()), last()); }
+  // Final dev.6: with STOP latched GAIT.SELECT is refused (STOP_LATCHED): no WALK
+  // is sent for the refused mode and the selector returns to the Controller's.
+  { const before = commands().length; device.replies.push(ok(fx.ack_gait_select_latched), ok(fx.ack_gait_select_latched));
+    q('input[name="simple-walk-mode"][value="FAST"]').click(); q('#simple-walk').click(); await settle();
+    const sent = commands().slice(before).map(c => JSON.parse(c.body).type);
+    assert(sent.length >= 1 && sent.every(t => t === 'GAIT.SELECT'), 'refused selection sends no WALK: ' + JSON.stringify(sent)); sequence += sent.length;
+    assert(/WALK non inviato: la modalità FAST non è stata accettata/.test(q('#simple-reason').textContent + ' ' + p.dom.window.document.body.textContent), 'refusal shown');
+    await refresh(fx.status_stopped_on); assert(q('input[name="simple-walk-mode"][value="SLOW"]').checked, 'selector back to the Controller selection'); }
+  await send('', () => q('#simple-walk').click(), ok(fx.ack_walk_accepted), 'BASE_VELOCITY', { vx: .100 / 5.0, vy: 0, yaw_rate: 0 }, 1000);
+  assert(/WALK SLOW 100 mm · .* · HTTP 200 · ACCEPTED/.test(last()), last());
   await refresh(fx.status_stopped);
   // 6. Escape sends the same STOP intent, also while another command is in flight.
   await refresh(fx.status_ready);

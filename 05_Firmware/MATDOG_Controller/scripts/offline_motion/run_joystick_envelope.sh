@@ -9,7 +9,7 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
-# Usage: run_joystick_envelope.sh [output-dir]. Geometry only.
+# Usage: run_joystick_envelope.sh [output-dir]. Geometry only. 46 scenarios.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)"
 out="${1:-$(mktemp -d /tmp/matdog-joystick.XXXXXX)}";mkdir -p "$out"
@@ -18,13 +18,42 @@ for n in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKinemat
 "${CXX:-g++}" -std=c++17 -O2 -Wall -Wextra -Werror -Wno-misleading-indentation -I "$sketch/scripts/tests/simple_host_stub" "$here/joystick_envelope.cpp" "${src[@]}" -o "$out/joy"
 mapfile -t lines < <(python3 - <<'PY'
 import itertools,math
-lim=[.045/6.5,.020/6.5,.20/6.5]
+lim=[.045/5.0,.020/5.0,.16/5.0]  # dev.6: one law (v2, 5 s); steered fore/aft, lateral, yaw per second
+pub,back=.100/5.0,.050/5.0  # dev.5: fore/aft walks the WALK STANDARD law up to 100 mm (backward 50 mm)
 v=lambda a:','.join(repr(x) for x in a)
-print('forward','26:'+v([lim[0],0,0]));print('backward','26:'+v([-lim[0],0,0]))
+print('forward','26:'+v([pub,0,0]));print('backward','26:'+v([-pub,0,0]))
+print('forward_steered','6:'+v([lim[0],lim[1]/2,0])+' 20:'+v([lim[0],0,0]));print('backward_steered','6:'+v([-lim[0],lim[1]/2,0])+' 20:'+v([-lim[0],0,0]))
+print('frontal_changes','6:'+v([.2*pub,0,0])+' 6:'+v([pub,0,0])+' 6:'+v([.1*pub,0,0])+' 8:'+v([.7*pub,0,0]))
+# Ground HW 08/11: a forward stick carried 0.1-0.4 mm/s of lateral, alternating sides.
+print('frontal_jitter',' '.join('0.48:'+v([.0069,s*1e-4,0]) for s in [1,2,-3,4,-1,3,-2,1]*7))
+print('frontal_to_steer','10:'+v([pub,0,0])+' 20:'+v([pub/2,lim[1]/2,0]))
+# dev.6 held-stick sequences, one press, no WALK STOP expected (only the reversal stops).
+h=lambda f,l,y:v([f,l,y])
+print('held_fwd_diag_lat_rot_backright_fwd','12:'+h(pub,0,0)+' 15:'+h(.7*pub,-.7*lim[1],0)+' 15:'+h(0,-lim[1],0)+' 15:'+h(0,0,lim[2])+' 15:'+h(-.5*lim[0],-.7*lim[1],0)+' 30:'+h(pub,0,0))
+print('held_rev_lat_fwd','12:'+h(-back,0,0)+' 15:'+h(0,lim[1],0)+' 30:'+h(pub,0,0))
+print('held_yaw_lat_fwd','15:'+h(.5*lim[0],.5*lim[1],.5*lim[2])+' 30:'+h(pub,0,0))
+# Stride increases while walking (kJoystickFrontalRampCycles), at several phases, and seeded fore/aft sequences.
+for k,t0 in enumerate((6.0,7.2,8.4)):print(f'frontal_accel{k}',f'{t0}:'+v([.1*pub,0,0])+' 12:'+v([pub,0,0]))
+import random
+for seed in range(1,4):
+    random.seed(seed);steps=[];t=0
+    while t<120:
+        d=.5+random.random()*3.5;x=random.uniform(-1,1)*pub
+        steps.append(f'{d:.2f}:'+v([x,random.uniform(-4e-4,4e-4),0]) if random.random()>=.15 else f'{d:.2f}:0,0,0');t+=d
+    print(f'frontal_random_{seed}',' '.join(steps))
 print('left','26:'+v([0,lim[1],0]));print('right','26:'+v([0,-lim[1],0]))
 print('ccw','26:'+v([0,0,lim[2]]));print('cw','26:'+v([0,0,-lim[2]]))
 for s in itertools.product((1,-1),repeat=3):
     print('octant_'+''.join('p' if x>0 else 'm' for x in s),'26:'+v([s[j]*lim[j]/math.sqrt(3) for j in range(3)]))
+# Small steady lateral/yaw demands (motion-perf-next): 2.9 % stays in the low sway band
+# (<= 5 mm), 3.3 % takes the full sway. A steady mid amplitude (~6 mm) sits on the
+# fillet contact band and gave negative static support with a linear sway map.
+for k,tag in ((.029,'small'),(.033,'mid')):
+    print(f'lat_{tag}','20:'+v([.8*lim[0],k*lim[1],0]));print(f'yaw_{tag}','20:'+v([.8*lim[0],0,k*lim[2]]))
+# Full turns (motion-perf-next review): the compensation envelope is bounded in the
+# heading frame, so the hip/fillet loading must not depend on the accumulated heading.
+turn=round(2*math.pi/lim[2]+2,1)
+print('turn_cw',f'{turn}:'+v([0,0,-lim[2]]));print('turn_ccw',f'{turn}:'+v([0,0,lim[2]]))
 print('reverse_twice','8:'+v([lim[0],0,0])+' 14:'+v([-lim[0],0,0])+' 14:'+v([lim[0],lim[1]/2,0]))
 print('silent_client','15:'+v([lim[0]/2,lim[1]/2,lim[2]/2])+' 30:-')
 print('release_in_start','1:'+v([-lim[0],0,lim[2]/2]))

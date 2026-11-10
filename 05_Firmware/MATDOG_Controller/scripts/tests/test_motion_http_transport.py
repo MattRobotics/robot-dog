@@ -145,7 +145,8 @@ int main() {
  check(status.response_headers["Content-Type"]=="application/json"&&status.response_headers["Cache-Control"]=="no-store","JSON/no-store response");
  auto caps=request(s,"/api/motion/capabilities","");caps.method=HTTP_GET;runMotion(caps);
  check(caps.status==200&&caps.response.find("\"motion_stack\":\"MATDOG_SIMPLE_V1\"")!=std::string::npos&&
-       caps.response.find("\"commands\":[\"STAND\",\"WALK_STANDARD\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"]")!=std::string::npos,"SIMPLE catalog delivered via mailbox");
+       caps.response.find("\"commands\":[\"STAND\",\"WALK_STANDARD\",\"GAIT_SELECT\",\"JOYSTICK\",\"WALK_STOP\",\"PRONE\",\"STOP\"]")!=std::string::npos&&
+       caps.response.find("\"walk_modes\":[{\"name\":\"SLOW\"")!=std::string::npos&&caps.response.find("\"walk_mode_default\":\"SLOW\"")!=std::string::npos,"SIMPLE catalog delivered via mailbox (walk modes 2026-11-09: GAIT_SELECT and the mode table)");
  check(caps.response.size()<kMotionCapabilitiesBytes&&caps.response.find("\"hardware_qualified\":{\"stand\":false,\"walk\":false,\"imu_compensation\":false}")!=std::string::npos,"bounded catalog discloses hardware qualification");
  auto unauth=motionRequest(s,command("MOTION.STOP"),false);runMotion(unauth);check(unauth.status==403&&s.service.command_calls==0,"cookie and CSRF required even for semantic writes");
  login(s);
@@ -165,7 +166,7 @@ int main() {
   g.headers["X-Csrf-Token"]=std::string(64,'0');runMotion(g);check(g.status==200&&g.response.find("\"admin_session\":false")!=std::string::npos,"invalid CSRF cannot renew session");
   g.headers["X-Csrf-Token"]=s.portal_.csrf();runMotion(g);check(g.status==200&&g.response.find("\"admin_session\":true")!=std::string::npos,"authenticated Dashboard poll renews session");}
  expectReject(s,"POSTURE.STAND","{\"target_height_m\":0.15}","NOT_READY",2);
- expectReject(s,"GAIT.SELECT","{\"gait\":\"TROT\"}","COMMAND_NOT_IN_SIMPLE_V1",3);
+ expectReject(s,"GAIT.SELECT","{\"gait\":\"TROT\"}","WALK_MODE_UNKNOWN",3);  // walk modes 2026-11-09: GAIT.SELECT names SLOW|STANDARD|FAST
  expectReject(s,"ACTION.EXECUTE","{\"action_id\":\"action.wave\"}","COMMAND_NOT_IN_SIMPLE_V1",4);
  expectReject(s,"BASE_VELOCITY","{\"vx\":0.1,\"vy\":0,\"yaw_rate\":0}","NOT_READY",5);
  expectReject(s,"BODY_POSE","{\"x\":0.01}","COMMAND_NOT_IN_SIMPLE_V1",6);

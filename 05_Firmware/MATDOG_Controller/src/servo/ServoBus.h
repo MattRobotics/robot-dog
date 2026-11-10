@@ -263,8 +263,12 @@ class ServoBus {
                     (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
     validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
   // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
+  // Exact pairs: STAND rc.10, then WALK SLOW, STANDARD, FAST of
+  // simple::kWalkModes (dev.6 trace 44: STANDARD was refused here, so its first
+  // frame faulted SYNC_WRITE_FAILED before any TX). Any other pair is refused
+  // before transmission. Kept equal to the mode table by test_preenable_bus.
   bool setOperationalDrive(uint16_t speed,uint8_t acc) {
-    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)))return false;  // STAND rc.10, WALK
+    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)||(speed==1800&&acc==180)||(speed==1950&&acc==220)))return false;
     validation_speed_=speed;validation_acceleration_=acc;return true;
   }
   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}
@@ -350,8 +354,47 @@ class ServoBus {
 
   // One persistent-profile register. Width 1 or 2; any other width is refused
   // rather than guessed. Read-only by construction: there is no width-aware
-  // write counterpart anywhere.
-  bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out);
+  // write counterpart anywhere. `capture` (@SERVO READ evidence only) also
+  // receives this one reply's bytes and validity; the read is the same.
+  bool readProfileRegister(int id, uint8_t address, uint8_t width, int32_t* out,
+                           diagnostics::ReadCapture* capture = nullptr);
+
+  // Trace-45 ACC diagnostic (@SERVO ACC, MAINTENANCE only): THE one reviewed
+  // 1-byte register write. Addresses: 41 ACC (SRAM, 1..254: never 0, so an
+  // unexpected torque arming stays profile-limited), 55 Lock (0/1), 85
+  // Maximum_Acceleration (1..254). In one bus transaction: TorqueEnable must
+  // read 0 before the write, then the written address and TorqueEnable are
+  // read back; the verdict is the readback only (the ACK proves nothing).
+  // TorqueEnable not read back 0 afterwards: safeOff() at once.
+  static constexpr uint8_t kAccDiagAcc = 41, kAccDiagLock = 55, kAccDiagMaxAcc = 85;
+  struct AccDiagWrite {
+    bool refused = true;   // argument, bus or torque precondition: nothing sent
+    ServoWriteVerifyResult verify = ServoWriteVerifyResult::UNVERIFIED_NO_RESPONSE;
+    int readback = -1, torque_after = -1;  // -1: no valid answer
+    bool safe_off_issued = false;
+    SafeOffResult safe_off = SafeOffResult::UNVERIFIED_NO_RESPONSE;
+  };
+  AccDiagWrite writeAccDiagnosticByte(int id, uint8_t address, uint8_t value);
+
+  // Runtime ACC ceiling, set before a Motion activation from torque OFF.
+  // Register 85 is the servo's ACC ceiling and a write with the Lock closed
+  // is VOLATILE (hardware 10/11, servo 23: 41 settles at min(written, 85),
+  // asynchronously, within 55 ms; a power cycle restores the factory 50).
+  // Per servo: 85 read equal to `target`, nothing is written. Otherwise Lock 55
+  // must read 1 (an open Lock would let the write reach EEPROM: that servo
+  // keeps its own 85) and the write goes through writeAccDiagnosticByte()
+  // (TorqueEnable read 0 before and after it, safeOff() otherwise). After any
+  // write, 85 is read again on every servo once kAccCeilingSettleMs have
+  // passed: the settled value. Returns the LOWEST 85 left on the `count`
+  // servos (at most `target`): what Motion may command. 0 = not verified: a
+  // servo unread, a write refused or torque not read OFF, or an admitted STOP
+  // (the bound preemption predicate, polled before each servo's step, in every
+  // millisecond of the settle wait and before every settle read; a step
+  // already started completes: its 85 read, Lock read and write are bounded
+  // transactions, not preemptible). A volatile 85 already written stays: it
+  // is a ceiling, the ACC applied is still each frame's 41.
+  static constexpr unsigned long kAccCeilingSettleMs = 100;
+  uint8_t configureAccCeiling(const uint8_t* ids, unsigned count, uint8_t target);
 
  private:
   // Core Motion V5: every transaction below opens a BusGuard (BusTransaction.h) -

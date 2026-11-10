@@ -92,7 +92,8 @@ async function scenario(browser, base, { warm, throttle, input }) {
     await page.waitForTimeout(1500);
     const stops = device.log.filter(r => r.type === 'MOTION.STOP').map(r => r.at);
     const joystick = device.log.filter(r => r.type === 'BASE_VELOCITY').length;
-    const allowed = new Set(['/', '/status', '/wifi/status', '/wifi/session', '/api/motion/status', '/api/motion/command', ...Object.keys(assets)]);
+    // walk modes 2026-11-09: the page reads the WALK mode table (capabilities) once at load.
+    const allowed = new Set(['/', '/status', '/wifi/status', '/wifi/session', '/api/motion/status', '/api/motion/capabilities', '/api/motion/command', ...Object.keys(assets)]);
     const foreign = [...new Set(device.log.map(r => r.url).filter(u => !allowed.has(u)))];
     const twinRequests = device.log.filter(r => r.url.startsWith('/twin')).length;
     const page_ = await page.evaluate(() => ({ inputs: window.__inputs, sent: window.matdogMotionTrace.commands.filter(c => c.type === 'MOTION.STOP').map(c => c.sent_ms),

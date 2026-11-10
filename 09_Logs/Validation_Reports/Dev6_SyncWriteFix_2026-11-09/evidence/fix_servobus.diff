@@ -1,0 +1,39 @@
+commit 4ed0d6a65b3a7dc15bc3e2a3f6735b80b45dba3a
+Author: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date:   Mon Nov 9 19:48:47 2026 +0100
+
+    fix(servo): admit the STANDARD and FAST walk-mode drives (trace 44)
+    
+    Hardware trace 44 (dev.6 70abcff on the fixture): the first WALK STANDARD
+    frame faulted SYNC_WRITE_FAILED at cycle 0.000. ServoBus::setOperationalDrive
+    admitted only {480,13} and {1000,50}, so Controller::SimpleServoPort::frame
+    returned false for {1800,180} before any byte was transmitted.
+    
+    The gate now admits exactly STAND {480,13}, SLOW {1000,50}, STANDARD
+    {1800,180} and FAST {1950,220} (simple::kWalkModes); every other pair is
+    still refused before transmission. STOP, SAFE_OFF, torque enable, RAW
+    conversion, kinematics and limits unchanged. ACC 180/220 and speeds
+    1800/1950 are admitted in software only: never measured on the servos.
+    
+    RCA: MATDOG_1_0_2_DEV6_INCIDENT_SYNCWRITE_20261109T175118Z.
+    
+    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+
+diff --git a/05_Firmware/MATDOG_Controller/src/servo/ServoBus.h b/05_Firmware/MATDOG_Controller/src/servo/ServoBus.h
+index fbc419b..f22d572 100644
+--- a/05_Firmware/MATDOG_Controller/src/servo/ServoBus.h
++++ b/05_Firmware/MATDOG_Controller/src/servo/ServoBus.h
+@@ -263,8 +263,12 @@ class ServoBus {
+                     (speed==kStandDriveSpeed&&acceleration==kStandDriveAcceleration);
+     validation_speed_=walk||(speed>=1&&speed<=40)?speed:0;validation_acceleration_=walk||(acceleration>=1&&acceleration<=10)?acceleration:0;}
+   // Operational RAM profiles only. EEPROM/PID/ID/offsets are untouched.
++  // Exact pairs: STAND rc.10, then WALK SLOW, STANDARD, FAST of
++  // simple::kWalkModes (dev.6 trace 44: STANDARD was refused here, so its first
++  // frame faulted SYNC_WRITE_FAILED before any TX). Any other pair is refused
++  // before transmission. Kept equal to the mode table by test_preenable_bus.
+   bool setOperationalDrive(uint16_t speed,uint8_t acc) {
+-    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)))return false;  // STAND rc.10, WALK
++    if(!((speed==480&&acc==13)||(speed==1000&&acc==50)||(speed==1800&&acc==180)||(speed==1950&&acc==220)))return false;
+     validation_speed_=speed;validation_acceleration_=acc;return true;
+   }
+   void setValidationTimeout(uint32_t ms){validation_timeout_ms_=ms>=2&&ms<=20?ms:0;}

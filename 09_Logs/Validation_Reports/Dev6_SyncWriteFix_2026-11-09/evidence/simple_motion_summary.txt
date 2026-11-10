@@ -1,0 +1,5 @@
+walk mode STANDARD: 90 mm stride, 3.00 s, 110 mm, drive 1800/180, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+walk mode FAST: 80 mm stride, 2.50 s, 105 mm, drive 1950/220, STOP braking ACC 84, 8 STOP+resume keep the mode, next walk takes the selection, joystick SLOW PASS (software only)
+walk recovery from a 30 mrad board roll: held up to 13.1 mrad, WALK_IMU_SETTLING seen, STANDARD starts at -9.1/0.1 mrad inside its envelope, 1500 releases without fault PASS (software only)
+PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION
+rc=0

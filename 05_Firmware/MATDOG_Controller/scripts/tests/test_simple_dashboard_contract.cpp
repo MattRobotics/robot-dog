@@ -24,6 +24,7 @@
 #include "../../src/network/PortalSecurity.h"
 #include "../../src/update/Sha256.h"
 #include <fstream>
+#include <map>
 #include <sstream>
 using namespace matdog;
 namespace {
@@ -89,6 +90,9 @@ std::string statusJson(core::MotionService& service, Rig& rig) {
 std::string ackJson(core::MotionService& service, const motion::MotionAck& a) {
   char out[512]{}; check(service.ackJson(a, out, sizeof(out)), "ackJson"); return out;
 }
+std::string capabilitiesJson(core::MotionService& service) {
+  char out[4096]{}; check(service.capabilitiesJson(out, sizeof(out)), "capabilitiesJson"); return out;
+}
 motion::MotionCommand semantic(motion::Intent intent, Rig& rig, double vx = 0) {
   static uint32_t sequence = 0;
   motion::MotionCommand c; c.owner = motion::ClientOwner::DASHBOARD; c.intent = intent; c.sequence = ++sequence;
@@ -129,6 +133,7 @@ int fixtures(const char* path) {
     test_clock_us = rig.p.now;
     check(rig.m.fresh(rig.p.now) && !std::strcmp(rig.m.poseRegion(rig.p.now), "PRONE_ENTRY"), "idle PRONE pose classified from fresh feedback");
     put("status_ready", statusJson(service, rig));
+    put("capabilities", capabilitiesJson(service));  // walk_modes: the joystick's full scale per mode
     auto prone=semantic(motion::Intent::LIE_DOWN,rig);strcpy(prone.id,"prone-fixture");
     put("ack_prone",ackJson(service,service.command(prone,prone.issued_at_ms)));
     const auto c = semantic(motion::Intent::STAND, rig); auto stand = c; stand.target_height_m = .15;
@@ -162,7 +167,37 @@ int fixtures(const char* path) {
     put("ack_rejected", ackJson(service, a));
   }
   {
+    // Pre-flash dynamic joystick: the real status of a joystick walk, of the
+    // Controller's own reversal (JOYSTICK_REVERSING: WALK STOP) and of its
+    // settling, read by the page's hold through a reversal.
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    const double vx = simple::kJoystickStrideM / simple::kJoystickPeriodS;
+    check(!rig.m.drive(vx, 0, 0, rig.p.now), "fixture joystick walk accepted");
+    for (unsigned i = 0; i < 3000 && rig.m.state() != simple::State::WALKING; ++i) { if (i % 12 == 0) rig.m.drive(vx, 0, 0, rig.p.now); rig.tick(); }
+    for (unsigned i = 0; i < 120; ++i) { if (i % 12 == 0) rig.m.drive(vx, 0, 0, rig.p.now); rig.tick(); }
+    service.update();
+    check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive(), "fixture joystick walking");
+    put("status_joystick_walking", statusJson(service, rig));
+    auto back = semantic(motion::Intent::BASE_VELOCITY, rig, -vx); std::strcpy(back.gait, "JOYSTICK");
+    const auto reversal = service.command(back, back.issued_at_ms);
+    check(reversal.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(reversal.reason, "JOYSTICK_REVERSING") &&
+          !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING") && !rig.m.joystickActive(), "fixture joystick reversal, ACK JOYSTICK_REVERSING");
+    put("ack_joystick_reversing", ackJson(service, reversal));
+    rig.tick(); service.update();
+    put("status_joystick_reversing", statusJson(service, rig));
+    for (unsigned i = 0; i < 4000 && rig.m.state() == simple::State::WALKING; ++i) rig.tick();
+    service.update();
+    check(rig.m.state() == simple::State::MOVING && !std::strcmp(rig.m.reason(), "WALK_SETTLING") && !rig.m.joystickActive(), "fixture reversal settling");
+    put("status_walk_settling", statusJson(service, rig));
+  }
+  {
+    Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    { auto sel = semantic(motion::Intent::GAIT_SELECT, rig); std::strcpy(sel.gait, "STANDARD");
+      const auto r = service.command(sel, sel.issued_at_ms);
+      check(r.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(r.reason, "WALK_MODE_SELECTED") && rig.m.selectedWalkMode() == simple::WalkMode::STANDARD, "fixture GAIT.SELECT STANDARD accepted");
+      put("ack_gait_select", ackJson(service, r));
+      std::strcpy(sel.gait, "SLOW"); sel.sequence += 1; std::snprintf(sel.id, sizeof sel.id, "sel-back"); service.command(sel, sel.issued_at_ms);
+      check(rig.m.selectedWalkMode() == simple::WalkMode::SLOW, "fixture GAIT.SELECT back to SLOW"); }
     const auto walk = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[1] / simple::kWalkPeriodS);
     const auto a = service.command(walk, walk.issued_at_ms);
     check(a.outcome == motion::CommandOutcome::ACCEPTED, "fixture WALK accepted");
@@ -188,7 +223,7 @@ int fixtures(const char* path) {
     for (unsigned i = 0; i < 20; ++i) rig.tick(false);
     service.update();
     check(rig.m.offVerified(), "fixture explicit SAFE_OFF verified (scripted port)");
-    put("status_stopped", statusJson(service, rig), true);
+    put("status_stopped", statusJson(service, rig));
   }
   {
     // dev.17: with STOP latched, a WALK STANDARD preset reaches SimpleMotion
@@ -196,7 +231,7 @@ int fixtures(const char* path) {
     // non-preset velocity stay refused with STOP_LATCHED.
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
     const auto walk = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[1] / simple::kWalkPeriodS);
-    check(service.command(walk, walk.issued_at_ms).outcome == motion::CommandOutcome::ACCEPTED, "STOP->WALK fixture: WALK45 accepted");
+    check(service.command(walk, walk.issued_at_ms).outcome == motion::CommandOutcome::ACCEPTED, "STOP->WALK fixture: WALK75 accepted");
     for (unsigned i = 0; i < 3000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
     for (unsigned i = 0; i < 200; ++i) rig.tick();
     auto stop = semantic(motion::Intent::STOP, rig); service.command(stop, stop.issued_at_ms);
@@ -210,11 +245,17 @@ int fixtures(const char* path) {
     auto joy = semantic(motion::Intent::BASE_VELOCITY, rig, .003); std::strcpy(joy.gait, "JOYSTICK"); refused(joy, "joystick");
     refused(semantic(motion::Intent::LIE_DOWN, rig), "PRONE");
     refused(semantic(motion::Intent::BASE_VELOCITY, rig, .004), "non-preset velocity");
+    // Final dev.6: GAIT.SELECT is refused while STOP is latched (the recovery
+    // keeps the stopped walk's mode); the page must not then send a WALK.
+    { auto sel = semantic(motion::Intent::GAIT_SELECT, rig); std::strcpy(sel.gait, "FAST");
+      const auto r = service.command(sel, sel.issued_at_ms);
+      check(r.outcome == motion::CommandOutcome::REJECTED && !std::strcmp(r.reason, "STOP_LATCHED") && rig.m.selectedWalkMode() == simple::WalkMode::SLOW, std::string("GAIT.SELECT refused while STOP is latched: ") + r.reason);
+      put("ack_gait_select_latched", ackJson(service, r), true); }
     const auto again = semantic(motion::Intent::BASE_VELOCITY, rig, simple::kStrideM[2] / simple::kWalkPeriodS);
     const auto a = service.command(again, again.issued_at_ms);
-    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "COMMAND_ACCEPTED"), std::string("WALK60 after STOP accepted: ") + a.reason);
+    check(a.outcome == motion::CommandOutcome::ACCEPTED && !std::strcmp(a.reason, "COMMAND_ACCEPTED"), std::string("WALK100 after STOP accepted: ") + a.reason);
     for (unsigned i = 0; i < 4000 && rig.m.state() != simple::State::WALKING; ++i) rig.tick();
-    check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - simple::kStrideM[2] / simple::kWalkPeriodS) < 1e-12, "STOP->WALK fixture: WALK60 running");
+    check(rig.m.state() == simple::State::WALKING && std::abs(rig.m.walkVelocityX() - simple::kStrideM[2] / simple::kWalkPeriodS) < 1e-12, "STOP->WALK fixture: WALK100 running");
   }
   {
     // dev.17 pre-flash: dashboard joystick order, through the real JSON parser,
@@ -222,7 +263,7 @@ int fixtures(const char* path) {
     // are shaped like the page's: id "simple-<page session>-<sequence>".
     Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
     check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK order: HOLD at the WALK height");
-    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;  // full forward on the pad
+    const double vx = simple::kJoystickStrideM / simple::kJoystickPeriodS;  // full forward on the pad
     auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
     auto joy = [&](const char* page, unsigned seq, uint32_t issued, double v) {
       char b[400];
@@ -287,7 +328,7 @@ int fixtures(const char* path) {
     // Deadman without the release, and the id format, on a fresh Controller.
     Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
     check(!rig.m.stand(simple::kWalkHeightM, rig.p.now) && rig.reachStand(), "JOYSTICK deadman: HOLD at the WALK height");
-    const double vx = simple::kJoystickStrideM / simple::kWalkPeriodS;
+    const double vx = simple::kJoystickStrideM / simple::kJoystickPeriodS;
     auto now = [&]() { return static_cast<uint32_t>(rig.p.now / 1000); };
     auto joy = [&](const std::string& id, unsigned seq, uint32_t issued, double v) {
       char b[400];
@@ -377,12 +418,16 @@ void anchors(const std::string& src) {
   check(controller.find("if(c->http_transport_.stopPending())c->http_transport_.serviceStopLane(millis());") != std::string::npos &&
         controller.find("http_transport_.serviceStopLane(now_ms);") != std::string::npos,
         "STOP lane served by the Controller loop and by servo-bus preemption");
+  // Pre-flash: the page's joystick link deadline is the Controller's own deadman.
+  check(slurp(src + "/network/MotionDashboard.h").find("JOY_DEADLINE_MS=" + std::to_string(simple::kJoystickTimeoutUs / 1000) + ",") != std::string::npos,
+        "dashboard JOY_DEADLINE_MS equals kJoystickTimeoutUs");
 }
 
 int envelopes(const char* path, const char* src) {
   anchors(src);
   std::ifstream in(path);
-  std::string line, standBody, stopBody, walkBody;
+  std::string line, standBody, stopBody, walkBody, selectBody;
+  std::map<std::string, std::string> dynamic;  // the page's dynamic joystick press, replayed in order below
   unsigned seen = 0, previousSequence = 0;
   while (std::getline(in, line)) {
     const auto tab = line.find('\t'); if (tab == std::string::npos) continue;
@@ -397,7 +442,13 @@ int envelopes(const char* path, const char* src) {
     const char* why = nullptr;
     const uint32_t now = c.issued_at_ms + 40;  // HTTP latency after the dashboard's uptime estimate
     check(motion::validCommand(c, now, &why), name + ": validCommand " + (why ? why : ""));
-    if (name == "stand50" || name == "stand150") {
+    if (name.rfind("joystick_dynamic_", 0) == 0) {
+      // Published ellipsoid (dev.5): fore/aft at the WALK STANDARD 100 speed, lateral/yaw of the steered law.
+      const double T = simple::kJoystickPeriodS, nx = c.vx * simple::kWalkPeriodS / simple::kStrideM[2], ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
+            name + ": BASE_VELOCITY gait JOYSTICK inside the Controller ellipsoid, mailbox");
+      dynamic[name] = body;
+    } else if (name == "stand50" || name == "stand150") {
       const double h = name == "stand50" ? .05 : .15;
       check(c.intent == motion::Intent::STAND && c.target_height_m == h && c.ttl_ms == 5000 && !gate.stopLane, name + ": POSTURE.STAND, exact height, mailbox");
       if (name == "stand150") standBody = body;
@@ -412,11 +463,28 @@ int envelopes(const char* path, const char* src) {
       const auto r=serve(request(body,session),session,service,rig,now);
       check(c.intent==motion::Intent::LIE_DOWN&&!gate.stopLane&&r.code=="REJECTED PRONE_REQUIRES_STAND_HOLD","PRONE explicit refusal through real parser/service");
       check(rig.p.frames==frames&&rig.p.offCalls==off,"PRONE refusal does not move or STOP");
+    } else if (name == "select_then_walk") {
+      check(c.intent == motion::Intent::GAIT_SELECT && !std::strcmp(c.gait, "STANDARD") && !gate.stopLane, name + ": GAIT.SELECT STANDARD, mailbox");
+      selectBody = body;
+    } else if (name == "select_then_walk_walk") {
+      // Final dev.6: the page's select-then-WALK pair through the real parser,
+      // session/CSRF, MotionService and SimpleMotion: STANDARD's top preset
+      // (2026-11-10: every mode walks its preset 2, the index a mode change keeps).
+      check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[2] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0, name + ": preset 2 index");
+      Session fresh; Rig r2; core::MotionService s2; s2.begin(&r2.m, nullptr, nullptr); s2.setReady(true, "READY");
+      const auto sel = serve(request(selectBody, fresh), fresh, s2, r2, now);
+      check(sel.status == 200 && sel.code == "ACCEPTED WALK_MODE_SELECTED", name + ": GAIT.SELECT accepted (" + sel.code + ")");
+      const auto w = serve(request(body, fresh), fresh, s2, r2, now);
+      check(w.status == 200 && w.code == "ACCEPTED COMMAND_ACCEPTED", name + ": WALK accepted (" + w.code + ")");
+      for (unsigned k = 0; k < 4000 && r2.m.state() != simple::State::WALKING; ++k) r2.tick();
+      const auto& std_ = simple::walkModeSpec(simple::WalkMode::STANDARD);
+      check(r2.m.state() == simple::State::WALKING && r2.m.walkMode() == simple::WalkMode::STANDARD && std::abs(r2.m.walkVelocityX() - std_.strideM[2] / std_.periodS) < 1e-12 &&
+            std::abs(r2.m.requestedHeightM() - std_.heightM) < 1e-12, name + ": STANDARD 90 mm / 3.0 s = 30 mm/s walking at its height (software only)");
     } else if (name.rfind("walk", 0) == 0 && name != "walk_stop") {
-      const unsigned i = name == "walk30" ? 0 : name == "walk45" ? 1 : 2;
+      const unsigned i = name == "walk50" ? 0 : name == "walk75" ? 1 : 2;
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == simple::kStrideM[i] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 && c.ttl_ms == 1000,
             name + ": BASE_VELOCITY equals STANDARD preset " + std::to_string(i));
-      if (name == "walk45") walkBody = body;
+      if (name == "walk100") walkBody = body;
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED", name + ": HTTP 200 ACCEPTED (" + r.code + ")");
       for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) rig.tick();
@@ -432,8 +500,9 @@ int envelopes(const char* path, const char* src) {
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
       check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
     } else if (name == "joystick_forward" || name == "joystick_backward" || name == "joystick_lateral" || name == "joystick_turn") {
-      const double T = simple::kWalkPeriodS, nx = c.vx * T / simple::kJoystickStrideM, ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
-      const bool shape = name == "joystick_forward" ? c.vx == simple::kJoystickStrideM / T && c.vy == 0 && c.yaw_rate == 0 :
+      // Published ellipsoid (dev.5): fore/aft at the WALK STANDARD 100 speed, lateral/yaw of the steered law.
+      const double T = simple::kJoystickPeriodS, nx = c.vx * simple::kWalkPeriodS / simple::kStrideM[2], ny = c.vy * T / simple::kJoystickLateralM, nw = c.yaw_rate * T / simple::kJoystickYawRad;
+      const bool shape = name == "joystick_forward" ? c.vx == simple::kStrideM[2] / simple::kWalkPeriodS && c.vy == 0 && c.yaw_rate == 0 :
                          name == "joystick_backward" ? c.vx < 0 && c.vy == 0 && c.yaw_rate == 0 :
                          name == "joystick_lateral" ? c.vx == 0 && c.vy > 0 && c.yaw_rate == 0 : c.vx == 0 && c.vy == 0 && c.yaw_rate > 0;
       check(c.intent == motion::Intent::BASE_VELOCITY && !std::strcmp(c.gait, "JOYSTICK") && c.ttl_ms == 1000 && !gate.stopLane && shape && nx*nx + ny*ny + nw*nw <= 1 + 1e-9,
@@ -450,8 +519,8 @@ int envelopes(const char* path, const char* src) {
       check(serve(request(body, session), session, lateService, late, c.issued_at_ms + 1000).code == "REJECTED EXPIRED", name + ": 1 s TTL enforced");
     } else if (name == "joystick_release") {
       check(c.intent == motion::Intent::BASE_VELOCITY && c.vx == 0 && c.vy == 0 && c.yaw_rate == 0 && !std::strcmp(c.gait, "JOYSTICK") && !gate.stopLane, name + ": zero BASE_VELOCITY");
-      check(!rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now), name + ": test joystick walk started");
-      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(simple::kJoystickStrideM / simple::kWalkPeriodS, 0, 0, rig.p.now); rig.tick(); }
+      check(!rig.m.drive(simple::kJoystickStrideM / simple::kJoystickPeriodS, 0, 0, rig.p.now), name + ": test joystick walk started");
+      for (unsigned k = 0; k < 3000 && rig.m.state() != simple::State::WALKING; ++k) { if (k % 12 == 0) rig.m.drive(simple::kJoystickStrideM / simple::kJoystickPeriodS, 0, 0, rig.p.now); rig.tick(); }
       const auto r = serve(request(body, session), session, service, rig, now);
       check(r.status == 200 && r.code == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), name + ": accepted, coordinated WALK_STOPPING (" + r.code + ")");
       check(rig.reachStand(), name + ": scripted gait ends in STAND (software only)");
@@ -472,7 +541,89 @@ int envelopes(const char* path, const char* src) {
             name + ": feedback-verified motion arrest, existing torque ON, support unknown");
     } else check(false, "unknown envelope case " + name);
   }
-  check(seen == 14, "fourteen dashboard envelopes captured (" + std::to_string(seen) + ")");
+  check(seen == 21, "twenty-one dashboard envelopes captured (" + std::to_string(seen) + ")");
+  // Pre-flash dynamic joystick, end to end (dev.17 HW: a sideways move of the
+  // held stick ended the walk). The page's own envelopes of one press, through
+  // the handler gate, session, parser, MotionService and SimpleMotion, each
+  // refreshed every 240 ms like the page: forward, forward-right, right a hair
+  // behind centre, forward-left never stop the walk; a full pull back reverses
+  // through one WALK STOP (the page silent meanwhile), the held intent starts
+  // the backward walk at STANDING, the release ends it. Software only.
+  {
+    const char* names[] = {"joystick_dynamic_forward", "joystick_dynamic_diagonal", "joystick_dynamic_lateral", "joystick_dynamic_left",
+                           "joystick_dynamic_back", "joystick_dynamic_reverse", "joystick_dynamic_release"};
+    for (const char* n : names) check(dynamic.count(n) == 1, std::string(n) + " envelope present");
+    Session session; Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
+    check(!rig.m.stand(.15, rig.p.now) && rig.reachStand(), "dynamic joystick: STAND 150 HOLD");
+    unsigned seq = 1000, stops = 0; bool stopping = false;
+    auto observe = [&] {  // a WALK STOP began: walking, the joystick walk ended
+      const bool now = rig.m.state() == simple::State::WALKING && !rig.m.joystickActive();
+      stops += now && !stopping; stopping = now;
+    };
+    // A later refresh of the same page: next page sequence (id suffix too), Controller time.
+    auto post = [&](const std::string& name) {
+      const auto& body = dynamic[name]; motion::MotionCommand parsed; const char* why = nullptr;
+      check(core::parseMotionJson(body.data(), body.size(), &parsed, &why), name + ": envelope parses");
+      const std::string id = parsed.id; ++seq;
+      auto fresh = replace(body, "\"id\":\"" + id + "\"", "\"id\":\"" + id.substr(0, id.rfind('-') + 1) + std::to_string(seq) + "\"");
+      fresh = replace(fresh, "\"sequence\":" + std::to_string(parsed.sequence), "\"sequence\":" + std::to_string(seq));
+      fresh = replace(fresh, "\"issued_at_ms\":" + std::to_string(parsed.issued_at_ms), "\"issued_at_ms\":" + std::to_string(rig.p.now / 1000));
+      const auto code = serve(request(fresh, session), session, service, rig, rig.p.now / 1000).code; observe(); return code;
+    };
+    auto step = [&](const std::string& what) {
+      rig.tick(); service.update(); observe();
+      check(rig.m.state() != simple::State::FAULT && !rig.m.stopActive(), what + ": no fault, no STOP");
+    };
+    auto hold = [&](const std::string& name, double cycles) {  // refreshed every 12 releases (240 ms)
+      const double end = rig.m.walkCycles() + cycles;
+      for (unsigned k = 0; k < 20000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() >= end); ++k) {
+        if (k % 12 == 0) check(post(name) == "ACCEPTED COMMAND_ACCEPTED", name + ": refresh accepted");
+        step(name);
+      }
+      check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive() && !std::strcmp(rig.m.reason(), "WALK_JOYSTICK"), name + ": joystick walk goes on");
+    };
+    hold("joystick_dynamic_forward", 1.5);
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() == 0, "dynamic: forward");
+    // dev.6 one law: forward alone walks the WALK STANDARD regime; a held
+    // steering demand retires the stride to the steered range and hands the
+    // walk over to the steered regime without a WALK STOP (no ACK reason, the
+    // page stays in its walk).
+    {double handover = -1;
+     for (unsigned k = 0; k < 6000 && handover < 0; ++k) {
+       if (k % 12 == 0) check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held forward-right accepted during the fore/aft walk");
+       step("joystick_dynamic_diagonal");
+       check(rig.m.state() == simple::State::WALKING, "dynamic: forward-right during a fore/aft walk keeps walking");
+       if (rig.m.walkVelocityY() < 0) handover = k * .02;
+     }
+     check(handover > 0 && stops == 0, "dynamic: forward-right hands over to the steered regime without WALK STOP");
+     std::printf("dynamic joystick: fore/aft -> steered handover %.1f s after the steering demand, no WALK STOP\n", handover);}
+    // Intent -> reference: the next release moves the lateral reference; full
+    // scale takes kJoystickRampCycles cycles (rate limit, envelope gate).
+    hold("joystick_dynamic_forward", .5);
+    const double vy0 = rig.m.walkVelocityY(), c0 = rig.m.walkCycles();
+    check(post("joystick_dynamic_diagonal") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: forward-right accepted");
+    step("joystick_dynamic_diagonal");
+    const double firstMove = std::abs(rig.m.walkVelocityY() - vy0);
+    hold("joystick_dynamic_diagonal", 2.5);
+    check(firstMove > 0 && rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() < 0, "dynamic: forward-right reached, reference moved at the next release");
+    hold("joystick_dynamic_lateral", 2.5);
+    check(rig.m.walkVelocityX() == 0 && rig.m.walkVelocityY() < 0, "dynamic: right, fore/aft at zero, no reversal");
+    hold("joystick_dynamic_left", 3);
+    check(rig.m.walkVelocityX() > 0 && rig.m.walkVelocityY() > 0 && stops == 0, "dynamic: forward-left; no WALK STOP in five direction changes");
+    std::printf("dynamic joystick: intent->reference at the next release (%.3f mm/s of lateral per release), full scale %.1f s (kJoystickRampCycles %.1f x %.1f s); %.2f cycles without a stop\n",
+                firstMove * 1000, simple::kJoystickRampCycles * simple::kJoystickPeriodS, simple::kJoystickRampCycles, simple::kJoystickPeriodS, rig.m.walkCycles() - c0);
+    check(post("joystick_dynamic_back") == "ACCEPTED JOYSTICK_REVERSING" && !std::strcmp(rig.m.reason(), "JOYSTICK_REVERSING"), "dynamic: full pull back reverses (WALK STOP), the ACK says so");
+    bool settled = false;
+    for (unsigned k = 0; k < 6000 && rig.m.state() != simple::State::STANDING; ++k) { step("reversal"); settled |= !std::strcmp(rig.m.reason(), "WALK_SETTLING"); }
+    check(rig.m.state() == simple::State::STANDING && settled && stops == 1, "dynamic: the reversal is the one WALK STOP, settling, STANDING (page silent)");
+    for (unsigned k = 0; k < 3000 && !(rig.m.state() == simple::State::WALKING && rig.m.walkCycles() > 1); ++k) {
+      if (k % 12 == 0) check(post("joystick_dynamic_reverse") == "ACCEPTED COMMAND_ACCEPTED", "dynamic: held backward intent accepted at STANDING");
+      step("joystick_dynamic_reverse");
+    }
+    check(rig.m.state() == simple::State::WALKING && rig.m.joystickActive() && rig.m.walkVelocityX() < 0, "dynamic: the held intent walks backward");
+    check(post("joystick_dynamic_release") == "ACCEPTED COMMAND_ACCEPTED" && !std::strcmp(rig.m.reason(), "WALK_STOPPING"), "dynamic: release, WALK STOP");
+    check(rig.reachStand(), "dynamic: release ends in STAND (software only)");
+  }
   check(!standBody.empty() && !stopBody.empty(), "STAND 150 and STOP envelopes present");
   // Reuse the shipped STOP/STAND envelopes for the new WALK recovery path.
   for(unsigned stride:{1u,2u}){
@@ -501,12 +652,12 @@ int envelopes(const char* path, const char* src) {
       !std::strcmp(terminal.activeOutcome,"COMPLETED"),"HTTP recovery actually reaches STAND_REACHED");
     check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP recovery has no enable/OFF");
   }
-  // dev.17: the shipped WALK45 envelope after a verified STOP in WALK and in
-  // HOLD: the STAND-after-STOP admission, the resume route, then WALK STANDARD.
-  check(!walkBody.empty(), "WALK45 envelope present");
+  // dev.17: the shipped WALK75 envelope (preset 1) after a verified STOP in WALK
+  // and in HOLD: the STAND-after-STOP admission, the resume route, then WALK STANDARD.
+  check(!walkBody.empty() && !selectBody.empty(), "WALK100 and select-then-WALK envelopes present");
   for(unsigned origin=0;origin<2;++origin){
     Session session;Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
-    if(origin==0){check(!rig.m.walk(2,rig.p.now),"HTTP STOP->WALK: WALK60 intent");
+    if(origin==0){check(!rig.m.walk(2,rig.p.now),"HTTP STOP->WALK: WALK100 intent");
       for(unsigned n=0;n<3000&&rig.m.state()!=simple::State::WALKING;++n)rig.tick();for(unsigned n=0;n<300;++n)rig.tick();}
     else check(!rig.m.stand(.15,rig.p.now)&&rig.reachStand(),"HTTP STOP->WALK: STAND 150 HOLD");
     const auto enables=rig.p.enables,off=rig.p.offCalls;
@@ -521,10 +672,10 @@ int envelopes(const char* path, const char* src) {
     for(unsigned n=0;n<300&&!rig.m.stopVerified();++n){rig.tick();service.update();}
     check(rig.m.stopVerified()&&rig.m.energized()&&statusJson(service,rig).find("\"stand_resume_allowed\":true")!=std::string::npos,"HTTP STOP->WALK: STOP verified, resume admitted");
     const auto walk=serve(request(freshBody(walkBody,201),session),session,service,rig,rig.p.now/1000);
-    check(walk.status==200&&walk.code=="ACCEPTED COMMAND_ACCEPTED",std::string("HTTP STOP->WALK: WALK45 accepted (")+walk.code+")");
+    check(walk.status==200&&walk.code=="ACCEPTED COMMAND_ACCEPTED",std::string("HTTP STOP->WALK: WALK100 accepted (")+walk.code+")");
     for(unsigned n=0;n<4000&&rig.m.state()!=simple::State::WALKING;++n){rig.tick();service.update();}
-    check(rig.m.state()==simple::State::WALKING&&std::abs(rig.m.walkVelocityX()-simple::kStrideM[1]/simple::kWalkPeriodS)<1e-12&&
-          rig.m.requestedHeightM()==simple::kWalkHeightM,"HTTP STOP->WALK: WALK STANDARD 45 at the WALK height (software only)");
+    check(rig.m.state()==simple::State::WALKING&&std::abs(rig.m.walkVelocityX()-simple::kStrideM[2]/simple::kWalkPeriodS)<1e-12&&
+          rig.m.requestedHeightM()==simple::kWalkHeightM,"HTTP STOP->WALK: WALK SLOW 100 at the WALK height (software only)");
     check(rig.p.enables==enables&&rig.p.offCalls==off,"HTTP STOP->WALK: no enable/OFF, no intermediate STAND command");
   }
   // Rejections keep working on the generated envelopes: none reaches the service.

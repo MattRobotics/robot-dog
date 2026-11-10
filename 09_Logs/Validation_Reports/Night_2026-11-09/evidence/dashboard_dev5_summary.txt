@@ -1,0 +1,7 @@
+SIMPLE_DASHBOARD_FIXTURES = PASS (79 checks; real MotionService bodies)
+SIMPLE_DASHBOARD_DOM = PASS (21 envelopes captured from the shipped page; real MotionService fixtures; 89 commands)
+DASHBOARD_LAYOUT_BROWSER PASS (Chrome 156.0.8078.79; shipped page; fixtures; no device)
+TWIN_VIEWCUBE_BROWSER PASS (Chrome 156.0.8078.79, software WebGL; shipped page and TwinAssets.h; camera only; no device)
+STOP_DURING_TWIN_LOAD_BROWSER PASS (Chrome 156.0.8078.79; worst input->STOP request at the server during a Twin load: 541 ms; measured, not a bound; offline, software WebGL, no device)
+dynamic joystick: intent->reference at the next release (0.005 mm/s of lateral per release), full scale 13.0 s (kJoystickRampCycles 2.0 x 6.5 s); 8.01 cycles without a stop
+SIMPLE_DASHBOARD_CONTRACT = PASS (6175 checks; 21 shipped-JS envelopes through real parser, origin, session/CSRF, MotionService, SimpleMotion; HTTPD/socket/mailbox/STOP-lane threading mirrored and source-anchored, not executed; NO HARDWARE VALIDATION)

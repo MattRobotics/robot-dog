@@ -1,0 +1,19 @@
+PLANT SLOW     WALK_90s         11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=66.3 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT SLOW     WALK_90s          9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=66.3 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT SLOW     STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=67.0 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.04 s
+PLANT SLOW     STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=67.0 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.04 s
+PLANT SLOW     IMU_PITCH_VERTEX 11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=66.3 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT SLOW     IMU_PITCH_VERTEX  9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=66.3 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT STANDARD WALK_90s         11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=83.1 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT STANDARD WALK_90s          9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=83.1 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT STANDARD STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=101.2 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.12 s
+PLANT STANDARD STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=101.2 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.12 s
+PLANT STANDARD IMU_PITCH_VERTEX 11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=81.8 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT STANDARD IMU_PITCH_VERTEX  9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=81.8 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT FAST     WALK_90s         11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=126.9 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT FAST     WALK_90s          9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=126.9 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT FAST     STOP8_RESUME     11.1V seeds=6 faults=0 stops_ok=48/48 max_tracking=125.8 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.08 s
+PLANT FAST     STOP8_RESUME      9.6V seeds=6 faults=0 stops_ok=48/48 max_tracking=125.8 ticks max_stop_end_offset=2.0 ticks max_stop_settle=2.08 s
+PLANT FAST     IMU_PITCH_VERTEX 11.1V seeds=6 faults=0 stops_ok=0/0 max_tracking=136.6 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+PLANT FAST     IMU_PITCH_VERTEX  9.6V seeds=6 faults=0 stops_ok=0/0 max_tracking=136.6 ticks max_stop_end_offset=0.0 ticks max_stop_settle=0.00 s
+rc=0

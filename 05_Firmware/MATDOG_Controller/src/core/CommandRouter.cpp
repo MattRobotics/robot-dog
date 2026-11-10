@@ -258,6 +258,11 @@ void CommandRouter::handleLine(String line) {
       unsigned(e.valid),unsigned(e.fault),e.reason,e.phase,simple::name(e.state),(unsigned long long)e.atUs,(unsigned long long)e.nowUs,unsigned(e.energized),(unsigned long)e.releases,(unsigned long)e.missed,
       (unsigned long long)e.maxGapUs,unsigned(e.drive.speed),unsigned(e.drive.acc),(unsigned long long)e.goalSentUs,(unsigned long long)e.settleUs,(unsigned long long)e.deadlineUs,e.lastPolled,
       *e.loadedPhase?e.loadedPhase:"NONE",unsigned(e.loadedMask));
+    {const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(e.walkMode));
+    Serial.printf("MOTION_DIAG exit_cause refused_by=%u check=%s imu_reason=%s cycles=%.3f nominal_solved=%u steered=%u correction_mrad=%.1f,%.1f wanted_mrad=%.1f,%.1f advance=%.4f,%.4f,%.4f walk_mode=%s period_s=%.3f mode_drive=%u/%u stop_brake_acc=%u\n",
+      unsigned(e.refusedBy),e.refusedBy<sizeof(simple::kSafeChecks)/sizeof(*simple::kSafeChecks)?simple::kSafeChecks[e.refusedBy]:"?",e.imuReason,e.cycles,unsigned(e.nominalSolved),unsigned(e.steered),
+      e.roll*1e3,e.pitch*1e3,e.wantedRoll*1e3,e.wantedPitch*1e3,e.advance[0],e.advance[1],e.advance[2],w.name,w.periodS,unsigned(w.drive.speed),unsigned(w.drive.acc),
+      unsigned(e.drive.acc<simple::kStopBrakeAcc?e.drive.acc:simple::kStopBrakeAcc));}
     if(e.valid)for(unsigned i=0;i<12;++i)joint("exit_j",i,e.commandedRaw[i],e.fb[i],e.atUs);
     return;
   }
@@ -274,8 +279,15 @@ void CommandRouter::handleLine(String line) {
       for(unsigned k=0;k<simple::timing::WORKS;++k)Serial.printf(" %s=%lu previous_%s=%lu",works[k],(unsigned long)r.work[k],works[k],(unsigned long)r.previousWork[k]);Serial.println();
     }
     Serial.printf("MOTION_TIMING totals max_visit_gap_us=%llu max_outside_visit_us=%llu",(unsigned long long)t.maxVisitGap,(unsigned long long)t.maxOutside);
+#ifdef MATDOG_DIAG_PREEMPTION
+    Serial.printf(" diag_preemption=1 max_other_tasks_us=%lu max_work_other_tasks_us=%lu first_miss_other_tasks_us=%lu",(unsigned long)t.maxOtherTasksUs,(unsigned long)t.maximum.otherTasksUs,(unsigned long)t.firstMiss.otherTasksUs);
+#endif
     for(unsigned k=0;k<simple::timing::EXTERNALS;++k)Serial.printf(" external%u_max_us=%lu",k,(unsigned long)t.externalMax[k]);
-    for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();return;
+    for(unsigned k=0;k<simple::timing::PARTS;++k)Serial.printf(" part%u_max_us=%lu",k,(unsigned long)t.sectionMax[k]);Serial.println();
+    // Distributions of the armed command's releases: work (<5,<10,<15,<20,<25,<30,<40,>=40 ms), READ section (<2.5,<4,<6,>=6 ms), lateness (<1,<5,<10,<20,<40,>=40 ms).
+    Serial.printf("MOTION_TIMING hist work=");for(unsigned k=0;k<8;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.workHist[k]);
+    Serial.printf(" read=");for(unsigned k=0;k<4;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.readHist[k]);
+    Serial.printf(" lateness=");for(unsigned k=0;k<6;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.latenessHist[k]);Serial.println();return;
   }
   if(upper.startsWith("@SERVO SAFE_OFF")){
     int id=-1;char extra=0;
@@ -309,7 +321,7 @@ void CommandRouter::handleLine(String line) {
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];
     Serial.println(modules_.service->motionAck(ack,out,sizeof(out))?out:"MOTION=REJECTED REASON=ACK_UNAVAILABLE");return;
   }
-  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP") {
+  if(upper=="@STOP"||upper=="@MOTION STOP"||upper=="@MOTION PRONE"||upper=="@MOTION STATUS"||upper.startsWith("@MOTION STAND ")||upper=="@MOTION WALK STANDARD"||upper=="@MOTION WALK STOP"||upper.startsWith("@MOTION WALK MODE ")) {
     if(upper=="@MOTION STATUS"){
       char* out=usbMotionJson();MotionStatusSnapshot snapshot;bool ok;
       {simple::timing::Outside timer(simple::timing::USB_CAPTURE);ok=modules_.service->motionSnapshot(snapshot,millis());}
@@ -324,6 +336,7 @@ void CommandRouter::handleLine(String line) {
       c.intent=motion::Intent::STAND;c.target_height_m=mm/1000;
     }else if(upper=="@MOTION WALK STANDARD"){c.intent=motion::Intent::BASE_VELOCITY;c.vx=simple::kStrideM[1]/simple::kWalkPeriodS;}
     else if(upper=="@MOTION WALK STOP")c.intent=motion::Intent::BASE_VELOCITY;
+    else if(upper.startsWith("@MOTION WALK MODE ")){c.intent=motion::Intent::GAIT_SELECT;snprintf(c.gait,sizeof(c.gait),"%s",upper.c_str()+18);}
     else if(upper=="@MOTION PRONE")c.intent=motion::Intent::LIE_DOWN;
     const auto ack=modules_.service->motionCommand(c,millis());char out[512];modules_.service->motionAck(ack,out,sizeof(out));Serial.println(out);return;
   }
@@ -1331,6 +1344,21 @@ void CommandRouter::handleLine(String line) {
     } else {
       Serial.println("ERROR=PREFLIGHT_ALREADY_RUNNING");
     }
+  } else if (upper.startsWith("@SERVO ACC")) {
+    if (q0CaptureOwnsServoDiagnostics() || servoDiagnosticBusy()) {
+      Serial.println("SERVO_ACC=BLOCKED");
+      Serial.println(motionExecutorBusy() ? "REASON=MOTION_EXECUTOR_ACTIVE"
+                     : q0CaptureOwnsServoDiagnostics() ? "REASON=CALIBRATION_Q0_CAPTURE_ACTIVE"
+                                                       : "REASON=SERVO_DIAGNOSTIC_BUSY");
+      return;
+    }
+    if (modules_.operating_mode->mode() != OperatingMode::MAINTENANCE) {
+      Serial.println("SERVO_ACC=BLOCKED");
+      Serial.println("REASON=NOT_IN_MAINTENANCE_MODE");
+      Serial.printf("MODE=%s\n", toString(modules_.operating_mode->mode()));
+      return;
+    }
+    handleServoAcc(upper.c_str());
   } else if (upper.startsWith("@SERVO READ")) {
     if (q0CaptureOwnsServoDiagnostics() || motionExecutorBusy()) {
       Serial.println("SERVO_READ=BLOCKED");
@@ -1459,6 +1487,8 @@ void CommandRouter::printHelp() {
   Serial.println("  @SERVO PREFLIGHT        (MAINTENANCE mode only; read-only 12-leg");
   Serial.println("                           identity + MATDOG_C018_V1 profile check)");
   Serial.println("  @SERVO READ <id>        (MAINTENANCE mode only)");
+  Serial.println("  @SERVO ACC STATUS|BACKUP <id>|SRAM <id> <v>|FACTORY <id> <v> VOLATILE|PERSIST <token>");
+  Serial.println("                          (MAINTENANCE only; trace-45 ACC diagnostic, leg servos)");
   Serial.println("  @SERVO SAFE_OFF <id>    (always allowed, any mode)");
   Serial.println("  @MODE STATUS|MAINTENANCE|RUN");
   Serial.println("  @SYSTEM SHUTDOWN");
@@ -2245,6 +2275,139 @@ void CommandRouter::printServoRead(int id) {
   }
   Serial.printf("SERVO_LIMITS id=%d sampled_ms=%lu max_torque=%ld torque_limit=%ld unload_condition=%ld led_alarm=%ld protection_current=%ld protection_torque=%ld protection_time=%ld overload_torque=%ld overcurrent_time=%ld servo_status=%ld known_mask=%u source=READ_ONLY_REGISTERS eeprom=16,18,19,28,34,35,36,38 ram=48,65 unknown=-1\n",
     id,(unsigned long)millis(),(long)value[0],(long)value[1],(long)value[2],(long)value[3],(long)value[4],(long)value[5],(long)value[6],(long)value[7],(long)value[8],(long)value[9],known);
+  // Trace 45 (ACC 180 written, 50 stored): four separate 1-byte reads, 40
+  // TorqueEnable, 41 ACC, 85 and 86 (LeRobot/rustypot "Maximum_Acceleration"
+  // and "Acceleration_Multiplier", not in Feetech's SDK; never one 2-byte read
+  // of 85). 41/85/86 only once 40 read VALID 0. Each reply is printed raw; a
+  // failed read is READ_FAILED with value -1, never a value.
+  const uint8_t acc_address[]={40,41,85,86};
+  int32_t acc[4]={-1,-1,-1,-1};unsigned acc_valid=0;
+  for(unsigned i=0;i<4;++i){
+    diagnostics::ReadCapture c;
+    const bool torque_off_verified=(acc_valid&1u)&&acc[0]==0;
+    if((i==0||torque_off_verified)&&modules_.servo_bus->readProfileRegister(id,acc_address[i],1,&acc[i],&c))acc_valid|=1u<<i;
+    else acc[i]=-1;
+    char rx[2*sizeof(c.bytes)+1]="-";
+    for(unsigned k=0;k<c.size&&k<sizeof(c.bytes);++k)snprintf(rx+2*k,3,"%02X",unsigned(c.bytes[k]));
+    Serial.printf("SERVO_ACC id=%d reg=%u status=%s value=%ld validity=%s rx_size=%u drained=%u read_ms=%lu..%lu rx=%s\n",
+      id,unsigned(acc_address[i]),(acc_valid>>i)&1u?"VALID":i==0||torque_off_verified?"READ_FAILED":"NOT_READ_TORQUE_NOT_VERIFIED_OFF",
+      (long)acc[i],diagnostics::toString(c.validity),unsigned(c.size),unsigned(c.drained),(unsigned long)c.started_ms,(unsigned long)c.finished_ms,rx);
+  }
+  Serial.printf("SERVO_ACC_SUMMARY id=%d torque_40=%ld acc_41=%ld max_acc_85=%ld acc_multiplier_86=%ld valid_mask=%u source=READ_ONLY_1_BYTE unknown=-1\n",
+    id,(long)acc[0],(long)acc[1],(long)acc[2],(long)acc[3],acc_valid);
+}
+
+void CommandRouter::handleServoAcc(const char* upper) {
+  // Trace 45: ACC 180 written, 50 stored; register 85 reads 50 on 12/12 leg
+  // servos. Does 85 cause the clamp? Leg servos only; one 1-byte register at
+  // a time; a failed read is never a value; any failed or unverified write or
+  // restore latches every further ACC write off until reboot.
+  servo::ServoBus& bus=*modules_.servo_bus;
+  if(!strcmp(upper,"@SERVO ACC STATUS")){
+    Serial.printf("SERVO_ACC_STATUS factory_id=%d original85=%d failed=%s\n",acc_factory_id_,acc_factory_original85_,acc_diag_failed_?"YES":"NO");
+    return;
+  }
+  int id=-1,value=-1;char mode[12]={0},token[48]={0};
+  const bool backup=sscanf(upper,"@SERVO ACC BACKUP %d",&id)==1;
+  const bool sram=!backup&&sscanf(upper,"@SERVO ACC SRAM %d %d",&id,&value)==2;
+  const bool factory=!backup&&!sram&&sscanf(upper,"@SERVO ACC FACTORY %d %d %11s %47s",&id,&value,mode,token)==4;
+  bool leg=false;
+  for(uint8_t i=0;i<servo::kLegServoCount;++i){const auto* s=servo::legServoAt(i);if(s&&s->bus_id==id)leg=true;}
+  if(!(backup||sram||factory)||!leg||(!backup&&(value<1||value>254))){
+    Serial.println("ERROR=USAGE @SERVO ACC STATUS | BACKUP <leg id> | SRAM <leg id> <1..254> | FACTORY <leg id> <1..254> VOLATILE|PERSIST <token>");
+    return;
+  }
+  auto read1=[&](uint8_t address,int32_t* v){*v=-1;return bus.readProfileRegister(id,address,1,v);};
+  if(backup){
+    // Read-only image of 0..70 and 80..86, one validated 1-byte read each; an
+    // unread byte is "--" (never 00) and its raw reply is printed.
+    uint32_t hash=2166136261u;unsigned valid=0;
+    const uint8_t first[2]={0,80},last[2]={70,86};
+    for(unsigned r=0;r<2;++r){
+      char hex[2*71+1]={0};
+      for(unsigned a=first[r];a<=last[r];++a){
+        diagnostics::ReadCapture c;int32_t v=-1;char* at=hex+2*(a-first[r]);
+        if(bus.readProfileRegister(id,static_cast<uint8_t>(a),1,&v,&c)){snprintf(at,3,"%02X",unsigned(v));++valid;}
+        else{at[0]=at[1]='-';
+          char rx[2*sizeof(c.bytes)+1]="-";
+          for(unsigned k=0;k<c.size&&k<sizeof(c.bytes);++k)snprintf(rx+2*k,3,"%02X",unsigned(c.bytes[k]));
+          Serial.printf("SERVO_ACC_BACKUP_FAIL id=%d addr=%u validity=%s rx=%s\n",id,a,diagnostics::toString(c.validity),rx);}
+        hash=(hash^static_cast<uint8_t>(at[0]))*16777619u;hash=(hash^static_cast<uint8_t>(at[1]))*16777619u;
+      }
+      Serial.printf("SERVO_ACC_BACKUP id=%d range=%u-%u hex=%s\n",id,unsigned(first[r]),unsigned(last[r]),hex);
+    }
+    Serial.printf("SERVO_ACC_BACKUP_DONE id=%d valid=%u/78 fnv1a=0x%08lx\n",id,valid,(unsigned long)hash);
+    return;
+  }
+  if(acc_diag_failed_){Serial.printf("SERVO_ACC=REFUSED id=%d reason=EARLIER_FAILURE_REBOOT_REQUIRED\n",id);return;}
+  const bool persist=factory&&!strcmp(mode,"PERSIST");
+  if(factory){
+    char expected[48];
+    snprintf(expected,sizeof(expected),persist?"CONFIRM_ACC85_PERSIST_%d_%d":"CONFIRM_ACC85_%d_%d",id,value);
+    if((!persist&&strcmp(mode,"VOLATILE"))||strcmp(token,expected)){Serial.printf("SERVO_ACC=REFUSED id=%d reason=CONFIRMATION_TOKEN expected=%s\n",id,expected);return;}
+    if(acc_factory_id_>=0&&acc_factory_id_!=id){Serial.printf("SERVO_ACC=REFUSED id=%d reason=ONE_SERVO_PER_BOOT factory_id=%d\n",id,acc_factory_id_);return;}
+  }
+  // Motion cannot start while this lease is held (it needs authority NONE or MOTION).
+  AuthorityLease lease;
+  if(modules_.authority->request(ActuatorAuthority::DIAGNOSTICS,modules_.operating_mode->mode(),&lease)!=AuthorityResult::GRANTED){
+    Serial.printf("SERVO_ACC=REFUSED id=%d reason=ACTUATOR_OWNER_BUSY\n",id);return;}
+  auto write=[&](const char* step,uint8_t address,uint8_t v){
+    const auto w=bus.writeAccDiagnosticByte(id,address,v);
+    Serial.printf("SERVO_ACC_WRITE id=%d step=%s reg=%u value=%u sent=%s readback=%d verify=%s torque_after=%d safe_off=%s\n",
+      id,step,unsigned(address),unsigned(v),w.refused?"NO":"YES",w.readback,servo::toString(w.verify),w.torque_after,
+      w.safe_off_issued?servo::toString(w.safe_off):"NOT_NEEDED");
+    if(!w.refused&&(w.readback<0||w.torque_after!=0))acc_diag_failed_=true;
+    return w;
+  };
+  if(sram){
+    int32_t before=-1;const bool known=read1(servo::ServoBus::kAccDiagAcc,&before);
+    const auto w=write("SRAM41",servo::ServoBus::kAccDiagAcc,static_cast<uint8_t>(value));
+    Serial.printf("SERVO_ACC_SRAM id=%d written=%d before=%ld stored=%d result=%s\n",id,value,known?(long)before:-1L,w.readback,
+      w.refused?"REFUSED_NOTHING_SENT":w.torque_after!=0?"TORQUE_NOT_OFF_SAFE_OFF":w.readback<0?"UNVERIFIED":w.readback==value?"STORED_EXACT":"STORED_DIFFERENT");
+    modules_.authority->release(lease);
+    return;
+  }
+  // Register 85 on ONE servo. Preconditions, all read VALID: torque OFF, ACC
+  // 41 not 0 (run SRAM first: an unexpected arming stays profile-limited),
+  // Lock 55 = 1; 84/85/86 kept to prove they are unchanged afterwards.
+  int32_t t40=-1,a41=-1,l55=-1,r84=-1,r85=-1,r86=-1;
+  bool pre=read1(40,&t40);  // every precondition is read, so a refusal shows them all
+  pre=read1(41,&a41)&&pre;pre=read1(55,&l55)&&pre;pre=read1(84,&r84)&&pre;pre=read1(85,&r85)&&pre;pre=read1(86,&r86)&&pre;
+  pre=pre&&t40==0&&a41!=0&&l55==1;
+  if(!pre){
+    Serial.printf("SERVO_ACC=REFUSED id=%d reason=PRECONDITION torque_40=%ld acc_41=%ld lock_55=%ld r84=%ld r85=%ld r86=%ld\n",
+      id,(long)t40,(long)a41,(long)l55,(long)r84,(long)r85,(long)r86);
+    modules_.authority->release(lease);return;
+  }
+  if(acc_factory_id_<0){acc_factory_id_=id;acc_factory_original85_=r85;}
+  bool ok=true;
+  if(persist){const auto u=write("UNLOCK55",servo::ServoBus::kAccDiagLock,0);ok=u.verify==servo::ServoWriteVerifyResult::VERIFIED_APPLIED&&u.torque_after==0;}
+  bool applied=false;
+  if(ok){
+    const auto w=write("WRITE85",servo::ServoBus::kAccDiagMaxAcc,static_cast<uint8_t>(value));
+    applied=w.verify==servo::ServoWriteVerifyResult::VERIFIED_APPLIED&&w.torque_after==0;
+    ok=applied||(!w.refused&&w.readback==r85&&w.torque_after==0);  // kept its value: not applied
+  }
+  // Always relock after PERSIST (the writer itself refuses unless torque reads OFF).
+  if(persist){const auto l=write("RELOCK55",servo::ServoBus::kAccDiagLock,1);ok=ok&&l.verify==servo::ServoWriteVerifyResult::VERIFIED_APPLIED;}
+  int32_t p40=-1,p55=-1,p84=-1,p85=-1,p86=-1;
+  const bool post=read1(40,&p40)&&read1(55,&p55)&&read1(84,&p84)&&read1(85,&p85)&&read1(86,&p86);
+  ok=ok&&post&&p40==0&&p55==1&&p84==r84&&p86==r86&&p85==(applied?value:r85);
+  const char* result=!ok?"FAILED":!applied?"NOT_APPLIED":value==acc_factory_original85_?"RESTORED_ORIGINAL":"APPLIED";
+  if(!ok){
+    // Put 85 and the lock back as they were; the latch stays set either way.
+    acc_diag_failed_=true;
+    if(!(post&&p85==r85)){
+      if(persist&&!(post&&p55==0))write("RESTORE_UNLOCK55",servo::ServoBus::kAccDiagLock,0);
+      write("RESTORE85",servo::ServoBus::kAccDiagMaxAcc,static_cast<uint8_t>(r85));
+    }
+    if(persist||!(post&&p55==1))write("RESTORE_RELOCK55",servo::ServoBus::kAccDiagLock,1);
+    const bool restored=read1(85,&p85)&&p85==r85&&read1(55,&p55)&&p55==1&&read1(40,&p40)&&p40==0;
+    result=restored?"FAILED_RESTORED":"FAILED_RESTORE_FAILED";
+  }
+  Serial.printf("SERVO_ACC_FACTORY id=%d mode=%s value=%d original85=%d before85=%ld after85=%ld r84=%ld/%ld r86=%ld/%ld lock=%ld/%ld torque=%ld result=%s\n",
+    id,persist?"PERSIST":"VOLATILE",value,acc_factory_original85_,(long)r85,(long)p85,(long)r84,(long)p84,(long)r86,(long)p86,(long)l55,(long)p55,(long)p40,result);
+  modules_.authority->release(lease);
 }
 
 void CommandRouter::printServoSafeOff(int id) {

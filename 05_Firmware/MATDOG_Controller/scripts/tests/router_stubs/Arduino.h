@@ -30,6 +30,16 @@ class String {
 namespace router_test {
 inline uint32_t now_ms = 1000;
 inline unsigned hardware_calls = 0;
+// @SERVO READ tests (router_fake_hardware.cpp): one scripted servo whose
+// registers answer when `answers` says so; nullptr = every servo read fails.
+// Diagnostic writes (writeAccDiagnosticByte) update `values`; optional models:
+// 41 clamped to 85, 85 kept while Lock 55 != 0, an 85 write flipping 86, a
+// write arming torque.
+struct ServoReadScript {
+  int torque = 0; bool answers[256] = {}; uint8_t values[256] = {}; std::string reads, writes;
+  bool clamp_from_85 = false, reject_85_locked = false, clobber_86_on_85 = false, arm_on_write = false;
+};
+inline ServoReadScript* servo_read_script = nullptr;
 }
 inline uint32_t millis() { return router_test::now_ms; }
 inline uint32_t micros() { return router_test::now_ms * 1000u; }

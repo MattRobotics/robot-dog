@@ -1,0 +1,61 @@
+PERTURB nominal                WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB nominal                WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=13 max_missed=0
+PERTURB nominal                HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB nominal                RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB nominal                RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB imu +1.5deg pitch      WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB imu +1.5deg pitch      WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=15 max_missed=0
+PERTURB imu +1.5deg pitch      HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB imu +1.5deg pitch      RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=15 max_missed=0
+PERTURB imu +1.5deg pitch      RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=15 max_missed=1
+PERTURB imu -1.5deg pitch      WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=18 max_missed=0
+PERTURB imu -1.5deg pitch      WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB imu -1.5deg pitch      HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=18 max_missed=0
+PERTURB imu -1.5deg pitch      RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=16 max_missed=0
+PERTURB imu -1.5deg pitch      RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB imu +3deg roll         WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB imu +3deg roll         WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=13 max_missed=0
+PERTURB imu +3deg roll         HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB imu +3deg roll         RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB imu +3deg roll         RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB imu -3deg pitch        WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=18 max_missed=0
+PERTURB imu -3deg pitch        WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=16 max_missed=0
+PERTURB imu -3deg pitch        HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=18 max_missed=0
+PERTURB imu -3deg pitch        RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=16 max_missed=0
+PERTURB imu -3deg pitch        RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB leg offsets+sag/load   WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB leg offsets+sag/load   WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=14 max_missed=0
+PERTURB leg offsets+sag/load   HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB leg offsets+sag/load   RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB leg offsets+sag/load   RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=15 max_missed=1
+PERTURB feedback lag 1 rel     WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=18 max_missed=0
+PERTURB feedback lag 1 rel     WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=14 max_missed=0
+PERTURB feedback lag 1 rel     HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB feedback lag 1 rel     RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB feedback lag 1 rel     RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB release jitter 0-8ms   WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=24 max_missed=1693
+PERTURB release jitter 0-8ms   WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=19 max_missed=1696
+PERTURB release jitter 0-8ms   HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=23 max_missed=2798
+PERTURB release jitter 0-8ms   RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=7 maxRAW=20 max_missed=2098
+PERTURB release jitter 0-8ms   RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=19 max_missed=2085
+PERTURB missed 2%              WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=33 max_missed=180
+PERTURB missed 2%              WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=26 max_missed=182
+PERTURB missed 2%              HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=33 max_missed=288
+PERTURB missed 2%              RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=27 max_missed=227
+PERTURB missed 2%              RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=7 maxRAW=26 max_missed=237
+PERTURB uart 4ms               WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB uart 4ms               WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=13 max_missed=0
+PERTURB uart 4ms               HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB uart 4ms               RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB uart 4ms               RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB voltage 9.0V           WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=17 max_missed=0
+PERTURB voltage 9.0V           WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=13 max_missed=0
+PERTURB voltage 9.0V           HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=17 max_missed=0
+PERTURB voltage 9.0V           RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=8 maxRAW=14 max_missed=0
+PERTURB voltage 9.0V           RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=6 maxRAW=14 max_missed=1
+PERTURB combined               WALK100     faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=36 max_missed=1366
+PERTURB combined               WALK75      faults=0 stop_recovery_fail=0 max_stops=0 maxRAW=29 max_missed=1361
+PERTURB combined               HELD_SEQ    faults=0 stop_recovery_fail=0 max_stops=2 maxRAW=36 max_missed=2238
+PERTURB combined               RANDOM_JOY  faults=0 stop_recovery_fail=0 max_stops=5 maxRAW=29 max_missed=1677
+PERTURB combined               RANDOM_STOP faults=0 stop_recovery_fail=0 max_stops=5 maxRAW=27 max_missed=1693
+rc=0

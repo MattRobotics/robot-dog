@@ -489,6 +489,7 @@ CALREC_SRCS=(
   "$SCRIPT_DIR/router_nvs_stub.cpp" \
   "$SKETCH_DIR/src/calibration/CalibrationRecordNvsBackend.cpp" \
   "$SKETCH_DIR/src/core/CommandRouter.cpp" \
+  "$SKETCH_DIR/src/diagnostics/PrimeDiagnostic.cpp" \
   "$SKETCH_DIR/src/calibration/StartupRecoveryQualification.cpp" \
   "$SKETCH_DIR/src/core/CommandRouterPersistence.cpp" \
   "$SKETCH_DIR/src/core/MotionService.cpp" \

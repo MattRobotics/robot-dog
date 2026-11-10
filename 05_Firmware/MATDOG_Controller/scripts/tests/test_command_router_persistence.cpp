@@ -703,6 +703,158 @@ void hostlink_motion_contract() {
   std::printf("HOSTLINK USB contract: hello, capabilities, status, STAND/LIE_DOWN/JOYSTICK/STOP acks, TTL/owner/schema refusals, overflow recovery; no ServoBus call\n");
 }
 
+// Trace 45: @SERVO READ adds 40/41/85/86 as four 1-byte reads with the raw
+// reply; 41/85/86 only after 40 read VALID 0; MAINTENANCE only; a failed read
+// is never a value. The fake bus records every read (address/width).
+void servo_read_acc_registers() {
+  framing_case = "servo_read_acc";
+  Fixture f;
+  const auto hardware_before = router_test::hardware_calls;  // other cases count from zero
+  router_test::ServoReadScript s;
+  for (int reg : {16, 18, 19, 28, 34, 35, 36, 38, 48, 65, 40, 41, 85, 86}) s.answers[reg] = true;
+  s.values[41] = 50; s.values[85] = 50; s.values[86] = 0;
+  router_test::servo_read_script = &s;
+  auto has = [](const std::string& out, const char* text) { return out.find(text) != std::string::npos; };
+
+  std::string out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_READ id=23 position=2048") && has(out, "torque=0"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=VALID value=0 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=41 status=VALID value=50 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=85 status=VALID value=50 validity=VALID rx_size=7"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=86 status=VALID value=0 validity=VALID rx_size=7"));
+  // 85's own reply: FF FF 23 len 3 status 0 value 50 checksum.
+  CHECK(has(out, "reg=85 status=VALID value=50 validity=VALID rx_size=7 drained=0 read_ms=0..0 rx=FFFF17030032B3\n"));
+  CHECK(has(out, "SERVO_ACC_SUMMARY id=23 torque_40=0 acc_41=50 max_acc_85=50 acc_multiplier_86=0 valid_mask=15 "));
+  CHECK(s.reads.find("40/1 41/1 85/1 86/1 ") != std::string::npos);  // four distinct 1-byte reads, last
+  CHECK(s.reads.find("85/2") == std::string::npos);
+
+  s.answers[85] = false; s.reads.clear();
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=85 status=READ_FAILED value=-1 validity=NO_RESPONSE rx_size=0"));
+  CHECK(has(out, "rx=-\n"));
+  CHECK(has(out, "max_acc_85=-1 acc_multiplier_86=0 valid_mask=11 "));
+  s.answers[85] = true;
+
+  s.answers[40] = false; s.reads.clear();  // torque not read: nothing else is read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=READ_FAILED value=-1"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=41 status=NOT_READ_TORQUE_NOT_VERIFIED_OFF value=-1 validity=NOT_ATTEMPTED"));
+  CHECK(has(out, "SERVO_ACC id=23 reg=86 status=NOT_READ_TORQUE_NOT_VERIFIED_OFF value=-1"));
+  CHECK(s.reads.find("41/1") == std::string::npos && s.reads.find("85/1") == std::string::npos);
+  s.answers[40] = true;
+
+  s.torque = 1; s.values[40] = 1; s.reads.clear();  // torque ON: no ACC read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_ACC id=23 reg=40 status=VALID value=1"));
+  CHECK(has(out, "SERVO_ACC_SUMMARY id=23 torque_40=1 acc_41=-1 max_acc_85=-1 acc_multiplier_86=-1 valid_mask=1 "));
+  CHECK(s.reads.find("41/1") == std::string::npos && s.reads.find("85/1") == std::string::npos &&
+        s.reads.find("86/1") == std::string::npos);
+  s.torque = 0; s.values[40] = 0;
+
+  f.mode.setMode(OperatingMode::RUN); s.reads.clear();  // outside MAINTENANCE: refused before any read
+  out = f.command("@SERVO READ 23");
+  CHECK(has(out, "SERVO_READ=BLOCKED") && has(out, "REASON=NOT_IN_MAINTENANCE_MODE") && s.reads.empty());
+  CHECK(!has(out, "SERVO_ACC"));
+  router_test::servo_read_script = nullptr;
+  router_test::hardware_calls = hardware_before;
+  std::printf("@SERVO READ ACC registers: 40/41/85/86 as 1-byte reads with raw replies, torque-OFF gate, READ_FAILED never a value, MAINTENANCE only\n");
+}
+
+// Trace 45 causal test surface (@SERVO ACC): BACKUP read-only; SRAM 41 write;
+// register 85 behind a per-value token, ONE servo per boot, ACC 41 != 0,
+// Lock 1, 84/86 unchanged, restore on failure, latch; DIAGNOSTICS lease.
+void servo_acc_diagnostic_procedure() {
+  framing_case = "servo_acc";
+  const auto hardware_before = router_test::hardware_calls;
+  auto has = [](const std::string& out, const char* text) { return out.find(text) != std::string::npos; };
+  router_test::ServoReadScript s;
+  for (int reg = 0; reg <= 70; ++reg) s.answers[reg] = true;
+  for (int reg = 80; reg <= 86; ++reg) s.answers[reg] = true;
+  s.values[55] = 1; s.values[84] = 33; s.values[85] = 50; s.values[86] = 1; s.clamp_from_85 = true;
+  {
+    Fixture f;
+    router_test::servo_read_script = &s;
+    std::string out = f.command("@SERVO ACC BACKUP 23");
+    CHECK(has(out, "SERVO_ACC_BACKUP id=23 range=0-70 hex=") && has(out, "SERVO_ACC_BACKUP id=23 range=80-86 hex=00000000213201\n"));
+    CHECK(has(out, "SERVO_ACC_BACKUP_DONE id=23 valid=78/78 fnv1a=0x") && s.writes.empty());
+    s.answers[85] = false;
+    out = f.command("@SERVO ACC BACKUP 23");
+    CHECK(has(out, "SERVO_ACC_BACKUP_FAIL id=23 addr=85 validity=NO_RESPONSE rx=-") && has(out, "hex=0000000021--01\n") && has(out, "valid=77/78"));
+    s.answers[85] = true;
+    for (const char* bad : {"@SERVO ACC SRAM 51 180", "@SERVO ACC SRAM 23 0", "@SERVO ACC SRAM 23 255", "@SERVO ACC FACTORY 23 300 VOLATILE X",
+                            "@SERVO ACC WRITE 23 41 180", "@SERVO ACC BACKUP 99"})
+      CHECK(has(f.command(bad), "ERROR=USAGE"));
+    out = f.command("@SERVO ACC FACTORY 23 100 VOLATILE CONFIRM");
+    CHECK(has(out, "reason=CONFIRMATION_TOKEN expected=CONFIRM_ACC85_23_100"));
+    out = f.command("@SERVO ACC FACTORY 23 100 VOLATILE CONFIRM_ACC85_23_100");  // power-on ACC 41 = 0
+    CHECK(has(out, "reason=PRECONDITION torque_40=0 acc_41=0 lock_55=1"));
+    CHECK(s.writes.empty());
+    CHECK(has(f.command("@SERVO ACC SRAM 23 180"), "SERVO_ACC_SRAM id=23 written=180 before=0 stored=50 result=STORED_DIFFERENT"));
+    out = f.command("@SERVO ACC FACTORY 23 100 VOLATILE CONFIRM_ACC85_23_100");
+    CHECK(has(out, "step=WRITE85 reg=85 value=100 sent=YES readback=100 verify=VERIFIED_APPLIED torque_after=0 safe_off=NOT_NEEDED"));
+    CHECK(has(out, "SERVO_ACC_FACTORY id=23 mode=VOLATILE value=100 original85=50 before85=50 after85=100 r84=33/33 r86=1/1 lock=1/1 torque=0 result=APPLIED"));
+    CHECK(has(f.command("@SERVO ACC SRAM 23 180"), "stored=100 result=STORED_DIFFERENT"));  // the clamp follows 85
+    CHECK(has(f.command("@SERVO ACC SRAM 23 90"), "stored=90 result=STORED_EXACT"));
+    CHECK(has(f.command("@SERVO ACC FACTORY 22 100 VOLATILE CONFIRM_ACC85_22_100"), "reason=ONE_SERVO_PER_BOOT factory_id=23"));
+    out = f.command("@SERVO ACC FACTORY 23 50 VOLATILE CONFIRM_ACC85_23_50");
+    CHECK(has(out, "before85=100 after85=50") && has(out, "result=RESTORED_ORIGINAL"));
+    CHECK(has(f.command("@SERVO ACC SRAM 23 180"), "stored=50 result=STORED_DIFFERENT"));
+    CHECK(s.writes == "41=180 85=100 41=180 41=90 85=50 41=180 ");
+    CHECK(f.authority.current() == ActuatorAuthority::NONE);
+    CHECK(has(f.command("@SERVO ACC STATUS"), "SERVO_ACC_STATUS factory_id=23 original85=50 failed=NO"));
+    f.mode.setMode(OperatingMode::RUN); s.reads.clear(); s.writes.clear();
+    out = f.command("@SERVO ACC SRAM 23 180");
+    CHECK(has(out, "SERVO_ACC=BLOCKED") && has(out, "REASON=NOT_IN_MAINTENANCE_MODE") && s.reads.empty() && s.writes.empty());
+    router_test::servo_read_script = nullptr;
+  }
+  {  // Kept under Lock 1: VOLATILE is NOT_APPLIED (no latch); PERSIST unlocks, writes, relocks.
+    Fixture f;
+    router_test::servo_read_script = &s;
+    s.values[41] = 50; s.values[85] = 50; s.values[55] = 1; s.reject_85_locked = true; s.writes.clear();
+    std::string out = f.command("@SERVO ACC FACTORY 23 100 VOLATILE CONFIRM_ACC85_23_100");
+    CHECK(has(out, "after85=50") && has(out, "result=NOT_APPLIED"));
+    CHECK(has(f.command("@SERVO ACC FACTORY 23 100 PERSIST CONFIRM_ACC85_23_100"), "expected=CONFIRM_ACC85_PERSIST_23_100"));
+    out = f.command("@SERVO ACC FACTORY 23 100 PERSIST CONFIRM_ACC85_PERSIST_23_100");
+    CHECK(has(out, "mode=PERSIST value=100") && has(out, "after85=100") && has(out, "lock=1/1") && has(out, "result=APPLIED"));
+    CHECK(s.writes == "85=100 55=0 85=100 55=1 " && s.values[55] == 1);
+    s.reject_85_locked = false;
+    router_test::servo_read_script = nullptr;
+  }
+  {  // 86 changed by the 85 write: FAILED, 85 put back, latch until reboot.
+    Fixture f;
+    router_test::servo_read_script = &s;
+    s.values[41] = 50; s.values[85] = 50; s.values[86] = 1; s.values[55] = 1; s.clobber_86_on_85 = true; s.writes.clear();
+    std::string out = f.command("@SERVO ACC FACTORY 23 100 VOLATILE CONFIRM_ACC85_23_100");
+    CHECK(has(out, "step=RESTORE85 reg=85 value=50") && has(out, "after85=50") && has(out, "result=FAILED_RESTORED"));
+    CHECK(has(f.command("@SERVO ACC SRAM 23 60"), "reason=EARLIER_FAILURE_REBOOT_REQUIRED"));
+    CHECK(has(f.command("@SERVO ACC STATUS"), "failed=YES"));
+    s.clobber_86_on_85 = false; s.values[86] = 1;
+    router_test::servo_read_script = nullptr;
+  }
+  {  // A write that arms torque: SAFE_OFF at once, then every ACC write refused.
+    Fixture f;
+    router_test::servo_read_script = &s;
+    s.values[40] = 0; s.values[41] = 50; s.arm_on_write = true; s.writes.clear();
+    std::string out = f.command("@SERVO ACC SRAM 23 60");
+    CHECK(has(out, "torque_after=1 safe_off=") && has(out, "result=TORQUE_NOT_OFF_SAFE_OFF") && s.values[40] == 0);
+    CHECK(has(f.command("@SERVO ACC SRAM 23 60"), "reason=EARLIER_FAILURE_REBOOT_REQUIRED"));
+    s.arm_on_write = false;
+    router_test::servo_read_script = nullptr;
+  }
+  {  // Another owner holds the actuators: refused, nothing written.
+    Fixture f;
+    AuthorityLease other;
+    CHECK(f.authority.request(ActuatorAuthority::CALIBRATION, OperatingMode::MAINTENANCE, &other) == AuthorityResult::GRANTED);
+    router_test::servo_read_script = &s;
+    s.writes.clear();
+    CHECK(has(f.command("@SERVO ACC SRAM 23 60"), "reason=ACTUATOR_OWNER_BUSY") && s.writes.empty());
+    router_test::servo_read_script = nullptr;
+    f.authority.release(other);
+  }
+  router_test::hardware_calls = hardware_before;
+  std::printf("@SERVO ACC: BACKUP read-only 78 regs, SRAM 41 clamp, 85 token/one servo/ACC41!=0/Lock/84-86 invariants, NOT_APPLIED, PERSIST unlock-write-relock, restore+latch, SAFE_OFF on arming, DIAGNOSTICS lease\n");
+}
+
 int main() {
   hostlink_motion_contract();
   source_identity_is_read_only();
@@ -712,6 +864,8 @@ int main() {
   valid_usb_framing_limits(); invalid_usb_lines_and_recovery(); usb_multiple_lines_and_begin_reset();
   wifi_commands_keep_safety_invariants();
   mode_changes_keep_actuators_closed();
+  servo_read_acc_registers();
+  servo_acc_diagnostic_procedure();
   std::printf("test_command_router_persistence: %d checks, %d failures\n", checks, failures);
   return failures ? 1 : 0;
 }

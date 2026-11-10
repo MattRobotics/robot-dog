@@ -1,5 +1,7 @@
 #pragma once
 #include <atomic>
+#include <algorithm>
+#include <cmath>
 #include <stdint.h>
 #include "../motion/MotionContract.h"
 #include "../motion/Gait.h"
@@ -10,34 +12,140 @@
 
 namespace matdog { namespace simple {
 constexpr uint32_t kPeriodUs=20000, kReadTimeoutMs=2;
-// WALK STANDARD: one gait law, three strides per cycle. Constant clock; C2
-// geometric stride ramps over one cycle at start and at WALK STOP; fore/aft
-// and lateral body offsets change only with four feet down.
-constexpr double kWalkPeriodS=6.5, kWalkDuty=.825, kWalkLiftM=.008;
-// Lower WALK posture stays in the existing HEIGHT joint box. The 2 mm
-// lateral sway leaves room for STOP and the recorded loaded HIP residuals.
-constexpr double kWalkHeightM=.120, kWalkSwayXM=.010, kWalkSwayYM=.002, kWalkStartCycles=1, kWalkStopCycles=1;
+// WALK STANDARD v2 (gait redesign 2026-11-08): one statically stable crawl
+// law (lateral sequence RH, RF, LH, LF), three strides per cycle, C2 stride
+// ramps over one cycle at start and at WALK STOP. Against v1.0.1 (duty .825,
+// 6.5 s, 30/45/60 mm, fore/aft sway 10 mm) three things change, each with
+// its offline cause (scripts/offline_motion/walk_tilt_envelope_check.cpp):
+// - the body walks kWalkComShiftXM ahead of the canonical foothold pattern.
+//   The URDF COM stands 9.4 mm behind the centre of the canonical WALK120
+//   contacts; centred, the stance stroke sits inside the kHeight joint range
+//   (front UPPER 31 ticks from its lower bound at 100 mm, v1.0.1 15 ticks at
+//   60 mm) and a 3 mm fore/aft sway keeps >= +2.5 mm static support through
+//   start, steady walk and every WALK STOP (v1.0.1 +0.9 mm);
+// - the swing foot moves with a trapezoidal velocity in thirds (kWalkSwingRamp):
+//   peak speed and acceleration 1.5x and 4.5x the mean against 1.875x and
+//   5.77x of the smootherstep, the binding joint-speed limit of a fast crawl.
+//   The last third decelerates toward the touchdown, where the front UPPER
+//   meets its kHeight lower bound: it lasts longer than the STOP arrest from
+//   the peak speed (1.5 v/a), so the STOP proof keeps its margin there (with
+//   ramps of 0.25 the IMU pitch-down envelope collapsed on that proof);
+// - duty .80 lengthens the swing; the start clock eases in over one second
+//   (walkClockS) and the final recentring takes kWalkSettleCycles, so the
+//   four-contact body moves stay inside the qualified drive.
+constexpr double kWalkPeriodS=5.0, kWalkDuty=.80, kWalkLiftM=.008;
+// Lower WALK posture stays in the existing HEIGHT joint box (HIP +/-25 mrad).
+// The HIP range is shared by the lateral sway, the IMU roll correction and the
+// STOP arrest: the 1.5 mm lateral transfer in a 0.25 s four-contact window
+// leaves >= 9 ticks for a STOP proved on a RAW secant one tick per period
+// pessimistic (2 mm left -1.7 ticks there: walk_tilt_envelope_check.cpp).
+constexpr double kWalkHeightM=.120, kWalkSwayXM=.003, kWalkSwayYM=.0015, kWalkStartCycles=1, kWalkStopCycles=1;
+constexpr double kWalkComShiftXM=.011, kWalkSwingRamp=1./3, kWalkSettleCycles=.10;
 static constexpr const collision::Box& kWalkBox=collision::kHeight;
-constexpr double kStrideM[]={.030,.045,.060};
-// JOYSTICK: the same WALK law steered in SE(2). Displacement per cycle inside
-// the ellipsoid (x/kJoystickStrideM)^2+(y/kJoystickLateralM)^2+(yaw/
-// kJoystickYawRad)^2 <= 1, each axis rate limited to full scale over two gait
-// cycles; swing targets are planned on that ramp. A steered walk keeps the
-// WALK height, duty, lift and stride ramps and differs from WALK STANDARD only
-// where lateral and turning steps need it: 14 mm lateral sway and stance
-// contact on the tread fillet (FootContact.h), inside its own certified joint
-// box kSteer and IMU tilt envelope. Offline, with the real fillet contacts and
-// the URDF COM, the binding support edge is the RF-LH diagonal while RH swings;
-// the lateral sway moves the COM away from it by ~0.75 mm per mm and tilts the
-// stance feet (hip roll), so 15 mm already leaves the fillet limit at the IMU
-// envelope boundary. At 14 mm steady commands keep >= +1.8 mm static support
-// and the random multi-axis set >= +0.5 mm, a static model margin, not a
-// dynamic stability claim (scripts/offline_motion/run_joystick_envelope.sh). The Controller
-// ends the walk with WALK STOP when no admitted joystick command arrives for
-// kJoystickTimeoutUs (ESP clock).
-constexpr double kJoystickStrideM=kStrideM[1], kJoystickLateralM=.020, kJoystickYawRad=.20, kJoystickRampCycles=2;
-constexpr double kJoystickSwayYM=.014;
+constexpr double kStrideM[]={.050,.075,.100};
+// Gait time of a walk clock started at rest: C2 ease of the rate 0->1 over the
+// first second (start and STOP recovery), then real time minus 0.5 s.
+inline double walkClockS(double t){const double u=std::fmin(1.,t);return t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5;}
+// The two walking laws (single definition for the firmware and offline tools).
+// WALK modes: see WalkModeSpec below.
+enum class WalkMode : uint8_t { SLOW, STANDARD, FAST };
+motion::GaitParameters walkGait(unsigned stride,WalkMode mode=WalkMode::SLOW);
+motion::GaitParameters steerGait(const double goal[3]);
+// JOYSTICK (dev.6 consolidation, one law). A joystick walk on the SLOW mode
+// runs the WALK STANDARD v2 law (walkGait: 5 s, duty .80, 11 mm COM shift,
+// trapezoidal swing, eased clock), steered in SE(2) by gaitRetarget, the fillet
+// contact always allowed (inside the nominal strip it changes no joint); on
+// STANDARD and FAST it walks forward on that mode's own law (walkGait), fore/aft
+// regime only (2026-11-10). Two regimes of the SLOW law differ only by their
+// certified region and IMU envelope:
+// - fore/aft: kHeight, kWalkTilt100, stride up to 100 mm (back kJoystickBackM),
+//   sway kWalkSwayYM;
+// - steered: kSteer, kSteerTilt (heading frame), stride <= kJoystickStrideM,
+//   lateral and yaw per cycle in the ellipsoid, sway by joystickSwayYM.
+// The regime changes inside the walk, at a release where the reference with its
+// applied correction already lies in the new region (regimeHandover): v2 frames
+// up to a 60 mm stride with the WALK sway are inside both boxes (kSteer >= 30
+// mrad, kHeight 14.2 mrad offline), so the box changes under an unchanged
+// reference. Fore/aft -> steered: the stride first retires to kJoystickStrideM,
+// lateral and yaw start after the handover; steered -> fore/aft: lateral, yaw
+// and sway retire first. No WALK STOP: only a fore/aft reversal still stops
+// (leg order). Offline (joystick gate, fillet contacts, URDF COM): with the v2
+// law the 14 mm steered sway fails the STOP proof (sway transfer in the 0.25 s
+// four-contact window, refused_by STOP_PLAN), 11-13 mm too in 18-28 of 42
+// scenarios; 10 mm passes; 7 mm or less gives negative static support. With
+// 10 mm, 24 seeded random sequences: lateral 25 mm/yaw .16 rad per cycle one
+// fault and p10 +0.37 mm of static support; lateral 20 mm/yaw .16 (4 mm/s,
+// 1.83 deg/s) no fault, p10 +0.63 mm; yaw .20 only +0.18 mm minimum.
+constexpr double kJoystickPeriodS=kWalkPeriodS, kJoystickSwayBaseYM=kWalkSwayYM;
+constexpr double kJoystickStrideM=.045, kJoystickLateralM=.020, kJoystickYawRad=.16, kJoystickRampCycles=2;
+// Steered lateral sway: a demand under kJoystickSwayOnDemand of the lateral/yaw
+// ellipsoid rises linearly from the base to kJoystickSwayLowM; from there any
+// lateral or turning intent takes the full kJoystickSwayYM until the demand falls
+// below kJoystickSwayOffDemand (hysteresis keyed on the current amplitude). The
+// amplitude changes only with four feet down (steerWalk), rate limited.
+constexpr double kJoystickSwayYM=.010, kJoystickSwayLowM=.005, kJoystickSwayOnDemand=.03, kJoystickSwayOffDemand=.015, kJoystickSwayRampCycles=.5;
+inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){
+  const double y=advanceYM/kJoystickLateralM,w=yawRad/kJoystickYawRad,s=std::sqrt(y*y+w*w);
+  if(s>=(currentSwayYM>kJoystickSwayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return kJoystickSwayYM;
+  return kJoystickSwayBaseYM+(kJoystickSwayLowM-kJoystickSwayBaseYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
+}
 constexpr uint64_t kJoystickTimeoutUs=1000000;
+// Fore/aft band (dev.5, ground HW 08/11/2026: a nearly forward stick carried
+// 0.1-0.4 mm/s of lateral, 3-13 % of the range, and took the full steered sway,
+// 28 mm p-p measured). A demand whose lateral and yaw part of the published
+// ellipsoid stays under kJoystickFrontalBand is fore/aft only, in either regime.
+// Stride increases ramp over kJoystickFrontalRampCycles for the full 100 mm
+// (offline 20 -> 100 mm: -2.91 mm of static support with 1 cycle, >= +0.83 with
+// 4); decreases over kJoystickFrontalDecelCycles (seeded fore/aft sequences:
+// -0.31 mm with 1 cycle, positive with 2). Backward
+// the v2 support window on a forward COM error is narrower (zero near +2.9 mm
+// at 50 mm against +3.6 mm forward at 100 mm), hence kJoystickBackM.
+constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontalRampCycles=4, kJoystickFrontalDecelCycles=2;
+// WALK STANDARD IMU tilt envelopes: inner convex polygons of the kHeight box,
+// gen-1 RAW, nominal support strip (including rounding) and the StopPlan over
+// the full phase set of walkGait (start, steady, every WALK STOP terminal and
+// recentring), by ray search (scripts/offline_motion/walk_tilt_envelope_check.cpp
+// --search: STOP proved on the worst-case RAW rounding of the motion, then
+// x0.85 for the runtime slew, T2 interpolation and late releases; the v1.0.1
+// law passes that check at every vertex of its own envelopes). Vertices are
+// roll/pitch BODY-in-support radians, not independent
+// rectangular limits or a claim of physical contact. kWalkTilt75 serves the
+// 50 and 75 mm strides, kWalkTilt100 the 100 mm stride.
+// dev.6 consolidation: the check now also proves the STOP secants of the T2
+// chord-midpoint references and 8 sub-period phases of the release grid. The
+// old kWalkTilt100 failed it (swing-end UPPER, c .464/.968: midpoint->exact
+// secant one tick faster, arrest 1.4 ticks outside kHeight), the rig's long
+// WALK100 faulted WALK_IK_OR_WORKSPACE/STOP_PLAN at cycle 19.5, and dev.4 on
+// the ground walked WALK100 with the correction on that pitch-down boundary.
+// kWalkTilt100 re-derived (pitch-down -18.7 -> -12.8 mrad, pitch-up 38.1 ->
+// 36.7); kWalkTilt75 passes unchanged.
+// compensationSafe refusal codes (imuRefusedBy), in check order.
+inline constexpr const char* kSafeChecks[]={"","POINT_SAFE","RAW_CONVERSION","RAW_BOX","LOAD_LIMIT","LOAD_BOX","LOAD_POINT","STOP_CLOCK","STOP_RATE","STOP_PLAN"};
+struct TiltVertex { double roll,pitch; };
+constexpr TiltVertex kWalkTilt75[]={{0.019019,0.000000},{0.019297,0.007993},{0.019700,0.019700},{0.019071,0.046042},{0.000000,0.066738},{-0.019000,0.045870},{-0.019700,0.019700},{-0.019297,0.007993},{-0.019019,0.000000},{-0.018722,-0.007755},{-0.018313,-0.018313},{-0.017392,-0.041987},{-0.000000,-0.081773},{0.017392,-0.041987},{0.018313,-0.018313},{0.018722,-0.007755}};
+constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.019678,0.019678},{0.012877,0.031088},{0.000000,0.036669},{-0.012877,0.031088},{-0.019678,0.019678},{-0.019297,0.007993},{-0.019019,0.000000},{-0.013430,-0.005563},{-0.008320,-0.008320},{-0.004336,-0.010468},{-0.000000,-0.012794},{0.004336,-0.010468},{0.008320,-0.008320},{0.013430,-0.005563}};
+// STANDARD and FAST (walk modes final, 2026-11-09): one envelope per mode for
+// its three presets. The geometric search (walk_tilt_envelope_check --mode 1|2
+// --stride 2 --search 16 --phases 8: STANDARD pitch-down -34.3, up +41.2, roll
+// +-18 mrad; FAST -52.7 / +41.3 / +-18) is not the runtime limit: with the
+// servo response model (run_servo_plant.sh: profile, latency, sag, ACC
+// capability above the bench-measured 50 drawn 6 000-15 000 step/s^2 times
+// load and voltage) the lagging stance legs make the support fit ask up to
+// -94 mrad after a STOP recovery, and the full polygons met STOP_PLAN with the
+// IMU at 0.9 of the pitch-down vertex (6/6 seeds) and POINT_SAFE at the
+// recovery start. Scaled down until none was left (6 seeds, WALK 90 s, 8 STOP
+// + recovery, IMU at the vertex; 11.1 and 9.6 V): STANDARD x0.5 (x0.65: one
+// POINT_SAFE), FAST x0.65. Each envelope rechecked on every preset (--stride
+// 0|1|2): PASS. STANDARD -17.1 / +20.6 / +-9.1, FAST -34.2 / +26.8 / +-11.8
+// mrad (SLOW100 -12.8; dev.4 on the ground asked -15 to -18 in WALK100).
+constexpr TiltVertex kStandardTilt[16]={{0.009136,0.000000},{0.009274,0.003841},{0.009478,0.009478},{0.008380,0.020231},{0.000000,0.020591},{-0.008380,0.020231},{-0.009498,0.009498},{-0.009289,0.003847},{-0.009136,0.000000},{-0.008987,-0.003723},{-0.008771,-0.008771},{-0.006111,-0.014753},{-0.000000,-0.017136},{0.006111,-0.014753},{0.008771,-0.008771},{0.008987,-0.003723}};
+constexpr TiltVertex kFastTilt[16]={{0.011837,0.000000},{0.012562,0.005203},{0.013663,0.013663},{0.011042,0.026656},{0.000000,0.026850},{-0.011042,0.026656},{-0.013663,0.013663},{-0.012562,0.005203},{-0.011837,0.000000},{-0.011122,-0.004607},{-0.010201,-0.010201},{-0.008215,-0.019833},{-0.000000,-0.034234},{0.008215,-0.019833},{0.010201,-0.010201},{0.011122,-0.004607}};
+// Steered IMU envelope (heading frame): inner convex envelope of kSteer, gen-1
+// RAW, the tread fillet up to kEdgeContactMaxTiltRad and STOP over the steered
+// phase set (offline rays, run_joystick_envelope.sh). Shared with the gate.
+// dev.6 one law (v2 parameters, 10 mm sway): pitch-up vertex .070 -> .055
+// (.060 still fails one ray at the 45 mm stride).
+constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.055},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
 // by at most kImuSlewMaxDtUs: no catch-up step after a pause.
@@ -71,6 +179,86 @@ struct Drive { uint16_t speed; uint8_t acc; };
 // STAND rc.10: register ceilings above the planner (above); inside the WALK
 // pair already used in operation. WALK retains the STANDARD reference's ceilings.
 constexpr Drive kStandDrive{480,13}, kWalkDrive{1000,50}, kCalibrationDrive{160,8};
+// Register 85 (the servo's ACC ceiling, factory 50, VOLATILE with the Lock
+// closed) is set to this on the 12 leg servos before each activation from
+// torque OFF and read back settled (Controller::prepareSimpleMotion): the
+// highest ACC of the drive table (FAST). Motion is given the LOWEST value read
+// back and refuses any command whose drive ACC is above it (stand(), and
+// selectWalkMode() during a walk): a failed write leaves the factory 50, so
+// STAND and SLOW only. kWalkModes static_asserts every drive under it.
+constexpr uint8_t kAccCeilingTarget=220;
+// STOP braking assumed by StopPlan (beginStop and the compensationSafe proof):
+// the RAM ACC of the commanded drive, never more than kStopBrakeAcc. ACC is the
+// servo's profile limit, not a deceleration it is known to reach (walk modes
+// 2026-11-09). Bench QC V6.1 RAW (500 Hz, 22 ST3215-C018, 11.1 V, no load,
+// ACC 50 commanded): acceleration 4 918 step/s^2 median (p10 4 795, the profile
+// is followed), arrival deceleration 9 231 median, p10 8 397. 84 (8 400) is that
+// measured unloaded braking; nothing above it is assumed, whatever the register
+// says. SLOW {1000,50} and STAND {480,13} keep their own ACC (unchanged). Loaded
+// braking is not measured: the stance joints' arrest deceleration is reported
+// apart by walk_support_check (stance arrest).
+constexpr uint8_t kStopBrakeAcc=84;
+inline double stopSpeedRadS(Drive d){return d.speed*kTickRad;}
+inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:kStopBrakeAcc)*100*kTickRad;}
+// WALK modes (final dev.6, 2026-11-09): the one WALK STANDARD v2 law at three
+// time scales, selected for the next walk and, since 2026-11-10, for a forward
+// walk in progress (selectWalkMode, volatile, SLOW at boot). SLOW is the law qualified on dev.4, bit for bit. Each mode has its
+// own three presets (strideM; the WALK command carries the preset index), so
+// no preset is refused. STANDARD and FAST: duty .825, asymmetric swing
+// (swingRampEnd .55: slower touchdown, where the front UPPER meets kHeight),
+// lower walk heights. Search (walk_support_check / walk_tilt_envelope_check
+// what-ifs, ~1 950 configurations: stride 75-120 mm, height 100-120 mm, duty
+// .80-.85, COM shift 11-17 mm, ramps, lift 6/8 mm, lateral sway 1-2 mm):
+// - the STOP proof at the measured braking (kStopBrakeAcc) binds on the
+//   front UPPER at swing end and, above ~34 mm/s, on the HIP dragged through
+//   the common arrest duration set by the fast swing UPPER (0.30 s);
+// - the STOP capture point falls with the speed: ~0 mm at 40 mm/s, <= 1.1 mm
+//   at 34-36 mm/s in every configuration that passes the STOP proof;
+// - lower heights give pitch authority but take HIP room (sag) and support.
+// Chosen with: STOP proof at kStopBrakeAcc, capture point and static support
+// not below SLOW (1.41 / 1.7 mm), HIP >= 8.7 ticks, envelopes kept by the
+// servo model. 40 mm/s is not reachable under these conditions; 32 mm/s is.
+// Offline (rigid ground, URDF COM, ideal tracking), top preset:
+//                          SLOW 100 mm  STANDARD 90 mm  FAST 80 mm
+//   period, speed          5.0 s 20     3.0 s 30        2.5 s 32 mm/s
+//   height, lift, sway y   120 8 1.5    110 8 1.5       105 6 1.0 mm
+//   swing joint peak       1.275 5.81   2.207 21.0      2.350 26.4 rad/s, rad/s^2
+//   stance (loaded) peak   0.61 5.81    0.77 7.31       0.87 10.8
+//   static support         2.12         2.18            1.71 mm
+//   STOP capture point     1.41         1.69            1.41 mm
+//   kHeight margin HIP     9.3          8.7             11.1 ticks
+// RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
+// keeps {1000,50}. The joystick walks forward on the selected mode's law (its
+// top speed is full scale); steering and backward walking exist on the SLOW
+// law only (its steered envelopes and backward stride are certified there).
+// STANDARD and FAST: IMPLEMENTED, NOT HARDWARE QUALIFIED.
+// Mode change inside a walk (stepWalkMode, 2026-11-10): the law moves on the
+// release grid, never through WALK STOP. Clock rate and stride stay within the
+// slower of the two laws until the law shape (duty, swing profile, lift)
+// changes, at the first release of a four-contact window (no foot in flight
+// under either duty) with the applied correction inside the target envelope.
+// Height and lateral sway (four feet down) between the two laws are walked
+// with the faster law's shape (designed for the lower body: the kHeight HIP
+// room grows with the height) at the slower law's clock; a slower law's shape
+// only at its own height; a smaller sway at once, a larger one only with the
+// target's own shape and height; a law's own clock only with its own shape,
+// height and sway (offline servo-plant pairs 10/11: a shape below its own
+// height or a sway grown early lost HIP room, STOP_MEASURED_OUTSIDE_BOX). The
+// drive is the faster mode's until the clock has the target's rate. Clock rate 0.1 cycle/s per s (SLOW
+// 0.2 -> FAST 0.4 in 2 s), height 2 mm/s (120 -> 105 mm in 7.5 s), lateral sway
+// 4 mm per cycle; the stride keeps the joystick's fore/aft ramps
+// (kJoystickFrontalRampCycles up, kJoystickFrontalDecelCycles down).
+constexpr double kWalkModeRateSlope=.1, kWalkModeHeightRate=.002, kWalkModeSwayRate=.004;
+using TiltPolygon=TiltVertex[16];
+struct WalkModeSpec {
+  const char* name; double periodS,duty,heightM,swayXM,swingRamp,swingRampEnd; Drive drive;
+  double strideM[3];                       // the three WALK presets of this mode (index 2: top speed)
+  double liftM,swayYM;
+  const TiltPolygon *tiltShort,*tiltTop;  // IMU envelope of presets 0-1 and of preset 2
+  bool hardwareQualified;
+};
+const WalkModeSpec& walkModeSpec(WalkMode);
+bool parseWalkMode(const char*,WalkMode&);
 // PRONE ends at rest (dev.15): after the verified PRONE_LAND arrival the
 // ordinary SAFE_OFF releases the torque (STOPPED, then READY, reason PRONE_REST).
 enum class State : uint8_t { READY, MOVING, STANDING, WALKING, STOPPED, FAULT };
@@ -114,6 +302,8 @@ struct Inputs {
   uint32_t bmsAgeMs=UINT32_MAX;
   uint64_t imuStampUs=0; double quaternion[4]{1,0,0,0};
   double minRad[12]{},maxRad[12]{};
+  // Lowest register 85 read back on the 12 leg servos at this activation (0: not verified).
+  uint8_t accCeiling=0;
 };
 // LOADDIAG evidence only: Motion state at the first exit (fault or STOP) of
 // the latest accepted command, frozen before SAFE_OFF. Never read by Motion.
@@ -124,12 +314,19 @@ struct ExitSnapshot {
   uint32_t releases=0,missed=0; unsigned lastPolled=12; Drive drive{0,0};
   uint16_t commandedRaw[12]{}; Feedback fb[12]{};
   uint16_t loadedMask=0; const char* loadedPhase="";
+  // First cause of a refused levelled reference (dev.6 consolidation): the
+  // compensationSafe check of that release, the walk clock and law, and the
+  // IMU correction enterOff resets right after.
+  uint8_t refusedBy=0,walkMode=0; bool nominalSolved=false,steered=false; const char* imuReason="";  // walkMode: of the walk (WalkMode)
+  double cycles=0,roll=0,pitch=0,wantedRoll=0,wantedPitch=0,advance[3]{};
 };
 class SimpleMotion {
  public:
   void begin(ServoPort* p,bool powered=true) { port_=p; if(powered)enterOff(false,"BOOTING");else reason_="USB_ONLY"; }
   void inputs(const Inputs& i) { input_=i; }
-  const char* stand(double height,uint64_t now);
+  // acc: the highest drive ACC the command will use (STAND's, or its WALK
+  // mode's), refused above the verified register 85 (Inputs::accCeiling).
+  const char* stand(double height,uint64_t now,uint8_t acc=kStandDrive.acc);
   // Descent to the PRONE terminal, then rest with torque OFF (proneRest). Arrival
   // is not proof of ventral or passive support.
   const char* prone(uint64_t now);
@@ -172,9 +369,29 @@ class SimpleMotion {
   double requestedHeightM() const { return requestedHeight_; }
   double walkCycles() const { return cycles_; }
   // Fore/aft body velocity of the walking law (m/s), not a measurement.
-  double walkVelocityX() const { return phase_==Phase::WALK?gait_.advanceXM/kWalkPeriodS:0; }
-  double walkVelocityY() const { return phase_==Phase::WALK?gait_.advanceYM/kWalkPeriodS:0; }
-  double walkYawRate() const { return phase_==Phase::WALK?gait_.yawRad/kWalkPeriodS:0; }
+  double walkVelocityX() const { return phase_==Phase::WALK?gait_.advanceXM/period():0; }
+  double walkVelocityY() const { return phase_==Phase::WALK?gait_.advanceYM/period():0; }
+  double walkYawRate() const { return phase_==Phase::WALK?gait_.yawRad/period():0; }
+  // Gait period of the current (or last) walk: its WALK mode's, between two
+  // modes' while the walk changes mode (stepWalkMode). The regime (fore/aft,
+  // steered) never changes it.
+  double period() const { return walkPeriod_; }
+  // WALK mode selection (volatile, SLOW at boot): the next walk's and, while a
+  // walk can change its law (walkModeLive), that walk's too: it moves to the
+  // mode progressively (stepWalkMode) with torque, authority and gait phase
+  // kept. During a walk a mode whose drive ACC is above the verified register
+  // 85 is refused. WALK STOP, a STOP and its recovery keep the law they have.
+  const char* selectWalkMode(WalkMode m);
+  WalkMode selectedWalkMode() const { return selectedMode_; }
+  WalkMode walkMode() const { return walkMode_; }  // law shape of the current (or last) walk
+  WalkMode walkTarget() const { return walkTarget_; }  // the mode that walk moves to (walkMode() when none)
+  // A forward walk (WALK, or a joystick walk neither steered nor backward), not
+  // stopping: its law follows the selected WALK mode.
+  bool walkModeLive() const { return phase_==Phase::WALK&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&!steered_; }
+  double walkHeightM() const { return walkHeight_; }  // nominal height of that walk's law
+  // Gait time t s after the start: eased in (walkClockS, its first four-contact
+  // window carries the COM offset).
+  double walkClock(double t) const { return walkClockS(t); }
   // A joystick intent holds the walk: walking or rising to walk, not stopping.
   bool joystickActive() const { return joystick_&&(walkRequested_||(state_==State::WALKING&&!walkStopping_)); }
   uint32_t releases() const { return releases_; }
@@ -188,6 +405,12 @@ class SimpleMotion {
   // ATTENUATED, WORKSPACE, SUPPORT_FIT or IMU_STALE; requested and applied
   // body roll/pitch (rad). Values of the latest compensation, never re-solved.
   const char* imuReason() const { return imuReason_; }
+  // dev.5 diagnostics, read-only. The compensationSafe check that refused last
+  // in this release (kSafeChecks; 0 none): the first divergence behind WORKSPACE.
+  uint8_t imuRefusedBy() const { return safeRefusal_; }
+  // Measured joint farthest outside the entry region (12 when inside or not
+  // fresh) and its signed distance (rad, < 0 under the low bound).
+  unsigned entryViolation(uint64_t now,double& outsideRad) const;
   double imuWanted(unsigned i) const { return imuWanted_[i&1]; }
   double imuApplied(unsigned i) const { return (i&1?pitchCorrection_:rollCorrection_)*correctionScale_; }
   uint64_t nextReleaseUs() const { return nextUs_; }
@@ -230,6 +453,10 @@ class SimpleMotion {
   bool frameTimed(const uint16_t raw[12],Drive);
   bool planInitialReference();
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
+  // Pre-actuation refusal of the measured entry pose (torque never enabled):
+  // SAFE_OFF re-verified, no latch; READY again only through entryReadmitted.
+  void refuseEntry();
+  bool entryReadmitted(uint64_t now);
   bool pointSafe(const motion::JointTargetFrame&) const;
   bool transitionSafe(const motion::JointTargetFrame&,const motion::JointTargetFrame&,const collision::Box&) const;
   bool send(const motion::JointTargetFrame&,Drive,uint64_t,bool holdReference=false);
@@ -268,6 +495,10 @@ class SimpleMotion {
   motion::JointTargetFrame measured() const;
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
+  // T2: the nominal frame of this release, written into the caller's frame
+  // (target.valid false when a solve failed). Solves go through solveGaitInto
+  // so the loop task stack never holds a temporary frame.
+  void nominalRelease(motion::LocomotionFrame&,const motion::GaitParameters&,double terminal,bool clockDone);
   void compensate(motion::LocomotionFrame&,uint64_t);
   double slewStep(uint64_t now,uint64_t maxDtUs=kImuSlewMaxDtUs);
   motion::JointTargetFrame compensationTarget(const motion::LocomotionFrame&,const motion::BodyPose&,const motion::JointTargetFrame&,bool nominalStrip=false,double edgeTilt=0);
@@ -275,7 +506,19 @@ class SimpleMotion {
   void compensateLevel(motion::LocomotionFrame&,const motion::Vector3&,uint64_t,bool unwind=false);
   void startWalk(uint64_t);
   void steerWalk(uint64_t);
-  bool limitWalkTilt(double& roll,double& pitch) const;
+  // One release of a WALK mode change (walkModeLive): the walk clock's eased time now.
+  void stepWalkMode(double eased);
+  // Displacement per cycle of the latest JOYSTICK demand on one law.
+  void joystickGoal(bool frontal,double goal[3]) const;
+  // The joystick regime may change only where the issued reference, with its
+  // applied level correction, already lies in the other region (box, envelope).
+  bool regimeHandover(bool toSteered) const;
+  // The steered IMU envelope is active: steered regime, not returning to fore/aft
+  // (lateral, yaw and sway retired for a fore/aft demand). Single source for
+  // limitWalkTilt and the offline envelope gate.
+  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM); }
+  bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
+  const TiltPolygon& pendingWalkTilt() const;  // fore/aft envelope of the walk startWalk would start
   const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
   void serviceOff();
   bool serviceStop();
@@ -294,7 +537,8 @@ class SimpleMotion {
   const char* holdReason_=nullptr; // automatic support hold (PRONE not completed); null for an operator STOP
   State state_=State::STOPPED; Phase phase_=Phase::IDLE;
   const char* reason_="BOOTING";
-  bool operatorStopped_=false,proneRest_=false;
+  bool operatorStopped_=false,proneRest_=false,entryRefused_=false;
+  uint64_t entrySinceUs_=0; // start of the current continuous re-admission evidence
   bool stopActive_=false,stopVerified_=false,stopIo_=false,stopFrame_=false,readInterrupted_=false;
   const uint16_t* stopRaw_=nullptr;
   Drive stopDrive_=kStandDrive;
@@ -305,8 +549,11 @@ class SimpleMotion {
   Phase stopOrigin_=Phase::IDLE;
   // Writer-owned samples of the accepted RAW reference (including unchanged
   // held goals). Timestamped with the ESP clock after TX, not release entry.
-  uint16_t previousRaw_[12]{};
-  uint64_t issuedUs_=0,previousUs_=0;
+  // Two accepted references before the current one: the STOP reference rate
+  // is a secant over a window of at least one release period (rateFromHistory).
+  uint16_t previousRaw_[12]{},previous2Raw_[12]{};
+  uint64_t issuedUs_=0,previousUs_=0,previous2Us_=0;
+  bool rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const;
   Phase issuedPhase_=Phase::IDLE;
   bool issuedPlanned_=false;
   bool energized_=false,offPending_=false,offSent_=false,faultLatched_=false;
@@ -336,7 +583,7 @@ class SimpleMotion {
   // nominal target. Alternate WALK/HOLD releases reuse it on the new nominal
   // target; compensationSafe still runs on every release.
   motion::JointTargetFrame reuseOffset_{};Phase reusePhase_=Phase::IDLE;uint64_t reuseUs_=0;
-  double reuseGait_[3]{};bool reuseLight_=false,reuseSettled_=false;
+  bool reuseLight_=false,reuseSettled_=false;
   void rememberCorrection(const motion::JointTargetFrame& accepted,const motion::JointTargetFrame& nominal,uint64_t now);
 public:
   struct ReuseStats { uint32_t light=0,full=0,rejected=0; double maxShadowRad=0; };
@@ -355,17 +602,61 @@ private:
   motion::GaitParameters gait_{};
   motion::GaitTrack track_{};
   bool joystick_=false,steered_=false;
-  double joystickGoal_[3]{},steeredCycles_=0;  // displacement per cycle: x, y (m), yaw (rad)
+  double joystickVel_[3]{},steeredCycles_=0;  // latest admitted demand: vx, vy (m/s), yaw rate (rad/s)
+  bool joystickFrontal_=false;  // that demand is fore/aft only (kJoystickFrontalBand)
+  double regimeSinceCycles_=-1;  // gait cycle since which a regime handover precondition holds (-1: none)
   uint64_t joystickDeadlineUs_=0;
   motion::LocomotionFrame walkPrevious_{};
+  // T2 (motion-perf-next): the walking law is solved exactly at release grid
+  // points two periods apart (one solve every other release) and every
+  // release sends the joint-space linear interpolation of the two solutions
+  // that bracket its own clock, so the reference is the law at `now` as in
+  // v1.0.1 (the RAW secant STOP and compensationSafe read stays consistent
+  // with wall time under late releases). Every release still runs pointSafe,
+  // the WALK box, RAW, loaded and STOP proofs on what it sends. A structural
+  // change of the law (terminal, STOP recovery, end of the clock) or a grid
+  // point outside the bracket rebuilds both solutions; steerWalk retargets
+  // stay continuous by construction and are tolerated.
+  motion::LocomotionFrame walkExact_{},walkAhead_{};
+  uint64_t walkExactUs_=0,walkExactGridUs_=0,walkAheadUs_=0;double walkExactTerminal_=-1;  // exact solve time, its grid point, look-ahead time
+  motion::GaitParameters walkExactGait_{},walkAheadGait_{};  // laws at the two exact samples (shape check; shadow compare)
+  bool walkAheadValid_=false,nominalSolved_=true;  // nominalSolved_: this release paid a nominal IK solve
+  void resetLookahead(){walkAheadValid_=false;walkExactUs_=0;nominalSolved_=true;
+#ifdef MATDOG_T2_SHADOW
+    shadowTrack_=track_;
+#endif
+  }
+  void lerpFrame(motion::LocomotionFrame&,double u,const motion::GaitParameters&,double terminal) const;
+#ifdef MATDOG_T2_SHADOW
+  motion::GaitTrack shadowTrack_{};  // test builds: the law's track sampled at every release clock
+#endif
+public:
+  // exact: releases that solved the law; interp: releases that only
+  // interpolated; resync: exact solutions rebuilt (start, missed release,
+  // WALK STOP terminal). maxShadowRad (MATDOG_T2_SHADOW builds): largest
+  // joint difference between the sent reference and the exact solve at the
+  // release clock on the law's own track (v1.0.1 sampling).
+  struct LookaheadStats { uint32_t exact=0,interp=0,resync=0; double maxShadowRad=0; };
+  const LookaheadStats& lookaheadStats() const { return lookaheadStats_; }
+private:
+  LookaheadStats lookaheadStats_{};
   motion::LocomotionFrame holdNominal_{};
   uint64_t walkStartUs_=0;
   double cycles_=0,stopCycle_=-1;
   // Explicit STAND after a verified WALK STOP: the same gait completes its WALK STOP
   // from the stopped phase. Clock eased in from rest; the held RAW offset fades out.
   bool walkRecover_=false; double recoverCycles_=0; uint64_t recoverUs_=0; motion::JointTargetFrame recoverOffset_{};
+  WalkMode selectedMode_=WalkMode::SLOW,pendingMode_=WalkMode::SLOW,walkMode_=WalkMode::SLOW,walkTarget_=WalkMode::SLOW;  // selected, latched by walk()/drive(), the walk's law shape, its destination
+  // Walk clock: cycles_=clockCycles_+(walkClock-clockEased_)/walkPeriod_, re-based
+  // only when stepWalkMode changes the period (otherwise walkClock/period as
+  // before). modeEased_: eased time of the last mode step. walkHeight_: nominal
+  // height of the law. walkDrive_: what the walk sends (the faster mode's while
+  // the law changes mode).
+  double walkPeriod_=kWalkPeriodS,clockCycles_=0,clockEased_=0,modeEased_=0,walkHeight_=kWalkHeightM;
+  Drive walkDrive_=kWalkDrive;
   bool walkStopping_=false,imuLimited_=false;
   double rollCorrection_=0,pitchCorrection_=0,correctionScale_=0;
   const char* imuReason_="IMU_STALE";double imuWanted_[2]{};
+  mutable uint8_t safeRefusal_=0;
 };
 } }

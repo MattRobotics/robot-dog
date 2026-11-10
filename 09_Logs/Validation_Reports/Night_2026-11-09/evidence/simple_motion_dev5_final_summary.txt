@@ -1,0 +1,27 @@
+PRONE REST PASS: automatic torque OFF only after the verified terminal, STOP latch kept, STAND from the settled pose through ACQUIRE/ENABLE; passive support NOT validated
+entry recovery: refusal -> STOPPED (no frame, no enable, torque OFF), ACK ABORTED, STOP keeps it, repositioned HW pose READY after 78 releases, aborted STAND not run, new STAND reaches STANDING
+entry recovery negative 'feedback lost': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery negative 'one joint 2 ticks outside kEntry': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery negative 'servo still moving': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery negative 'moving backwards (sign bit)': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery negative 'unexpected torque': STOPPED for 288 releases, READY 106 releases after it ended
+entry recovery negative 'servo status alarm': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery negative 'servo 70 C': STOPPED for 288 releases, READY 70 releases after it ended
+entry recovery negative 'voltage 3.9 V': STOPPED for 288 releases, READY 76 releases after it ended
+entry recovery: crossing an uncertified region and a 36-release pass through PRONE_ENTRY never READY; final placement READY after 76 releases
+refusal diagnostics: HOLD 150 under 0.2 rad of board roll, WORKSPACE refused_by STOP_PLAN
+ENTRY RECOVERY PASS: pre-actuation refusal recoverable without STOP/reset/KEY OFF, only on legitimate ACQUIRE evidence; other faults and the SAFE_OFF latch unchanged
+production closed-loop STAND board plant PASS: quantized 0.1s servo lag, signed/combined/slow tilt, saturation reversal, flat return, stale IMU, height/PRONE unwind, STOP and explicit STAND; no hardware stability claim
+T2 look-ahead: alternation, missed-release and WALK STOP re-sync, STOP on both release kinds, retarget tolerance PASS (software only)
+P1 STOP rate history: span >= one period on the grid, zero rate on identical RAW, fail-closed on stale history, first references, STAND resume fallback PASS (software only)
+steered sway map: low band <= 5 mm up to 2.9 %, 14 mm from 3.3 % with release under 1.5 %, amplitude changes only with four feet down; new walk under the fore/aft band = WALK STANDARD sway PASS (software only)
+steered tilt envelope: heading-frame projection, identity bit for bit, 90 deg heading maps pitch to the roll vertex PASS (software only)
+STOP->WALK: STOP in WALK/HOLD/HEIGHT then WALK STANDARD through the STAND-after-STOP admission and resume routes, stride applied at HOLD, refusals unchanged PASS (offline)
+JOYSTICK fore/aft with the recorded touch jitter: WALK STANDARD law, body lateral excursion 1.50 mm (sway 1.5 mm), no WALK STOP
+JOYSTICK fore/aft stride changes: 0.000100 m per release (limit 0.000100), max RAW step 16 ticks/release
+JOYSTICK PASS: vx/vy/yaw_rate sign and SE(2) proportionality, ellipsoid saturation, neutral WALK STOP, ESP deadline, rising timeout, fore/aft reversal via WALK STOP only when mostly backward, per-axis rate limits and RAW continuity, SE(2) track == closed-form law, STOP and STAND recovery, IMU board; software only, NO HARDWARE MOTION VALIDATION
+H1 steered settle unwind route 0: settle correction +0.0641/-0.0661 rad (max over 2 settles 0.0661), 156 retired unwind steps, PRONE_REST
+H1 steered settle unwind route 1: settle correction +0.0641/-0.0661 rad (max over 1 settles 0.0661), 119 retired unwind steps, PRONE_REST
+WALK profile entry STOP and production closed-loop board tests PASS; no hardware contact/stability qualification
+TX latency 7 ms / alternating 0-7 ms / late releases: WALK45/60 pre-check, STOP in WALK and long HOLD PASS (software timing only)
+PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION

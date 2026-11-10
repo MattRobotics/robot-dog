@@ -74,8 +74,69 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   recovery, fixed dashboard slots and joystick anchor, Twin after a reload
 //   with torque ON, WALK STANDARD directly after a verified STOP, Motion
 //   Cockpit and Twin view cube; pre-flash: dashboard joystick commands
-//   admitted in page-session order only.
-constexpr const char* kFirmwareVersion = "1.0.1-dev.17"; // Offline candidate; hardware qualification pending
+//   admitted in page-session order only. Released unchanged as Stable v1.0.1.
+// 1.0.2-dev.1: v1.0.1 + Motion release budget (A1 position-only gait
+//   sampling, A2 exact analytic IK savings, T2 look-ahead nominal gait on
+//   alternate WALK releases, T1b retarget-tolerant IMU correction reuse);
+//   gait law, geometry, boxes, calibration, STOP and drive profile unchanged.
+//   Identity proposed by the motion-perf-next branch, to be agreed before any
+//   flash; the installed firmware stays 1.0.1-dev.17 (APP 14e055a0...).
+// 1.0.2-dev.2: 1.0.2-dev.1 + WALK STANDARD v2 (gait redesign): COM-centred
+//   crawl, duty .80, trapezoidal swing velocity, 50/75/100 mm per 5 s cycle
+//   (10/15/20 mm/s) with the qualified drive {1000,50} and the kHeight box;
+//   eased walk start clock; IMU tilt envelopes recomputed; JOYSTICK law,
+//   geometry, boxes, calibration, STOP unchanged. Offline candidate.
+// 1.0.2-dev.3: 1.0.2-dev.2 + pre-flash fixes: late T2 resync anchored to its
+//   grid point, StopPlan search start (same plans), dynamic joystick (a mainly
+//   lateral/yaw demand never reverses; the page holds the stick through late
+//   polls and through a reversal). Gait law, envelopes, geometry, boxes,
+//   calibration, STOP and drive unchanged. Offline candidate.
+// 1.0.2-dev.4: 1.0.2-dev.3 + H1-RCA fix: the HEIGHT/PRONE_HEIGHT unwind of a
+//   level correction accepted by a steered WALK_SETTLE in the fillet edge
+//   model is solved in that model (dev.3 hardware: NATIVE_TARGET_NOT_REACHED
+//   on the joystick restart after a reversal). Everything else unchanged.
+// 1.0.2-dev.5: 1.0.2-dev.4 (installed, VH on fixture and floor 08/11) + a
+//   refused entry pose recoverable without power cycle (READY again on the
+//   ACQUIRE evidence, no movement); fore/aft joystick on the WALK STANDARD v2
+//   law (up to 20 mm/s forward, 10 mm/s backward, touch jitter never steers);
+//   in-place HTTP response reset (loop stack worst path -7 KB); refusal and
+//   entry diagnostics. Steered law, boxes, envelopes, geometry, calibration,
+//   STOP and drive {1000,50} unchanged. Offline candidate.
+// 1.0.2-dev.6 (consolidated 2026-11-09, supersedes the 2c53ecf dev.6 build):
+//   one continuous joystick law (fore/aft and steered regimes hand over
+//   without WALK STOP; only a fore/aft reversal stops); WALK100 STOP proof
+//   with the T2 midpoints (kWalkTilt100 re-derived, held correction on a
+//   refused WALK step); first-exit cause in @MOTION DIAG. Geometry, URDF,
+//   calibration, limits, STOP/SAFE_OFF and drive {1000,50} unchanged.
+//   Walk-modes addendum (same version string, new build): WALK modes SLOW
+//   (the law above, default at boot), STANDARD (75 mm, 3.0 s, {1500,140}) and
+//   FAST (75 mm, 2.5 s, 110 mm, {1900,190}), selected by GAIT.SELECT for the
+//   next walk; StopPlan braking capped at the measured 8 400 step/s^2 (SLOW
+//   and STAND unchanged); joystick SLOW. STANDARD/FAST not hardware qualified.
+//   Final dev.6 (same version string, new build): per-mode presets, STANDARD
+//   60/75/90 mm at 3.0 s (30 mm/s, 110 mm, {1800,180}), FAST 60/70/80 mm at
+//   2.5 s (32 mm/s, 105 mm, lift 6 mm, sway 1 mm, {1950,220}); IMU envelopes
+//   kept by the servo response model. Technical closure (same version
+//   string, new build): a walk starts only inside its own IMU envelope
+//   (STANDARD recovery fault RCA); dashboard: one speed selector SLOW 20 /
+//   STANDARD 25 / FAST 32 mm/s ordered after GAIT.SELECT. Installed 09/11
+//   (70abcff); trace 44: its first STANDARD frame faulted SYNC_WRITE_FAILED,
+//   the ServoBus drive gate refused {1800,180}. Trace-44 fix (same version
+//   string, new build): the gate admits the STANDARD/FAST pairs {1800,180} and
+//   {1950,220} too; WALK speed selector readable in the narrow cockpit.
+//   Installed 09/11 (dd76fad); trace 45: ACC 180 written, 50 stored in
+//   register 41. ACC diagnostic (same version string, new build): the
+//   MAINTENANCE/idle-gated @SERVO READ also prints registers 40, 41, 85 and
+//   86, read-only, as separate 1-byte reads. Installed 09/11 (975fe51): 85 =
+//   50, 86 = 1 on 12/12. ACC causal test (same version string, new build):
+//   @SERVO ACC BACKUP / SRAM 41 / register 85 on one servo behind a token,
+//   MAINTENANCE, idle, torque OFF. Installed 10/11 (1fbee7b): register 85 is
+//   the ACC ceiling, VOLATILE. Operational ACC 220 (same version string, new
+//   build): register 85 set to 220 before every activation, Motion bounded by
+//   the lowest value read back; WALK mode change during a walk; the joystick
+//   on the selected mode, a selection with the stick held never dropped
+//   (final audit). Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

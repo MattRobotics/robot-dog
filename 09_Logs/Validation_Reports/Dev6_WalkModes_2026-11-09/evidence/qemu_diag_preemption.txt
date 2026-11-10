@@ -1,0 +1,3 @@
+DIAG_PREEMPTION preemptor=0 releases=40 wall_us=730720 other_tasks_us=0 share=0.000
+DIAG_PREEMPTION preemptor=1 releases=40 wall_us=736009 other_tasks_us=222795 share=0.303
+DONE

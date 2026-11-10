@@ -1,0 +1,10 @@
+HOLD100 tilted   n= 650 trig mean/max=  56.3/ 106  inv-trig=  8.9/ 15  sqrt=  31.1/  80  hypot=  0.0 rem=  0.0 floor=  0.5 | libm mean=  96.8 | host_us mean=  5.7 max=  35.7 | work max solves=1 ik=4 newton=4 fk=11
+HOLD100 tilted   libm per release p50=177 p90=177 p99=196 max=202
+WALK75 tilted    n= 975 trig mean/max= 128.1/ 260  inv-trig= 30.9/ 57  sqrt=  62.2/ 122  hypot= 10.0 rem=  2.5 floor= 10.0 | libm mean= 243.8 | host_us mean= 13.8 max= 114.0 | work max solves=1 ik=4 newton=8 fk=15
+WALK75 tilted    libm per release p50=231 p90=272 p99=467 max=479
+WALK100 tilted   n= 975 trig mean/max= 121.9/ 260  inv-trig= 30.2/ 57  sqrt=  59.7/ 120  hypot= 10.0 rem=  2.5 floor= 10.0 | libm mean= 234.3 | host_us mean= 13.4 max=  89.6 | work max solves=1 ik=4 newton=8 fk=15
+WALK100 tilted   libm per release p50=231 p90=245 p99=430 max=473
+JOYSTICK tilted  n= 975 trig mean/max= 182.0/ 522  inv-trig= 36.5/105  sqrt=  64.2/ 191  hypot= 11.5 rem=  2.8 floor= 10.0 | libm mean= 307.0 | host_us mean= 15.5 max=  79.6 | work max solves=1 ik=8 newton=12 fk=23
+JOYSTICK tilted  libm per release p50=269 p90=433 p99=822 max=879
+JOY fore/aft jit n= 975 trig mean/max= 119.6/ 222  inv-trig= 29.9/ 54  sqrt=  53.3/ 108  hypot= 10.0 rem=  2.5 floor= 10.0 | libm mean= 225.4 | host_us mean= 19.6 max=6185.7 | work max solves=1 ik=4 newton=8 fk=15
+JOY fore/aft jit libm per release p50=225 p90=237 p99=390 max=396
