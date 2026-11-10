@@ -43,6 +43,7 @@ SimpleMotion fed by the twin).
 | `fw_bridge/` | `build.sh`, `fk_reference.cpp`, `export_sequences.cpp`, `cosim.cpp`, `rig_record.h` (shared record columns) |
 | `requirements.txt`, `setup_venv.sh` | pinned environment |
 | `PROVENANCE.md` | firmware sources used (identical in `ae70e03` and `450d2c793dcb`), input and hardware-data hashes |
+| `REPORT_M5.md` | M5 final report: the 450d2c7 hardware session (provenance, reconciliation with its `REPORT_HW_SESSION.md`), HW/SIM comparison on the fixture and on the ground, residual discrepancies |
 
 ## Runs
 
@@ -69,6 +70,7 @@ $PY m5_imu_tilt.py <ground trace.json | session dir ...> [--from S]             
 cd 06_Software/Matdog_MuJoCo; PY=~/MATDOG/tools/mujoco-venv/bin/python
 $PY view.py --list                                   # catalog (data: $MATDOG_TWIN_DATA)
 $PY view.py stop_fuori_box modi stand150             # desktop viewer on the ASUS (X11)
+$PY view.py m5_terra_fast_stop m5_fixture_fast_stop # M5: hardware samples [HW] on the twin's replay
 MUJOCO_GL=egl $PY view.py stop_fuori_box --mp4 out.mp4 --start 9 --end 16.5 --fps 25
 ./demo.sh <out dir>                                  # the whole demo, no display needed
 ```
@@ -86,8 +88,11 @@ MuJoCo, [FW] production SimpleMotion output, [HW] measured on the robot, [IPOTES
   modelled); other links collide with the floor only through their convex hulls; no self-collision.
 - Floor rigid and level, friction 0.8 (hypothesis), MuJoCo soft contact.
 - The servo model is identified unloaded at ≤ 600 step/s and ACC ≤ 50; loaded braking, ACC 180/220
-  dynamics, load-dependent gear friction and the internal speed loop are not measured.
+  dynamics, load-dependent gear friction and the internal speed loop are not measured. Compared, not
+  refitted, with the 450d2c7 fixture runs (unloaded, 1000–1950 step/s, ACC 50–220): paired error RMSE
+  3.8–10.4 ticks; under load on the ground the twin carries ~1.9x the hardware duty (`REPORT_M5.md`).
 - Open-loop replays carry the scripted rig's references (with its level-IMU artifact: use the
   `imufollows_*` sequences or the closed loop for representative runs). In the closed loop
   SimpleMotion polls two servos per release (each every 120 ms) as on the robot; reads see the
-  state at the release boundary without bus latency and the IMU is the exact base orientation.
+  state at the release boundary without bus latency and the IMU is the exact base orientation
+  (`m5_compare.py --variant imu_mount` rotates it by the pitch offset measured on the ground; not default).
