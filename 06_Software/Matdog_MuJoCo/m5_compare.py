@@ -73,7 +73,7 @@ def walk_phase_at(snaps, t_ms):
 def events(snaps, cmds, mode):
     """cosim events and, per event, the index of the hardware command it replays: in-walk commands on
     walk_cycles, the others on the delay from the previous command (the first after LEAD_S)."""
-    out, owner = [], []
+    out, owner, selected = [], [], None
     for k, c in enumerate(cmds):
         wc = walk_phase_at(snaps, c["t_ms"])
         when = ("cycles", wc) if wc is not None else (LEAD_S if k == 0 else ("after", (c["t_ms"] - cmds[k - 1]["t_ms"]) / 1e3))
@@ -83,15 +83,19 @@ def events(snaps, cmds, mode):
             m = (before[-1]["selected"] if before else None) or mode
             words = (c["label"] or "").split()
             preset = STRIDES_MM[m].index(int(words[2])) if len(words) >= 4 and words[2].isdigit() else 2
-            add = [(when, f"SELECT {m}"), (("after", 0.0), f"WALK {preset}")]
+            # the twin's selection follows the hardware's: re-selected only when it differs (a STOP latch refuses it)
+            add = ([(when, f"SELECT {m}"), (("after", 0.0), f"WALK {preset}")] if m != selected else [(when, f"WALK {preset}")])
+            selected = m
         elif kind == "SELECT":
             add = [(when, f"SELECT {c['arg']}")]
+            selected = c["arg"]
         elif kind in ("WALKSTOP", "STOP"):
             add = [(when, kind)]
         elif kind == "DRIVE":
-            vx, vy = c["arg"]
-            if abs(vy) > 5e-4:
-                raise SystemExit(f"command at {c['t_ms'] / 1e3:.3f} s: lateral {vy * 1e3:.1f} mm/s, not reproducible (cosim DRIVE is forward only)")
+            vx, vy, yaw = (tuple(c["arg"]) + (0.0,))[:3]
+            if abs(vy) > 5e-4 or abs(yaw) > 1e-3:
+                raise SystemExit(f"command at {c['t_ms'] / 1e3:.3f} s: lateral {vy * 1e3:.1f} mm/s, yaw {yaw:.3f} rad/s, "
+                                 "not reproducible (cosim DRIVE is frontal only)")
             add = [(when, f"DRIVE {vx:.6f}")]
         else:
             raise SystemExit(f"command {kind} at {c['t_ms'] / 1e3:.3f} s not reproducible inside an episode")
@@ -276,6 +280,7 @@ def main():
             w.writerow([x[c] for c in cols] + [f"{v:.5g}" for k in ("hw_err", "sim_err", "hw_duty", "sim_duty", "hw_q", "sim_q", "age_ms") for v in x[k]]
                        + [f"{v:.4g}" for v in (*x["hw_rp"], *x["sim_rp"])])
     report = {"name": name, "variant": variant, "variant_definition": v, "sources": [str(f) for f in files],
+              "episode_sources": {k: sum(s["source"] == k for s in sel) for k in dict.fromkeys(s["source"] for s in sel)},
               "episode_now_s": [sel[0]["now_ms"] / 1e3, sel[-1]["now_ms"] / 1e3], "height_m": height,
               "conditions": "fixture (body welded, rigid; attitude from the hardware HOLD)" if fixture else "ground (flat, mu 0.8)",
               "fixture_attitude_mrad": None if attitude is None else [1e3 * a for a in attitude],
