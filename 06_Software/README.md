@@ -22,6 +22,10 @@ It does not own the current project milestone or the robot's runtime architectur
 - [`Matdog_Core/hardware/`](Matdog_Core/hardware/) — retained hardware-facing development tools;
   they are not current motion authorization.
 - [`Matdog_Core/viewer/`](Matdog_Core/viewer/) — host-side visualization tools.
+- [`Matdog_MuJoCo/`](Matdog_MuJoCo/README.md) — MuJoCo twin V1 (offline): model from the REV01-FIX URDF,
+  closed-loop co-simulation of the production SimpleMotion, viewer, and the hardware correlation
+  report [`REPORT_M5.md`](Matdog_MuJoCo/REPORT_M5.md). Frozen baseline: tag `matdog-mujoco-v1-20261110`. Simulation only,
+  never a hardware qualification.
 
 ## Current boundary
 
