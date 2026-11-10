@@ -34,6 +34,9 @@ SimpleMotion fed by the twin).
 | `cosim.py` | closed loop with `fw_bridge/cosim` |
 | `m4_hip_stop.py` | STOP_MEASURED_OUTSIDE_BOX: hip evidence from hardware traces vs the twin, closed-loop attribution variants |
 | `rca_ground_stop.py` | ground STOP RCA: per STOP, the joint out of the STOP box and since when, reference, error, duty, foot forces, COM, attitude, settle criteria; the gait's own stop |
+| `m5_hw.py` | M5: hardware session logs (dashboard trace, recorder `http.jsonl`, `serial.log`, preflight, flash log): provenance, real per-joint sampling rate, commands, Motion states, replayable episodes |
+| `m5_compare.py` | M5: a hardware run replayed in closed loop with its own commands (walk commands at the same `walk_cycles`), each snapshot observed on the twin as the controller observed the robot (per-joint reading age, IMU time); paired HW/SIM tables; `--fixture` for the suspended robot, `--variant` for one correction |
+| `m5_imu_tilt.py` | M5: IMU tilt against the four-feet plane from the encoders, per ground HOLD (IMU mounting offset) |
 | `view.py` | desktop viewer (play/pause, step, speed, fault, replay selection) and MP4/PNG offscreen, with tagged overlays and the hip-vs-kHeight plot |
 | `demo.sh` | renders the visual demo (5 MP4 + key frames) offscreen |
 | `report_tables.py` | markdown tables of all results |
@@ -55,6 +58,9 @@ $PY m3_hw_compare.py <dev.4 matdog-motion-trace (1).json> $S $O
 $PY cosim.py $B/cosim $O [scenario ...]
 $PY m4_hip_stop.py $B/cosim <cl dir> $O <hardware traces ...>
 $PY rca_ground_stop.py <cl dir> $O [scenario ...]
+$PY m5_hw.py <session dir | trace.json | http.jsonl> [--out report.json]          # provenance, rates, episodes
+$PY m5_compare.py $B/cosim $O <name> <hw files> --from S --to S [--fixture] [--mode SLOW] [--variant imu_mount]
+$PY m5_imu_tilt.py <ground trace.json ...>
 ```
 
 ## Visual supervision

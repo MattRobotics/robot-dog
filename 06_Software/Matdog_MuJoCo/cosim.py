@@ -17,6 +17,7 @@ import subprocess
 import sys
 import time
 
+import mujoco
 import numpy as np
 
 import dynamics
@@ -63,21 +64,42 @@ class Bridge:
         self.p.wait(timeout=10)
 
 
-def run(binary, out_dir, name, params=None, mu=0.8, tag="", unit=None):
-    """One closed-loop scenario; `unit` scales a servo's torque constant (servo.apply_to_model)."""
+def due(when, t, rows, fired):
+    """An event's condition: a time from STANDING (s), ("cycles", c) the first WALKING
+    release at walk_cycles >= c, or ("after", s) s after the previous event fired."""
+    if isinstance(when, tuple) and when[0] == "cycles":
+        return bool(rows) and rows[-1]["state"] == "WALKING" and float(rows[-1]["walk_cycles"]) >= when[1]
+    if isinstance(when, tuple) and when[0] == "after":
+        return t >= (fired[-1] if fired else 0.0) + when[1] - 1e-9
+    return when <= t + 1e-9
+
+
+def imu_quaternion(base, offset):
+    """What the IMU reports: the base orientation turned by a mounting offset (roll, pitch) in rad, or the base itself."""
+    if offset is None:
+        return base
+    mount, out = np.zeros(4), np.zeros(4)
+    mujoco.mju_euler2Quat(mount, np.array([offset[1], offset[0], 0.0]), "yxz")
+    mujoco.mju_mulQuat(out, base, mount)
+    return out
+
+
+def simulate(binary, events, duration, params=None, mu=0.8, unit=None, height=0.15, fixture=None, imu_offset=None):
+    """The closed loop from STANDING at `height` (m): (rows, twin, replies, columns).
+    Events [(when, command)] fire in order, each at the first release where due() holds.
+    `imu_offset` (roll, pitch) rad: the IMU mounted turned from base_link (None: aligned, as before)."""
     params = params or servo.Params()
-    events, duration = SCENARIOS[name]
     bridge = Bridge(binary)
-    standing = bridge.record(bridge.ask("STAND 0.15"))
+    standing = bridge.record(bridge.ask(f"STAND {height}"))
     raw0 = np.array([int(standing[f"raw{i}"]) for i in range(12)])
-    tw = dynamics.Twin(params, mu=mu, unit=unit)
+    tw = dynamics.Twin(params, mu=mu, unit=unit, fixture=fixture)
     tw.begin((raw0 - 2048) * twin.TICK, int(standing["drive_speed_step_s"]), int(standing["drive_acc_100step_s2"]))
-    rows, replies, pending = [], [], list(events)
-    started = time.time()
+    rows, replies, pending, fired = [], [], list(events), []
     for n in range(int(round(duration / twin.RELEASE_S))):
         t = n * twin.RELEASE_S
-        while pending and pending[0][0] <= t + 1e-9:
+        while pending and due(pending[0][0], t, rows, fired):
             replies.append((t, pending[0][1], bridge.ask(pending.pop(0)[1])))
+            fired.append(t)
         d = tw.d
         q, qd = d.qpos[7:19], d.qvel[6:18]
         raw = 2048 + np.rint(q / twin.TICK).astype(int)
@@ -85,7 +107,7 @@ def run(binary, out_dir, name, params=None, mu=0.8, tag="", unit=None):
         # PresentLoad: the duty with the servo's sign convention, opposite to (goal - raw):
         # settledUnderLoad requires (commandedRaw - raw > 0) == load bit 10 (rc.11 HOLD: err -21, load +176).
         load = -np.rint(1e3 * tw.servos.duty(q)).astype(int)
-        quat = d.qpos[3:7]
+        quat = imu_quaternion(d.qpos[3:7], imu_offset)
         line = "TICK " + " ".join(map(str, np.concatenate([raw, speed, load]))) + " " + " ".join(repr(float(v)) for v in quat)
         rec = bridge.record(bridge.ask(line))
         rec["t_s"] = repr(t + twin.RELEASE_S)
@@ -96,12 +118,21 @@ def run(binary, out_dir, name, params=None, mu=0.8, tag="", unit=None):
         on = np.full(12, int(rec["torque_on"]) == 12)
         tw.release(goal, int(rec["drive_speed_step_s"]), int(rec["drive_acc_100step_s2"]), on)
     bridge.close()
+    return rows, tw, replies, bridge.columns
+
+
+def run(binary, out_dir, name, params=None, mu=0.8, tag="", unit=None):
+    """One closed-loop scenario; `unit` scales a servo's torque constant (servo.apply_to_model)."""
+    params = params or servo.Params()
+    events, duration = SCENARIOS[name]
+    started = time.time()
+    rows, tw, replies, columns = simulate(binary, events, duration, params, mu, unit)
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = name + (f"__{tag}" if tag else "")
     path = out_dir / f"{tag}.csv"
     with open(path, "w", newline="") as f:
         feedback = [f"fb_{k}{i}" for k in ("raw", "speed", "load") for i in range(12)]
-        w = csv.DictWriter(f, fieldnames=["t_s"] + bridge.columns + feedback)
+        w = csv.DictWriter(f, fieldnames=["t_s"] + columns + feedback)
         w.writeheader()
         w.writerows(rows)
     seq = twin.sequence(path)
