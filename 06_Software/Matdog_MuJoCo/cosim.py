@@ -37,6 +37,10 @@ SCENARIOS = {
     "cl_stop_lateswing_slow": ([(1.0, "SELECT SLOW"), (1.0, "WALK 2"), (1.0, "STOPFRONT 8 0.85")], 22.0),
     "cl_stop_lateswing_standard": ([(1.0, "SELECT STANDARD"), (1.0, "WALK 2"), (1.0, "STOPFRONT 8 0.85")], 20.0),
     "cl_stop_lateswing_fast": ([(1.0, "SELECT FAST"), (1.0, "WALK 2"), (1.0, "STOPFRONT 8 0.85")], 20.0),
+    # the gait's own stop (walkStop, a released joystick): one decelerating cycle, four feet down, WALK_HOLD
+    "cl_walkstop_slow": ([(1.0, "SELECT SLOW"), (1.0, "WALK 2"), (13.0, "WALKSTOP")], 26.0),
+    "cl_walkstop_standard": ([(1.0, "SELECT STANDARD"), (1.0, "WALK 2"), (13.0, "WALKSTOP")], 22.0),
+    "cl_walkstop_fast": ([(1.0, "SELECT FAST"), (1.0, "WALK 2"), (13.0, "WALKSTOP")], 22.0),
 }
 
 
