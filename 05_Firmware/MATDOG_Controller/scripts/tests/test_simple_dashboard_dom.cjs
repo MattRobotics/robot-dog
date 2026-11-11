@@ -53,7 +53,7 @@ async function boot(initialStatus = fx.status_ready) {
           init.signal?.addEventListener('abort', () => { device.holdUrl = null; const i = device.held.indexOf(entry); if (i >= 0) device.held.splice(i, 1); reject(new w.DOMException('aborted', 'AbortError')); }, { once: true });
         });
         if (url === '/wifi/session') return device.sessionOk ? reply(CSRF) : reply('AUTH_FAILED', 403);
-        if (url === '/status') return reply('mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n');
+        if (url === '/status') return reply(device.statusText || 'mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n', device.statusCode);
         if (url === '/wifi/status') return reply(JSON.stringify({ profiles: [], scan: [], active_profile: 0, sta_test: { seq: 0 }, policy: {}, network_phase: 'ADMIN_AP', admin_generation: 1 }));
         if (url === '/api/motion/status') return reply(device.status);
         if (url === '/api/motion/command') {
@@ -949,6 +949,52 @@ async function boot(initialStatus = fx.status_ready) {
     assert.deepStrictEqual(js.calls.filter(c => c.url === '/api/motion/command').map(c => JSON.parse(c.body).params.vx > 0 ? 'move' : 'neutral'), ['move', 'neutral']);
     assert.deepStrictEqual([hold, walking, js].flatMap(r => r.errors), []);
     for (const r of [hold, walking, js]) r.dom.window.close();
+  }
+  // Battery P1, instants of the 10/11 replay with the facts the firmware now
+  // publishes with torque ON (test_led_ring_manager replays the policy): measured
+  // voltages first, the DALY SOC an estimate, never green; the cockpit line
+  // carries the same facts and says NON VERIFICATA whenever /status is not current.
+  {
+    const e = await boot(fx.status_standing);  // HOLD, torque ON
+    const base = { mode: 'RUN', authority: 'MOTION', power_state: 'RUN', system_health: 'READY', bms_comm: 'OK', bms_valid: 'YES',
+      bms_fresh: 'YES', bms_sample_age_ms: '400', bms_state: 'STATIONARY', bms_current_a: '-0.3', bms_charge_mos: 'ON', bms_discharge_mos: 'ON',
+      bms_alarms: '0000 0000 0000 0000', led_charging: 'NO', led_charging_fault: 'NO', led_battery_warning: 'NO', led_battery_critical: 'NO',
+      led_render_deferred: 'YES' };
+    const show = async o => { e.device.statusText = Object.entries({ ...base, ...o }).map(([k, v]) => k + '=' + v).join('\n') + '\n'; e.device.statusCode = 200; await e.fire(4000); };
+    const line = () => e.q('#simple-energy'), card = () => e.q('#energyState').textContent;
+    assert(line() && !line().closest('details') && e.q('#simple-state').parentNode.nextElementSibling === line(), 'energy line right under the cockpit state, outside diagnostics');
+    await show({ bms_pack_v: '10.9', bms_cell_min_mv: '3643', bms_soc_percent: '44.9' });  // 19:20:15Z, torque ON
+    assert.strictEqual(line().textContent, 'Energia senza allarmi noti · pacco 10.9 V · cella min 3643 mV · SOC DALY 45 % (stima, non autonomia) · anello LED fermo fino a coppia OFF');
+    assert.strictEqual(line().dataset.tone, 'muted', 'no alarm: neutral, not green');
+    assert.strictEqual(e.q('#packV').textContent, '10.9 V'); assert.strictEqual(e.q('#cellMin').textContent, 'cella min 3643 mV');
+    assert.strictEqual(e.q('#soc').textContent, '45 %'); assert.strictEqual(e.q('#socBar').className, 'bar ', 'SOC estimate bar never green');
+    await show({ bms_pack_v: '10.5', bms_cell_min_mv: '3515', bms_soc_percent: '42.7', led_battery_warning: 'YES' });  // 19:46:55Z, torque ON
+    assert(line().textContent.startsWith('Energia BASSA · pacco 10.5 V · cella min 3515 mV · SOC DALY 43 % (stima, non autonomia)'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'warn');
+    assert(card().startsWith('BATTERY_WARNING') && e.q('#bmsBadge').textContent === 'BASSA' && e.q('#socBar').className === 'bar warn', card());
+    e.device.statusText = '{"version":1,"ok":false,"error":"MOTION_BUDGET_UNAVAILABLE","elapsed_ms":0}'; e.device.statusCode = 503; await e.fire(4000);
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · stato del Controller di 4 s fa · ultimo: BASSA · pacco 10.5 V'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'warn', 'paused diagnostic: the last values are not current');
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3350', bms_soc_percent: '41.2', led_battery_critical: 'YES' });  // trend continued, 3350 mV
+    assert(line().textContent.startsWith('Energia CRITICA · pacco 10.2 V · cella min 3350 mV · SOC DALY 41 % (stima, non autonomia)'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'bad');
+    assert(card().startsWith('BATTERY_CRITICAL') && e.q('#socBar').hidden && e.q('#soc').textContent === '41 %', 'critical: no SOC bar, the BMS estimate kept as reported');
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3350', bms_soc_percent: '41.2', bms_fresh: 'NO', bms_sample_age_ms: '9000', led_battery_critical: 'YES' });
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · dato BMS vecchio · ultimo: CRITICA') && line().dataset.tone === 'bad', line().textContent);
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3401', bms_soc_percent: '41.5', led_battery_warning: 'YES', led_render_deferred: 'NO' });  // 19:58:50Z, torque OFF
+    assert(!line().textContent.includes('anello LED'), 'ring live again at torque OFF');
+    await e.poll(13000); e.intervals.filter(i => i.ms === 1000).forEach(i => i.fn());
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · stato del Controller di 13 s fa'), line().textContent);
+    // No false "full": an alarm at any reported SOC is never green, and charging at 100 % is never "piena".
+    for (const soc of ['100.0', '75.0', '50.0', '31.0'])
+      for (const alarm of [{ led_battery_warning: 'YES' }, { led_battery_critical: 'YES' }]) {
+        await show({ bms_pack_v: '10.4', bms_cell_min_mv: '3480', bms_soc_percent: soc, ...alarm });
+        assert(line().dataset.tone !== 'muted' && !e.q('#socBar').classList.contains('ok') && e.q('#bmsBadge').className !== 'chip ok', soc + JSON.stringify(alarm));
+      }
+    await show({ bms_pack_v: '12.6', bms_cell_min_mv: '4190', bms_soc_percent: '100.0', bms_state: 'CHARGING', led_charging: 'YES' });
+    assert(line().textContent.startsWith('Energia IN CARICA') && !/pien|full|complet/i.test(line().textContent + card()), line().textContent);
+    assert.deepStrictEqual(e.errors, []);
+    e.dom.window.close();
   }
   fs.writeFileSync(envelopesPath, envelopes.join('\n') + '\n');
   console.log('SIMPLE_DASHBOARD_DOM = PASS (' + envelopes.length + ' envelopes captured from the shipped page; real MotionService fixtures; ' + (sequence) + ' commands)');

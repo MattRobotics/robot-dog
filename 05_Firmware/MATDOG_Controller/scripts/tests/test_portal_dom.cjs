@@ -159,8 +159,9 @@ const row = (page, list, label) => {
   // ---- battery: fresh / thresholds / stale / offline -------------------------------
   eq(p.q('#soc').textContent, '38 %', 'SoC equals the BMS value');
   eq(p.q('#socBar i').style.width, '38%', 'bar equals the BMS value');
-  ok(p.q('#socBar').classList.contains('ok'), 'normal charge colour');
-  eq(p.q('#packV').textContent, '11.3 V · 3S', 'pack voltage');
+  ok(p.q('#socBar').className === 'bar ', 'no alarm: the DALY SOC estimate bar is neutral, never green');
+  eq(p.q('#packV').textContent, '11.3 V', 'pack voltage is the headline');
+  eq(p.q('#cellMin').textContent, 'cella min 3779 mV', 'minimum cell next to it');
   eq(row(p, '#bmsMore', 'Tensioni celle').textContent, '3780 · 3781 · 3779 mV', 'cell voltages');
   p.device.status.bms_soc_percent = '25.0'; await p.poll();
   ok(p.q('#socBar').classList.contains('warn') && p.q('#bmsBadge').textContent === 'BASSA', 'low charge colour');

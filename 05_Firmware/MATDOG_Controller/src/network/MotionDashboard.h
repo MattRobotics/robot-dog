@@ -44,6 +44,9 @@ header.top .who{flex-wrap:wrap;max-width:100%}
 #simple-reason,#simple-last{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;height:2.8em;line-height:1.4em;margin:6px 0}
 #simple-log{margin:8px 0;padding-left:20px;font-size:13px}#simple-log li[data-kind=bad]{color:var(--bad)}#simple-log li[data-kind=warn]{color:var(--warn)}#simple-state[data-tone=bad]{color:var(--bad)}
 #simple-state[data-tone=ok]{color:var(--ok)}#simple-state[data-tone=warn]{color:var(--warn)}
+/* Energy (Battery P1): the Controller's /status facts, rendered by PortalPage; one fixed line. */
+#simple-energy{margin:-4px 0 8px;font-size:14px;color:var(--muted);height:1.4em;line-height:1.4em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#simple-energy[data-tone=bad]{color:var(--bad)}#simple-energy[data-tone=warn]{color:var(--warn)}
 #simple-motion .note{max-width:850px}#simple-detail{max-height:320px;overflow:auto}
 #simple-last{font-weight:600}#simple-last[data-kind=bad]{color:var(--bad)}#simple-last[data-kind=warn]{color:var(--warn)}#simple-last[data-kind=pending]{color:var(--muted)}
 #simple-joints{width:100%;border-collapse:collapse;font-size:14px;margin-top:10px}#simple-joints th,#simple-joints td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}#simple-joints th:first-child,#simple-joints td:first-child{text-align:left}
@@ -66,6 +69,7 @@ let walkModes=[],modeSending=false;  // WALK mode table (capabilities) and a sel
 const card=document.createElement('div');card.className='card';card.id='simple-motion';
 card.innerHTML=`<h2 class="cockpit-title">MATDOG — Motion Cockpit</h2>
 <p class="cockpit-status"><span id="simple-state" data-state="STOPPED" data-tone="muted">COLLEGAMENTO…</span></p>
+<p id="simple-energy" role="status" data-tone="muted">Energia: in attesa dello stato del Controller.</p>
 <div class="cockpit"><div id="simple-twin" aria-labelledby="simple-twin-title"><h3 id="simple-twin-title">Digital Twin 3D</h3><iframe id="simple-twin-frame" title="MATDOG Digital Twin"></iframe><p id="simple-twin-state" role="status">Modello 3D non ancora caricato.</p></div><div class="command-panel" id="simple-controls" tabindex="-1" aria-label="Comandi Motion">
 <p id="simple-reason" role="status">Lettura dello stato reale dal Controller.</p>
 <p id="simple-last" role="status" data-kind="none">Ultimo comando: nessuno inviato da questa pagina.</p>

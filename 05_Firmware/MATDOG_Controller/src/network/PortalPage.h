@@ -23,6 +23,9 @@
 //
 // Battery colours are presentation only: BAT_LOW / BAT_CRIT below, or the
 // controller's own battery_warning / battery_critical facts when it sets them.
+// The headline is the measured pack and minimum cell voltage; the DALY SOC is
+// a BMS estimate, never green and never an autonomy. The Motion page has no
+// battery card: energyLine() writes the same facts on one cockpit line.
 namespace matdog { namespace network {
 static constexpr char kPortalPage[]=R"MATDOG(<!doctype html><html lang="it"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MATDOG · controllo locale</title><style>
 :root{color-scheme:dark;font:16px/1.4 system-ui,sans-serif;--bg:#0f1720;--card:#18232f;--line:#33475a;--text:#e6edf5;--muted:#9fb2c3;--accent:#5cd6cf;--ok:#3fbf86;--warn:#e3a53a;--bad:#ea5a52;--na:#7d8b9a;--lock:#8fa3ff}
@@ -57,7 +60,7 @@ pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;margin:8px 0 0}a{
 <div id="staleNote">Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.</div>
 <div class="cards">
 <div class="card"><h3>Stato generale</h3><div class="kpis"><div><small>Sistema</small><b id="health">—</b></div><div><small>Alimentazione</small><b id="power">—</b></div><div><small>Authority</small><b id="authority">—</b></div></div><div class="mods" id="mods"></div><dl id="sysList"></dl><p class="note" id="safety"></p></div>
-<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><p id="energyState" class="note">Disponibilità energetica non verificata</p><small>SOC BMS stimato · non calibrato</small><div class="big"><b id="soc">N/D</b><span id="packV"></span></div><div id="socBar" class="bar" role="meter" aria-label="Stato di carica" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
+<div class="card"><h3>Batteria · BMS Daly<span id="bmsBadge" class="chip">N/D</span></h3><p id="energyState" class="note">Disponibilità energetica non verificata</p><small>Tensione pacco 3S · cella minima</small><div class="big"><b id="packV">N/D</b><span id="cellMin"></span></div><p class="note">SOC DALY <b id="soc">N/D</b> · stima del BMS, non autonomia</p><div id="socBar" class="bar" role="meter" aria-label="SOC DALY stimato" aria-valuemin="0" aria-valuemax="100"><i></i></div><dl id="bmsList"></dl><details><summary>Celle, MOS e allarmi</summary><dl id="bmsMore"></dl></details></div>
 <div class="card"><h3>IMU BNO085<span id="imuBadge" class="chip">N/D</span></h3><dl id="imuList"></dl></div>
 <div class="card"><h3>Servo e attuatori<span id="servoBadge" class="chip">N/D</span></h3><dl id="servoList"></dl></div>
 <div class="card"><h3>Calibrazione<span id="calBadge" class="chip">N/D</span></h3><dl id="calList"></dl><p class="note">La calibrazione disponibile è un'evidenza salvata, non un'autorizzazione al movimento.</p></div>
@@ -75,7 +78,7 @@ const PAGES=['dashboard','wifi','ap','performance','ota','diagnostics'];
 const $=s=>document.querySelector(s);
 const E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
 let authReady=Promise.resolve();
-let budget=false,csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0;
+let budget=false,csrf='',sessionAt=0,resumeAt=0,editing=false,st=null,wf=null,lastOk=0,fails=0,timer=0,busy=false,watch=null,rv=null,generation=0,energy=null;
 // The portal's diagnostic lane: one request at a time (status reads, admin
 // posts). The Motion status poll has its own lane (MotionDashboard.h, dev.17).
 // window.mdReads counts the reads in flight of BOTH lanes: the page never has
@@ -118,17 +121,22 @@ function renderStatus(){
  const crit=s.led_battery_critical==='YES'||soc<=BAT_CRIT,low=s.led_battery_warning==='YES'||soc<=BAT_LOW;
  const unavailable=crit||s.led_charging_fault==='YES'||['FAULT','PROTECTED'].includes(s.bms_state)||(fresh&&s.bms_discharge_mos==='OFF'&&s.bms_state!=='CHARGING');
  $('#energyState').textContent=!valid||!fresh?'Disponibilità energetica non verificata · dati assenti/stale'+(crit?' · ultimo allarme BATTERY_CRITICAL':''):unavailable?(crit?'BATTERY_CRITICAL':'PROTEZIONE BMS')+' · energia operativa esaurita · autonomia utilizzabile non stimata':low?'BATTERY_WARNING · energia operativa limitata · SOC non prova autonomia':'Energia operativa senza allarmi noti · autonomia utilizzabile non stimata';
+ const level=crit?'CRITICA':unavailable?'INDISPONIBILE':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',pack=s.bms_pack_v+' V',cell=s.bms_cell_min_mv+' mV';
+ energy={valid,fresh,crit,tone:unavailable?'bad':low?'warn':'muted',level:level==='OK'?'senza allarmi noti':level,ring:s.led_render_deferred==='YES',
+  facts:'pacco '+pack+' · cella min '+cell+' · SOC DALY '+(isFinite(soc)?soc.toFixed(0)+' %':'N/D')+' (stima, non autonomia)'};
  if(valid&&fresh){
-  const socKnown=isFinite(soc);$('#soc').textContent=socKnown?soc.toFixed(0)+' %':'N/D';$('#packV').textContent=s.bms_pack_v+' V · 3S';
-  bar.className='bar '+(crit?'bad':low?'warn':'ok');bar.hidden=unavailable||!socKnown;bar.firstChild.style.width=bar.hidden?'0%':Math.max(0,Math.min(100,soc))+'%';if(bar.hidden)bar.removeAttribute('aria-valuenow');else bar.setAttribute('aria-valuenow',soc.toFixed(0));
-  chip('#bmsBadge',crit?'CRITICA':unavailable?'INDISPONIBILE':low?'BASSA':s.bms_state==='CHARGING'?'IN CARICA':'OK',unavailable?'bad':low?'warn':'ok');
+  // Measured voltages first; the SOC is the BMS estimate and its bar is never green.
+  const socKnown=isFinite(soc);$('#soc').textContent=socKnown?soc.toFixed(0)+' %':'N/D';$('#packV').textContent=pack;$('#cellMin').textContent='cella min '+cell;
+  bar.className='bar '+(crit?'bad':low?'warn':'');bar.hidden=unavailable||!socKnown;bar.firstChild.style.width=bar.hidden?'0%':Math.max(0,Math.min(100,soc))+'%';if(bar.hidden)bar.removeAttribute('aria-valuenow');else bar.setAttribute('aria-valuenow',soc.toFixed(0));
+  chip('#bmsBadge',level,unavailable?'bad':low?'warn':'ok');
  }else{
-  $('#soc').textContent=valid?'STALE':'N/D';$('#packV').textContent='';bar.className='bar';bar.firstChild.style.width='0';bar.removeAttribute('aria-valuenow');
+  $('#soc').textContent=$('#packV').textContent=valid?'STALE':'N/D';$('#cellMin').textContent='';bar.className='bar';bar.firstChild.style.width='0';bar.removeAttribute('aria-valuenow');
   chip('#bmsBadge',valid?'DATO VECCHIO':s.bms_comm==='NEVER_POLLED'?'IN ATTESA':'OFFLINE',valid?'warn':'bad');
  }
+ energyLine();
  rows('#bmsList',[['Comunicazione',s.bms_comm,s.bms_comm==='OK'?'ok':'bad'],['Età ultimo dato valido',valid?dur(+s.bms_sample_age_ms):'nessun dato',fresh?'':'warn'],
   valid&&!fresh&&isFinite(soc)?['Ultimo valore (non attuale)',soc.toFixed(0)+' % · '+s.bms_pack_v+' V','na']:null,
-  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null,valid?['Cella minima',s.bms_cell_min_mv+' mV']:null,
+  valid?['Stato BMS',s.bms_state]:null,valid?['Corrente',s.bms_current_a+' A']:null,
   valid&&parseFloat(s.bms_remaining_ah)>0?['Capacità residua (DALY)',s.bms_remaining_ah+' Ah · valore BMS']:null,valid&&s.bms_remaining_estimate_ah!=null?['Capacità residua STIMA',s.bms_remaining_estimate_ah+' Ah · STIMA = SOC × '+s.bms_capacity_config_ah+' Ah','na']:null,valid&&s.bms_capacity_config_ah?['Capacità nominale configurata',s.bms_capacity_config_ah+' Ah (3S)','na']:null]);
  const alarms=s.bms_alarms||'',clear=/^[0 ]+$/.test(alarms);
  rows('#bmsMore',valid?[['Celle',s.bms_cells],['Tensioni celle',(s.bms_cell_mv||'').split(',').join(' · ')+' mV'],['Min / max / delta',s.bms_cell_min_mv+' / '+s.bms_cell_max_mv+' / '+s.bms_cell_delta_mv+' mV'],['MOS carica',s.bms_charge_mos],['MOS scarica',s.bms_discharge_mos],['Parole di allarme (grezze)',clear?'nessuna':alarms,clear?'':'warn'],['Avvisi energia','SOC stimato ≤30/15%; cella ≤3500/3350 mV; pacco ≤10,50/10,05 V. SOC non prova autonomia.','na']]:[['Dettagli','non disponibili senza un campione valido','na']]);
@@ -151,10 +159,18 @@ function renderStatus(){
  rows('#calList',[['Record persistente',s.calibration_persist_verdict,s.calibration_persist_verdict==='VALID_ACKNOWLEDGED'?'ok':'warn'],['Generazione acknowledged',s.calibration_ack_generation],['Record integro',yn(s.calibration_record_intact),s.calibration_record_intact==='YES'?'ok':'warn'],
   ['Sessione',s.calibration_session_state],['Restore richiesto',yn(s.calibration_restore_required),s.calibration_restore_required==='YES'?'warn':''],['Movimento hardware (calibrazione)',s.calibration_hardware_motion_authorized==='YES'?'AUTORIZZATO':'NON AUTORIZZATO',s.calibration_hardware_motion_authorized==='YES'?'bad':'lock']]);
  chip('#ledBadge',s.led_availability||'N/D',CLASS[s.led_availability]);
- rows('#ledList',[['Presentazione',s.led_presentation],['SoC mostrato dai LED',s.led_soc_valid==='YES'?(+s.led_soc_percent).toFixed(0)+' % · '+s.led_soc_segments+' segmenti':'N/D',s.led_soc_valid==='YES'?'':'na'],['In carica',yn(s.led_charging)],['Fault di carica',yn(s.led_charging_fault),s.led_charging_fault==='YES'?'bad':''],['Diagnostica anello',s.led_diagnostic]]);
+ rows('#ledList',[['Presentazione',s.led_presentation],['SoC mostrato dai LED',s.led_soc_valid==='YES'?(+s.led_soc_percent).toFixed(0)+' % · '+s.led_soc_segments+' segmenti':'N/D',s.led_soc_valid==='YES'?'':'na'],['In carica',yn(s.led_charging)],['Fault di carica',yn(s.led_charging_fault),s.led_charging_fault==='YES'?'bad':''],['Diagnostica anello',s.led_diagnostic],
+  s.led_render_deferred?['Anello fisico',s.led_render_deferred==='YES'?'fermo durante Motion · si aggiorna a coppia OFF':'aggiornato',s.led_render_deferred==='YES'?'warn':'']:null]);
  $('#rawStatus').textContent=Object.entries(s).map(([k,v])=>k+'='+v).join('\n');
  rows('#otaList',[['Build in esecuzione',s.ota_running_build_id],['Stato',s.ota_state],['Ingest compilato',yn(s.ota_ingest_compiled)],['Rollback possibile',yn(s.ota_rollback_possible)]]);
 }
+// The Motion page has no battery card: the same Controller facts on one fixed
+// cockpit line (MotionDashboard #simple-energy), NON VERIFICATA unless current.
+function energyLine(){const e=$('#simple-energy'),n=energy;if(!e||!n)return;
+ const age=Date.now()-lastOk,current=n.valid&&n.fresh&&!budget&&fails<2&&age<=STALE_MS;
+ const why=!n.valid?'nessun dato BMS valido':!n.fresh?'dato BMS vecchio':'stato del Controller di '+dur(age)+' fa';
+ e.textContent=e.title='Energia '+(current?n.level+' · '+n.facts:'NON VERIFICATA · '+why+(n.valid?' · ultimo: '+n.level+' · '+n.facts:''))+(n.ring?' · anello LED fermo fino a coppia OFF':'');
+ e.dataset.tone=current?n.tone:n.crit?'bad':'warn'}
 // ---- Network ---------------------------------------------------------------
 const ROLE={MAINTENANCE_STA_READONLY:['lock','MAINTENANCE · LAN sola lettura, nessuna autorità Motion'],MAINTENANCE_AP:['','MAINTENANCE · AP amministrativo, sempre attivo'],RUN_STA:['','RUN · router'],RUN_NO_PROFILE_AP:['warn','RUN · AP di recupero: nessun router configurato'],RUN_RECOVERY_AP:['warn','RUN · AP di recupero: router non raggiungibile']};
 const TEST={CONNECTED:['ok','Connessione riuscita: il router ha accettato le credenziali e ha assegnato un indirizzo IP.'],AUTH_REJECTED:['bad','Credenziali rifiutate dal router: password errata, oppure handshake WPA2 non completato.'],AP_NOT_FOUND:['bad','Router non trovato: nessuna rete con questo nome e sicurezza compatibile a portata (solo 2,4 GHz).'],NO_IP:['bad','Associazione riuscita, ma nessun indirizzo IP: DHCP del router non ha risposto, o IP statico non valido.'],TIMEOUT:['bad','Tempo scaduto: la connessione non si è completata entro 30 secondi.'],ABORTED:['warn','Prova interrotta prima del termine (contesto critico o fault radio).'],STORAGE_ERROR:['bad','Errore di memoria: la configurazione non è stata scritta in NVS.'],RUNNING:['warn','Prova in corso…']};
@@ -214,6 +230,7 @@ function link(){
  else{dot.className='dot';dot.hidden=true;text.textContent='Diagnostica aggiornata'}
  text.title=text.textContent;  // one line on screen (dev.17): the full text stays readable
  document.body.classList.toggle('stale',!!lastOk&&(budget||fails>=2||age>STALE_MS));
+ energyLine();
  $('#staleNote').textContent=budget?'Dati non aggiornati: durante il movimento il dispositivo sospende la diagnostica generale. La scheda Motion ha telemetria ed età indipendenti. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.':'Dati non aggiornati: il dispositivo non risponde. I valori sotto sono gli ultimi ricevuti, non lo stato attuale.';
  // A temporary session ends on the controller SESSION_MS after its last
  // authenticated use; the Motion poll refreshes sessionAt on each one.
