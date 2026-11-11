@@ -108,7 +108,7 @@ async function boot(initialStatus = fx.status_ready) {
   // and the selector changes a forward walk in progress; the presets belong to the mode; no stale 6.5 s.
   assert(/fondo corsa in avanti è la velocità massima della modalità WALK scelta/.test(q('#simple-diagnostics').textContent) &&
     /Sterzo, laterale e retromarcia in tutte le modalità, ciascuna sulla propria legge/.test(q('#simple-diagnostics').textContent) &&
-    /retromarcia non ancora disponibile in STANDARD/.test(q('#simple-diagnostics').textContent) &&
+    /fino ad allora la leva resta sui limiti della legge in corso/.test(q('#simple-diagnostics').textContent) && !/retromarcia non ancora disponibile/.test(q('#simple-diagnostics').textContent) &&
     /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
     /Durante un WALK in avanti il selettore cambia la modalità del passo in corso/.test(q('#simple-diagnostics').textContent) &&
     !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
