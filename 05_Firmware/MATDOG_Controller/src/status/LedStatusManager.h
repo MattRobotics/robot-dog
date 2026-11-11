@@ -23,6 +23,9 @@ namespace status {
 // diagnostic blip, not a persistent override, because presentation has
 // exactly one owner and must never silently keep two.
 //
+// While Motion is engaged (deferRender()), update() likewise keeps the
+// policy snapshot current and submits no frame.
+//
 // This class never touches GPIO47, never
 // calls pixels_.begin()/show(), and inherits the USB_ONLY anti-back-power
 // guarantee because LedRing::setFrame() is a no-op when
@@ -32,6 +35,14 @@ class LedStatusManager {
   void begin(LedRing* ring) { ring_ = ring; }
 
   void update(uint32_t now_ms, const LedStatusInputs& inputs);
+  // Set by Controller before every update(): true while Motion is engaged.
+  // The policy, its snapshot (battery warning/critical included) and the
+  // transition history stay current, RAM only; the frame is not submitted,
+  // because the WS2812 transmission can wait up to 20 ms for the RMT
+  // (Ws2812DmaStrip::kTransmitTimeoutMs). The first update() after torque
+  // OFF renders the then-current presentation.
+  void deferRender(bool deferred) { render_deferred_ = deferred; }
+  bool renderDeferred() const { return render_deferred_; }
 
   LedPresentationState state() const { return policy_.state(); }
   const LedStatusSnapshot& snapshot() const { return policy_.snapshot(); }
@@ -56,6 +67,7 @@ class LedStatusManager {
  private:
   LedRing* ring_ = nullptr;
   LedStatusPolicy policy_;
+  bool render_deferred_ = false;
   Transition history_[kTransitionHistory]{};
   uint32_t transition_count_ = 0;
   bool first_update_ = true;

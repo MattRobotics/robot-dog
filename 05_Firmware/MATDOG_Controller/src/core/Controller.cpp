@@ -1195,7 +1195,12 @@ void Controller::update(uint32_t now_ms) {
     led_inputs.battery_alarm = status::dalyAlarmBlocksChargingPresentation(battery.alarms);
     // No reviewed charge-completion policy exists yet: the reserved
     // charge_complete_verified input stays false, including at 100% SOC.
-    if(!simple_motion_.engaged())led_status_.update(led_now_ms, led_inputs);
+    // Every tick, Motion or not: battery warning/critical facts are RAM-only
+    // policy work and must stay current with torque ON (10/11: a Motion guard
+    // here delayed BATTERY_WARNING by 12 min). Only the frame, whose RMT
+    // completion can wait up to 20 ms, waits for torque OFF.
+    led_status_.deferRender(simple_motion_.engaged());
+    led_status_.update(led_now_ms, led_inputs);
   }
 
   // Read-only copy of the calibration persistence RAM snapshot for the

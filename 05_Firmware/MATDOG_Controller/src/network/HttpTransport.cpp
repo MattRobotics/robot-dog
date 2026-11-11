@@ -1024,6 +1024,9 @@ void HttpTransport::statusExtension(
       status::toString(service_->ledDiagnostic()));
   if (led.soc_valid)
     add("led_soc_percent=%.1f\n", led.soc_percent);
+  // YES while Motion is engaged: the facts above are current, the physical
+  // ring keeps its last frame until torque OFF.
+  add("led_render_deferred=%s\n", service_->ledManager().renderDeferred() ? "YES" : "NO");
   add("network_phase=%s\nwifi_enabled=%s\nap_active=%s\nap_clients=%u\n"
       "heap_free=%lu\nheap_min_free=%lu\nloop_stack_min_free=%lu\n",
       toString(service_->networkAdminAccess().phase.load()),

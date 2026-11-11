@@ -16,6 +16,8 @@ void LedStatusManager::update(uint32_t now_ms, const LedStatusInputs& inputs) {
   // Keep read-only status facts fresh while either manual diagnostic owns
   // the pixels. Normal presentation resumes as soon as it finishes.
   if (ring_ == nullptr || ring_->testRunning()) return;
+  // Motion engaged: same facts, no WS2812/RMT transmission until torque OFF.
+  if (render_deferred_) return;
   ring_->setFrame(frame);
 }
 

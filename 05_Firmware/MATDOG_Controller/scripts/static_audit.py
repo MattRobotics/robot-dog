@@ -3001,6 +3001,18 @@ def check_led_status_boundaries(files):
         fail(f"{ctl_path}: DALY must keep its one existing scheduler update")
     if len(re.findall(r"\bled_status_\.update\(", ctl)) != 1:
         fail(f"{ctl_path}: LED manager must have one periodic caller")
+    # Battery P1 (10/11: BATTERY_WARNING 12 min late behind a Motion guard):
+    # the policy runs every tick, unconditionally after its inputs; only the
+    # frame is deferred while Motion is engaged, before any transmission.
+    deferred = re.search(r"if\s*\(render_deferred_\)\s*return;", manager)
+    if not guard or not deferred or not (guard.end() <= deferred.start() < frame_pos):
+        fail(f"{manager_path}: a deferred render must return before the frame submission")
+    if sum(len(re.findall(r"\.deferRender\(", code)) for _, code in production) != 1 or \
+            re.sub(r"\s+", "", ctl).count(
+                "dalyAlarmBlocksChargingPresentation(battery.alarms);"
+                "led_status_.deferRender(simple_motion_.engaged());"
+                "led_status_.update(led_now_ms,led_inputs);") != 1:
+        fail(f"{ctl_path}: LED policy must run every tick; only its frame waits for torque OFF")
     for call in re.findall(r"\bdaly_\.(\w+)\s*\(", ctl):
         if call not in {"begin", "update", "availability", "health", "sample", "lastCommResult"}:
             fail(f"{ctl_path}: DALY {call}() is outside cached LED inputs/existing scheduler")
