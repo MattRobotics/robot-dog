@@ -33,6 +33,17 @@
 - **Tools:** `joystick_envelope` and the QEMU bench set the verified register-85 ceiling (both refused every STAND since dev.6); the gate takes `JOY_MODE`; `certify_steer_box.py --name`.
 - **Pre-existing, unchanged, reported:** FAST forward joystick deceleration −0.44 mm static support (frames identical to `450d2c7`; 3 decel cycles give +0.84 mm); SLOW backward, a STOP in its first cycle met `STOP_MEASURED_OUTSIDE_BOX` in 1 of 6 `servo_plant` seeds (identical on `450d2c7`).
 
+## Unreleased — MATDOG Controller 1.0.2-dev.6 Battery P1: battery facts current with torque ON, LED ring deferred to torque OFF, energy on the dashboard — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. **Same version string `1.0.2-dev.6`, new source, build and APP** on `450d2c7`, which stays the installed reference (APP `82122e06…`) and, with `1fbee7b`, the rollback image.
+
+- **Why (hardware 10/11, `/status` replay):** since rc.11 r2 (`8e20c63`) `Controller.cpp` skipped `led_status_.update()` while Motion was engaged, freezing the policy together with the ring. BATTERY_WARNING (second fresh sample at pack ≤ 10.50 V) was due at 19:46:55Z and showed at 19:58:50Z, after torque OFF; the DALY samples stayed fresh throughout.
+- **Change:** the policy runs every tick. `LedStatusManager::deferRender(simple_motion_.engaged())` withholds only the frame (its RMT completion can wait up to 20 ms) until torque OFF, when the first update renders the current presentation. `/status` adds `led_render_deferred=YES|NO`.
+- **Dashboard:** the battery card headline is the pack voltage and the minimum cell; the DALY SOC is shown as an estimate ("stima del BMS, non autonomia") and its bar is never green. The Motion cockpit gets one fixed-height energy line from the same `/status` facts, `NON VERIFICATA` whenever `/status` is not current.
+- **Unchanged:** thresholds and hysteresis, SOC values (no correction), DALY parameters, NVS/EEPROM, Motion and its limits, STOP, SAFE_OFF, the `led_.update()` guard of the diagnostics. Ring transmissions are those of `450d2c7` in every tick.
+- **Tests:** the 10/11 replay (511 samples) through the real ring, manager and policy: warning fact at 19:46:55Z with torque ON, no transmission in 463 engaged samples, warning frame at 19:58:50Z; critical at 3350 mV immediate. `static_audit.py` pins the unconditional policy call and the deferral (5 new mutations). DOM: replay instants on the shipped page.
+- **Not in this candidate (P2):** a non-blocking ring render with torque ON.
+
 ## Unreleased — MATDOG Controller 1.0.2-dev.6 operational ACC 220: register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
 
 > Operational candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `1fbee7b` (APP `39840bd4…`), which stays the rollback image with `975fe51` and `dd76fad`. Sources `5617f0e` and the dashboard fix after `ae70e03` (final audit 10/11). Hardware validation plan: `MATDOG_1_0_2_DEV6_ACC220_OPERATIONAL_20261110/HW_VALIDATION_PLAN.md`.
