@@ -4,6 +4,16 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — MATDOG Controller 1.0.2-dev.7 integrated candidate: Motion vNext + Battery P1 — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. New version string `1.0.2-dev.7` (never assigned before; `v1.0.1-dev.7` is a different series). Branch `integ/motion-vnext-battery-p1-dev7-20261111` on the Motion candidate `a7f5c2c`; the two source branches stay unchanged (`feat/motion-multidirectional-vnext-20261111` at `a7f5c2c`, `fix/battery-p1-20261111` at `f5b9d32`). `450d2c7` (APP `82122e06…`) stays the installed reference and the rollback.
+
+- **Motion vNext** (entries below, `a7f5c2c`): multidirectional joystick on every WALK mode's own law, STANDARD backward, STOP inside its box under HIP flex, handover gate, joystick limits of the walking law. Added tests: a prolonged joystick refresh loss (five 503 in a row: fresh refreshes, outcome unknown, never neutral); a release while the handover waits (the deferral never holds back an exit from the walk).
+- **Battery P1** (cherry-picked `ffff2c1`, `3cfe6cf`, `1890190`, `f5b9d32`): battery warning/critical facts current with torque ON; the LED frame (RMT wait up to 20 ms) deferred to torque OFF; energy from pack and minimum cell voltages, the DALY SOC as an estimate. Conflicts: CHANGELOG only.
+- **Removed:** `bms_remaining_estimate_ah` and its portal row (SOC x 9 Ah restated the uncalibrated DALY SOC as a capacity). The DALY remaining-capacity register and the configured nominal stay, labelled.
+- **Integration check:** every source file equals its Motion or its Battery P1 version, except the three both touched (CHANGELOG, `MotionDashboard.h`, `test_simple_dashboard_dom.cjs`), whose difference from Motion is exactly the Battery P1 diff, and the two changes above.
+- **Unchanged:** geometry, URDF, calibration, NVS/EEPROM, joint limits, boxes and certificates, STOP, SAFE_OFF, watchdog, drive table, DALY algorithm.
+
 ## Unreleased — MATDOG Controller 1.0.2-dev.6 Motion vNext audit fixes: STOP under HIP flex, handover, transitions — 2026-11-11
 
 > Offline candidate on `1160dce` (the entry below), **IMPLEMENTED NOT HARDWARE VALIDATED**; same version string `1.0.2-dev.6`, new source, build and APP. Answers the independent Codex audit of `1160dce` (NOT READY). Battery P1 not included. Evidence: `09_Logs/Validation_Reports/Motion_vNext_Multidirectional_2026-11-11/AUDIT_FIXES.md`.

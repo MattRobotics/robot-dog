@@ -136,7 +136,16 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   the lowest value read back; WALK mode change during a walk; the joystick
 //   on the selected mode, a selection with the stick held never dropped
 //   (final audit). Offline candidate.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.6"; // Offline candidate; hardware qualification pending
+// 1.0.2-dev.7 (2026-11-11): one integrated candidate of the two dev.6 branches
+//   on 450d2c7. Motion vNext (a7f5c2c): multidirectional joystick on every
+//   WALK mode's own law, STANDARD backward, STOP inside its box under HIP flex
+//   (backward sway, STANDARD sway 1.25 mm, handover gate), joystick limits of
+//   the walking law. Battery P1 (ffff2c1, 3cfe6cf): battery facts current with
+//   torque ON, LED frame deferred to torque OFF (no RMT wait in Motion), energy
+//   from pack and cell voltages with the DALY SOC as an estimate; the SOC x
+//   nominal Ah estimate removed. Geometry, calibration, NVS, limits, STOP and
+//   SAFE_OFF unchanged. Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.2-dev.7"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;
