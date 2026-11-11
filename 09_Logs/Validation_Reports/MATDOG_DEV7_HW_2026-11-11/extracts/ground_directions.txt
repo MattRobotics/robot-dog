@@ -1,0 +1,25 @@
+Camminate a terra 19:31–19:49Z: modo | direzione | sorgente | campioni (~s) | primo–ultimo | max |vx| mm/s, |vy| mm/s, |yaw| °/s
+SLOW     | avanti                             | joystick       |  34 | 19:33:43–19:42:18 | 20.0 / 0.0 / 0.00
+SLOW     | avanti                             | preset/arresto |  22 | 19:34:04–19:47:23 | 20.0 / 0.0 / 0.00
+STANDARD | avanti                             | joystick       |  39 | 19:34:14–19:49:05 | 30.0 / 0.3 / 0.00
+STANDARD | avanti                             | preset/arresto |  17 | 19:34:25–19:46:58 | 30.0 / 0.0 / 0.00
+FAST     | avanti                             | joystick       |  28 | 19:34:43–19:43:27 | 32.0 / 0.0 / 0.00
+FAST     | avanti+destra                      | joystick       |  11 | 19:34:55–19:35:05 | 16.1 / 4.8 / 0.00
+FAST     | destra                             | joystick       |  10 | 19:35:06–19:35:15 | 0.0 / 4.8 / 0.00
+FAST     | destra                             | preset/arresto |   3 | 19:35:16–19:35:18 | 0.0 / 4.8 / 0.00
+FAST     | indietro                           | joystick       |   9 | 19:35:21–19:35:29 | 20.0 / 0.0 / 0.00
+STANDARD | sinistra                           | joystick       |  16 | 19:44:04–19:48:11 | 0.4 / 6.7 / 0.00
+STANDARD | sinistra                           | preset/arresto |   7 | 19:44:15–19:48:14 | 0.0 / 6.7 / 0.00
+STANDARD | yaw+ (antiorario)                  | joystick       |   9 | 19:44:22–19:44:30 | 0.0 / 0.0 / 2.29
+STANDARD | yaw+ (antiorario)                  | preset/arresto |   4 | 19:44:31–19:44:34 | 0.0 / 0.0 / 2.29
+STANDARD | yaw- (orario)                      | joystick       |  11 | 19:44:38–19:44:48 | 0.0 / 0.0 / 2.29
+SLOW     | indietro                           | joystick       |  20 | 19:45:10–19:45:29 | 10.0 / 0.0 / 0.00
+SLOW     | indietro                           | preset/arresto |   6 | 19:45:30–19:45:35 | 10.0 / 0.0 / 0.00
+STANDARD | indietro                           | joystick       |  42 | 19:45:48–19:48:26 | 16.7 / 0.4 / 0.00
+STANDARD | indietro                           | preset/arresto |   3 | 19:46:20–19:46:22 | 16.7 / 0.0 / 0.00
+FAST     | avanti                             | preset/arresto |  21 | 19:46:59–19:47:19 | 32.0 / 0.0 / 0.00
+STANDARD | avanti+destra                      | joystick       |   5 | 19:47:57–19:48:01 | 14.9 / 2.7 / 0.00
+STANDARD | avanti+sinistra                    | joystick       |   4 | 19:48:03–19:48:06 | 10.5 / 4.8 / 0.00
+STANDARD | indietro+destra                    | joystick       |  17 | 19:48:27–19:48:43 | 11.9 / 6.7 / 0.00
+STANDARD | destra                             | joystick       |  10 | 19:48:44–19:48:53 | 0.0 / 6.7 / 0.00
+STANDARD | destra                             | preset/arresto |   4 | 19:48:54–19:48:57 | 0.0 / 6.4 / 0.00

@@ -1,0 +1,49 @@
+USB: 4142 righe
+  2026-11-11T19:20:02.640+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+  2026-11-11T19:20:12.650+00:00 MOTION_DIAG exit valid=0 fault=0 reason= phase=IDLE state=STOPPED at_us=0 now_us=0 energized=0 releases=0 missed=0 max_gap_us=0 drive=0/0 goal_sent_us=0 settle_us=0 deadline_us=0 last_polled
+  2026-11-11T19:20:12.650+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+HTTP: motion 331 campioni (0 senza risposta valida), status 66
+IDENTITÀ: 1.0.2-dev.7 build b5610620d0ce ota b5610620d0ce | health READY, BMS OK 12.0 V | uptime 1726557 ms
+SEQUENZA (stato fase motivo | profilo selezionato attivo destinazione)
+  19:15:30 STANDING HOLD STAND_REACHED | FAST FAST FAST
+  19:16:29 STANDING HOLD STAND_REACHED | SLOW FAST FAST
+  19:16:35 MOVING HEIGHT HEIGHT_CHANGE | SLOW FAST FAST
+  19:16:36 STANDING HOLD STAND_REACHED | SLOW FAST FAST
+  19:16:41 MOVING HEIGHT HEIGHT_CHANGE | SLOW FAST FAST
+  19:16:42 WALKING WALK_STANDARD WALK_STANDARD | SLOW SLOW SLOW
+  19:16:55 WALKING WALK_STANDARD WALK_STANDARD | STANDARD SLOW STANDARD
+  19:16:56 WALKING WALK_STANDARD WALK_STANDARD | STANDARD STANDARD STANDARD
+  19:17:18 WALKING WALK_STANDARD WALK_STANDARD | FAST STANDARD FAST
+  19:17:19 WALKING WALK_STANDARD WALK_STANDARD | FAST FAST FAST
+  19:17:39 WALKING WALK_STANDARD WALK_STANDARD | SLOW FAST SLOW
+  19:18:00 WALKING WALK_STANDARD WALK_STANDARD | STANDARD FAST STANDARD
+  19:18:45 WALKING WALK_STANDARD WALK_STANDARD | SLOW FAST SLOW
+  19:19:06 MOVING STOP STOP_IN_PROGRESS | SLOW FAST SLOW
+  19:19:08 STOPPED STOP STOPPED_SUPPORT_UNVERIFIED | SLOW FAST SLOW
+  19:19:10 MOVING WALK_STANDARD STAND_FROM_STOPPED_WALK | SLOW FAST SLOW
+  19:19:16 MOVING WALK_SETTLE WALK_SETTLING | SLOW FAST SLOW
+  19:19:17 STANDING HOLD STAND_REACHED | SLOW FAST SLOW
+CAMBI DI PROFILO DURANTE IL WALK (risoluzione 1 s; completato = vx al 98 % del massimo del profilo)
+  19:16:55 SLOW→STANDARD completato in 8 s (atteso circa 8 s); drive di destinazione dopo 1 s
+  19:17:18 STANDARD→FAST completato in 4 s (atteso circa 4,5 s); drive di destinazione dopo 1 s
+  19:17:39 FAST→SLOW superato da una nuova selezione
+  19:18:00 FAST→STANDARD superato da una nuova selezione
+  19:18:45 FAST→SLOW interrotto; fine dopo 21 s: MOVING STOP_IN_PROGRESS
+PER PROFILO (WALKING a regime: attivo = destinazione)
+  SLOW: 13 campioni, vx max 20.0 mm/s, joystick max 0.0 mm/s, servo_read speed/ACC 1000-1000/50-50 (atteso 1000/50, max 20 mm/s)
+  STANDARD: 22 campioni, vx max 30.0 mm/s, joystick max 0.0 mm/s, servo_read speed/ACC 1800-1800/180-180 (atteso 1800/180, max 30 mm/s)
+  FAST: 20 campioni, vx max 32.0 mm/s, joystick max 0.0 mm/s, servo_read speed/ACC 1950-1950/220-220 (atteso 1950/220, max 32 mm/s)
+ANCHE E INSEGUIMENTO (coppia ON; margine delle anche dalla box kHeight ±25 mrad, in tick)
+  STANDING FAST        n=174 | margine anche min LF 16.3 RF 12.3 RH 12.3 LH 14.3 | max |err| H/U/L 4/12/16 tick | max carico H/U/L 40/68/40 ‰
+  MOVING FAST          n= 11 | margine anche min LF 12.3 RF 12.3 RH 12.3 LH 14.3 | max |err| H/U/L 8/75/55 tick | max carico H/U/L 68/204/204 ‰
+  WALKING SLOW         n= 14 | margine anche min LF 10.3 RF 10.3 RH 10.3 LH 10.3 | max |err| H/U/L 13/160/111 tick | max carico H/U/L 88/212/208 ‰
+  WALKING STANDARD     n= 23 | margine anche min LF 11.3 RF 11.3 RH 11.3 LH 10.3 | max |err| H/U/L 11/109/85 tick | max carico H/U/L 64/232/368 ‰
+  WALKING FAST         n=107 | margine anche min LF 12.3 RF 13.3 RH 11.3 LH 10.3 | max |err| H/U/L 9/170/118 tick | max carico H/U/L 64/356/316 ‰
+  STOPPED FAST         n=  2 | margine anche min LF 16.3 RF 13.3 RH 13.3 LH 16.3 | max |err| H/U/L 4/5/3 tick | max carico H/U/L 40/48/32 ‰
+STOP
+  19:19:06 STOP in corso (profilo FAST→SLOW)
+  19:19:08 verificato dopo 2.0 s, coppia ON
+TEMPERATURE: max 46 °C (servo 42 alle 19:16:58); campioni ≥ 60 °C: nessuno; spike filtrati dal firmware 1
+TEMPI: missed 134→141, overrun 2853→3264, max lavoro per rilascio 46691 µs (max nella finestra)
+ULTIMO STATO: STANDING HOLD STAND_REACHED | SAFE_OFF verificato False, mask 0, coppia ON
+CRITERI DI INTERRUZIONE: nessuno

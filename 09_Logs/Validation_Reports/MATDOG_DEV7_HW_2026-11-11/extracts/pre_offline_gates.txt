@@ -1,0 +1,19 @@
+PASS candidate HEAD = b561062
+PASS candidate branch integ/motion-vnext-battery-p1-dev7-20261111
+PASS candidate worktree clean
+PASS candidate not pushed (no remote branch contains it)
+PASS manifest: commit, build id, CLEAN, ROBOT_POWERED, OTA 0, version, APP, layout
+PASS APP SHA256 and size = manifest
+PASS partition table SHA256 = manifest = installed 450d2c7
+PASS APP embeds build id and version
+PASS flash script pins = candidate — sha256 3d8d1d35bc5f26a5
+PASS flash script refuses without MATDOG_DEV7_FLASH_AUTHORIZED
+PASS flash script dry gates (layout, SHA, size, manifest, backup) — WRITE_RANGE           = 0x010000 .. 0x1bd120 (partition 'app0')
+PASS rollback APP 450d2c7 = 82122e06
+PASS rollback script refuses without MATDOG_DEV6_ACC220_FLASH_AUTHORIZED
+PASS rollback script dry gates (incl. full-flash backup SHA) — WRITE_RANGE           = 0x010000 .. 0x1bb800 (partition 'app0')
+PASS rollback SCRIPT_DIR worktree still at 450d2c7 and clean
+PASS esptool 5.3.1 present
+PASS layout scripts identical in candidate and rollback worktrees
+PASS session tools = 10/11 copies (usb_session, ctl, http_watch identical; preflight, session_summary: pin line only)
+OFFLINE_GATES = PASS
