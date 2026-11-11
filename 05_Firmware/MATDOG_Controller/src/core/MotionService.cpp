@@ -108,12 +108,14 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
  // WALK mode (2026-11-09): a volatile choice, no actuator and no active
  // command. A forward walk in progress moves its law to it progressively
- // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); otherwise the
- // next walk takes it (a WALK STOP, a STOP recovery, a steered or backward
- // joystick walk keep their law).
+ // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); a steered
+ // joystick walk takes it at its handover back to the forward regime, without
+ // stopping (vNext: WALK_MODE_AFTER_STEERING); otherwise the next walk takes it
+ // (a WALK STOP, a STOP recovery and a backward walk keep their law).
  if(c.intent==motion::Intent::GAIT_SELECT){simple::WalkMode m;if(!simple::parseWalkMode(c.gait,m))return result("WALK_MODE_UNKNOWN");
    if(const char* r=motion_->selectWalkMode(m))return result(r);const auto st=motion_->state();
-   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
+   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":motion_->walkSteered()&&st==simple::State::WALKING?"WALK_MODE_AFTER_STEERING":
+                         st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
    // Nothing to stop at the PRONE rest: never take over the active command.
    if(motion_->proneRest())return result("NOT_WALKING");
@@ -145,13 +147,18 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
                  simple::kJoystickBackM/simple::kWalkPeriodS,simple::kJoystickFrontalBand,simple::kJoystickStrideM/simple::kJoystickPeriodS);
  if(n<=0||static_cast<size_t>(n)>=cap)return false;
  // WALK modes (2026-11-09), the Controller's single table (SimpleMotion.cpp):
- // a GAIT_SELECT chooses the next walk and moves a forward walk in progress;
- // the joystick walks forward at the selected mode's top speed (full scale).
+ // a GAIT_SELECT chooses the next walk and moves a fore/aft walk in progress;
+ // the joystick walks forward at the selected mode's top speed (full scale) and,
+ // vNext, backward, lateral and yaw at that mode's own limits (JoystickSpec;
+ // the top-level "joystick" object keeps the SLOW values for older pages).
  size_t used=static_cast<size_t>(n)-1;  // reopen the object
  for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
-   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s}",
+   const auto& j=simple::joystickSpec(static_cast<simple::WalkMode>(i));
+   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s,"
+     "\"joystick\":{\"vx_back_max_m_s\":%.17g,\"vy_max_m_s\":%.17g,\"yaw_rate_max_rad_s\":%.17g,\"vx_steered_max_m_s\":%.17g}}",  // round-trip exact: full stick = the Controller's range
      i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,w.strideM[0]*1e3,w.strideM[1]*1e3,w.strideM[2]*1e3,w.strideM[2]/w.periodS*1e3,w.heightM*1e3,w.liftM*1e3,w.duty,
-     unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified));
+     unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified),
+     j.backM/w.periodS,j.lateralM/w.periodS,j.yawRad/w.periodS,j.strideM/w.periodS);
    if(k<=0||static_cast<size_t>(k)>=cap-used)return false;used+=k;}
  return snprintf(out+used,cap-used,"]}")==2;
 }

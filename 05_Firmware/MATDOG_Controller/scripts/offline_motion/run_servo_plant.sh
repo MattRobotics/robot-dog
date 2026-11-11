@@ -4,7 +4,9 @@
 # model of servo_plant.inc (profile, capability, latency, deadband, sag; ranges
 # drawn per seed), for SLOW, STANDARD and FAST: long walk, 8 STOP + resume,
 # IMU at the pitch-down vertex, mode changes during the walk with STOPs inside
-# them (2026-11-10); 11.1 and 9.6 V. Controller outcome against a
+# them (2026-11-10); vNext joystick (2026-11-11, scenarios 4-7): steered and
+# backward sequences with STOPs, the steered IMU vertex, selections during backward walks;
+# 11.1 and 9.6 V. Controller outcome against a
 # servo that lags; software only, not a hardware result.
 # Usage: SEEDS=6 run_servo_plant.sh
 set -euo pipefail

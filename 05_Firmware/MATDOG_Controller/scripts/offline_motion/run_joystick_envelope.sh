@@ -9,17 +9,22 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
-# Usage: run_joystick_envelope.sh [output-dir]. Geometry only. 46 scenarios.
+# Usage: [JOY_MODE=0|1|2] run_joystick_envelope.sh [output-dir]. Geometry only. 46 scenarios.
+# JOY_MODE (vNext): the WALK mode whose own law the joystick walks (default SLOW);
+# the scenario speeds are that mode's limits, printed by the tool (--limits).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)";sketch="$(cd "$here/../.." && pwd)"
 out="${1:-$(mktemp -d /tmp/matdog-joystick.XXXXXX)}";mkdir -p "$out"
 src=("$sketch/src/simple/SimpleMotion.cpp" "$sketch/src/servo/ServoPopulation.cpp")
 for n in BodyPose ContactMode FootContact Gait GaitTiming ImuAttitude LegKinematics LegInverseKinematics StandTrajectory TiltCompensation TiltedContactIk; do src+=("$sketch/src/motion/$n.cpp"); done
 "${CXX:-g++}" -std=c++17 -O2 -Wall -Wextra -Werror -Wno-misleading-indentation -I "$sketch/scripts/tests/simple_host_stub" "$here/joystick_envelope.cpp" "${src[@]}" -o "$out/joy"
-mapfile -t lines < <(python3 - <<'PY'
-import itertools,math
-lim=[.045/5.0,.020/5.0,.16/5.0]  # dev.6: one law (v2, 5 s); steered fore/aft, lateral, yaw per second
-pub,back=.100/5.0,.050/5.0  # dev.5: fore/aft walks the WALK STANDARD law up to 100 mm (backward 50 mm)
+limits=$("$out/joy" --limits)
+mapfile -t lines < <(JOY_LIMITS="$limits" python3 - <<'PY'
+import itertools,math,os
+# SLOW: steered .045/.020/.16 per 5 s cycle, forward 100 mm, backward 50 mm (dev.5/dev.6);
+# vNext: the selected mode's JoystickSpec per cycle of its period (joystick_envelope --limits).
+f=[float(x) for x in os.environ['JOY_LIMITS'].split()]
+lim=f[:3];pub,back=f[3],f[4]
 v=lambda a:','.join(repr(x) for x in a)
 print('forward','26:'+v([pub,0,0]));print('backward','26:'+v([-pub,0,0]))
 print('forward_steered','6:'+v([lim[0],lim[1]/2,0])+' 20:'+v([lim[0],0,0]));print('backward_steered','6:'+v([-lim[0],lim[1]/2,0])+' 20:'+v([-lim[0],0,0]))
@@ -75,5 +80,5 @@ awk "$gate" "$out/contact_steady.log" "$out/contact_random.log" || fail=1
 summary=$(cat "$out/contact_steady.log" "$out/contact_random.log" | awk '$3~/^-?[0-9.]+$/{if(s==""||$3+0<s){s=$3+0;sn=$1}if(c==""||$9+0<c){c=$9+0;cn=$1}} END{printf "min support %.2f mm (%s), min non-foot clearance %.2f mm (%s)",s,sn,c,cn}')
 tilt=$(grep -o 'compensated=[0-9.]*/[0-9.]*' "$out/envelope.log" | cut -d/ -f2 | sort -n | tail -1)
 echo "summary: $summary, max compensated stance-foot tilt $tilt deg" | tee -a "$out/envelope.log"
-echo "JOYSTICK envelope $([[ $fail == 0 ]] && echo PASS || echo FAIL): geometry and sequencing only, no hardware motion validation ($out)"
+echo "JOYSTICK envelope mode ${JOY_MODE:-0} $([[ $fail == 0 ]] && echo PASS || echo FAIL): geometry and sequencing only, no hardware motion validation ($out)"
 exit $fail

@@ -1463,10 +1463,11 @@ static void walkModeChange(){
    assert(w.maxStep<=bound&&w.maxDv<=5e-4);
    std::printf("joystick held at 100%%: SLOW->FAST %.2f s, FAST->STANDARD %.2f s, STANDARD->SLOW %.2f s, WALKING throughout, speed step <= %.3f mm/s, RAW step <= %d ticks PASS (software only)\n",
      up*.02,down*.02,back*.02,w.maxDv*1e3,w.maxStep);}
-  // Steering and backward exist on SLOW only.
+  // vNext: steering and backward walking on every mode's own law (multidirectionalJoystick).
   {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(WalkMode::FAST);
-   assert(!std::strcmp(r.m.drive(0,.8*simple::kJoystickLateralM/simple::kJoystickPeriodS,0,r.p.now),"JOYSTICK_STEERING_SLOW_ONLY")&&
-          !std::strcmp(r.m.drive(-.005,0,0,r.p.now),"JOYSTICK_BACKWARD_SLOW_ONLY"));}
+   const auto& j=simple::joystickSpec(WalkMode::FAST);const double T=simple::walkModeSpec(WalkMode::FAST).periodS;
+   assert(!r.m.drive(0,.8*j.lateralM/T,0,r.p.now)&&!r.m.drive(-.5*j.backM/T,0,0,r.p.now));
+   assert(!std::strcmp(r.m.drive(0,1.01*j.lateralM/T,0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));}
   // STOP at six instants of each change: verified, no fault.
   unsigned stops=0;
   for(auto pair:{std::pair<WalkMode,WalkMode>{WalkMode::SLOW,WalkMode::FAST},{WalkMode::FAST,WalkMode::SLOW},{WalkMode::STANDARD,WalkMode::FAST}})
@@ -1481,6 +1482,55 @@ static void walkModeChange(){
    assert(settled(r,WalkMode::FAST,topSpeed(WalkMode::FAST)));}
   std::printf("STOP during WALK mode changes: %u STOPs (SLOW->FAST, FAST->SLOW, STANDARD->FAST; preset and joystick; six instants) verified without fault; WALK STOP mid-change stands at the selected height and walks it PASS (software only)\n",stops);
 }
+// Motion vNext (2026-11-11): the joystick walks lateral, yaw and (SLOW, FAST)
+// backward on every WALK mode's own law (JoystickSpec, steerBox), proportionally,
+// and STOP at six instants of each direction is verified without fault; STANDARD
+// refuses backward; a backward walk keeps its law (the selection is the next
+// walk's); a steered walk takes a selection at its return to the forward regime.
+// Ideal tracking, software only.
+static void multidirectionalJoystick(){
+  using simple::State;unsigned stops=0,runs=0;
+  auto hold=[](Rig& r,const double v[3],unsigned releases){for(unsigned n=0;n<releases;++n){if(n%12==0)r.m.drive(v[0],v[1],v[2],r.p.now);r.tick();assert(r.m.state()!=State::FAULT);}};
+  auto stopNow=[&](Rig& r){r.m.stop();for(unsigned s=0;s<400&&!r.m.stopVerified();++s){r.tick();assert(r.m.state()!=State::FAULT);}
+    assert(r.m.stopVerified()&&simple::StopReferenceProbe::stopPlan(r.m).duration>0);++stops;};
+  for(unsigned mi=0;mi<3;++mi){const WalkMode mode=static_cast<WalkMode>(mi);const auto& w=simple::walkModeSpec(mode);const auto& j=simple::joystickSpec(mode);
+    const double T=w.periodS,lat=j.lateralM/T,yaw=j.yawRad/T,back=j.backM/T,fore=j.strideM/T;
+    const double dirs[][3]={{0,lat,0},{0,-lat,0},{0,0,yaw},{0,0,-yaw},{.7*fore,.7*lat,0},{-.6*fore,-.6*lat,.4*yaw},{0,.5*lat,0},{-back,0,0},{-.5*back,0,0}};
+    if(j.backM<=0){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(mode));
+      assert(!std::strcmp(r.m.drive(-.005,0,0,r.p.now),"JOYSTICK_BACKWARD_UNAVAILABLE")&&!std::strcmp(r.m.drive(-.6*fore,-.6*lat,0,r.p.now),"JOYSTICK_BACKWARD_UNAVAILABLE"));}
+    for(const auto& d:dirs)for(unsigned k=0;k<6;++k){if((d[0]<0&&j.backM<=0)||(d[0]==0&&d[1]==0&&d[2]==0))continue;/* no backward on this law */Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(mode));
+      assert(!r.m.drive(d[0],d[1],d[2],r.p.now));hold(r,d,unsigned((8*T+12)/.02)+k*37);++runs;
+      assert(r.m.state()==State::WALKING&&r.m.walkMode()==mode&&r.m.walkSteered()==(d[1]!=0||d[2]!=0));
+      // Inside the ellipsoid the law walks the demand itself (proportional, no saturation).
+      assert(std::abs(r.m.walkVelocityX()-d[0])<1e-9&&std::abs(r.m.walkVelocityY()-d[1])<1e-9&&std::abs(r.m.walkYawRate()-d[2])<1e-9);
+      stopNow(r);}
+    std::printf("joystick %s: lateral %.2f mm/s, yaw %.2f deg/s, backward %.2f mm/s%s, steered fore/aft %.2f mm/s on its own law; %u directions x 6 STOP instants verified PASS (software only)\n",
+      w.name,lat*1e3,yaw*180/M_PI,back*1e3,j.backM>0?"":" (refused: JOYSTICK_BACKWARD_UNAVAILABLE)",fore*1e3,j.backM>0?9u:6u);}
+  // A backward walk keeps its law with a new selection (not live); a STOP is verified; the next walk takes it.
+  const std::pair<WalkMode,WalkMode> pairs[]={{WalkMode::SLOW,WalkMode::FAST},{WalkMode::FAST,WalkMode::SLOW}};
+  for(const auto& pr:pairs)for(unsigned k=0;k<3;++k){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(pr.first));
+    const auto backOf=[](WalkMode m){return simple::joystickSpec(m).backM/simple::walkModeSpec(m).periodS;};
+    const double v0[3]={-backOf(pr.first),0,0};
+    assert(!r.m.drive(v0[0],0,0,r.p.now));hold(r,v0,unsigned((8*simple::walkModeSpec(pr.first).periodS+12)/.02));
+    assert(r.m.state()==State::WALKING&&r.m.walkVelocityX()<0);
+    assert(!r.m.selectWalkMode(pr.second)&&!r.m.walkModeLive());hold(r,v0,120+k*170);
+    assert(r.m.state()==State::WALKING&&r.m.walkMode()==pr.first&&r.m.walkTarget()==pr.first);stopNow(r);++runs;}
+  // A steered walk keeps its law with a new selection, takes it at the fore/aft handover, then steers on the new law.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(WalkMode::STANDARD));
+   const auto& js=simple::joystickSpec(WalkMode::STANDARD);const double T=simple::walkModeSpec(WalkMode::STANDARD).periodS;
+   const double steer[3]={0,js.lateralM/T,0};assert(!r.m.drive(0,steer[1],0,r.p.now));hold(r,steer,unsigned((6*T+12)/.02));
+   // The page scales the stick to the selected mode (the range drive() checks): the
+   // STANDARD law keeps steering at FAST's lateral limit until the forward handover.
+   const auto& jf=simple::joystickSpec(WalkMode::FAST);const double Tf=simple::walkModeSpec(WalkMode::FAST).periodS,steerF[3]={0,jf.lateralM/Tf,0};
+   assert(r.m.walkSteered()&&!r.m.selectWalkMode(WalkMode::FAST)&&!r.m.walkModeLive());
+   assert(!std::strcmp(r.m.drive(0,steer[1],0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));hold(r,steerF,unsigned(4*T/.02));
+   assert(r.m.walkMode()==WalkMode::STANDARD&&r.m.walkSteered()&&std::abs(r.m.walkVelocityY()-steerF[1])<1e-9);
+   const double ahead[3]={topSpeed(WalkMode::FAST),0,0};unsigned n=0;
+   for(;n<8000&&!settled(r,WalkMode::FAST,topSpeed(WalkMode::FAST));++n){if(n%12==0)r.m.drive(ahead[0],0,0,r.p.now);r.tick();assert(r.m.state()==State::WALKING);}
+   assert(n<8000);const double again[3]={0,0,jf.yawRad/Tf};
+   hold(r,again,unsigned(8*Tf/.02));assert(r.m.walkSteered()&&r.m.walkMode()==WalkMode::FAST&&std::abs(r.m.walkYawRate()-again[2])<1e-9);stopNow(r);++runs;}
+  std::printf("multidirectional joystick: %u runs, %u STOPs verified without fault; a backward walk keeps its law with a new selection (2 pairs x 3, STOP verified); a steered walk takes the selection at its forward handover PASS (software only)\n",runs,stops);
+}
 // dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
 // law, applied/wanted IMU correction, the release's compensationSafe check):
 // enterOff resets the correction right after, a later STOP keeps the record.
@@ -1494,7 +1544,7 @@ static void exitCause(){
          e.refusedBy==0&&e.advance[0]==simple::kStrideM[2]&&!e.steered&&simple::StopReferenceProbe::pitch(r.m)==0);
   std::printf("exit cause: WALK fault at cycle %.3f keeps correction %.1f/%.1f mrad, refused_by %u, law %.0f mm fore/aft after STOP PASS (software only)\n",e.cycles,e.roll*1e3,e.pitch*1e3,unsigned(e.refusedBy),e.advance[0]*1e3);
 }
-int main(){walkModes();accCeilingGate();walkModeChange();exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+int main(){walkModes();accCeilingGate();walkModeChange();multidirectionalJoystick();exitCause();longWalk100();proneRest();entryRecovery();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();

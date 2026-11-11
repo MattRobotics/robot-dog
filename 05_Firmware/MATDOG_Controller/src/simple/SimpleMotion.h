@@ -7,6 +7,8 @@
 #include "../motion/Gait.h"
 #include "CollisionData.h"
 #include "SteerCollisionData.h"
+#include "SteerStandardCollisionData.h"
+#include "SteerFastCollisionData.h"
 #include "ViaPlan.h"
 #include "StopPlan.h"
 
@@ -51,13 +53,17 @@ inline double walkClockS(double t){const double u=std::fmin(1.,t);return t<1?u*u
 enum class WalkMode : uint8_t { SLOW, STANDARD, FAST };
 motion::GaitParameters walkGait(unsigned stride,WalkMode mode=WalkMode::SLOW);
 motion::GaitParameters steerGait(const double goal[3]);
+// The steered regime of a mode's own law (SLOW: steerGait above, bit for bit).
+motion::GaitParameters steerGait(const double goal[3],WalkMode mode);
 // JOYSTICK (dev.6 consolidation, one law). A joystick walk on the SLOW mode
 // runs the WALK STANDARD v2 law (walkGait: 5 s, duty .80, 11 mm COM shift,
 // trapezoidal swing, eased clock), steered in SE(2) by gaitRetarget, the fillet
 // contact always allowed (inside the nominal strip it changes no joint); on
 // STANDARD and FAST it walks forward on that mode's own law (walkGait), fore/aft
-// regime only (2026-11-10). Two regimes of the SLOW law differ only by their
-// certified region and IMU envelope:
+// regime only (2026-11-10). Motion vNext (2026-11-11): STANDARD and FAST have the
+// same two regimes on their own law (JoystickSpec, steerBox; nominal strip in
+// fore/aft, fillet contact once steered). Two regimes of the SLOW law differ
+// only by their certified region and IMU envelope:
 // - fore/aft: kHeight, kWalkTilt100, stride up to 100 mm (back kJoystickBackM),
 //   sway kWalkSwayYM;
 // - steered: kSteer, kSteerTilt (heading frame), stride <= kJoystickStrideM,
@@ -84,10 +90,16 @@ constexpr double kJoystickStrideM=.045, kJoystickLateralM=.020, kJoystickYawRad=
 // below kJoystickSwayOffDemand (hysteresis keyed on the current amplitude). The
 // amplitude changes only with four feet down (steerWalk), rate limited.
 constexpr double kJoystickSwayYM=.010, kJoystickSwayLowM=.005, kJoystickSwayOnDemand=.03, kJoystickSwayOffDemand=.015, kJoystickSwayRampCycles=.5;
-inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){
-  const double y=advanceYM/kJoystickLateralM,w=yawRad/kJoystickYawRad,s=std::sqrt(y*y+w*w);
-  if(s>=(currentSwayYM>kJoystickSwayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return kJoystickSwayYM;
-  return kJoystickSwayBaseYM+(kJoystickSwayLowM-kJoystickSwayBaseYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
+// JOYSTICK per WALK mode (Motion vNext, 2026-11-11): what each mode's own law
+// walks besides forward, per gait cycle of that law. backM: backward stride
+// (fore/aft regime, time-reversed leg order); strideM, lateralM, yawRad: the
+// steered regime's ellipsoid (0: no steering on that law); the steered sway
+// (base: the law's own, low and full amplitude). SLOW: the dev.6 values above.
+struct JoystickSpec { double backM,strideM,lateralM,yawRad,swayBaseYM,swayLowM,swayYM; };
+inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM,const JoystickSpec& j){
+  const double y=advanceYM/j.lateralM,w=yawRad/j.yawRad,s=std::sqrt(y*y+w*w);
+  if(s>=(currentSwayYM>j.swayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return j.swayYM;
+  return j.swayBaseYM+(j.swayLowM-j.swayBaseYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
 }
 constexpr uint64_t kJoystickTimeoutUs=1000000;
 // Fore/aft band (dev.5, ground HW 08/11/2026: a nearly forward stick carried
@@ -101,6 +113,8 @@ constexpr uint64_t kJoystickTimeoutUs=1000000;
 // the v2 support window on a forward COM error is narrower (zero near +2.9 mm
 // at 50 mm against +3.6 mm forward at 100 mm), hence kJoystickBackM.
 constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontalRampCycles=4, kJoystickFrontalDecelCycles=2;
+constexpr JoystickSpec kSlowJoystick{kJoystickBackM,kJoystickStrideM,kJoystickLateralM,kJoystickYawRad,kJoystickSwayBaseYM,kJoystickSwayLowM,kJoystickSwayYM};
+inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){return joystickSwayYM(advanceYM,yawRad,currentSwayYM,kSlowJoystick);}
 // WALK STANDARD IMU tilt envelopes: inner convex polygons of the kHeight box,
 // gen-1 RAW, nominal support strip (including rounding) and the StopPlan over
 // the full phase set of walkGait (start, steady, every WALK STOP terminal and
@@ -146,6 +160,16 @@ constexpr TiltVertex kFastTilt[16]={{0.011837,0.000000},{0.012562,0.005203},{0.0
 // dev.6 one law (v2 parameters, 10 mm sway): pitch-up vertex .070 -> .055
 // (.060 still fails one ray at the 45 mm stride).
 constexpr TiltVertex kSteerTilt[]={{0.0245,0.0245},{0,0.055},{-0.0245,0.0245},{-0.0245,-0.0245},{0,-0.042},{0.0245,-0.0245}};
+// vNext: each WALK mode's steered region, its joint box and its IMU envelope
+// (heading frame). SLOW: kSteer and kSteerTilt. STANDARD and FAST: their own
+// boxes (certify_steer_box.py over 97 scenarios of the mode's joystick_envelope
+// set and direction grid, +/-40 mrad: 120/120 non-adjacent pairs, 12/12 adjacent),
+// with the steered envelope of SLOW (no ray outside the box or fillet limit).
+// Inline, like walkBox(): every translation unit reads its own box constant.
+using SteerPolygon=TiltVertex[6];
+static_assert(sizeof(kSteerTilt)==sizeof(SteerPolygon),"steered envelopes share one vertex count");
+inline const collision::Box& steerBox(WalkMode m){return m==WalkMode::STANDARD?collision::kSteerStandard:m==WalkMode::FAST?collision::kSteerFast:collision::kSteer;}
+inline const SteerPolygon& steerTilt(WalkMode){return kSteerTilt;}
 // IMU level correction slew in physical time (dev.14: 0.020 rad/s counted per
 // release, slower still when releases were missed). A late release advances
 // by at most kImuSlewMaxDtUs: no catch-up step after a pause.
@@ -229,8 +253,10 @@ inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:k
 //   kHeight margin HIP     9.3          8.7             11.1 ticks
 // RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
 // keeps {1000,50}. The joystick walks forward on the selected mode's law (its
-// top speed is full scale); steering and backward walking exist on the SLOW
-// law only (its steered envelopes and backward stride are certified there).
+// top speed is full scale); vNext: backward, lateral and yaw too, within that
+// mode's JoystickSpec (backward 50 mm per cycle: walk_tilt_envelope_check and
+// walk_support_check --reverse PASS on every law; steered limits: the mode's
+// joystick_envelope gate, steerBox and run_servo_plant scenarios 4-7).
 // STANDARD and FAST: IMPLEMENTED, NOT HARDWARE QUALIFIED.
 // Mode change inside a walk (stepWalkMode, 2026-11-10): the law moves on the
 // release grid, never through WALK STOP. Clock rate and stride stay within the
@@ -258,6 +284,7 @@ struct WalkModeSpec {
   bool hardwareQualified;
 };
 const WalkModeSpec& walkModeSpec(WalkMode);
+const JoystickSpec& joystickSpec(WalkMode);
 bool parseWalkMode(const char*,WalkMode&);
 // PRONE ends at rest (dev.15): after the verified PRONE_LAND arrival the
 // ordinary SAFE_OFF releases the torque (STOPPED, then READY, reason PRONE_REST).
@@ -386,8 +413,12 @@ class SimpleMotion {
   WalkMode walkMode() const { return walkMode_; }  // law shape of the current (or last) walk
   WalkMode walkTarget() const { return walkTarget_; }  // the mode that walk moves to (walkMode() when none)
   // A forward walk (WALK, or a joystick walk neither steered nor backward), not
-  // stopping: its law follows the selected WALK mode.
+  // stopping: its law follows the selected WALK mode. vNext: a steered walk takes
+  // the selection at its handover back to the forward fore/aft regime. Backward
+  // stays out (run_servo_plant scenario 7, 2026-11-11: a STOP 1 s into a backward
+  // STANDARD->FAST change met STOP_MEASURED_OUTSIDE_BOX in 2 of 6 seeds per voltage).
   bool walkModeLive() const { return phase_==Phase::WALK&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&!steered_; }
+  bool walkSteered() const { return phase_==Phase::WALK&&steered_; }
   double walkHeightM() const { return walkHeight_; }  // nominal height of that walk's law
   // Gait time t s after the start: eased in (walkClockS, its first four-contact
   // window carries the COM offset).
@@ -516,10 +547,10 @@ class SimpleMotion {
   // The steered IMU envelope is active: steered regime, not returning to fore/aft
   // (lateral, yaw and sway retired for a fore/aft demand). Single source for
   // limitWalkTilt and the offline envelope gate.
-  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==kJoystickSwayBaseYM); }
+  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==joystickSpec(walkMode_).swayBaseYM); }
   bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
   const TiltPolygon& pendingWalkTilt() const;  // fore/aft envelope of the walk startWalk would start
-  const collision::Box& walkBox() const { return steered_?collision::kSteer:kWalkBox; }
+  const collision::Box& walkBox() const { return steered_?steerBox(walkMode_):kWalkBox; }
   void serviceOff();
   bool serviceStop();
   void beginStop(uint64_t);

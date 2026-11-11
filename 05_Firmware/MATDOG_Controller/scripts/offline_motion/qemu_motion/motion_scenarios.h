@@ -57,7 +57,8 @@ struct Sim{
   simple::SimpleMotion m;Port p;simple::Inputs in;Cost cost;const char* firstFault=nullptr;
   void begin(){p.reset();cost=Cost{};firstFault=nullptr;gClock=1000000;
     m.~SimpleMotion();new(&m) simple::SimpleMotion();m.begin(&p);
-    in=simple::Inputs{};in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";
+    // Register 85 verified at its target (dev.6): without it every STAND is refused.
+    in=simple::Inputs{};in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";in.accCeiling=simple::kAccCeilingTarget;
     const double lo[12]={-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738};
     const double hi[12]={.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981};
     for(unsigned i=0;i<12;++i){in.minRad[i]=lo[i];in.maxRad[i]=hi[i];}
@@ -93,6 +94,15 @@ inline void run(Sim& s){
    const unsigned len[]={1500,1500,1500,1500,1500,2000,3000};
    for(unsigned g=0;g<7;++g)for(unsigned k=0;k<len[g];++k){if(k%12==0)s.m.drive(seg[g][0],seg[g][1],seg[g][2],gClock);s.tick();}
    report("JOYSTICK_HELD_SEQUENCE",s);}
+  // 4b (Motion vNext 2026-11-11): on each mode's own law, a held steered sequence
+  // (lateral, diagonal, yaw, backward-lateral) and a backward walk at full scale.
+  for(unsigned mi=0;mi<3;++mi){const auto mode=static_cast<WalkMode>(mi);const auto& j=simple::joystickSpec(mode);const double T=simple::walkModeSpec(mode).periodS;
+   const double lat=j.lateralM/T,yaw=j.yawRad/T,fore=j.strideM/T,back=j.backM/T;char n[48];
+   {stand(s);s.tilt(.005,.008);s.m.selectWalkMode(mode);const double seg[][3]={{0,lat,0},{.7*fore,-.7*lat,0},{0,0,yaw},{-.6*fore,.6*lat,0}};
+    for(unsigned g=0;g<4;++g)for(unsigned k=0;k<1500;++k){if(k%12==0)s.m.drive(seg[g][0],seg[g][1],seg[g][2],gClock);s.tick();}
+    std::snprintf(n,sizeof n,"JOY_STEER_%s",simple::walkModeSpec(mode).name);report(n,s);}
+   {stand(s);s.tilt(.005,.008);s.m.selectWalkMode(mode);for(unsigned k=0;k<3000;++k){if(k%12==0)s.m.drive(-back,0,0,gClock);s.tick();}
+    std::snprintf(n,sizeof n,"JOY_BACK_%s",simple::walkModeSpec(mode).name);report(n,s);}}
   // 5: STOP at eight instants of a WALK100 SLOW cycle (swing and four-contact),
   // each verified, then the STAND recovery completes the interrupted WALK STOP.
   {unsigned ok=0;Sim& x=s;stand(x);walk(x,WalkMode::SLOW,2);for(unsigned k=0;k<300;++k)x.tick();

@@ -60,11 +60,20 @@ struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0
 int main(int argc,char** argv){
   // scenario: holds "seconds:vx[,vy,yaw_rate]" (SI); vx '-' = silent client;
   // "rand:SEED:SECONDS" = random commands inside the Controller ellipsoid.
+  // JOY_MODE 0|1|2 (vNext): the joystick walks that WALK mode's own law; limits per
+  // cycle of its period (JoystickSpec). "--limits" prints them (m/s, rad/s) for the script:
+  // steered fore/aft, lateral, yaw, published forward top, backward.
+  const auto mode=static_cast<simple::WalkMode>(std::getenv("JOY_MODE")?std::atoi(std::getenv("JOY_MODE")):0);
+  const auto& spec=simple::walkModeSpec(mode);const auto& js=simple::joystickSpec(mode);
+  const double T=spec.periodS,lim[3]={js.strideM/T,js.lateralM/T,js.yawRad/T};
+  if(argc==2&&!std::strcmp(argv[1],"--limits")){std::printf("%.17g %.17g %.17g %.17g %.17g\n",lim[0],lim[1],lim[2],spec.strideM[2]/T,js.backM/T);return 0;}
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
-  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
-  V kSteerTilt[std::size(simple::kSteerTilt)];for(unsigned i=0;i<std::size(kSteerTilt);++i)kSteerTilt[i]={simple::kSteerTilt[i].roll,simple::kSteerTilt[i].pitch};
-  V walk100[std::size(simple::kWalkTilt100)];for(unsigned i=0;i<std::size(walk100);++i)walk100[i]={simple::kWalkTilt100[i].roll,simple::kWalkTilt100[i].pitch};
+  // The steered envelope of the mode (vNext steerTilt; SLOW: kSteerTilt).
+  const auto& steerTilt=simple::steerTilt(mode);
+  V kSteerTilt[std::extent<simple::SteerPolygon>::value];for(unsigned i=0;i<std::size(kSteerTilt);++i)kSteerTilt[i]={steerTilt[i].roll,steerTilt[i].pitch};
+  // The fore/aft regime's envelope: the mode's top-preset polygon (SLOW: kWalkTilt100).
+  V walk100[16];for(unsigned i=0;i<16;++i)walk100[i]={(*spec.tiltTop)[i].roll,(*spec.tiltTop)[i].pitch};
   struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);
@@ -77,12 +86,14 @@ int main(int argc,char** argv){
     else{Step s{0,{0,0,0},false};char v[64]{};if(std::sscanf(argv[a],"%lf:%63s",&s.seconds,v)!=2)return 2;
       if(!std::strcmp(v,"-"))s.silent=true;else std::sscanf(v,"%lf,%lf,%lf",&s.v[0],&s.v[1],&s.v[2]);steps.push_back(s);}}
   simple::SimpleMotion m;Port port;simple::Inputs in;m.begin(&port);
-  in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";std::copy(kLo,kLo+12,in.minRad);std::copy(kHi,kHi+12,in.maxRad);
+  // Register 85 verified at its target (dev.6): without it STAND is refused.
+  in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";in.accCeiling=simple::kAccCeilingTarget;std::copy(kLo,kLo+12,in.minRad);std::copy(kHi,kHi+12,in.maxRad);
   auto tick=[&](){port.now+=simple::kPeriodUs;clock_us=port.now;in.imuStampUs=port.now;m.inputs(in);port.publish();m.update(port.now);};
   for(int i=0;i<15;++i)tick();
   if(m.stand(.120,port.now)){std::puts("STAND refused");return 1;}
   for(int i=0;i<3000&&m.state()!=simple::State::STANDING;++i)tick();
   if(m.state()!=simple::State::STANDING){std::puts("STAND not reached");return 1;}
+  if(const char* refused=m.selectWalkMode(mode)){std::printf("WALK mode refused: %s\n",refused);return 1;}
   Result r;motion::JointTargetFrame last{};
   for(const auto& st:steps){
     for(int n=0;n<std::lround(st.seconds*50);++n){
