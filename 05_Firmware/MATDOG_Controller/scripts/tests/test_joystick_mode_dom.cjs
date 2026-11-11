@@ -20,6 +20,10 @@ const portal = fs.readFileSync(path.join(src, 'network/PortalPage.h'), 'utf8');
 const motion = fs.readFileSync(path.join(src, 'network/MotionDashboard.h'), 'utf8');
 const html = portal.split('R"MATDOG(')[1].split(')MATDOG"')[0] + motion.split('R"MOTION(')[1].split(')MOTION"')[0] + '</html>';
 const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
+// The transport's own JSON error body (HttpTransport::sendJsonError), as test_simple_dashboard_dom.
+const http = fs.readFileSync(path.join(src, 'network/HttpTransport.cpp'), 'utf8');
+const errorFormat = http.split('esp_err_t HttpTransport::sendJsonError')[1].match(/snprintf\(body,sizeof\(body\),"((?:[^"\\]|\\.)*)"/)[1].replace(/\\"/g, '"');
+const jsonError = (code, ms = 0) => errorFormat.replace('%s', code).replace('%lu', String(ms));
 const caps = JSON.parse(fx.capabilities);
 const top = Object.fromEntries(caps.walk_modes.map(m => [m.name, m.top_speed_mm_s / 1000]));
 const lim = Object.fromEntries(caps.walk_modes.map(m => [m.name, m.joystick]));  // vNext: per-mode joystick limits
@@ -35,7 +39,8 @@ async function boot() {
   const timers = [], intervals = [], calls = [];
   // The Controller model. holdNext keeps the next command pending until release().
   // law: the walk's mode; a backward walk keeps it (joystickMode) until the walk ends.
-  const ctl = { selected: 'SLOW', law: 'SLOW', backward: false, walking: false, stop: false, rejected: 0, lastJoystick: 0, maxGap: 0, holdNext: false, held: [] };
+  // fail503: the next joystick refreshes the transport answers 503 MOTION_BUDGET_UNAVAILABLE (outcome unknown).
+  const ctl = { selected: 'SLOW', law: 'SLOW', backward: false, walking: false, stop: false, rejected: 0, lastJoystick: 0, maxGap: 0, holdNext: false, held: [], fail503: 0 };
   const held = () => ctl.walking && ctl.backward;
   const joyMode = () => held() ? ctl.law : ctl.selected;
   const statusBody = () => { const s = JSON.parse(ctl.stop ? fx.status_stopped_on : ctl.walking ? fx.status_joystick_walking : fx.status_ready);
@@ -75,6 +80,7 @@ async function boot() {
         if (url === '/api/motion/status') return reply(statusBody());
         if (url === '/api/motion/command') {
           if (ctl.holdNext) { ctl.holdNext = false; await new Promise(r => ctl.held.push(r)); }
+          if (ctl.fail503 && JSON.parse(init.body).type === 'BASE_VELOCITY') { --ctl.fail503; return reply(jsonError('MOTION_BUDGET_UNAVAILABLE', 100), 503); }
           const a = JSON.parse(answer(init.body)), c = JSON.parse(init.body); a.id = c.id; a.sequence = c.sequence;
           return reply(JSON.stringify(a));
         }
@@ -205,6 +211,26 @@ async function boot() {
   pointer('pointerdown', -1, 0); await settle(); await p.tick();
   assert(last().params.vx === -lim.STANDARD.vx_back_max_m_s && ctl.law === 'STANDARD', 'the next walk takes STANDARD and its backward limit');
   assert.strictEqual(ctl.rejected, 0, 'no joystick demand beyond the limits the Controller applies');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+
+  // 7. Prolonged refresh loss (hardware 10/11: one 503 at the end of a steered
+  //    walk): the transport answers five refreshes in a row with 503
+  //    MOTION_BUDGET_UNAVAILABLE. With the status link alive the page keeps the
+  //    stick held and sends a fresh refresh every tick, never neutral, shows
+  //    the outcome as unknown (not executed), then continues when answered.
+  //    The Controller's own 1 s deadline (JOYSTICK_TIMEOUT, host test) ends a
+  //    walk whose refreshes stop arriving.
+  click('SLOW'); await settle(); await p.poll();
+  pointer('pointerdown', 1, 0); await settle(); await p.tick(); await p.poll();
+  assert(ctl.walking && last().params.vx === top.SLOW, 'walking forward before the loss');
+  const mark8 = cmds().length; ctl.fail503 = 5;
+  for (let k = 0; k < 5; ++k) { await p.tick(); if (k % 2) await p.poll(); }
+  const lost = cmds().slice(mark8);
+  assert(lost.length === 5 && lost.every(c => c.type === 'BASE_VELOCITY' && c.params.vx === top.SLOW), 'a fresh non-neutral refresh every tick during the loss (' + lost.map(c => c.params.vx).join(',') + ')');
+  assert(/MOTION_BUDGET_UNAVAILABLE/.test(q('#message').textContent) && /ESITO SCONOSCIUTO/.test(q('#message').textContent), 'the 503 is shown as an unknown outcome, never as executed (' + q('#message').textContent + ')');
+  await p.tick();
+  assert(ctl.fail503 === 0 && last().params.vx === top.SLOW && ctl.walking, 'answered again: the held stick continues');
   pointer('pointerup', 0, 0); await settle();
+  assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'release after the loss: neutral');
   console.log(`JOYSTICK_MODE_DOM = PASS (full scale SLOW/STANDARD/FAST ${top.SLOW * 1e3}/${top.STANDARD * 1e3}/${top.FAST * 1e3} mm/s, half stick ${(fraction(.5) * 100).toFixed(1)} %, lateral on every mode's own limits, backward where the law has it; held-stick change in order with refreshes at most ${changeGap} ms apart (deadline 1 s); timeout explicit; release and STOP first; repeated selections consistent; shipped page, real fixtures, no device)`);
 })().catch(e => { console.error(e); process.exit(1); });

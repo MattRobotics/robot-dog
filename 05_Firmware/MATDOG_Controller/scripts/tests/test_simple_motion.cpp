@@ -1558,15 +1558,22 @@ static void multidirectionalJoystick(){
    assert(!std::strcmp(r.m.selectWalkMode(WalkMode::FAST),"SERVO_ACC_CEILING_BELOW_DRIVE")&&r.m.selectedWalkMode()==WalkMode::STANDARD);stopNow(r);++runs;}
   // The handover to kHeight waits while the measured pose (a scripted 24-tick
   // HIP flex: always beyond the kHeight HIP bound) plus the arrest leaves the
-  // box; the walk keeps steering on its box, a STOP there is verified; without
-  // the flex it hands over.
+  // box; the walk keeps steering on its box, a STOP or a release (WALK STOP)
+  // there completes; without the flex it hands over. The deferral never holds
+  // back an exit from the walk.
   unsigned deferred=0;
-  for(unsigned k=0;k<2;++k){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(WalkMode::STANDARD));
+  for(unsigned k=0;k<3;++k){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(WalkMode::STANDARD));
    const double T=simple::walkModeSpec(WalkMode::STANDARD).periodS;
    const double steer[3]={0,simple::joystickSpec(WalkMode::STANDARD).lateralM/T,0},ahead[3]={topSpeed(WalkMode::STANDARD),0,0};
    assert(!r.m.drive(0,steer[1],0,r.p.now));hold(r,steer,unsigned((6*T+12)/.02));assert(r.m.walkSteered());
    r.p.flexTicks[9]=24;hold(r,ahead,unsigned(6*T/.02));assert(r.m.walkSteered());++deferred;
    if(k==0){stopNow(r);continue;}
+   // Release under the deferral: the WALK STOP runs its gait to WALK_SETTLE in
+   // the steered regime (no handover after it); the 24-tick scripted flex then
+   // removed, as no native arrival can absorb it (NATIVE_TARGET_NOT_REACHED).
+   if(k==2){r.m.walkStop();unsigned n=0;
+     for(;n<4000&&!std::strcmp(r.m.phase(),"WALK_STANDARD");++n){r.tick();assert(r.m.state()!=State::FAULT&&r.m.walkSteered()==(r.m.phase()==std::string("WALK_STANDARD")));}
+     assert(n<4000&&!std::strcmp(r.m.phase(),"WALK_SETTLE"));r.p.flexTicks[9]=0;assert(r.reachStand());continue;}
    r.p.flexTicks[9]=0;hold(r,ahead,unsigned(4*T/.02));assert(!r.m.walkSteered()&&r.m.state()==State::WALKING);stopNow(r);++runs;}
   std::printf("multidirectional joystick: %u runs, %u STOPs verified without fault; a backward walk keeps its law with a new selection (2 pairs x 3, STOP verified); a steered walk takes the selection at its forward handover; joystick limits of the walking law, backward saturated at its limit, below-band starts refused, ACC ceiling at selection, handover deferred under flex (%u) PASS (software only)\n",runs,stops,deferred);
 }
