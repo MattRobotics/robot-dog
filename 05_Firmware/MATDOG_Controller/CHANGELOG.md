@@ -4,6 +4,18 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — MATDOG Controller 1.0.2-dev.6 Motion vNext: multidirectional joystick on STANDARD and FAST — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. **Same version string `1.0.2-dev.6`, new source, build and APP** on `450d2c7`, which stays the installed reference (APP `82122e06…`) and the rollback with `1fbee7b`. Battery P1 (`fix/battery-p1-20261111`) is not included. Evidence: `09_Logs/Validation_Reports/Motion_vNext_Multidirectional_2026-11-11/`.
+
+- **Why:** handoff of 10/11: lateral, yaw and backward existed on SLOW only (`JOYSTICK_STEERING_SLOW_ONLY`, `JOYSTICK_BACKWARD_SLOW_ONLY`, `steerGait` on the SLOW law, `slowLaw` handover gate).
+- **Change:** a joystick spec per WALK mode (`JoystickSpec`: backward stride, steered ellipsoid, steered sway) and a steered box per mode (`steerBox`): each mode steers on its own law (period, duty, swing, height). Per second: SLOW unchanged (back 10, lateral 4.0 mm/s, yaw 1.83 deg/s); STANDARD lateral 6.7 mm/s, yaw 2.29 deg/s, sway 9 mm, **no backward yet** (`JOYSTICK_BACKWARD_UNAVAILABLE`); FAST back 20, lateral 4.8 mm/s, yaw 1.83 deg/s, sway 7.5 mm. Capabilities publish them per mode (`walk_modes[].joystick`), the dashboard scales the stick to them. A steered walk takes a new WALK mode at its return to the forward regime (`WALK_MODE_AFTER_STEERING`); a backward walk keeps its law.
+- **Certified boxes:** `kSteerStandard`, `kSteerFast` (`certify_steer_box.py`, 97 scenarios each, +/-40 mrad: 120/120 non-adjacent and 12/12 adjacent pairs, 11.08 / 10.99 mm), also admitted by `pointSafe`.
+- **Unchanged:** the SLOW laws (frame digests and SLOW joystick gate frames identical to `450d2c7`), STANDARD/FAST forward, STOP, SAFE_OFF, `kHeight`, `kSteer`, IMU envelopes, tolerances, drive table, NVS, geometry.
+- **Tests:** rig (151 joystick runs, 151 STOP verified), joystick gate per mode (SLOW/STANDARD PASS; FAST: only the pre-existing `frontal_changes`), `servo_plant` scenarios 4–7 per mode (steered STOP 48/48, steered IMU vertex 48/48, FAST backward 48/48), dashboard suite with Chrome, QEMU cost per release (steered STANDARD/FAST +3/+6 % peak against steered SLOW).
+- **Tools:** `joystick_envelope` and the QEMU bench set the verified register-85 ceiling (both refused every STAND since dev.6); the gate takes `JOY_MODE`; `certify_steer_box.py --name`.
+- **Pre-existing, unchanged, reported:** FAST forward joystick deceleration −0.44 mm static support (frames identical to `450d2c7`; 3 decel cycles give +0.84 mm); SLOW backward, a STOP in its first cycle met `STOP_MEASURED_OUTSIDE_BOX` in 1 of 6 `servo_plant` seeds (identical on `450d2c7`).
+
 ## Unreleased — MATDOG Controller 1.0.2-dev.6 operational ACC 220: register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
 
 > Operational candidate. **Same version string `1.0.2-dev.6`, new source, build and APP**; supersedes the installed `1fbee7b` (APP `39840bd4…`), which stays the rollback image with `975fe51` and `dd76fad`. Sources `5617f0e` and the dashboard fix after `ae70e03` (final audit 10/11). Hardware validation plan: `MATDOG_1_0_2_DEV6_ACC220_OPERATIONAL_20261110/HW_VALIDATION_PLAN.md`.
