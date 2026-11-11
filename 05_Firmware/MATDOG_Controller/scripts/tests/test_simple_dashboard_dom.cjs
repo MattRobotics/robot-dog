@@ -107,7 +107,8 @@ async function boot(initialStatus = fx.status_ready) {
   // 2026-11-10: the guide says the joystick's full scale is the selected mode's top speed, steering SLOW only,
   // and the selector changes a forward walk in progress; the presets belong to the mode; no stale 6.5 s.
   assert(/fondo corsa in avanti è la velocità massima della modalità WALK scelta/.test(q('#simple-diagnostics').textContent) &&
-    /Sterzo, laterale e retromarcia solo in SLOW/.test(q('#simple-diagnostics').textContent) &&
+    /Sterzo, laterale e retromarcia in tutte le modalità, ciascuna sulla propria legge/.test(q('#simple-diagnostics').textContent) &&
+    /retromarcia non ancora disponibile in STANDARD/.test(q('#simple-diagnostics').textContent) &&
     /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
     /Durante un WALK in avanti il selettore cambia la modalità del passo in corso/.test(q('#simple-diagnostics').textContent) &&
     !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
