@@ -102,7 +102,12 @@ inline void run(Sim& s){
     for(unsigned g=0;g<4;++g)for(unsigned k=0;k<1500;++k){if(k%12==0)s.m.drive(seg[g][0],seg[g][1],seg[g][2],gClock);s.tick();}
     std::snprintf(n,sizeof n,"JOY_STEER_%s",simple::walkModeSpec(mode).name);report(n,s);}
    {stand(s);s.tilt(.005,.008);s.m.selectWalkMode(mode);for(unsigned k=0;k<3000;++k){if(k%12==0)s.m.drive(-back,0,0,gClock);s.tick();}
-    std::snprintf(n,sizeof n,"JOY_BACK_%s",simple::walkModeSpec(mode).name);report(n,s);}}
+    std::snprintf(n,sizeof n,"JOY_BACK_%s",simple::walkModeSpec(mode).name);report(n,s);}
+   // vNext audit: steered -> fore/aft handover, with the loaded-arrest gate (regimeHandover).
+   {stand(s);s.tilt(.005,.008);s.m.selectWalkMode(mode);const double top=simple::walkModeSpec(mode).strideM[2]/T;
+    for(unsigned k=0;k<1500;++k){if(k%12==0)s.m.drive(0,lat,0,gClock);s.tick();}
+    for(unsigned k=0;k<1500;++k){if(k%12==0)s.m.drive(top,0,0,gClock);s.tick();}
+    std::snprintf(n,sizeof n,"JOY_HANDOVER_%s",simple::walkModeSpec(mode).name);report(n,s);}}
   // 5: STOP at eight instants of a WALK100 SLOW cycle (swing and four-contact),
   // each verified, then the STAND recovery completes the interrupted WALK STOP.
   {unsigned ok=0;Sim& x=s;stand(x);walk(x,WalkMode::SLOW,2);for(unsigned k=0;k<300;++k)x.tick();

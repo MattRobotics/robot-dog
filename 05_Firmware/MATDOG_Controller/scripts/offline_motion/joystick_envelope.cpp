@@ -53,7 +53,7 @@ struct Port: simple::ServoPort {
   bool verifyOff(unsigned i) override{return i==12||o[i].torque==0;}
   void publish(){for(unsigned i=0;i<12;++i){o[i].raw=t[i];o[i].q=(int(t[i])-2048)*simple::kTickRad;}}
 };
-struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0,nominalTilt=0,liftErr=0,maxStep=0;unsigned frames=0,tiltFail=0;double lo[12],hi[12];std::string end;
+struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0,nominalTilt=0,liftErr=0,maxStep=0;unsigned frames=0,tiltFail=0,refused=0;double lo[12],hi[12];std::string end,refusals;
   Result(){for(unsigned i=0;i<12;++i){lo[i]=1e9;hi[i]=-1e9;}}
   void joint(unsigned i,double q){lo[i]=std::fmin(lo[i],q);hi[i]=std::fmax(hi[i],q);}};
 }
@@ -98,7 +98,14 @@ int main(int argc,char** argv){
   for(const auto& st:steps){
     for(int n=0;n<std::lround(st.seconds*50);++n){
       if(st.walk>=0){if(n==0)m.walk(unsigned(st.walk),port.now);}
-      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
+      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();  // dashboard refresh 240 ms
+        // vNext audit: every refusal is reported and fails the scenario, except the
+        // refreshes while a WALK STOP runs (WALK_STOPPING) or its walk settles
+        // (MOTION_BUSY in WALK_SETTLE): the page holds the stick silent there and
+        // the next refresh after STANDING starts the walk.
+        else if(const char* why=m.drive(st.v[0],st.v[1],st.v[2],port.now)){
+          const bool settling=!std::strcmp(why,"MOTION_BUSY")&&m.state()==simple::State::MOVING&&!std::strcmp(m.phase(),"WALK_SETTLE");
+          if(std::strcmp(why,"WALK_STOPPING")&&!settling){++r.refused;if(r.refusals.find(why)==std::string::npos)r.refusals+=std::string(r.refusals.empty()?"":",")+why;}}}
       tick();
       if(m.state()==simple::State::FAULT){r.end=std::string("FAULT ")+m.reason();break;}
       if(std::strcmp(m.phase(),"WALK_STANDARD"))continue;
@@ -150,8 +157,12 @@ int main(int argc,char** argv){
   if(r.end.empty())r.end=std::string(simple::name(m.state()))+" "+m.reason();
   std::fclose(out);
   if(const char* env=std::getenv("JOY_ENVELOPE")){FILE* e=std::fopen(env,"a");if(e){for(unsigned i=0;i<12;++i)std::fprintf(e,"%s%.9f %.9f",i?" ":"",r.lo[i],r.hi[i]);std::fprintf(e,"\n");std::fclose(e);}}
-  if(!r.frames){std::printf("frames=0 walk=NOT_APPLICABLE end=%s\n",r.end.c_str());return r.end.rfind("FAULT",0)==0?1:0;}  // never reached WALK_STANDARD
-  std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad end=%s\n",
-    r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.end.c_str());
-  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0?1:0;
+  // A scenario walks unless declared otherwise (JOY_EXPECT_NOWALK: release in the
+  // start ramp); a walk that never came, or came unexpected, fails (vNext audit).
+  const bool noWalk=std::getenv("JOY_EXPECT_NOWALK")!=nullptr;
+  if(!r.frames){std::printf("frames=0 walk=%s refused=%u%s%s end=%s\n",noWalk?"NOT_APPLICABLE":"MISSING",r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
+    return r.end.rfind("FAULT",0)==0||!noWalk||r.refused?1:0;}
+  std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad refused=%u%s%s end=%s\n",
+    r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
+  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0||r.refused||noWalk?1:0;
 }

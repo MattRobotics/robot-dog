@@ -9,6 +9,9 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
+# vNext audit (2026-11-11): every other scenario must walk (frames > 0) and
+# none may have a joystick refresh refused (WALK_STOPPING of a reversal aside);
+# the tool's exit status is part of the verdict.
 # Usage: [JOY_MODE=0|1|2] run_joystick_envelope.sh [output-dir]. Geometry only. 46 scenarios.
 # JOY_MODE (vNext): the WALK mode whose own law the joystick walks (default SLOW);
 # the scenario speeds are that mode's limits, printed by the tool (--limits).
@@ -68,8 +71,9 @@ PY
 fail=0;steady=();random=()
 for line in "${lines[@]}"; do name=${line%% *};args=${line#* }
   [[ "$name" == random_* ]] && random+=("$name" "$out/$name.txt") || steady+=("$name" "$out/$name.txt")
-  res=$("$out/joy" "$out/$name.txt" $args 1:0,0,0 || true);echo "$name $res" | tee -a "$out/envelope.log"
-  [[ "$res" == *"end=STANDING"* && ( "$res" == *"walk=NOT_APPLICABLE"* || ( "$res" == *"tilt_fail=0 "* && "$res" != *"box_margin=-"* ) ) ]] || fail=1
+  expect=();[[ "$name" == release_in_start ]] && expect=(JOY_EXPECT_NOWALK=1)
+  rc=0;res=$(env "${expect[@]}" "$out/joy" "$out/$name.txt" $args 1:0,0,0) || rc=$?;echo "$name $res" | tee -a "$out/envelope.log"
+  [[ $rc == 0 && "$res" == *"end=STANDING"* && ( "$res" == *"walk=NOT_APPLICABLE"* || ( "$res" == *"tilt_fail=0 "* && "$res" != *"box_margin=-"* ) ) ]] || fail=1
 done
 contact=(env PYTHONDONTWRITEBYTECODE=1 python3 "$here/foot_edge_contact.py" frames)
 "${contact[@]}" "$out/contact_steady.json" "${steady[@]}" | tee "$out/contact_steady.log"
