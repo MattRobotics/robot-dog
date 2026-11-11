@@ -110,11 +110,12 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  // command. A forward walk in progress moves its law to it progressively
  // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); a steered
  // joystick walk takes it at its handover back to the forward regime, without
- // stopping (vNext: WALK_MODE_AFTER_STEERING); otherwise the next walk takes it
+ // stopping (vNext: WALK_MODE_AFTER_STEERING, a forward one only: a steered
+ // backward walk returns to a backward walk); otherwise the next walk takes it
  // (a WALK STOP, a STOP recovery and a backward walk keep their law).
  if(c.intent==motion::Intent::GAIT_SELECT){simple::WalkMode m;if(!simple::parseWalkMode(c.gait,m))return result("WALK_MODE_UNKNOWN");
    if(const char* r=motion_->selectWalkMode(m))return result(r);const auto st=motion_->state();
-   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":motion_->walkSteered()&&st==simple::State::WALKING?"WALK_MODE_AFTER_STEERING":
+   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":motion_->walkModeAtHandover()?"WALK_MODE_AFTER_STEERING":
                          st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
    // Nothing to stop at the PRONE rest: never take over the active command.
@@ -190,7 +191,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuRefusedBy=motion_->imuRefusedBy();
- s.walkModes=static_cast<uint8_t>(static_cast<unsigned>(motion_->selectedWalkMode())|static_cast<unsigned>(motion_->walkTarget())<<2|static_cast<unsigned>(motion_->walkMode())<<4);
+ s.walkModes=static_cast<uint8_t>(static_cast<unsigned>(motion_->selectedWalkMode())|static_cast<unsigned>(motion_->walkTarget())<<2|static_cast<unsigned>(motion_->walkMode())<<4|
+                                static_cast<unsigned>(motion_->joystickMode())<<6);
  {double d=0;s.entrySlot=static_cast<uint8_t>(motion_->entryViolation(esp_timer_get_time(),d));s.entryOutsideMrad=static_cast<int16_t>(std::lround(std::clamp(d*1e3,-32767.,32767.)));}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -277,16 +279,21 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  // WALK mode (2026-11-09): selected for the next walk, the law shape of the
  // current (or last) walk and the mode it moves to (2026-11-10: target, equal
  // to active once its law shape changed); the mode table is in the
- // capabilities. servo_read: goal
+ // capabilities. joystick (vNext audit, present only when it is not the
+ // selection): the mode whose joystick limits the Controller applies now (a
+ // steered or backward walk keeps its own law's until it can take the
+ // selection); the page scales the stick to it. servo_read: goal
  // speed min/max, ACC min/max the 12 servos hold (control read) and the age of
  // the oldest of those reads (ms); -1 until every servo has been read.
- {const unsigned selected=s.walkModes&3,target=(s.walkModes>>2)&3,current=s.walkModes>>4;int speedMin=-1,speedMax=-1,accMin=-1,accMax=-1;uint64_t oldest=0;
+ {const unsigned selected=s.walkModes&3,target=(s.walkModes>>2)&3,current=(s.walkModes>>4)&3,joystick=s.walkModes>>6;int speedMin=-1,speedMax=-1,accMin=-1,accMax=-1;uint64_t oldest=0;
   for(const auto& f:s.feedback){if(f.goalSpeed<0||f.acc<0){speedMin=speedMax=accMin=accMax=-1;break;}
     speedMin=speedMin<0?f.goalSpeed:std::min(speedMin,f.goalSpeed);speedMax=std::max(speedMax,f.goalSpeed);
     accMin=accMin<0?f.acc:std::min(accMin,f.acc);accMax=std::max(accMax,f.acc);oldest=oldest?std::min(oldest,f.controlStampUs):f.controlStampUs;}
-  add(",\"walk_mode\":{\"selected\":\"%s\",\"active\":\"%s\",\"target\":\"%s\",\"servo_read\":[%d,%d,%d,%d,%lld]}",
+  add(",\"walk_mode\":{\"selected\":\"%s\",\"active\":\"%s\",\"target\":\"%s\"",
     simple::walkModeSpec(static_cast<simple::WalkMode>(selected)).name,simple::walkModeSpec(static_cast<simple::WalkMode>(current)).name,
-    simple::walkModeSpec(static_cast<simple::WalkMode>(target)).name,
+    simple::walkModeSpec(static_cast<simple::WalkMode>(target)).name);
+  if(joystick!=selected)add(",\"joystick\":\"%s\"",simple::walkModeSpec(static_cast<simple::WalkMode>(joystick)).name);  // only when it differs: bounded budget
+  add(",\"servo_read\":[%d,%d,%d,%d,%lld]}",
     speedMin,speedMax,accMin,accMax,(long long)(speedMin<0||s.capturedUs<oldest?-1:(long long)((s.capturedUs-oldest)/1000)));}
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",

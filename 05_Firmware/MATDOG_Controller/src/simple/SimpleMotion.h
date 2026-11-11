@@ -95,7 +95,22 @@ constexpr double kJoystickSwayYM=.010, kJoystickSwayLowM=.005, kJoystickSwayOnDe
 // (fore/aft regime, time-reversed leg order); strideM, lateralM, yawRad: the
 // steered regime's ellipsoid (0: no steering on that law); the steered sway
 // (base: the law's own, low and full amplitude). SLOW: the dev.6 values above.
-struct JoystickSpec { double backM,strideM,lateralM,yawRad,swayBaseYM,swayLowM,swayYM; };
+// backSwayYM (vNext audit, 2026-11-11): the base sway of a backward walk, in
+// both regimes. kHeight leaves the HIP +-16.3 ticks; the loaded joint sits off
+// its reference (servo_plant static flex up to 10.5 HIP ticks, HW SLOW 5-6) and a
+// STOP checks the MEASURED pose in the box at every release: with the forward
+// sway, STOPs of backward walks met STOP_MEASURED_OUTSIDE_BOX (servo_plant 36
+// seeds: SLOW 5/562 attempts, STANDARD 4/68 on 6, FAST 1/571, all at a flex
+// >= 1.3x the HW pattern). Chosen with a STOP at every release of the
+// four-contact (sway transfer) windows, 36 seeds x 2 voltages x 14 instants =
+// 1008 STOPs over the plant's whole flex range (0.5-1.5x): SLOW 1.125, STANDARD
+// 0.75, FAST 0.5 mm, 0 of 1008 each (SLOW 1.25: 8, STANDARD 1.0: 2); scenario 5
+// at 72 seeds 0 of 576 per voltage. walk_support_check --reverse static support
+// 1.49 / 1.66 / 1.52 mm, capture 1.72 / 1.84 / 1.38 mm (below the forward laws'
+// 1.7 / 1.41 selection rule: the price of the HIP room), walk_tilt_envelope_check
+// --reverse PASS (HIP margin 10.3 / 12.3 / 13.3 ticks). decelCycles: the forward joystick decrease
+// (kJoystickFrontalDecelCycles below; FAST 3: frontal_changes -0.44 mm with 2).
+struct JoystickSpec { double backM,strideM,lateralM,yawRad,swayBaseYM,swayLowM,swayYM,backSwayYM,decelCycles; };
 inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM,const JoystickSpec& j){
   const double y=advanceYM/j.lateralM,w=yawRad/j.yawRad,s=std::sqrt(y*y+w*w);
   if(s>=(currentSwayYM>j.swayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return j.swayYM;
@@ -113,7 +128,9 @@ constexpr uint64_t kJoystickTimeoutUs=1000000;
 // the v2 support window on a forward COM error is narrower (zero near +2.9 mm
 // at 50 mm against +3.6 mm forward at 100 mm), hence kJoystickBackM.
 constexpr double kJoystickFrontalBand=.20, kJoystickBackM=.050, kJoystickFrontalRampCycles=4, kJoystickFrontalDecelCycles=2;
-constexpr JoystickSpec kSlowJoystick{kJoystickBackM,kJoystickStrideM,kJoystickLateralM,kJoystickYawRad,kJoystickSwayBaseYM,kJoystickSwayLowM,kJoystickSwayYM};
+constexpr double kJoystickBackSwayYM=.001125;
+constexpr JoystickSpec kSlowJoystick{kJoystickBackM,kJoystickStrideM,kJoystickLateralM,kJoystickYawRad,kJoystickSwayBaseYM,kJoystickSwayLowM,kJoystickSwayYM,
+                                     kJoystickBackSwayYM,kJoystickFrontalDecelCycles};
 inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM){return joystickSwayYM(advanceYM,yawRad,currentSwayYM,kSlowJoystick);}
 // WALK STANDARD IMU tilt envelopes: inner convex polygons of the kHeight box,
 // gen-1 RAW, nominal support strip (including rounding) and the StopPlan over
@@ -242,15 +259,26 @@ inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:k
 // Chosen with: STOP proof at kStopBrakeAcc, capture point and static support
 // not below SLOW (1.41 / 1.7 mm), HIP >= 8.7 ticks, envelopes kept by the
 // servo model. 40 mm/s is not reachable under these conditions; 32 mm/s is.
+// vNext audit (2026-11-11): STANDARD sway y 1.5 -> 1.25 mm. A STOP checks the
+// MEASURED pose in kHeight; the loaded HIP sits off its reference (servo_plant
+// flex up to 10.5 ticks): with 8.7 ticks of margin a forward STOP met
+// STOP_MEASURED_OUTSIDE_BOX (1 of 281 attempts per voltage, 36 seeds); with
+// 1.25 mm 0 of 576 per voltage on 72 seeds (1.0 mm as well, capture 1.32 mm).
+// SLOW forward keeps 9.3 ticks (0 of 288 per voltage, 36 seeds); backward: backSwayYM.
+// Not closed (design decision, kept within the rule above): a STOP at every
+// release of the sway-transfer windows (1008 per mode) still meets
+// STOP_MEASURED_OUTSIDE_BOX forward in SLOW 44 (flex >= 1.28x), STANDARD 2
+// (>= 1.16x), FAST 10 (>= 1.13x; 450d2c7 identical, STANDARD 36). 0 needs SLOW
+// 1.0 (capture 1.04 mm), STANDARD 1.0 or FAST 0.875 mm (capture 1.32 mm).
 // Offline (rigid ground, URDF COM, ideal tracking), top preset:
 //                          SLOW 100 mm  STANDARD 90 mm  FAST 80 mm
 //   period, speed          5.0 s 20     3.0 s 30        2.5 s 32 mm/s
-//   height, lift, sway y   120 8 1.5    110 8 1.5       105 6 1.0 mm
+//   height, lift, sway y   120 8 1.5    110 8 1.25      105 6 1.0 mm
 //   swing joint peak       1.275 5.81   2.207 21.0      2.350 26.4 rad/s, rad/s^2
 //   stance (loaded) peak   0.61 5.81    0.77 7.31       0.87 10.8
-//   static support         2.12         2.18            1.71 mm
-//   STOP capture point     1.41         1.69            1.41 mm
-//   kHeight margin HIP     9.3          8.7             11.1 ticks
+//   static support         2.12         1.99            1.71 mm
+//   STOP capture point     1.41         1.51            1.41 mm
+//   kHeight margin HIP     9.3          10.0            11.1 ticks
 // RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
 // keeps {1000,50}. The joystick walks forward on the selected mode's law (its
 // top speed is full scale); vNext: backward, lateral and yaw too, within that
@@ -419,6 +447,17 @@ class SimpleMotion {
   // STANDARD->FAST change met STOP_MEASURED_OUTSIDE_BOX in 2 of 6 seeds per voltage).
   bool walkModeLive() const { return phase_==Phase::WALK&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&!steered_; }
   bool walkSteered() const { return phase_==Phase::WALK&&steered_; }
+  // A steered forward joystick walk, not stopping: it takes the selection at its
+  // handover back to the fore/aft regime (a steered backward walk returns to a
+  // backward walk, which keeps its law: the next walk takes it).
+  bool walkModeAtHandover() const { return walkSteered()&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse; }
+  // The mode whose joystick limits apply now (drive(), status walk_mode.joystick):
+  // a walk rising to start, its latched mode; a joystick walk that cannot take
+  // the selection now (steered, backward, stopping), its own law's until it can;
+  // otherwise the selection (a live change, or the next walk).
+  WalkMode joystickMode() const {
+    if(joystick_&&walkRequested_&&phase_!=Phase::WALK)return pendingMode_;
+    return phase_==Phase::WALK&&state_==State::WALKING&&!walkModeLive()?walkMode_:selectedMode_;}
   double walkHeightM() const { return walkHeight_; }  // nominal height of that walk's law
   // Gait time t s after the start: eased in (walkClockS, its first four-contact
   // window carries the COM offset).
@@ -547,7 +586,12 @@ class SimpleMotion {
   // The steered IMU envelope is active: steered regime, not returning to fore/aft
   // (lateral, yaw and sway retired for a fore/aft demand). Single source for
   // limitWalkTilt and the offline envelope gate.
-  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==joystickSpec(walkMode_).swayBaseYM); }
+  bool steeredEnvelope() const { return steered_&&!(joystickFrontal_&&gait_.advanceYM==0&&gait_.yawRad==0&&gait_.swayYM==walkJoystick().swayBaseYM); }
+  // The walk's JoystickSpec in its direction: a backward walk's base sway is backSwayYM.
+  JoystickSpec walkJoystick() const { auto j=joystickSpec(walkMode_);if(gait_.reverse)j.swayBaseYM=j.backSwayYM;return j; }
+  // regimeHandover: an arrest STOP from the current reference, offset by each
+  // joint's measured load residual, stays inside the destination box.
+  bool loadedArrestInside(const motion::JointTargetFrame& q,const collision::Box& box) const;
   bool limitWalkTilt(double& roll,double& pitch,double headingCos=1,double headingSin=0) const;
   const TiltPolygon& pendingWalkTilt() const;  // fore/aft envelope of the walk startWalk would start
   const collision::Box& walkBox() const { return steered_?steerBox(walkMode_):kWalkBox; }
