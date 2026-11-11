@@ -975,15 +975,12 @@ void HttpTransport::statusExtension(
         bms.discharge_mos_on ? "ON" : "OFF", bms.alarms[0], bms.alarms[1],
         bms.alarms[2], bms.alarms[3]);
     // Capacity (Dashboard 2026-10-17): the DALY 0xD2 remaining-capacity
-    // register as reported (a BMS coulomb count, not validated on MATDOG), the
-    // configured nominal pack, and SOC x nominal labelled as an ESTIMATE.
-    // Display only: nothing here feeds a protection, permit or LED threshold.
-    add("bms_remaining_ah=%.1f\nbms_capacity_config_ah=%.1f\n"
-        "bms_remaining_estimate_ah=%.2f\n",
-        bms.remaining_ah, power::kPackNominalCapacityAh,
-        bms.soc_percent >= 0 && bms.soc_percent <= 100
-            ? bms.soc_percent * power::kPackNominalCapacityAh / 100.0f
-            : 0.0f);
+    // register as reported (a BMS coulomb count, not validated on MATDOG) and
+    // the configured nominal pack. Display only: nothing here feeds a
+    // protection, permit or LED threshold. (1.0.2-dev.7: the former SOC x
+    // nominal "estimate" restated the uncalibrated DALY SOC in Ah; removed.)
+    add("bms_remaining_ah=%.1f\nbms_capacity_config_ah=%.1f\n",
+        bms.remaining_ah, power::kPackNominalCapacityAh);
     add("bms_cells=%u\nbms_cell_min_mv=%u\nbms_cell_max_mv=%u\n"
         "bms_cell_delta_mv=%u\n",
         (unsigned)bms.cell_count, (unsigned)bms.cell_min_mv,
