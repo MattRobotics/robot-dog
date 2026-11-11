@@ -157,12 +157,14 @@ int main(int argc,char** argv){
   if(r.end.empty())r.end=std::string(simple::name(m.state()))+" "+m.reason();
   std::fclose(out);
   if(const char* env=std::getenv("JOY_ENVELOPE")){FILE* e=std::fopen(env,"a");if(e){for(unsigned i=0;i<12;++i)std::fprintf(e,"%s%.9f %.9f",i?" ":"",r.lo[i],r.hi[i]);std::fprintf(e,"\n");std::fclose(e);}}
-  // A scenario walks unless declared otherwise (JOY_EXPECT_NOWALK: release in the
-  // start ramp); a walk that never came, or came unexpected, fails (vNext audit).
+  // A scenario must walk unless declared otherwise (JOY_EXPECT_NOWALK, release in
+  // the start ramp: it may end before WALK, as STANDARD/FAST rising from the
+  // 120 mm stand, or walk a few frames, as SLOW at its own height); a missing
+  // walk anywhere else fails (vNext audit).
   const bool noWalk=std::getenv("JOY_EXPECT_NOWALK")!=nullptr;
   if(!r.frames){std::printf("frames=0 walk=%s refused=%u%s%s end=%s\n",noWalk?"NOT_APPLICABLE":"MISSING",r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
     return r.end.rfind("FAULT",0)==0||!noWalk||r.refused?1:0;}
   std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad refused=%u%s%s end=%s\n",
     r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
-  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0||r.refused||noWalk?1:0;
+  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0||r.refused?1:0;
 }

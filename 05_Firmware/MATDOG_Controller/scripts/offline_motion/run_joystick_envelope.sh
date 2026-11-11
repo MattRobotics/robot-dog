@@ -9,7 +9,8 @@
 # contacts and the URDF COM (> 0 required, steady and random) and the non-foot
 # ground clearance (>= 2 mm required); a scenario that never reaches WALK
 # (release in start) is NOT_APPLICABLE there and still gated on sequencing.
-# vNext audit (2026-11-11): every other scenario must walk (frames > 0) and
+# vNext audit (2026-11-11): every other scenario must walk (frames > 0; for
+# release_in_start the walk is optional, SLOW walks a few frames there) and
 # none may have a joystick refresh refused (WALK_STOPPING of a reversal aside);
 # the tool's exit status is part of the verdict.
 # Usage: [JOY_MODE=0|1|2] run_joystick_envelope.sh [output-dir]. Geometry only. 46 scenarios.
