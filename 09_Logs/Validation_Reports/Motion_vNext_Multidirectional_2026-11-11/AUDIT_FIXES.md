@@ -2,7 +2,9 @@
 
 Offline only: no device, no flash. Firmware status: **IMPLEMENTED NOT HARDWARE
 VALIDATED**. Commits on `1160dce`: `f6c899e` (motion), `fecced4` (dashboard),
-`3221764` and `acd849c` (offline tools), then this documentation commit.
+`3221764` and `acd849c` (offline tools), `9d9554d` (this documentation), then the
+build source that restores the `selectWalkMode()` line `static_audit.py` pins
+(the handover ACC check as a separate statement, same behaviour).
 Model: `servo_plant.inc` (ST3215 response, per-seed load, ACC/brake capability,
 latency, deadband, static flex 0.5-1.5x the dev.15 HIP pattern, 11.1 and 9.6 V).
 A plant result is software against a modelled servo, never a hardware result.

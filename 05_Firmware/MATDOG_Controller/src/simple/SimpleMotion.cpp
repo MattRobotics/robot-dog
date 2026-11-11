@@ -1069,9 +1069,11 @@ void SimpleMotion::steerWalk(uint64_t now){
 }
 const char* SimpleMotion::selectWalkMode(WalkMode m){
   // A walk that follows the selection must have the mode's drive accepted by
-  // the servos: never above the verified register 85. A steered forward walk
-  // follows it at its handover (vNext audit: accepted there, it never applied).
-  if((walkModeLive()||walkModeAtHandover())&&walkModeSpec(m).drive.acc>input_.accCeiling)return "SERVO_ACC_CEILING_BELOW_DRIVE";
+  // the servos: never above the verified register 85.
+  if(walkModeLive()&&walkModeSpec(m).drive.acc>input_.accCeiling)return "SERVO_ACC_CEILING_BELOW_DRIVE";
+  // A steered forward walk follows it at its handover (vNext audit: accepted
+  // there, it never applied).
+  if(walkModeAtHandover()&&walkModeSpec(m).drive.acc>input_.accCeiling)return "SERVO_ACC_CEILING_BELOW_DRIVE";
   selectedMode_=m;return nullptr;
 }
 // One release of a WALK mode change (SimpleMotion.h, kWalkModeRateSlope): a
