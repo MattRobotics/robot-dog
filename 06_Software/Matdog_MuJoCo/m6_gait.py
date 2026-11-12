@@ -94,6 +94,11 @@ def fast_scenarios(law, joy=FAST_JOY):
     for k in range(8):
         t = 14.0 + k * P / 8
         s[f"fast_stopcyc_{k}"] = ("FAST", h, held(1.0, t, d(1)) + [(t, "STOP")], t + 5.0, None)
+    # dense STOP sweep: 16 instants over one cycle, half a period later than stopcyc (other releases)
+    for k in range(16):
+        t = 14.0 + (k + .5) * P / 16
+        s[f"fast_stopdense_{k:02d}"] = ("FAST", h, held(1.0, t, d(1)) + [(t, "STOP")], t + 5.0, None)
+    s["fast_diag_stop"] = ("FAST", h, held(1.0, 16.0, d(.5, .5)) + [(16.0, "STOP")], 21.0, None)
     # continuous direction changes at the FAST ranges (the fractions of sweep_standard)
     sweep = []
     for k, (fx, fy) in enumerate(((1, 0), (.457, -.405), (.35, .72), (0, .72), (-.714, -.39), (-1, 0), (0, -1))):
