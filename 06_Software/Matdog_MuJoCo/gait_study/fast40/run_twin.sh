@@ -14,8 +14,8 @@ for spec in "$@"; do
   for s in $SC; do jobs="$jobs$label $law $bin $fw $s\n"; done
 done
 printf "$jobs" | xargs -P "${JOBS:-8}" -L1 sh -c 'cd '"$sim"' && MATDOG_FW_TREE=$3 ~/MATDOG/tools/mujoco-venv/bin/python m6_gait.py $2 '"$OUT"' $0 $4 --variant dev7_ground --fast-law $1 '"${EXTRA:-}"' > '"$OUT"'/$4__$0.log 2>&1 || echo "FAILED $0 $4"'
-# the perturbation must reach the twin: every JSON records its model in "definition"
-if [ -n "${EXTRA:-}" ]; then
+# a model perturbation (--set) must reach the twin: every JSON records its model in "definition"
+if [[ "${EXTRA:-}" == *--set* ]]; then
   ~/MATDOG/tools/mujoco-venv/bin/python -c 'import glob,json,sys
 sys.path.insert(0,sys.argv[2]);import m6_dev7
 base=json.loads(json.dumps(m6_dev7.VARIANTS["dev7_ground"]))

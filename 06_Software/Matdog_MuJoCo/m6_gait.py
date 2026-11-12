@@ -13,6 +13,7 @@ Metrics come from the twin's own physics (never from the commanded law):
 
 Usage: m6_gait.py <cosim> <out dir> <label> [scenario ...] [--variant dev7_ground] [--set key=value ...]
        [--fast-law period_s:stride_mm:height_mm] (the FAST law under test for the fast_* scenarios; default dev.7 2.5:80:105)
+       [--fast-joy lateral_mm:yaw_rad:back_mm] (its JoystickSpec per cycle; default dev.7 12:0.08:50)
 """
 import dataclasses
 import json
@@ -132,7 +133,7 @@ def run(binary, out_dir, label, name, v, write=True):
     idx = np.clip(np.ceil(t / twin.RELEASE_S - 1e-9).astype(int) - 1, 0, n - 1)
     st = stance[idx]
     walking = (st >= 0).all(axis=1)
-    rep = {"scenario": name, "label": label, "mode": mode, "params": dataclasses.asdict(params), "definition": v, "fast_law": dict(FAST_LAW),
+    rep = {"scenario": name, "label": label, "mode": mode, "params": dataclasses.asdict(params), "definition": v, "fast_law": dict(FAST_LAW), "fast_joy": dict(FAST_JOY),
            "refusals": [r for r in replies if r[2] != "OK -"], "wall_s": round(time.time() - started, 1),
            "faults": [(r["t_s"], r["reason"]) for r in rows if r["state"] == "FAULT"][:1],
            "imu_reasons": {k: sum(r["imu_reason"] == k for r in rows) for k in {r["imu_reason"] for r in rows}},
@@ -246,6 +247,12 @@ def main():
     if "--variant" in argv:
         i = argv.index("--variant")
         base = argv[i + 1]
+        del argv[i:i + 2]
+    if "--fast-joy" in argv:  # the FAST JoystickSpec under test, per cycle: lateral_mm:yaw_rad:back_mm
+        i = argv.index("--fast-joy")
+        lat_mm, yaw_rad, back_mm = (float(x) for x in argv[i + 1].split(":"))
+        FAST_JOY.update(lateral=lat_mm * 1e-3, yaw=yaw_rad, back=back_mm * 1e-3)
+        SCENARIOS.update(fast_scenarios(FAST_LAW))
         del argv[i:i + 2]
     if "--fast-law" in argv:
         i = argv.index("--fast-law")
