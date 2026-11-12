@@ -15,7 +15,12 @@ import math
 import pathlib
 import sys
 
-FOREAFT = ("fwd_", "back_")
+FOREAFT = ("fwd_", "back_", "fast_fwd", "fast_back")
+
+
+def is_yaw(name):
+    """Pure rotation scenarios (yaw_*, fast_yaw): travel in degrees."""
+    return name.startswith("yaw") or name in ("fast_yaw",)
 
 
 def load(d):
@@ -31,7 +36,7 @@ def useful(r):
     tr = r.get("travel")
     if not tr:
         return None
-    if r["scenario"].startswith("yaw"):
+    if is_yaw(r["scenario"]):
         return abs(tr["twin_yaw_deg_per_cycle"]), abs(tr["law_yaw_deg_per_cycle"]), "deg"
     lx, ly = tr["law_mm_per_cycle"]
     n = math.hypot(lx, ly) or 1.0
@@ -44,6 +49,10 @@ def row(r):
     u = useful(r)
     if u:
         cells["travel"] = f"{u[0]:.1f}/{u[1]:.1f} {u[2]} ({100 * u[0] / u[1]:.0f}%)" if u[1] else "-"
+        # per second (laws of different periods): the same useful travel over the law period
+        period = r.get("fast_law", {}).get("period") if r["scenario"].startswith("fast_") and r.get("mode") == "FAST" else None
+        if period:
+            cells["travel"] += f" = {u[0] / period:.2f} {u[2]}/s"
         cells["eff"] = u[0] / u[1] if u[1] else None
         cells["lat"] = r["travel"]["lateral_excursion_p2p_mm"][0]
     f = r.get("feet")

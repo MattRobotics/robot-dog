@@ -12,6 +12,7 @@ Metrics come from the twin's own physics (never from the commanded law):
 - STOP: verified or fault, and the time to verification.
 
 Usage: m6_gait.py <cosim> <out dir> <label> [scenario ...] [--variant dev7_ground] [--set key=value ...]
+       [--fast-law period_s:stride_mm:height_mm] (the FAST law under test for the fast_* scenarios; default dev.7 2.5:80:105)
 """
 import dataclasses
 import json
@@ -70,7 +71,42 @@ def scenarios():
     return s
 
 
+# FAST study (2026-11-12): the FAST law under test (dev.7 by default; --fast-law period:stride_mm:height_mm)
+# and its JoystickSpec per cycle (dev.7 FAST: lateral 12 mm, yaw .08 rad, backward 50 mm).
+FAST_LAW = {"period": 2.5, "stride": .080, "height": .105}
+FAST_JOY = {"lateral": .012, "yaw": .08, "back": .050}
+
+
+def fast_scenarios(law, joy=FAST_JOY):
+    """Every direction of the FAST law at its own published ranges (cosim DRIVE in m/s, rad/s)."""
+    P, h = law["period"], law["height"]
+    top, lat, yaw, back = law["stride"] / P, joy["lateral"] / P, joy["yaw"] / P, joy["back"] / P
+    # full precision: the published range is the same double quotient (a 6-digit rounding can exceed it)
+    d = lambda fx, fy=0.0, fw=0.0: f"DRIVE {fx * (top if fx >= 0 else back):.17g} {fy * lat:.17g} {fw * yaw:.17g}"
+    walk = lambda cmd, t1=31.0, w=(11.0, 31.0): ("FAST", h, held(1.0, t1, cmd) + [(t1 + .2, "WALKSTOP")], t1 + 9.0, w)
+    s = {"fast_fwd": walk(d(1)), "fast_fwd_32": walk(f"DRIVE {min(.032, top):.6f} 0 0"),
+         "fast_fwd_stop": ("FAST", h, [(1.0, "STOPFRONT 12 0.85")] + held(1.0, 30.0, d(1)), 22.0, None),
+         "fast_back": walk(d(-1)), "fast_back_stop": ("FAST", h, held(1.0, 13.0, d(-1)) + [(13.0, "STOP")], 18.0, None),
+         "fast_left": walk(d(0, 1), w=(13.0, 31.0)), "fast_right": walk(d(0, -1), w=(13.0, 31.0)),
+         "fast_yaw": walk(d(0, 0, 1), w=(13.0, 31.0)),
+         "fast_yaw_stop": ("FAST", h, held(1.0, 16.0, d(0, 0, -1)) + [(16.0, "STOP")], 21.0, None),
+         "fast_diag": walk(d(.5, .5), w=(13.0, 31.0)), "fast_diag_yaw": walk(d(.5, 0, .5), w=(13.0, 31.0))}
+    for k in range(8):
+        t = 14.0 + k * P / 8
+        s[f"fast_stopcyc_{k}"] = ("FAST", h, held(1.0, t, d(1)) + [(t, "STOP")], t + 5.0, None)
+    # continuous direction changes at the FAST ranges (the fractions of sweep_standard)
+    sweep = []
+    for k, (fx, fy) in enumerate(((1, 0), (.457, -.405), (.35, .72), (0, .72), (-.714, -.39), (-1, 0), (0, -1))):
+        sweep += held(1.0 + 6.0 * k, 7.0 + 6.0 * k, d(fx, fy))
+    s["fast_sweep"] = ("FAST", h, sweep + [(43.2, "WALKSTOP")], 50.0, (1.0, 43.0))
+    s["fast_modes_cycle"] = ("SLOW", .120, held(1.0, 12.0, "DRIVE 0.020 0 0") + [(12.0, "SELECT STANDARD")] + held(12.0, 24.0, "DRIVE 0.030 0 0")
+                             + [(24.0, "SELECT FAST")] + held(24.0, 36.0, d(1)) + [(36.0, "SELECT SLOW")] + held(36.0, 49.0, "DRIVE 0.020 0 0")
+                             + [(49.2, "WALKSTOP")], 58.0, (2.0, 49.0))
+    return s
+
+
 SCENARIOS = scenarios()
+SCENARIOS.update(fast_scenarios(FAST_LAW))
 
 
 def yaw_of(q):
@@ -91,7 +127,7 @@ def run(binary, out_dir, label, name, v, write=True):
     idx = np.clip(np.ceil(t / twin.RELEASE_S - 1e-9).astype(int) - 1, 0, n - 1)
     st = stance[idx]
     walking = (st >= 0).all(axis=1)
-    rep = {"scenario": name, "label": label, "mode": mode, "params": dataclasses.asdict(params), "definition": v,
+    rep = {"scenario": name, "label": label, "mode": mode, "params": dataclasses.asdict(params), "definition": v, "fast_law": dict(FAST_LAW),
            "refusals": [r for r in replies if r[2] != "OK -"], "wall_s": round(time.time() - started, 1),
            "faults": [(r["t_s"], r["reason"]) for r in rows if r["state"] == "FAULT"][:1],
            "imu_reasons": {k: sum(r["imu_reason"] == k for r in rows) for k in {r["imu_reason"] for r in rows}},
@@ -205,6 +241,12 @@ def main():
     if "--variant" in argv:
         i = argv.index("--variant")
         base = argv[i + 1]
+        del argv[i:i + 2]
+    if "--fast-law" in argv:
+        i = argv.index("--fast-law")
+        per, stride_mm, height_mm = (float(x) for x in argv[i + 1].split(":"))
+        FAST_LAW.update(period=per, stride=stride_mm * 1e-3, height=height_mm * 1e-3)
+        SCENARIOS.update(fast_scenarios(FAST_LAW))
         del argv[i:i + 2]
     binary, out_dir, label, names = pathlib.Path(argv[0]), pathlib.Path(argv[1]), argv[2], argv[3:] or list(SCENARIOS)
     variant, v = m6_dev7.variant_params(base, sets)
