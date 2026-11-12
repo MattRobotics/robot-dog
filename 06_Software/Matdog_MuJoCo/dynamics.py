@@ -17,7 +17,7 @@ import servo
 import twin
 
 HERE = pathlib.Path(__file__).resolve().parent
-COLLISION_H = HERE.parents[1] / "05_Firmware/MATDOG_Controller/src/simple/CollisionData.h"
+COLLISION_H = twin.FW_TREE / "src/simple/CollisionData.h"
 CONTACT_N = 0.1        # a foot is in contact above this normal force (N)
 DRAG_N = 2.0           # a swing foot carrying more than this drags on the floor (N)
 VERIFY_TICKS, VERIFY_LOAD, VERIFY_SPEED = 48, 0.400, 50   # SimpleMotion STOP verification (handoff section 4)
@@ -77,9 +77,12 @@ def support_margin(points, com):
 
 
 class Twin:
-    def __init__(self, params, mu=0.8, unit=None, fixture=None):
+    def __init__(self, params, mu=0.8, unit=None, fixture=None, noslip=0, base_mass_kg=None, com_shift_m=None):
         """`fixture` (roll, pitch) in rad: the body welded at that attitude 0.5 m above the floor, legs free
-        (the hardware fixture, assumed rigid); None: free body on the floor."""
+        (the hardware fixture, assumed rigid); None: free body on the floor. `noslip` > 0: MuJoCo's
+        no-slip iterations (a planted foot does not creep under a sustained tangential force, as the
+        soft contact otherwise lets it); `base_mass_kg`: base_link mass (e.g. without the Jetson),
+        inertia scaled with it; `com_shift_m`: (x, y, z) added to the base_link COM."""
         self.p = params
         self.fixture = fixture
         if fixture is None:
@@ -90,6 +93,15 @@ class Twin:
             self.m = spec.compile()
             self.d = mujoco.MjData(self.m)
             self.m.eq_solref[0] = [0.004, 1.0]  # as stiff as the contacts (geom default)
+        self.m.opt.noslip_iterations = int(noslip)
+        base = self.m.body("base_link").id
+        if base_mass_kg is not None:
+            self.m.body_inertia[base] *= base_mass_kg / self.m.body_mass[base]
+            self.m.body_mass[base] = base_mass_kg
+        if com_shift_m is not None:
+            self.m.body_ipos[base] += np.asarray(com_shift_m, float)
+        if base_mass_kg is not None or com_shift_m is not None:
+            mujoco.mj_setConst(self.m, self.d)
         self.feet = np.array([self.m.geom(f"{l}_foot_cylinder").id for l in twin.LEGS])
         self.floor = self.m.geom("floor").id
         self.m.geom_friction[self.feet, 0] = mu
@@ -139,7 +151,13 @@ class Twin:
     def advance(self, seconds, record=True):
         for s in range(int(round(seconds / self.dt))):
             self.servos.step(self.now, self.dt)
-            self.d.ctrl[:] = self.servos.torque(self.d.qpos[7:19])
+            tau = self.servos.torque(self.d.qpos[7:19])
+            if self.p.gear_efficiency != 1.0 and self.p.gear_friction_v0_rad_s > 0:
+                load = self.servos.gear_friction(tau) - self.p.friction
+                tau = tau - load * np.tanh(self.d.qvel[6:18] / self.p.gear_friction_v0_rad_s)
+            elif self.p.gear_efficiency != 1.0:
+                self.m.dof_frictionloss[self.dofs] = self.servos.gear_friction(tau)
+            self.d.ctrl[:] = tau
             mujoco.mj_step(self.m, self.d)
             self.now += self.dt
             if record and (s + 1) % self.every == 0:

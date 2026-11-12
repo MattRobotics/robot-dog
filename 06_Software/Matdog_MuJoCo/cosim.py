@@ -64,14 +64,21 @@ class Bridge:
         self.p.wait(timeout=10)
 
 
-def due(when, t, rows, fired):
+def due(when, t, rows, fired, renewed=None):
     """An event's condition: a time from STANDING (s), ("cycles", c) the first WALKING
-    release at walk_cycles >= c, or ("after", s) s after the previous event fired."""
+    release at walk_cycles >= c, ("after", s) s after the previous event fired, or
+    ("renew", s) s after the previous renewal or event (`renewed`: its time)."""
     if isinstance(when, tuple) and when[0] == "cycles":
         return bool(rows) and rows[-1]["state"] == "WALKING" and float(rows[-1]["walk_cycles"]) >= when[1]
     if isinstance(when, tuple) and when[0] == "after":
         return t >= (fired[-1] if fired else 0.0) + when[1] - 1e-9
+    if isinstance(when, tuple) and when[0] == "renew":
+        return t >= (renewed if renewed is not None else fired[-1] if fired else 0.0) + when[1] - 1e-9
     return when <= t + 1e-9
+
+
+def renewal(event):
+    return isinstance(event[0], tuple) and event[0][0] == "renew"
 
 
 def imu_quaternion(base, offset):
@@ -84,22 +91,38 @@ def imu_quaternion(base, offset):
     return out
 
 
-def simulate(binary, events, duration, params=None, mu=0.8, unit=None, height=0.15, fixture=None, imu_offset=None):
+def simulate(binary, events, duration, params=None, mu=0.8, unit=None, height=0.15, fixture=None, imu_offset=None, model=None):
     """The closed loop from STANDING at `height` (m): (rows, twin, replies, columns).
     Events [(when, command)] fire in order, each at the first release where due() holds.
-    `imu_offset` (roll, pitch) rad: the IMU mounted turned from base_link (None: aligned, as before)."""
+    `imu_offset` (roll, pitch) rad: the IMU mounted turned from base_link (None: aligned, as before);
+    `model`: dynamics.Twin options (noslip, base_mass_kg, com_shift_m)."""
     params = params or servo.Params()
     bridge = Bridge(binary)
     standing = bridge.record(bridge.ask(f"STAND {height}"))
     raw0 = np.array([int(standing[f"raw{i}"]) for i in range(12)])
-    tw = dynamics.Twin(params, mu=mu, unit=unit, fixture=fixture)
+    tw = dynamics.Twin(params, mu=mu, unit=unit, fixture=fixture, **(model or {}))
     tw.begin((raw0 - 2048) * twin.TICK, int(standing["drive_speed_step_s"]), int(standing["drive_acc_100step_s2"]))
-    rows, replies, pending, fired = [], [], list(events), []
+    rows, replies, pending, fired, renewed = [], [], list(events), [], None
     for n in range(int(round(duration / twin.RELEASE_S))):
         t = n * twin.RELEASE_S
-        while pending and due(pending[0][0], t, rows, fired):
-            replies.append((t, pending[0][1], bridge.ask(pending.pop(0)[1])))
+        while pending:
+            # a joystick renewal ("renew") never holds back the next command: once that is due, the
+            # renewals before it are dropped; "after" counts from the last command, not from a renewal
+            j = next((i for i, e in enumerate(pending) if not renewal(e)), None)
+            if j and due(pending[j][0], t, rows, fired):
+                del pending[:j]
+            if not due(pending[0][0], t, rows, fired, renewed):
+                break
+            event = pending.pop(0)
+            reply = bridge.ask(event[1])
+            if renewal(event):
+                renewed = t
+                if reply != "OK -":
+                    replies.append((t, "RENEW " + event[1], reply))
+                continue
+            replies.append((t, event[1], reply))
             fired.append(t)
+            renewed = t
         d = tw.d
         q, qd = d.qpos[7:19], d.qvel[6:18]
         raw = 2048 + np.rint(q / twin.TICK).astype(int)

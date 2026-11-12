@@ -1,12 +1,16 @@
 """Shared helpers of the MATDOG MuJoCo twin: model, slot map, replay data, foot contact."""
 import csv
 import math
+import os
 import pathlib
 
 import mujoco
 import numpy as np
 
 HERE = pathlib.Path(__file__).resolve().parent
+# Firmware sources the twin reads (boxes, gen-1 transform) and fw_bridge compiles: this
+# tree's, or another checkout's MATDOG_Controller (MATDOG_FW_TREE, e.g. the installed build's).
+FW_TREE = pathlib.Path(os.environ.get("MATDOG_FW_TREE") or HERE.parents[1] / "05_Firmware/MATDOG_Controller")
 MODEL_XML = HERE / "generated" / "matdog.xml"
 TICK = 2 * math.pi / 4096  # simple::kTickRad
 LEGS = ("lf", "rf", "rh", "lh")  # firmware slot order

@@ -4,7 +4,9 @@
 // instead of the commanded pose. One line per message on stdin/stdout:
 //   STAND <h>          stand from the rig's PRONE start with ideal tracking
 //                      (the twin starts at that STANDING pose); prints a record
-//   SELECT <mode>      selectWalkMode;  WALK <preset>; DRIVE <vx>; WALKSTOP; STOP
+//   SELECT <mode>      selectWalkMode;  WALK <preset>; DRIVE <vx> [<vy> <yaw>] (the joystick's
+//                      three axes, m/s and rad/s); WALKSTOP; STOP
+//   HEIGHT <h>         a STAND command while STANDING (HEIGHT_CHANGE), tracked by the twin
 //   STOPFRONT <s> [p]  STOP at the first front-leg swing progress >= p (0.5) after <s> s of walk
 //   TICK <raw x12> <speed x12> <load x12> <qw qx qy qz>
 //                      feedback in the rig's RAW map (raw = 2048 + q / tick),
@@ -41,13 +43,14 @@ int main() {
       const char* refused = r.m.stand(h, r.p.now);
       if (!refused && !r.reachStand()) refused = "NOT_REACHED";
       std::cout << "R " << rig_record::fields(r) << " " << (refused ? refused : "-") << std::endl;
-    } else if (cmd == "SELECT" || cmd == "WALK" || cmd == "DRIVE" || cmd == "WALKSTOP" || cmd == "STOP" || cmd == "STOPFRONT") {
+    } else if (cmd == "SELECT" || cmd == "WALK" || cmd == "DRIVE" || cmd == "WALKSTOP" || cmd == "STOP" || cmd == "STOPFRONT" || cmd == "HEIGHT") {
       const char* refused = nullptr;
-      if (cmd == "SELECT") {
+      if (cmd == "HEIGHT") { double h; in >> h; refused = r.m.stand(h, r.p.now); }
+      else if (cmd == "SELECT") {
         std::string m; in >> m; simple::WalkMode mode;
         refused = simple::parseWalkMode(m.c_str(), mode) ? r.m.selectWalkMode(mode) : "BAD_MODE";
       } else if (cmd == "WALK") { unsigned preset; in >> preset; refused = r.m.walk(preset, r.p.now); walkTime = 0; }
-      else if (cmd == "DRIVE") { double vx; in >> vx; refused = r.m.drive(vx, 0, 0, r.p.now); }
+      else if (cmd == "DRIVE") { double vx, vy = 0, yaw = 0; in >> vx; in >> vy >> yaw; refused = r.m.drive(vx, vy, yaw, r.p.now); }
       else if (cmd == "WALKSTOP") r.m.walkStop();
       else if (cmd == "STOP") r.m.stop();
       else { in >> stopFrontAfter; if (!(in >> stopFrontProgress)) stopFrontProgress = .5; }

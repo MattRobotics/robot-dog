@@ -13,7 +13,8 @@ calibration, NVS, servo ID, STOP or mechanical limit is modified; no robot acces
 06_Software/Matdog_MuJoCo/fw_bridge/build.sh <build dir>
 ```
 
-`build.sh` compiles three host tools against the firmware sources of this tree, unchanged:
+`build.sh` compiles three host tools against the firmware sources of this tree (or of `MATDOG_FW_TREE`,
+e.g. the installed build's checkout; commit and dirty files in `<build dir>/SOURCE.txt`), unchanged:
 `fk_reference` (LegKinematics + FootContact), `export_sequences` (SimpleMotion on the scripted rig of
 `test_simple_motion.cpp`, as the handoff's `export_walk_replay.cpp`) and `cosim` (the same
 SimpleMotion fed by the twin).
@@ -40,6 +41,12 @@ SimpleMotion fed by the twin).
 | `view.py` | desktop viewer (play/pause, step, speed, fault, replay selection) and MP4/PNG offscreen, with tagged overlays and the hip-vs-kHeight plot |
 | `demo.sh` | renders the visual demo (5 MP4 + key frames) offscreen |
 | `report_tables.py` | markdown tables of all results |
+| `m6_dev7.py` | M6: the 1.0.2-dev.7 session (b5610620d0ce) replayed in closed loop: 16 ground windows (7 STOPs) and 2 fixture windows with the joystick on three axes, and the M1 static HOLDs (`hold`); `--variant dev7_ground` is the corrected ground twin of `REPORT_M6.md` |
+| `m6_summary.py` | M6: per variant, the 7 STOPs against the hardware interval, twin/HW ratios of error, duty and speed, hip margins, IMU, yaw rate |
+| `m6_legs.py` | M6: swing-foot load proxy, validated on the twin (known foot force) before it is read on the hardware |
+| `m6_gait.py`, `m6_gait_summary.py` | M6 gait study: one Motion build (dev.7 or a `gait_study/*.patch`) over a fixed scenario set, metrics from the twin's physics only |
+| `gait_study/` | `build_variant.sh` (a patch on an exported copy of a commit, never a checkout) and the candidate patches of `REPORT_M6.md` |
+| `REPORT_M6.md` | M6 report: dev.7 correlation and gait study |
 | `fw_bridge/` | `build.sh`, `fk_reference.cpp`, `export_sequences.cpp`, `cosim.cpp`, `rig_record.h` (shared record columns) |
 | `requirements.txt`, `setup_venv.sh` | pinned environment |
 | `PROVENANCE.md` | firmware sources used (identical in `ae70e03` and `450d2c793dcb`), input and hardware-data hashes |
@@ -86,7 +93,10 @@ MuJoCo, [FW] production SimpleMotion output, [HW] measured on the robot, [IPOTES
 - Kinematics, masses, CoM and inertias are the URDF's (checked to 1e-12). The foot contact is the
   analytic cylinder of `MATDOG_FOOT_CONTACT_GEOMETRY.yaml` with a sharp rim (the 2 mm fillet is not
   modelled); other links collide with the floor only through their convex hulls; no self-collision.
-- Floor rigid and level, friction 0.8 (hypothesis), MuJoCo soft contact.
+- Floor rigid and level, friction 0.8 (hypothesis), MuJoCo soft contact (it creeps under a sustained
+  tangential force; `dynamics.Twin(noslip=5)` removes the creep, part of `dev7_ground`).
+- `servo.Params.gear_efficiency` < 1: load-dependent gear friction (default 1 = the model below, unchanged);
+  `dev7_ground` uses 0.5 with the smooth form (`gear_friction_v0_rad_s`), identified on static HOLDs only.
 - The servo model is identified unloaded at ≤ 600 step/s and ACC ≤ 50; loaded braking, ACC 180/220
   dynamics, load-dependent gear friction and the internal speed loop are not measured. Compared, not
   refitted, with the 450d2c7 fixture runs (unloaded, 1000–1950 step/s, ACC 50–220): paired error RMSE

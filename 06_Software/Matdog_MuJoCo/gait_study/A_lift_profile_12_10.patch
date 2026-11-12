@@ -1,0 +1,58 @@
+diff -ru a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp c/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-11 19:04:50.000000000 +0100
++++ c/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-12 08:13:21.049348948 +0100
+@@ -101,6 +101,21 @@
+   if(pv(u)>=1-r){const T w=T(1)-u;return T(1)-T(k)*w*w;}
+   return T(1/(1-r))*(u-T(.5*r));
+ }
++// Vertical swing profile (gait study, MuJoCo dev.7 correlation 2026-11-12):
++// kSwingLiftRise > 0 lifts the foot with a smootherstep over the first and
++// lowers it over the last kSwingLiftRise of the swing, flat at liftM between
++// (C2, zero speed and acceleration at lift-off and touchdown); 0 keeps the
++// legacy bell 64 u^3 (1-u)^3, which reaches only 26 % of liftM at u = 0.2.
++#ifndef MATDOG_SWING_LIFT_RISE
++#define MATDOG_SWING_LIFT_RISE 0.35
++#endif
++constexpr double kSwingLiftRise=MATDOG_SWING_LIFT_RISE;
++template<class T> T liftProfile(T u){
++  if(kSwingLiftRise<=0)return T(64)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++  const T up=pv(u)<kSwingLiftRise?smooth(u*T(1/kSwingLiftRise)):T(1);
++  const T down=pv(u)>1-kSwingLiftRise?smooth((T(1)-u)*T(1/kSwingLiftRise)):T(1);
++  return up*down;
++}
+ // Geometric stride law: body progress, in cycles of advance. Identity without
+ // ramps. The start raises the progress rate 0->1 over startCycles; after the
+ // decel cycle S=terminal-stopCycles the rate falls 1->0 at the terminal
+@@ -182,7 +197,7 @@
+     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
+     out.feet[i]=a;
+     if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp,p.swingRampEnd);
+-      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(p.liftM)*liftProfile(u);
+       out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
+ }
+ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double accel,double terminal,GaitTrack* track){
+diff -ru a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp c/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp	2026-11-11 19:04:50.000000000 +0100
++++ c/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp	2026-11-12 08:13:21.085459288 +0100
+@@ -88,7 +88,7 @@
+ constexpr WalkModeSpec kWalkModes[]={
+   {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
+   {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,.00125,&kStandardTilt,&kStandardTilt,false},
+-  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.006,.0010,&kFastTilt,&kFastTilt,false}};
++  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.010,.0010,&kFastTilt,&kFastTilt,false}};
+ // Register 85 is configured to cover every drive of the table.
+ static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&
+               kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,"every drive within register 85");
+diff -ru a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h c/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-11 19:04:50.000000000 +0100
++++ c/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-12 08:13:21.069459045 +0100
+@@ -35,7 +35,7 @@
+ // - duty .80 lengthens the swing; the start clock eases in over one second
+ //   (walkClockS) and the final recentring takes kWalkSettleCycles, so the
+ //   four-contact body moves stay inside the qualified drive.
+-constexpr double kWalkPeriodS=5.0, kWalkDuty=.80, kWalkLiftM=.008;
++constexpr double kWalkPeriodS=5.0, kWalkDuty=.80, kWalkLiftM=.012;
+ // Lower WALK posture stays in the existing HEIGHT joint box (HIP +/-25 mrad).
+ // The HIP range is shared by the lateral sway, the IMU roll correction and the
+ // STOP arrest: the 1.5 mm lateral transfer in a 0.25 s four-contact window

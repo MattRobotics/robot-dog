@@ -31,6 +31,7 @@ import servo
 import twin
 
 LEAD_S = 1.5  # twin HOLD before the first command (the run's own HOLD is not replayed)
+JOY_RENEW_S, JOY_HOLD_S, JOY_SLACK_S = 0.2, 1.0, 30.0  # joystick renewal in the twin; a last DRIVE without a follower is held JOY_HOLD_S
 STRIDES_MM = {"SLOW": (50, 75, 100), "STANDARD": (60, 75, 90), "FAST": (60, 70, 80)}  # WALK presets, SimpleMotion.cpp kModes
 # One motivated physical correction at a time (name -> {"params": {...}, "mu": .., "unit": [...], "imu_offset_mrad": (roll, pitch)}).
 VARIANTS = {"baseline": {},
@@ -92,23 +93,29 @@ def events(snaps, cmds, mode):
         elif kind in ("WALKSTOP", "STOP"):
             add = [(when, kind)]
         elif kind == "DRIVE":
-            vx, vy, yaw = (tuple(c["arg"]) + (0.0,))[:3]
-            if abs(vy) > 5e-4 or abs(yaw) > 1e-3:
-                raise SystemExit(f"command at {c['t_ms'] / 1e3:.3f} s: lateral {vy * 1e3:.1f} mm/s, yaw {yaw:.3f} rad/s, "
-                                 "not reproducible (cosim DRIVE is frontal only)")
-            add = [(when, f"DRIVE {vx:.6f}")]
+            vx, vy, yaw = (tuple(c["arg"]) + (0.0, 0.0))[:3]
+            add = [(when, f"DRIVE {vx:.6f} {vy:.6f} {yaw:.6f}")]
+            # the dashboard renews a held stick well inside kJoystickTimeoutUs (1 s); the 1 Hz snapshots see
+            # one renewal per second: the twin renews the last seen value every JOY_RENEW_S until the next command
+            # until the next command fires: it may be aligned on walk_cycles the twin reaches later than the
+            # hardware did (cosim.simulate drops the renewals left once it is due), hence the JOY_SLACK_S
+            nxt = cmds[k + 1]["t_ms"] if k + 1 < len(cmds) else None
+            span = ((nxt - c["t_ms"]) / 1e3 + JOY_SLACK_S if nxt is not None else JOY_HOLD_S) - 1e-6
+            add += [(("renew", JOY_RENEW_S), f"DRIVE {vx:.6f} {vy:.6f} {yaw:.6f}")] * max(0, int(span / JOY_RENEW_S))
         else:
             raise SystemExit(f"command {kind} at {c['t_ms'] / 1e3:.3f} s not reproducible inside an episode")
         out += add
-        owner += [k] * len(add)
+        owner += [k] * sum(not cosim.renewal(e) for e in add)
     return out, owner
 
 
 def fired(replies, owner):
     """Twin time at which each hardware command fired (its first event) and the twin's refusals."""
     fire, refused = {}, []
-    for (t, cmd, reply), k in zip(replies, owner):
-        fire.setdefault(k, t)
+    owners = iter(owner)
+    for t, cmd, reply in replies:
+        if not cmd.startswith("RENEW "):  # a refused joystick renewal owns no event
+            fire.setdefault(next(owners), t)
         if reply != "OK -":
             refused.append({"t": t, "command": cmd, "reply": reply})
     return fire, refused
@@ -146,12 +153,13 @@ def observe(snaps, cmds, rows, rec, fire, q0, direction, imu_offset=None):
         at = np.clip(np.searchsorted(rec_t, t_sim - s["age_ms"] / 1e3), 0, len(rec_t) - 1)
         q = np.rint(rec["q"][at, np.arange(12)] / twin.TICK) * twin.TICK
         duty = 1e3 * rec["duty"][at, np.arange(12)]
+        speed = rec["qd"][at, np.arange(12)] / twin.TICK  # joint-space step/s at each joint's read instant
         iq = int(np.clip(np.searchsorted(rec_t, t_sim - (s["now_ms"] - (s["quat_ms"] or s["now_ms"])) / 1e3), 0, len(rec_t) - 1))
         out.append({
             "now_ms": s["now_ms"], "t_sim": t_sim, "hw_label": m5_hw.label(s), "sim_label": label_row(r),
             "hw_reason": s["reason"], "sim_reason": r["reason"], "hw_wc": s["walk_cycles"], "sim_wc": float(r["walk_cycles"]),
             "hw_err": direction * (s["raw"] - s["cmd"]), "sim_err": (q - cmd_q) / twin.TICK,
-            "hw_duty": -direction * s["load"], "sim_duty": duty, "hw_q": direction * (s["raw"] - q0) * twin.TICK, "sim_q": q,
+            "hw_duty": -direction * s["load"], "sim_duty": duty, "hw_speed": direction * s["speed"], "sim_speed": speed, "hw_q": direction * (s["raw"] - q0) * twin.TICK, "sim_q": q,
             "cmd_diff": (direction * (s["cmd"] - q0) * twin.TICK - cmd_q) / twin.TICK,  # alignment check: same law, same phase
             "stance": [int(r[f"stance{l}"]) for l in range(4)],
             "hw_rp": np.array(dynamics.quat_rpy(s["quat"])) * 1e3 if s["quat"] else np.full(2, np.nan),
@@ -191,7 +199,10 @@ def compare(pairs, lo, hi, hw_label_only=False):
             se = np.array([x["sim_err"][idx] for x in sel])
             hd = np.array([x["hw_duty"][idx] for x in sel])
             sd = np.array([x["sim_duty"][idx] for x in sel])
+            hv = np.array([x["hw_speed"][idx] for x in sel])
+            sv = np.array([x["sim_speed"][idx] for x in sel])
             row[g] = {"abs_err_hw": p(np.abs(he).ravel()), "abs_err_sim": p(np.abs(se).ravel()),
+                      "abs_speed_hw": p(np.abs(hv).ravel()), "abs_speed_sim": p(np.abs(sv).ravel()),
                       "err_rmse_sim_minus_hw": float(np.sqrt(np.mean((se - he) ** 2))), "err_bias_sim_minus_hw": float(np.mean(se - he)),
                       "abs_duty_hw": p(np.abs(hd).ravel()), "abs_duty_sim": p(np.abs(sd).ravel()),
                       "duty_rmse_sim_minus_hw": float(np.sqrt(np.mean((sd - hd) ** 2))), "duty_bias_sim_minus_hw": float(np.mean(sd - hd))}
@@ -234,11 +245,23 @@ def main():
             i = argv.index(key)
             opt[key] = argv[i + 1]
             del argv[i:i + 2]
+    sets = []
+    while "--set" in argv:
+        i = argv.index("--set")
+        sets.append(argv[i + 1])
+        del argv[i:i + 2]
     fixture = "--fixture" in argv
     argv = [a for a in argv if a != "--fixture"]
     binary, out_dir, name, sources = pathlib.Path(argv[0]), pathlib.Path(argv[1]), argv[2], argv[3:]
     variant = opt.get("--variant", "baseline")
-    v = VARIANTS[variant]
+    v = dict(VARIANTS[variant])
+    for kv in sets:  # --set key=value: one servo.Params field (or mu) on top of the variant
+        key, value = kv.split("=")
+        if key == "mu":
+            v["mu"] = float(value)
+        else:
+            v["params"] = dict(v.get("params", {}), **{key: float(value)})
+        variant += f"+{key}{value}"
     files, snaps, trace_cmds = m5_hw.load(sources)
     boot = m5_hw.boots(snaps)[-1] if len(m5_hw.boots(snaps)) == 1 else max(m5_hw.boots(snaps), key=len)
     cmds = m5_hw.commands(trace_cmds, boot)
@@ -254,7 +277,7 @@ def main():
     params = dataclasses.replace(servo.Params(), **v.get("params", {}))
     print(f"{name}: {len(files)} file(s), episode {sel[0]['now_ms'] / 1e3:.2f}-{sel[-1]['now_ms'] / 1e3:.2f} s, {len(sel)} snapshots, "
           f"height {height * 1e3:.0f} mm, {'fixture ' + str(np.round(np.array(attitude) * 1e3, 1)) + ' mrad' if fixture else 'ground'}, variant {variant}", flush=True)
-    for e, k in zip(ev, owner):
+    for e, k in zip([e for e in ev if not cosim.renewal(e)], owner):
         print(f"  hw {ep_cmds[k]['t_ms'] / 1e3:9.3f} s {ep_cmds[k]['kind']:8s} -> twin {e}", flush=True)
     imu_offset = tuple(1e-3 * x for x in v["imu_offset_mrad"]) if "imu_offset_mrad" in v else None
     rows, tw, replies, columns = cosim.simulate(binary, ev, duration, params, v.get("mu", 0.8), v.get("unit"), height, attitude, imu_offset)
