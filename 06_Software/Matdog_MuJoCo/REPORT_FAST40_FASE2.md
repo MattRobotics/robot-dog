@@ -1,4 +1,4 @@
-# MATDOG — FAST 40 mm/s, fase 2: transizioni, stacco del piede, laterale e imbardata (13/11/2026)
+# MATDOG — FAST 40 mm/s, fase 2: transizioni, stacco del piede, laterale e imbardata (12/11/2026)
 
 Solo controlli offline e simulazione: nessun hardware, flash, push o merge. Motion dev.7 `b5610620d0ce`,
 box, protezioni, ACC, soglie, criteri STOP e calibrazioni sono invariati. Il candidato è una patch su una
