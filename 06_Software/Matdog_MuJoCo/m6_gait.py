@@ -8,6 +8,9 @@ Metrics come from the twin's own physics (never from the commanded law):
 - lateral body excursion: peak-to-peak of the base's lateral position about its linear trend;
 - feet: real swing clearance of the contact reference (p10/p50/p90) and the share of the swing with
   a normal force > DRAG_N; slip of loaded feet; support margin of the loaded feet (p05, min);
+  support actually transmitted against the law's schedule (RCA 01 / Codex, 2026-11-13): the share of samples
+  with no loaded foot (the loaded-feet margin skips them), the weight fraction carried by law-swing feet, and
+  the COM margin to the law-stance feet, a GEOMETRIC availability that says nothing on which feet carry load;
 - joints: p95 |error| (measured - commanded, ticks), p95 |speed| (step/s), p95 |duty| (per mille);
 - STOP: verified or fault, and the time to verification.
 
@@ -120,7 +123,8 @@ def yaw_of(q):
     return math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
 
 
-def run(binary, out_dir, label, name, v, write=True):
+def run(binary, out_dir, label, name, v, write=True, keep=False):
+    """keep: also return the simulation (rows, twin) for a caller's own metrics, outside the JSON (vNext, 2026-11-13)."""
     mode, height, events, duration, window = SCENARIOS[name]
     ev = ([(0.5, f"SELECT {mode}")] if mode != "SLOW" else []) + events
     params = dataclasses.replace(servo.Params(), **v.get("params", {}))
@@ -182,10 +186,17 @@ def run(binary, out_dir, label, name, v, write=True):
                     seg = rec["feet"][i0:i1, l, :2]
                     if len(seg) > 50:
                         slip = max(slip, float(np.max(np.linalg.norm(seg - seg[0], axis=1))))
+            fz = rec["fz"]
+            law_stance = st == 1
+            geo = np.array([dynamics.support_margin(rec["feet"][i][law_stance[i]], rec["com"][i][:2]) for i in np.flatnonzero(m)[::10]])
+            geo = geo[np.isfinite(geo)]
             rep["feet"] = {"swings": len(clear), "clearance_mm_p10_p50_p90": [float(np.percentile(clear, q)) for q in (10, 50, 90)] if clear else None,
                            "dragging_share_p50_p90": [float(np.percentile(drag, q)) for q in (50, 90)] if drag else None,
                            "support_margin_mm_p05_min": [1e3 * float(np.percentile(marg, 5)), 1e3 * float(marg.min())] if len(marg) else None,
-                           "slip_max_mm": 1e3 * slip}
+                           "slip_max_mm": 1e3 * slip,
+                           "no_loaded_foot_share": float(np.mean(~loaded[m].any(1))),
+                           "weight_on_law_swing_feet_mean": float(np.mean(np.where(st[m] == 0, fz[m], 0).sum(1) / np.maximum(fz[m].sum(1), 1e-9))),
+                           "law_stance_geometric_margin_mm_p05_min": [1e3 * float(np.percentile(geo, 5)), 1e3 * float(geo.min())] if len(geo) else None}
             # joints (release grid): error = read at release k+1 - frame k
             k = np.array([i for i in range(n - 1) if rows[i]["state"] == "WALKING" and a <= i * twin.RELEASE_S <= b])
             cmd = np.array([[int(rows[i][f"raw{j}"]) for j in range(12)] for i in k])
@@ -216,7 +227,7 @@ def run(binary, out_dir, label, name, v, write=True):
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"{name}__{label}.json").write_text(json.dumps(rep, indent=1, default=lambda o: o.tolist() if hasattr(o, "tolist") else str(o)) + "\n")
     show(rep)
-    return rep
+    return (rep, rows, tw) if keep else rep
 
 
 def show(r):

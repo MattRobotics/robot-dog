@@ -11,6 +11,16 @@ in five versions, each one change away from the previous:
           correction plus any FK/law mismatch);
   cmd   : the same commanded joints on the twin's SIMULATED base pose (cmd - nom: body height, pitch, roll);
   act   : the twin's real foot (cmd -> act: servo tracking, with the floor's reaction while in contact).
+RCA 01 (2026-11-13) adds two, so that tracking and attitude separate and the real geometry is measured:
+  actnom: MuJoCo FK of the ACTUAL joints on the law's body (nom -> actnom: servo tracking alone);
+  geom  : the signed distance between the whole foot cylinder and the floor (mj_geomDistance on the twin's
+          state, < 0 = penetration): the rim of a tilted cylinder sits below the reference line of `act`.
+The versions are not an additive decomposition: cmd/act/geom stand on the simulated body, nom/actnom on the
+law's level body, so a difference of two medians mixes body poses (Codex review of RCA 01, 2026-11-13).
+Codex corrections (2026-11-13): `act` is the FK of the recorded qpos (base and joints), the same state as
+actnom/geom; the twin's rec["feet"] is computed before the last physics step of the record (one 0.5 ms step
+older than rec["q"]), its offset is reported (act_record_offset_max_mm). Swings cut by the window edges are
+left out (a truncated swing has no law peak).
 Per swing: the peak of each version and their values at the law's peak instant (u = .5); the base height,
 pitch and roll at u = .5 against the law; the foot's normal force (share of the swing above DRAG_N, the
 last loaded sample after lift-off, the first before touchdown); the per-joint tracking error at u = .5.
@@ -73,21 +83,34 @@ def main():
         mujoco.mj_kinematics(tw.m, dk)
         return twin.contact_reference(dk, tw.centers, tw.feet)[:, 2]
 
+    def gap(pos, quat, q, l):
+        dk.qpos[0:3], dk.qpos[3:7], dk.qpos[7:19] = pos, quat, q
+        mujoco.mj_kinematics(tw.m, dk)
+        return mujoco.mj_geomDistance(tw.m, dk, tw.floor, tw.feet[l], 0.05, None)
+
     level = np.array([1.0, 0, 0, 0])
     swings = []
     stance_nom = []  # nom z of stance feet: checks that the FK and the law share the floor
+    wi = np.flatnonzero(m)
+    truncated = 0
     for l in range(4):
         sw = (stance[:, l] == 0) & m
         e = np.flatnonzero(np.diff(np.r_[0, sw.astype(int), 0]))
         for i0, i1 in zip(e[::2], e[1::2]):
             if i1 - i0 < 50:
                 continue
+            if i0 <= wi[0] or i1 > wi[-1]:  # cut by the window: no full swing, no law peak
+                truncated += 1
+                continue
             seg = np.arange(i0, i1)
             k = idx[seg]
             z_law = law_feet[k, l, 2]
             z_nom = np.array([fk([0, 0, body_z[kk]], level, qcmd[kk])[l] for kk in k])
             z_cmd = np.array([fk(rec["pos"][i], rec["quat"][i], qcmd[kk])[l] for i, kk in zip(seg, k)])
-            z_act = rec["feet"][seg, l, 2]
+            z_act = np.array([fk(rec["pos"][i], rec["quat"][i], rec["q"][i])[l] for i in seg])
+            act_record_offset = np.abs(z_act - rec["feet"][seg, l, 2]).max()
+            z_actnom = np.array([fk([0, 0, body_z[kk]], level, rec["q"][i])[l] for i, kk in zip(seg, k)])
+            z_geom = np.array([gap(rec["pos"][i], rec["quat"][i], rec["q"][i], l) for i in seg])
             fz = rec["fz"][seg, l]
             j = int(np.argmax(z_law))  # the law's peak instant (u = .5)
             i_mid = seg[j]
@@ -97,9 +120,13 @@ def main():
             hip, upp, low = 3 * l, 3 * l + 1, 3 * l + 2
             swings.append({
                 "leg": LEGS[l], "t0": float(t[i0]), "t1": float(t[i1 - 1]), "duration_s": float(t[i1 - 1] - t[i0]),
-                "peak_mm": {"law": 1e3 * float(z_law.max()), "nom": 1e3 * float(z_nom.max()), "cmd": 1e3 * float(z_cmd.max()), "act": 1e3 * float(z_act.max())},
-                "at_law_peak_mm": {"law": 1e3 * float(z_law[j]), "nom": 1e3 * float(z_nom[j]), "cmd": 1e3 * float(z_cmd[j]), "act": 1e3 * float(z_act[j])},
+                "peak_mm": {"law": 1e3 * float(z_law.max()), "nom": 1e3 * float(z_nom.max()), "cmd": 1e3 * float(z_cmd.max()), "act": 1e3 * float(z_act.max()),
+                            "actnom": 1e3 * float(z_actnom.max()), "geom": 1e3 * float(z_geom.max())},
+                "at_law_peak_mm": {"law": 1e3 * float(z_law[j]), "nom": 1e3 * float(z_nom[j]), "cmd": 1e3 * float(z_cmd[j]), "act": 1e3 * float(z_act[j]),
+                                   "actnom": 1e3 * float(z_actnom[j]), "geom": 1e3 * float(z_geom[j])},
+                "geom_gap_share": {"above_0_1mm": float(np.mean(z_geom > 1e-4)), "above_1mm": float(np.mean(z_geom > 1e-3))},
                 "u_of_act_peak": float(np.argmax(z_act) / max(1, len(seg) - 1)),
+                "act_record_offset_max_mm": 1e3 * float(act_record_offset),
                 "base_at_law_peak": {"z_mm_minus_law": 1e3 * float(rec["pos"][i_mid][2] - body_z[idx[i_mid]]), "roll_mrad": float(ang[0]), "pitch_mrad": float(ang[1]),
                                      "imu_correction_roll_pitch_mrad": (1e3 * corr[idx[i_mid]]).tolist()},
                 "contact": {"drag_share": float(np.mean(fz > dynamics.DRAG_N)), "loaded_share": float(np.mean(loaded)),
@@ -113,6 +140,7 @@ def main():
             stance_nom.append(1e3 * float(fk([0, 0, body_z[idx[i]]], level, qcmd[idx[i]])[l]))
     walk = [r for r in rows if r["state"] == "WALKING"]
     result = {"law": law, "sets": sets, "imu_offset_mrad": list(v["imu_offset_mrad"]), "window_s": [a, b], "swings": swings,
+              "truncated_swings_left_out": truncated,
               "stance_nom_z_mm_p05_p50_p95": np.percentile(stance_nom, [5, 50, 95]).tolist() if stance_nom else None,
               "faults": [(r["t_s"], r["reason"]) for r in rows if r["state"] == "FAULT"][:1], "walking_releases": len(walk)}
     json.dump(result, open(out, "w"), indent=1)

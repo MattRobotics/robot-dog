@@ -113,6 +113,7 @@ class Twin:
         self.foot_bodies = np.array([self.m.body(f"{l}_foot_link").id for l in twin.LEGS])
         self.base = self.m.body("base_link").id
         self.dt = self.m.opt.timestep
+        self.probe = None  # diagnostics only: called with the twin at every recorded sample, after the record
 
     def place(self, q):
         """Joints at q, body level, lowest contact reference on the floor (on the fixture: body welded in the air)."""
@@ -176,6 +177,8 @@ class Twin:
                 nc = self.d.ncon
                 g1, g2 = self.d.contact.geom1[:nc], self.d.contact.geom2[:nc]
                 rec["other"].append(float(np.any(~np.isin(np.where(g1 == self.floor, g2, g1), self.feet))))
+                if self.probe is not None:
+                    self.probe(self)
 
     def release(self, goal, speed, acc, torque_on=None, record=True):
         """One Motion release: a SYNC_WRITE frame, then 20 ms of physics."""
