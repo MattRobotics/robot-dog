@@ -22,7 +22,7 @@ const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 const CSRF = 'c'.repeat(64);
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise(r => setImmediate(r)); };
 
-async function boot(initialStatus = fx.status_ready) {
+async function boot(initialStatus = fx.status_ready, withGround = false) {
   let clock = 1000;
   const timers = [], intervals = [], calls = [], errors = [];
   // inflight: requests issued and not yet answered (each needs its own
@@ -56,6 +56,7 @@ async function boot(initialStatus = fx.status_ready) {
         if (url === '/status') return reply(device.statusText || 'mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n', device.statusCode);
         if (url === '/wifi/status') return reply(JSON.stringify({ profiles: [], scan: [], active_profile: 0, sta_test: { seq: 0 }, policy: {}, network_phase: 'ADMIN_AP', admin_generation: 1 }));
         if (url === '/api/motion/status') return reply(device.status);
+        if (withGround && url === '/api/motion/capabilities') return reply(fx.capabilities);
         if (url === '/api/motion/command') {
           const next = device.replies.shift();
           assert(next, 'unexpected command ' + init.body);
@@ -75,6 +76,31 @@ async function boot(initialStatus = fx.status_ready) {
 }
 
 (async () => {
+  {
+    const g=await boot(fx.status_standing,true);
+    assert.deepStrictEqual(g.errors,[]);
+    g.q('[data-page="ground-page"]').click();
+    assert(!g.q('#ground-page').hidden&&g.q('header #simple-stop'),'Ground card with global STOP');
+    assert.deepStrictEqual([...g.q('#ground-leg').options].map(x=>x.value),['LF','RF','LH','RH']);
+    assert(!g.q('#ground-observe').disabled,'real cached telemetry acquisition available in HOLD');
+    g.q('#ground-leg').value='LH';g.q('#ground-leg').dispatchEvent(new g.dom.window.Event('change'));
+    g.device.replies.push({body:fx.ack_ground,status:200});g.q('#ground-observe').click();await settle();
+    const sent=JSON.parse(g.calls.filter(c=>c.url==='/api/motion/command').at(-1).body);
+    assert.strictEqual(sent.type,'GROUND_CONTACT.OBSERVE');assert.strictEqual(sent.params.leg,'LH');
+    assert.strictEqual(sent.owner,'dashboard');assert(sent.sequence>0&&sent.ttl_ms===5000);
+    assert(!g.q('#ground-contact').querySelector('#ground-probe'),'no fictitious probe button');
+    g.q('#ground-leg').value='LF';g.device.status=fx.status_ground;await g.poll();
+    assert(g.q('#ground-progress').textContent.includes('12/12 campioni (non cicli)'));
+    assert(g.q('#ground-values').textContent.includes('NON VALIDA'));
+    assert(g.q('#ground-signals').textContent.includes('UPPER: RAW'));
+    assert(g.q('#ground-contact').textContent.includes('non sono conferme indipendenti'));
+    const stale=JSON.parse(fx.status_ground);stale.stale=true;g.device.status=JSON.stringify(stale);await g.poll();
+    assert(g.q('#ground-observe').disabled,'stale feedback disables observation, not STOP');
+    g.device.replies.push({body:fx.ack_stop,status:200});g.q('#ground-stop').click();await settle();
+    assert.strictEqual(JSON.parse(g.calls.filter(c=>c.url==='/api/motion/command').at(-1).body).type,'MOTION.STOP');
+    assert.deepStrictEqual(g.errors,[]);g.dom.window.close();
+    console.log('GROUND_DASHBOARD: selection, real observation intent, timestamped result, stale refusal, shared STOP PASS');
+  }
   const p = await boot();
   const { q, device } = p;
   const envelopes = [];

@@ -223,7 +223,7 @@ void CommandRouter::update(uint32_t now_ms) {
 namespace {
 // One USB Motion JSON line at a time (router thread only): @MOTION STATUS,
 // @MOTION CAPABILITIES.
-constexpr size_t kUsbMotionJsonBytes=6144;
+constexpr size_t kUsbMotionJsonBytes=kMotionStatusJsonBytes; // same bounded status, including Ground observation
 char* usbMotionJson(){static char out[kUsbMotionJsonBytes];return out;}
 }
 void CommandRouter::handleLine(String line) {

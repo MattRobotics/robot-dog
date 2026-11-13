@@ -13,7 +13,23 @@ namespace {
 const char* boolean(bool b){return b?"true":"false";}
 }
 void MotionService::update(){
+ if(ground_.running()&&motion_){
+   const uint64_t now=esp_timer_get_time();
+   if(!ready_)ground_.abort(reason_,now);
+   else if(const char* why=simple::GroundContactDiagnostic::admission(*motion_,now))ground_.abort(why,now);
+   else if(now<ground_.snapshot().startedUs||now-ground_.snapshot().startedUs>=simple::kGroundObservationTimeoutUs)ground_.abort("GROUND_OBSERVATION_TIMEOUT",now);
+   // Four cached FK evaluations only in cooperative slack, only during an
+   // explicitly requested observation. No work on ordinary STAND/WALK.
+   else if(slack(now,5000))ground_.update(*motion_,now);
+ }
  if(!active_||!motion_)return;
+ if(activeGround_){
+   if(!ground_.running()){
+     activeAck_.outcome=ground_.snapshot().samples==simple::kGroundObservationSamples?motion::CommandOutcome::COMPLETED:motion::CommandOutcome::ABORTED;
+     activeAck_.reason=ground_.snapshot().reason;active_=activeGround_=false;finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
+   }
+   activeAck_.executor_state=simple::name(motion_->state());return;
+ }
  if(activeStop_){
   // ACK revokes the old operation; only feedback-qualified arrest completes
   // the contextual STOP. SAFE_OFF is a distinct, register-verified terminal.
@@ -73,6 +89,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    // an older HTTP motion request is waiting for its Controller turn.
    stopEpoch_.fetch_add(1,std::memory_order_release);
    const bool fromFault=motion_->state()==simple::State::FAULT;
+   ground_.abort("GROUND_STOPPED",esp_timer_get_time());activeGround_=false;
    motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason=fromFault?"STOP_REQUESTED_FAULT_LATCHED":"STOP_REQUESTED";
    // Repeated STOPs acknowledge independently without restarting the first
    // operation's timing, progress or identity (including its held terminal).
@@ -103,9 +120,19 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  auto result=[&](const char* r,const char* accepted="COMMAND_ACCEPTED"){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:accepted;
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&c.intent!=motion::Intent::GAIT_SELECT){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&c.intent!=motion::Intent::GAIT_SELECT){
+     if(c.intent!=motion::Intent::GROUND_OBSERVE){ground_.abort("GROUND_SUPERSEDED",esp_timer_get_time());activeGround_=false;}
+     activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
+ if(c.intent==motion::Intent::GROUND_OBSERVE){
+   if(ground_.running())return result("GROUND_OBSERVATION_BUSY");
+   if(!ready_)return result(reason_);
+   if(const char* r=simple::GroundContactDiagnostic::admission(*motion_,us))return result(r);
+   const int leg=simple::groundLeg(c.leg);if(leg<0)return result("GROUND_LEG_REQUIRED");
+   ground_.start(static_cast<unsigned>(leg),us);activeGround_=true;
+   return result(nullptr,"GROUND_OBSERVATION_STARTED");
+ }
  // WALK mode (2026-11-09): a volatile choice, no actuator and no active
  // command. A forward walk in progress moves its law to it progressively
  // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); a steered
@@ -161,7 +188,9 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
      unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified),
      j.backM/w.periodS,j.lateralM/w.periodS,j.yawRad/w.periodS,j.strideM/w.periodS);
    if(k<=0||static_cast<size_t>(k)>=cap-used)return false;used+=k;}
- return snprintf(out+used,cap-used,"]}")==2;
+ const int tail=snprintf(out+used,cap-used,
+   "],\"ground_contact\":{\"observe_command\":\"GROUND_CONTACT.OBSERVE\",\"samples\":%u,\"probing_available\":false,\"probing_reason\":\"THREE_SUPPORT_TRANSFER_UNAVAILABLE\",\"ground_height_available\":false}}",simple::kGroundObservationSamples);
+ return tail>0&&static_cast<size_t>(tail)<cap-used;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  if(!motion_)return false;
@@ -219,6 +248,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.referenceFaultRaw=motion_->referenceFaultRaw();
  for(unsigned i=0;i<12;++i)s.feedback[i]=motion_->feedback()[i];
  for(unsigned i=0;i<4;++i)s.quaternion[i]=motion_->quaternion()[i];
+ s.ground=ground_.snapshot();
  s.referenceFaultFeedback=motion_->referenceFaultFeedback();return true;
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
@@ -302,6 +332,22 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
      s.referenceFaultSlot,f.raw,s.referenceFaultRaw,f.torque,f.goal,(unsigned long long)f.controlStampUs);}
 
+ // Diagnostic observation is historical, explicitly dated. No contact events
+ // or ground correction are synthesized from static STAND load variation.
+ const auto& g=s.ground;
+ if(g.leg<4){
+   add(",\"ground_contact\":{\"leg\":\"%s\",\"running\":%s,\"reason\":\"%s\",\"samples\":%u,\"required_samples\":%u,\"started_us\":%llu,\"finished_us\":%llu,\"ground_valid\":false,\"probing_available\":false,\"quality\":\"OBSERVATION_ONLY\",\"release_mm\":null,\"touchdown_mm\":null,\"correction_mm\":null,\"uncertainty_mm\":null",
+     simple::groundLegName(g.leg),boolean(g.running),g.reason,unsigned(g.samples),simple::kGroundObservationSamples,(unsigned long long)g.startedUs,(unsigned long long)g.finishedUs);
+   if(g.samples){
+     add(",\"lowest_mm\":%.2f,\"target_lowest_mm\":%.2f,\"range_mm\":[%.2f,%.2f],\"relative_mm\":%.2f,\"relative_range_mm\":[%.2f,%.2f],\"body_delta_mm\":%.2f,\"support_spread_mm\":%.2f,\"imu_stamp_us\":%llu,\"reference_sent_us\":%llu,\"span_us\":%lu,\"max_span_us\":%lu,\"joints\":[",
+       g.lowestMm,g.targetLowestMm,g.minMm,g.maxMm,g.relativeMm,g.relativeMinMm,g.relativeMaxMm,g.bodyDeltaMm,g.supportSpreadMm,
+       (unsigned long long)g.imuStampUs,(unsigned long long)g.referenceSentUs,(unsigned long)g.spanUs,(unsigned long)g.maxSpanUs);
+     for(unsigned j=0;j<3;++j)add("%s{\"stamp_us\":%llu,\"raw\":%u,\"commanded_raw\":%u,\"tracking_ticks\":%d,\"load\":%d,\"load_delta\":%d,\"load_range\":[%d,%d],\"current_raw\":%d,\"speed_raw\":%d,\"reference_jacobian_mm_rad\":%.2f}",j?",":"",
+       (unsigned long long)g.stampUs[j],g.raw[j],g.commandedRaw[j],int(g.tracking[j]),int(g.load[j]),int(g.loadDelta[j]),int(g.loadMin[j]),int(g.loadMax[j]),int(g.current[j]),int(g.speed[j]),g.referenceJacobianMm[j]);
+     add("%s","]");
+   }
+   add("%s","}");
+ }
  // Digital Twin contract already parsed by the existing viewer (telemetry v1):
  // the same 12 ACTUAL angles and BNO085 quaternion SimpleMotion holds, no new
  // read. sampled_at_ms dates the oldest joint sample; actual_rad when all 12

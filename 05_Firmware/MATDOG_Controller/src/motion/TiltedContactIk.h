@@ -2,6 +2,10 @@
 #define MATDOG_MOTION_TILTED_CONTACT_IK_H
 #include "BodyPose.h"
 namespace matdog { namespace motion {
+// Read-only diagnostic access to the same analytic reference Jacobian used
+// by the solver. contact must be the FK result for these joints and normal.
+bool contactReferenceJacobian(LegId, const LegJointAngles&, Vector3 normal,
+                              const ContactResult& contact, double J[3][3]);
 // G5-A explicit extension of G2 contact IK to a ground normal that is NOT +Z in base_link (level-body assumption
 // removed). It is a NEW solver beside the accepted analytic one: contactInverseKinematics / worldContactInverseKinematics
 // and supportsFlatContactIk are unchanged. It reuses contactForwardKinematics (which already accepts a ground normal) as

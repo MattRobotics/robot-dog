@@ -71,6 +71,19 @@ ContactResult contactForwardKinematics(LegId leg, const LegJointAngles& q, Vecto
   return result;
 }
 
+bool lowestTreadHeightM(const ContactResult& contact, Vector3 up, double& heightM) {
+  heightM=0;
+  const double length=norm(up);
+  if(contact.status!=ContactStatus::OK||!finite(up)||!std::isfinite(length)||length<=1e-12||
+     !finite(contact.lowestCoreM)||!std::isfinite(contact.axisTiltRad))return false;
+  // lowestCoreM already includes the central strip endpoint. The fillet
+  // extends below it; edgeContactLiftM is relative to nominal tilt, so is
+  // deliberately NOT used as an absolute ground-height correction.
+  heightM=dot(scale(up,1.0/length),contact.lowestCoreM)-
+          footContactModel().filletRadiusM*(1.0-std::cos(contact.axisTiltRad));
+  return std::isfinite(heightM);
+}
+
 ContactIkResult contactInverseKinematics(LegId leg, const Vector3& target,
                                           const ContactIkOptions& options) {
   ContactIkResult result;

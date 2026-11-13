@@ -128,6 +128,15 @@ int fixtures(const char* path) {
   out << "{";
   auto put = [&](const char* key, const std::string& value, bool last = false) { out << quoted(key) << ":" << quoted(value) << (last ? "" : ","); };
   {
+    Rig rig;core::MotionService service;service.begin(&rig.m,nullptr,nullptr);service.setReady(true,"READY");
+    check(!rig.m.stand(.12,rig.p.now)&&rig.reachStand(),"ground observation STAND");
+    for(unsigned n=0;n<30;++n)rig.tick();
+    auto c=semantic(motion::Intent::GROUND_OBSERVE,rig);strcpy(c.leg,"LF");
+    put("ack_ground",ackJson(service,service.command(c,c.issued_at_ms)));
+    for(unsigned n=0;n<100;++n){rig.tick();service.update();}
+    put("status_ground",statusJson(service,rig));
+  }
+  {
     Rig rig; core::MotionService service; service.begin(&rig.m, nullptr, nullptr); service.setReady(true, "READY");
     for (unsigned i = 0; i < 10; ++i) rig.tick(false);  // idle polling refreshes all 12 feedbacks
     test_clock_us = rig.p.now;
