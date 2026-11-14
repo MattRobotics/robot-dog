@@ -1,6 +1,11 @@
 # MATDOG history index — June to November 2026
 
-> **Stato corrente (07/11/2026):** [prima Stable `v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), firmware `1.0.1-dev.17` `17db0efe2324`, [validazione dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) e [manifest](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Cronologia delle ultime fasi: [dev.15](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) → [dev.16](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) → [dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) → PR #64/#65 MERGED in `main` → Stable `v1.0.1`. I paragrafi datati sotto sono **fotografie storiche**, non stato corrente.
+> **Stato corrente (10/11/2026).**
+> - **Firmware:** installata la build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`), [validazione hardware](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md); fixture Q1–Q8 qualificata, terra fuori protocollo.
+> - **Gemello:** MuJoCo V1 offline integrato (tag `matdog-mujoco-v1-20261110`).
+> - **Cronologia:** sezione 11.
+>
+> **Storico (07/11/2026):** [prima Stable `v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), firmware `1.0.1-dev.17` `17db0efe2324`, [validazione dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) e [manifest](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Cronologia delle ultime fasi: [dev.15](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) → [dev.16](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) → [dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) → PR #64/#65 MERGED in `main` → Stable `v1.0.1`. I paragrafi datati sotto sono **fotografie storiche**, non stato corrente.
 
 
 Estensione cronologica 06/11/2026: [dev.15 — PARTIAL HW VALIDATION](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) con [manifest SHA](Validation_Reports/Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md) e [video audit](Validation_Reports/Dev15_HW_2026-11-06/VIDEO_AUDIT.md). Storico: dev.7 pre-release → dev.12 04/11 → [dev.14](Validation_Reports/Dev14_HW_2026-11-05/REPORT.md) 05/11 → **dev.15 installata e parzialmente validata 06/11**, codice ancora solo ASUS locale. Nessuna stable, nessun merge firmware.
@@ -161,3 +166,16 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | 2026-10-31 | #57 `820d80b`, `7d04939` | [Physical properties report](Validation_Reports/REV01_FIX_Physical_Properties_2026-10-31/REPORT.md) | VERIFIED OFFLINE; no dynamic hardware validation |
 | 2026-10-31 | #57 `423de3a`, `bfdf7b8`, `f3876bf`, `bd6939c` | [Astra handoff](Validation_Reports/REV01_FIX_Alignment_2026-10-31/ASTRA_HANDOFF.md) (approved 7-sheet workbook, 29/40 RPM dependency map, Motion certifications still on REV00) | VERIFIED OFFLINE; handoff, not a certification |
 | 2026-10-31 | #57 merge `887103e` | Integration of the above into `main` | Merged; not a hardware validation |
+
+## 11. Update 2026-11-10 — Motion `1.0.2-dev.4` → `1.0.2-dev.6` ACC 220 and MuJoCo V1 (added; the sections above are unchanged)
+
+| Date | PR / commit | Document | Status |
+|---|---|---|---|
+| 2026-11-07/08 | #67 | [Motion performance, candidate dev.1](Validation_Reports/Motion_Perf_2026-11-07/REPORT.md) | VERIFIED OFFLINE; no flash |
+| 2026-11-08 | #67 | [Gait redesign, WALK STANDARD v2 (dev.2/dev.3)](Validation_Reports/Gait_Redesign_2026-11-08/REPORT.md) | VERIFIED OFFLINE candidate |
+| 2026-11-08 | #67 `4358f13` | [dev.4 hardware validation, fixture and floor](Validation_Reports/Dev4_HW_2026-11-08/REPORT.md) | VALIDATED HARDWARE in the tested scope, NOT STABLE |
+| 2026-11-09 | #67 | [Night 08→09/11, candidate dev.5](Validation_Reports/Night_2026-11-09/REPORT.md) | VERIFIED OFFLINE; not flashed |
+| 2026-11-09 | #67 | dev.6: [walk modes SLOW/STANDARD/FAST](Validation_Reports/Dev6_WalkModes_2026-11-09/REPORT.md), [final optimization](Validation_Reports/Dev6_Final_2026-11-09/REPORT.md), [technical closure](Validation_Reports/Dev6_Closure_2026-11-09/REPORT.md), [trace-44 fix](Validation_Reports/Dev6_SyncWriteFix_2026-11-09/REPORT.md), [consolidation](Validation_Reports/Dev6_Consolidation_2026-11-09/REPORT.md) | Offline reports of the dev.6 builds installed on 09–10/11; per-build status in the [Controller changelog](../05_Firmware/MATDOG_Controller/CHANGELOG.md) |
+| 2026-11-10 | #67 `450d2c7` | [**dev.6 ACC 220 hardware validation**](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) and [evidence manifest](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md) | VERIFIED HARDWARE: fixture Q1–Q8 qualified, 14/14 STOP, ground positive but out of protocol; installed |
+| 2026-11-10 | #67 merge `66cc102` | Integration of the installed source into `main` | Merged; no rebuild or flash |
+| 2026-11-10 | #68 merge `aa058a2`, tag `matdog-mujoco-v1-20261110` | [MuJoCo twin V1: M5 report](../06_Software/Matdog_MuJoCo/REPORT_M5.md), [package](../06_Software/Matdog_MuJoCo/README.md) | VERIFIED OFFLINE; simulation, not a hardware qualification |

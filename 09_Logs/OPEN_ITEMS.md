@@ -1,6 +1,32 @@
-# Stato operativo corrente — 07/11/2026: prima Stable `v1.0.1` (firmware 1.0.1-dev.17)
+# Stato operativo corrente — 10/11/2026: `1.0.2-dev.6` ACC 220 installata (build di sviluppo)
 
-**Installata, VERIFIED HARDWARE nel perimetro qualificato e rilasciata:** `1.0.1-dev.17`, build `17db0efe2324`, sorgente `17db0ef`, APP SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, promossa senza ricompilazione come GitHub Release `v1.0.1`. Rollback: dev.16 `e0ddbb1791d0`. [Report HW](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest release](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md).
+**Installata:** `1.0.2-dev.6`, sorgente `450d2c7` (in `main` dalla PR #67), build `450d2c793dcb`, APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
+- **VERIFIED HARDWARE il 10/11:** fixture Q1–Q8 qualificata; 14/14 STOP verificati (8 fixture, 6 terra); 0 fault Motion; registro 85 = 220 su 12/12.
+- **A terra:** verifica positiva ma fuori protocollo G0–G5.
+- **Riferimenti:** [report HW](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) · [evidenze](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
+- **Rollback:** `1fbee7b`.
+- **Stable storica:** `v1.0.1` (`1.0.1-dev.17`), immutabile.
+
+## Residui dopo la validazione del 10/11 (lavoro del prossimo ciclo)
+
+| Area | Stato | Issue |
+|---|---|---|
+| Qualifica a terra G0–G5 | Non eseguita: la prova del 10/11 era fuori protocollo (batteria 10,6–10,2 V, anticaduta non confermata per iscritto). Requisiti: batteria ≥ 11,0 V, anticaduta, progressione condizionata a un margine delle anche ≥ 4 tick | #52 |
+| STOP a terra a fine swing anteriore; mantenimenti lunghi dopo STOP; camminate lunghe a terra | Mai provocati o provati (a terra STANDARD 11 s, FAST 34 s) | #52 |
+| Frenata ACC 180/220 sotto carico | Provata solo indirettamente (STOP verificati), non misurata | #52 |
+| Joystick laterale, in rotazione e all'indietro in STANDARD e FAST | Non implementato, solo SLOW: handoff della sessione firmware (`HANDOFF_JOYSTICK_MULTIDIREZIONALE.md` sull'ASUS, vedi il [manifest](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md)) | #52 |
+| Cambio di profilo con la leva tenuta | Verificato solo offline (DOM 21/21); serve una prova da telefono o tablet | #62 |
+| SAFE_OFF dalla dashboard | Il pulsante non esiste; alternative: PRONE, USB `@SERVO SAFE_OFF 51`, KEY OFF | #62 |
+| Avviso batteria a coppia ON | Con Motion attivo la presentazione LED è sospesa: l'avviso compare solo a coppia OFF | #62 |
+| D1: release perse e overrun | 131 perse e 2 657 overrun, 0 fault; concentrate nelle riprese dopo STOP e nella sterzata | #52 |
+| D2: HTTP 503 `MOTION_BUDGET_UNAVAILABLE` | 1 caso in sterzata (aggiornamento joystick non eseguito; STOP e velocità nulla esenti) | #62 |
+| D3: temperature spurie | Letture isolate fino a 150 °C solo a coppia ON, tutte filtrate dal firmware; causa da verificare | #52 |
+| `EVIDENCE.sha256` della sessione del 10/11 | Assente; la cartella ha uno `SHA256SUMS` completo e verificato. Chiusura a cura del responsabile firmware | — |
+| Gemello MuJoCo: carichi a terra | Gemello a 1,9 volte il duty HW in mediana e 3/3 fault agli STOP a terra, dove l'HW li verifica. Per calibrarlo servono forze ai piedi e letture dense delle anche ([rapporto M5](../06_Software/Matdog_MuJoCo/REPORT_M5.md)) | — |
+
+## Stato precedente — 07/11/2026: prima Stable `v1.0.1` (firmware 1.0.1-dev.17)
+
+**Allora installata, VERIFIED HARDWARE nel perimetro qualificato e rilasciata:** `1.0.1-dev.17`, build `17db0efe2324`, sorgente `17db0ef`, APP SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`, promossa senza ricompilazione come GitHub Release `v1.0.1`. Rollback: dev.16 `e0ddbb1791d0`. [Report HW](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [manifest release](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md).
 
 ## Checklist della prima Stable (chiusa con `v1.0.1`)
 
@@ -10,7 +36,7 @@
 - [x] `/status` senza 503 sotto slack Motion, letture oltre il recupero TCP, joystick senza reflow e in ordine (dev.17).
 - [x] Sorgente su `main`, tag e Release con APP originale, manifest e checksum; dev.16 conservata come rollback.
 
-## Lavoro residuo per il prossimo ciclo (non prerequisiti della `v1.0.1`)
+## Lavoro residuo registrato il 07/11/2026 (non prerequisiti della `v1.0.1`; in parte affrontato dalle build `1.0.2`)
 
 | Area | Stato | Issue |
 |---|---|---|
