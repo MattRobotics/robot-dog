@@ -1,0 +1,4 @@
+QCAL2 nop_loop=32000 alu_branch=32264 load_store=32249 per 200002/200001/200001 insns cpu_mhz=80
+QCAL2 nop_loop=32264 alu_branch=32249 load_store=32001 per 200002/200001/200001 insns cpu_mhz=80
+QCAL2 nop_loop=32264 alu_branch=32249 load_store=32249 per 200002/200001/200001 insns cpu_mhz=80
+QCAL2 DONE
