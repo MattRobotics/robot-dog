@@ -9,6 +9,28 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — STOP/SAFE_OFF with torque OFF: an explicit STAND re-arms through ACQUIRE — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** a STOP at rest (READY, torque OFF), a SAFE_OFF, or a STOP at the PRONE rest ended in STOPPED with `operatorStopped_`, and `stand()` refused every later STAND with `SAFE_OFF_STAND_REFUSED` until reboot. The latch prevented any implicit re-enable, but it also blocked the operator's own explicit command: only a reboot cleared it, and after a reboot the same STAND from the same pose is admitted.
+- **What:**
+  - An explicit STAND (the public `stand()`, the dashboard and USB `POSTURE.STAND`) is admitted after an operator STOP/SAFE_OFF once the 13-servo OFF is verified. It consumes the latch and takes the existing full ACQUIRE/REFERENCE/ENABLE from the measured pose, exactly as from boot.
+  - Nothing re-arms by itself: `update()` still keeps STOPPED (never READY) while `operatorStopped_` is set. WALK and the joystick rise through `stand(...,command=false)` and stay refused (`SAFE_OFF_STAND_REFUSED`), so a stale joystick refresh after a STOP cannot re-enable the robot. A STAND first, then WALK as usual.
+  - Still refused: a latched fault (`FAULT_STOP_REQUIRED`), a SAFE_OFF or STOP in progress (`SAFE_OFF_IN_PROGRESS`), a refused entry pose, unready inputs, BMS/power, IMU and the ACC ceiling (same reasons as before). ACQUIRE still faults on a servo alarm, torque ON or motion, and refuses a pose outside every certified region before any write. Authority loss after admission faults before any enable.
+  - Held STOP (torque ON) resume is unchanged.
+  - Dashboard: STAND is enabled in STOPPED when the Controller reports SAFE_OFF verified (13/13, torque OFF), no fault, Motion ready and no refused entry. WALK and PRONE stay disabled there.
+  - `static_audit`: the stand() rule now pins the new refusal (`operatorStopped_&&(!command||energized_||!offVerified())`), the latch consumption only in the torque-OFF ACQUIRE branch, READY only with `!operatorStopped_`, and `command=false` in walk() and drive().
+- **Unchanged:** STOP/StopPlan, SAFE_OFF, FAULT, ACQUIRE/REFERENCE/ENABLE checks, entry re-admission, boxes, limits, thresholds, deadlines, gait law, conversions, calibration, NVS.
+- **Tests (offline):**
+  - New `operatorStopRearm` (`test_simple_motion`):
+    - STOP at rest then STAND through `MotionService` (ACK `SAFE_OFF_VERIFIED`, 500 releases STOPPED with no frame or enable, WALK and joystick refused, REFERENCE with torque OFF, 12 enables, `STAND_REACHED`);
+    - STOP during WALK at three instants: the held resume is unchanged (no ACQUIRE, no new enable); after SAFE_OFF an explicit STAND re-acquires and stands;
+    - repeated STOPs at rest, in ACQUIRE, in REFERENCE/ENABLE, in HOLD (held, resumed) and SAFE_OFF from HOLD;
+    - no re-arm with a latched fault, an incomplete SAFE_OFF, unready inputs, power, IMU, ACC ceiling or height out of range; servo alarm in ACQUIRE faults; pose outside the certified regions refused before any write.
+  - Updated: PRONE rest + STOP (`test_simple_motion`, `test_stop_support`), entry re-admission + STOP, SAFE_OFF after a WALK STOP (`safeOffAndRecovery`): STAND now re-acquires, WALK stays refused; a fault keeps `FAULT_STOP_REQUIRED`.
+  - `run_simple_motion_tests`, `run_stop_support_tests`, `run_prone_tests`, `run_preenable_bus_tests`, `run_host_tests`, dashboard suite (contract 6112 checks, DOM, joystick DOM, twin feed) and `static_audit` PASS.
+
 ## Unreleased — WALK_SETTLE: IMU correction expressed in the settle frame after a steered walk (Patch A) — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.

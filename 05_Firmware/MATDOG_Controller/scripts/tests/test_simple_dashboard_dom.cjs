@@ -365,7 +365,14 @@ async function boot(initialStatus = fx.status_ready, withGround = false) {
     const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='WALK_STANDARD';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
     await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Ripresa dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
-    await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
+    await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');
+    assert(!q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-prone').disabled, '2026-11-14: after an operator STOP/SAFE_OFF with the OFF verified only an explicit STAND is offered (the Controller re-acquires the real pose); WALK and PRONE stay off');
+    {const n=JSON.parse(JSON.stringify(s));n.ready=false;n.readiness_reason='IMU_UNAVAILABLE';await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'Motion readiness still gates STAND after SAFE_OFF');
+     n.ready=true;n.safe_off_verified=false;n.safe_off_mask=8190;await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'an incomplete 13-servo SAFE_OFF never offers STAND');
+     n.safe_off_verified=true;n.safe_off_mask=8191;n.torque_active=true;await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'torque reported ON is not a SAFE_OFF terminal');}
     {const e=JSON.parse(JSON.stringify(s));e.reason='INITIAL_POSE_OUTSIDE_SAFE_ENTRY';await refresh(JSON.stringify(e));
      assert.strictEqual(q('#simple-state').textContent,'POSA D’INGRESSO NON RICONOSCIUTA · COPPIA OFF');
      assert(q('#simple-state').dataset.tone==='warn'&&q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-reason').textContent.includes('torna PRONTO da solo'), 'dev.5: a refused entry pose is a recoverable STOPPED state with STAND disabled until the Controller reports READY');

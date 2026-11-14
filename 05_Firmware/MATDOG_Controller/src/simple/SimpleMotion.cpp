@@ -460,14 +460,18 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   first=solveGait(g,gaitTrackCartesian(track,g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
   return pointSafe(held)&&contains(walkBox(),held)&&first.valid&&pointSafe(first)&&contains(walkBox(),first);
 }
-const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc){
+const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc,bool command){
   if(faultLatched_)return "FAULT_STOP_REQUIRED";
   if(offPending_||safeOffRequest_.load()||stop_.load())return "SAFE_OFF_IN_PROGRESS";
   if(entryRefused_)return "INITIAL_POSE_OUTSIDE_SAFE_ENTRY";  // until re-admitted (READY)
   // Reuse this admission's computed handoff; no second IK solve or persistent cache.
   WalkRecoveryStart recovery;
   if(stopActive_){if(const char* r=standResumeRefusal(now,recovery))return r;}
-  else if(operatorStopped_&&!energized_)return "SAFE_OFF_STAND_REFUSED";
+  // After an operator STOP/SAFE_OFF nothing re-arms by itself: update() keeps
+  // STOPPED, never READY, and a WALK or joystick rise stays refused. Only an
+  // explicit STAND, from the verified 13-servo OFF, re-arms: the full
+  // ACQUIRE/REFERENCE/ENABLE below then decides from the measured pose.
+  else if(operatorStopped_&&(!command||energized_||!offVerified()))return "SAFE_OFF_STAND_REFUSED";
   if(!input_.ready)return input_.refusal;
   if(!input_.powerOk)return "POWER_NOT_READY";
   if(!input_.imuValid)return "IMU_UNAVAILABLE";
@@ -534,8 +538,8 @@ const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc){
     state_=State::MOVING;phase_=Phase::HEIGHT;reason_="HEIGHT_CHANGE";
     pendingGoal_=q;pendingGoalValid_=true; // intent only; TX at the next Motion release
     segmentDeadlineUs_=now+static_cast<uint64_t>((12+std::fmax(std::abs(rollCorrection_),std::abs(pitchCorrection_))/.020)*1e6);
-  }else{  // from torque OFF (boot, PRONE rest): the measured pose decides the route
-    referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;proneRest_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
+  }else{  // from torque OFF (boot, PRONE rest, operator STOP/SAFE_OFF): the measured pose decides the route
+    referenceFaultSlot_=12;requestedHeight_=h;walkRequested_=false;proneRest_=false;operatorStopped_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;acquire_=0;reason_="ACQUIRING_REAL_POSE";
     std::fill(controlFailures_,controlFailures_+12,0);}
   timing::arm();exit_.valid=false;loadedMask_=0;loadedPhase_=""; // LOADDIAG: re-arm the first-exit record
   return nullptr;
@@ -616,10 +620,11 @@ const char* SimpleMotion::walk(unsigned stride,uint64_t now){
   if(stride>=3)return "STANDARD_STRIDE_REQUIRED";
   if(state_==State::WALKING)return "ALREADY_WALKING";
   // One user command can acquire, energize, stand at the WALK height and then
-  // walk. The selected WALK mode is latched here (its height is this stand's);
-  // after a STOP the resumed walk keeps the mode of the stopped one.
+  // walk (not after an operator STOP/SAFE_OFF: an explicit STAND first). The
+  // selected WALK mode is latched here (its height is this stand's); after a
+  // STOP the resumed walk keeps the mode of the stopped one.
   const WalkMode mode=stopActive_?walkMode_:selectedMode_;
-  const char* r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc);if(r)return r;
+  const char* r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc,false);if(r)return r;
   requestedStride_=stride;joystick_=false;walkRequested_=true;pendingMode_=mode;
   // A resumed WALK STOP finishes with its own gait and tilt envelope; the
   // requested stride starts at HOLD (startWalk).
@@ -668,8 +673,9 @@ const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)
   }else if(joystick_&&walkRequested_){
     if(vx!=0)gait_.reverse=reverse;  // still rising: the walk starts with the latest direction and law
   }else{
-    // One command can acquire, energize, stand at the WALK height and walk.
-    const char* r=stand(law.heightM,now,law.drive.acc);if(r)return r;
+    // One command can acquire, energize, stand at the WALK height and walk
+    // (not after an operator STOP/SAFE_OFF: a stale refresh never re-arms).
+    const char* r=stand(law.heightM,now,law.drive.acc,false);if(r)return r;
     gait_.reverse=reverse;walkRequested_=true;pendingMode_=selectedMode_;
   }
   joystick_=true;std::copy(v,v+3,joystickVel_);joystickFrontal_=frontal;joystickDeadlineUs_=now+kJoystickTimeoutUs;

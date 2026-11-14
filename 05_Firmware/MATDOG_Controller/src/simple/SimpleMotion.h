@@ -381,7 +381,9 @@ class SimpleMotion {
   void inputs(const Inputs& i) { input_=i; }
   // acc: the highest drive ACC the command will use (STAND's, or its WALK
   // mode's), refused above the verified register 85 (Inputs::accCeiling).
-  const char* stand(double height,uint64_t now,uint8_t acc=kStandDrive.acc);
+  // The explicit operator STAND: the only command that re-arms after an
+  // operator STOP/SAFE_OFF, from the verified OFF and through ACQUIRE.
+  const char* stand(double height,uint64_t now,uint8_t acc=kStandDrive.acc){return stand(height,now,acc,true);}
   // Descent to the PRONE terminal, then rest with torque OFF (proneRest). Arrival
   // is not proof of ventral or passive support.
   const char* prone(uint64_t now);
@@ -522,6 +524,9 @@ class SimpleMotion {
   bool readDeferred() const { return readInterrupted_||port_->readDeferred(); }
   bool frameTimed(const uint16_t raw[12],Drive);
   bool planInitialReference();
+  // command false: the rise of a WALK or joystick command, refused after an
+  // operator STOP/SAFE_OFF until an explicit STAND.
+  const char* stand(double height,uint64_t now,uint8_t acc,bool command);
   bool certifiedRegion(const motion::JointTargetFrame&,InitialRoute&) const;
   // Pre-actuation refusal of the measured entry pose (torque never enabled):
   // SAFE_OFF re-verified, no latch; READY again only through entryReadmitted.
