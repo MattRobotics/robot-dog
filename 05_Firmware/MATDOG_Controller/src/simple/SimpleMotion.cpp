@@ -118,9 +118,13 @@ constexpr JoystickSpec kJoystickModes[]={kSlowJoystick,
 // sequences; lateral 12 mm, yaw .08 rad, sway 7.5 mm: 0 fault, min support 0.34 mm
 // (random sequences; steady steering >= 1.06 mm). Backward sway 0.5 mm (0.75 mm:
 // 1 of 576 STOPs out of the box at the start ramp, 36 seeds; 0.5 mm: 0 of 1008
-// in the sway-transfer windows); forward decrease
-// over 3 cycles (joystick_envelope frontal_changes -0.44 mm of static support with 2).
-  {kJoystickBackM,kJoystickStrideM,.012,.08,kWalkModes[2].swayYM,kJoystickSwayLowM,.0075,.0005,3}};
+// in the sway-transfer windows); the forward decrease and the steered stride over
+// 4 cycles. A stride change leaves the planted feet off their steady place (5-8 mm
+// at the next lift-off): frontal_changes -0.44 mm of static support with 2; random
+// sequences at full resolution (14/11, 32 seeds) -0.39 mm steered (stride over 2)
+// and -0.20 mm fore/aft (decrease over 3); 4 and 4: min 0.53 mm (steady steering
+// >= 2.1 mm, unchanged).
+  {kJoystickBackM,kJoystickStrideM,.012,.08,kWalkModes[2].swayYM,kJoystickSwayLowM,.0075,.0005,4}};
 const JoystickSpec& joystickSpec(WalkMode m){return kJoystickModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
 bool parseWalkMode(const char* name,WalkMode& m){
   for(unsigned i=0;i<3;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
@@ -1045,14 +1049,17 @@ void SimpleMotion::steerWalk(uint64_t now){
   // range first, lateral and yaw wait for the handover.
   auto next=gait_;double* axis[3]={&next.advanceXM,&next.advanceYM,&next.yawRad},goal[3];joystickGoal(!steered_&&joystickFrontal_,goal);
   if(!steered_)goal[1]=goal[2]=0;
-  // Full scale over kJoystickRampCycles (steered); fore/aft increases over
-  // kJoystickFrontalRampCycles, forward decreases over the mode's decelCycles.
+  // Full scale over kJoystickRampCycles (steered; the stride over decelCycles when longer);
+  // fore/aft increases over kJoystickFrontalRampCycles, forward decreases over the mode's decelCycles.
   const double limit[3]={steered_?js.strideM:kStrideM[2],js.lateralM,js.yawRad};
   const double dc=std::fmax(0.,cycles_-steeredCycles_);steeredCycles_=cycles_;
   for(unsigned j=0;j<3;++j){
     const double g=j==0&&(goal[0]<0)!=gait_.reverse?0:goal[j];  // never against the leg order
     // Forward only: a faster backward decrease left -0.69 mm of static support (seeded random sequence).
-    const double ramp=steered_?kJoystickRampCycles:!gait_.reverse&&std::abs(g)<std::abs(*axis[j])?js.decelCycles:kJoystickFrontalRampCycles,rate=limit[j]/ramp;
+    // Steered stride, both ways, over the mode's decelCycles when longer (FAST 4; SLOW and STANDARD
+    // keep kJoystickRampCycles): a stride change leaves the planted feet off their steady place.
+    const double ramp=steered_?(j==0?std::fmax(kJoystickRampCycles,js.decelCycles):kJoystickRampCycles):
+                      !gait_.reverse&&std::abs(g)<std::abs(*axis[j])?js.decelCycles:kJoystickFrontalRampCycles,rate=limit[j]/ramp;
     *axis[j]+=std::clamp(g-*axis[j],-rate*dc,rate*dc);track_.goal[j]=g;track_.goalRate[j]=rate;}
   // Lateral sway follows the rate-limited lateral/yaw demand, changing only
   // while all four feet are down (last nominal sample): the body never crosses

@@ -109,7 +109,7 @@ constexpr double kJoystickSwayYM=.010, kJoystickSwayLowM=.005, kJoystickSwayOnDe
 // 1.49 / 1.66 / 1.52 mm, capture 1.72 / 1.84 / 1.38 mm (below the forward laws'
 // 1.7 / 1.41 selection rule: the price of the HIP room), walk_tilt_envelope_check
 // --reverse PASS (HIP margin 10.3 / 12.3 / 13.3 ticks). decelCycles: the forward joystick decrease
-// (kJoystickFrontalDecelCycles below; FAST 3: frontal_changes -0.44 mm with 2).
+// (kJoystickFrontalDecelCycles below; FAST 4, also its steered stride: SimpleMotion.cpp).
 struct JoystickSpec { double backM,strideM,lateralM,yawRad,swayBaseYM,swayLowM,swayYM,backSwayYM,decelCycles; };
 inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM,const JoystickSpec& j){
   const double y=advanceYM/j.lateralM,w=yawRad/j.yawRad,s=std::sqrt(y*y+w*w);

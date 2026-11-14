@@ -9,6 +9,30 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — FAST joystick: stride changes over 4 cycles in both regimes — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** the FAST joystick envelope (CAD static support, `run_joystick_envelope.sh` mode 2) had negative static support margins in random command sequences, already on `200a3bd`.
+  - Values at full resolution: seed 11 −0.39 mm, seed 22 −0.05 mm, seed 39 −0.46 mm. Seed 22 is hidden by the gate's every-third-release sampling.
+  - Each minimum falls at a lift-off, for 40–120 ms. One planted foot sits 5–8 mm off its steady place because the stride per cycle changed while it stood. Steered: stride over 2 cycles, with full sway and the fillet contact. Fore/aft: forward decrease over 3 cycles, −0.20 mm in seed 10 when the timing shifts.
+  - Steady steering keeps ≥ 2.1 mm with the same commands. Slowing only lateral or yaw does not remove the minima; slowing the stride does.
+- **What:**
+  - FAST `decelCycles` 3 → 4: the forward decrease takes 4 cycles, like the fore/aft increases and the backward changes already do.
+  - The steered stride ramps over the longer of `kJoystickRampCycles` and the mode's `decelCycles`, i.e. 4 cycles for FAST.
+  - SLOW and STANDARD are unchanged bit for bit, since their `decelCycles` equals `kJoystickRampCycles`.
+- **Unchanged:** stride, lateral and yaw limits, speeds, sway amplitudes, lateral and yaw ramps, geometry, boxes and certificates, STOP/StopPlan, SAFE_OFF, FAULT, gates and thresholds, conversions, calibration, NVS.
+- **Tests (offline; evidence `verification-artifacts/MATDOG_1_0_2_FAST_SUPPORT_20261114/`):**
+  - Static support at every lift-off, full resolution, 64 random FAST seeds:
+    - before: minimum −0.46 mm (−1.01 mm with Patch A);
+    - after: minimum 0.53 mm (0.53 mm with Patch A).
+  - Joystick envelope with CAD: SLOW and STANDARD identical. FAST PASS, minimum 0.69 mm (`200a3bd`: 0.51 mm).
+  - STOP:
+    - window matrices (three modes, FAST backward, 6 seeds) and FAST handover matrices (dir 0–3): output identical to `200a3bd`;
+    - the SLOW forward window gives 160/168 at 9.6 V with flex 1.284, the same on `200a3bd`. This is the known model range above 1.13x; the hardware measured 0.3–0.6x.
+  - Servo plant, 6 seeds: 0 faults, STOPs 1296/1296.
+  - `test_simple_motion` and `test_ground_contact` PASS; frame digest identical.
+
 ## Unreleased — DALY telemetry transport diagnostics (Battery P1, D1) — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
