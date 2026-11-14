@@ -1,5 +1,7 @@
 # AGENTS.md — MATDOG
 
+> **Branch operativo unico (14/11/2026):** `integ/matdog-unified-operational-20261114`. La baseline qui sotto è quella di `main` al 10/11; leggi prima l'[handoff](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md).
+
 > **Baseline attuale (10/11/2026).**
 > - **Firmware installato:** build di sviluppo `1.0.2-dev.6` ACC 220. Sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Validazione:** fixture Q1–Q8 qualificata; a terra verifica positiva ma fuori protocollo ([dossier HW](09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).

@@ -1,5 +1,7 @@
 # MATDOG — quadrupede robotico di Matt Robotics
 
+> **Branch `integ/matdog-unified-operational-20261114` (14/11/2026):** lo stato qui sotto è quello di `main` al 10/11. Contenuto, identità firmware e obiettivi del branch operativo unico: [handoff](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md).
+
 MATDOG è un quadrupede costruito da zero. Il Controller ESP32-S3 è l'unica autorità su Motion, servomotori, cinematica, limiti e STOP; la dashboard invia comandi ad alto livello e mostra telemetria e Digital Twin.
 
 ## Stato corrente — 10/11/2026

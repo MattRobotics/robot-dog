@@ -1,0 +1,237 @@
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+@@ -51,10 +51,21 @@
+ // Forward while a hind leg swings, backward while a front leg swings; changes
+ // only with four contacts. After the terminal touchdown the held offset
+ // recentres with four contacts.
++// Body fore/aft speed modulation (GaitParameters::surgeXM): scaled by the forward
++// stride, faded in over the start ramp and out over the decel cycle of a WALK STOP
++// (smootherstep, C2 at both ends), so the terminal hold and recentring see none of it.
++template<class T> T surge(const GaitParameters& p,T s,double terminal) {
++  if(p.surgeXM==0||p.reverse||p.advanceXM<=0)return T();
++  if(terminal>=0&&pv(s)>=terminal)return T();
++  const double scale=std::fmin(1.,p.advanceXM/p.surgeStrideM);
++  T fade=pv(s)<p.startCycles?smooth(s*T(1/p.startCycles)):T(1);
++  if(terminal>=0&&pv(s)>terminal-p.stopCycles)fade=fade*(T(1)-smooth((s-T(terminal-p.stopCycles))*T(1/p.stopCycles)));
++  return T(p.surgeXM*scale)*sn(T(4*3.14159265358979323846)*(s-T(p.surgePhase)))*fade;
++}
+ template<class T> T sway(const GaitParameters& p,T s,double terminal) {
+   if(p.type!=GaitType::WALK||(p.swayXM==0&&p.comShiftXM==0))return T();
+   if(terminal>=0&&pv(s)>=terminal)return T(pv(swayRegular(p,T(terminal))))*(T(1)-smooth((s-T(terminal))*T(1/gaitSettleCycles(p))));
+-  return swayRegular(p,s);
++  return swayRegular(p,s)+surge(p,s,terminal);
+ }
+ template<class T> T lateralRegular(const GaitParameters& p,T s) {
+   const double w=p.duty-.75;const T a(p.swayYM),inv(1/w);
+@@ -181,7 +192,8 @@
+       a=track->anchor[i];b=track->target[i];
+     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
+     out.feet[i]=a;
+-    if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp,p.swingRampEnd);
++    if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);const bool lead=p.leadSwingRamp>=0&&(p.reverse?i>=2:i<2);
++      T f=lead?swingProfile(u,p.leadSwingRamp,p.leadSwingRampEnd):swingProfile(u,p.swingRamp,p.swingRampEnd);
+       T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
+       out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
+ }
+@@ -231,14 +243,16 @@
+ Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
+ }
+ bool validGaitParameters(const GaitParameters& p) {
+-  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles};
++  const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles,p.leadSwingRamp,p.leadSwingRampEnd,p.surgeXM,p.surgePhase,p.surgeStrideM};
+   for(double v:values)if(!std::isfinite(v))return false;
+   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
+     p.duty>=(p.type==GaitType::WALK?.75:.5)&&p.maxCondition>=1&&p.swayXM>=0&&
+     (p.swayXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&(p.comShiftXM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
+     p.swayYM>=0&&(p.swayYM==0||(p.type==GaitType::WALK&&p.duty>.75))&&
+     p.startCycles>=0&&p.stopCycles>=0&&(!p.reverse||p.type==GaitType::WALK)&&
+-    std::isfinite(p.edgeTiltRad)&&p.edgeTiltRad>=0&&p.edgeTiltRad<=kEdgeContactMaxTiltRad&&p.swingRamp>=0&&p.swingRamp<.5&&p.swingRampEnd>=0&&(p.swingRampEnd==0||(p.swingRamp>0&&p.swingRamp+p.swingRampEnd<1))&&p.settleCycles>=0&&p.settleCycles<=1;
++    std::isfinite(p.edgeTiltRad)&&p.edgeTiltRad>=0&&p.edgeTiltRad<=kEdgeContactMaxTiltRad&&p.swingRamp>=0&&p.swingRamp<.5&&p.swingRampEnd>=0&&(p.swingRampEnd==0||(p.swingRamp>0&&p.swingRamp+p.swingRampEnd<1))&&p.settleCycles>=0&&p.settleCycles<=1&&
++    (p.leadSwingRamp<0||(p.leadSwingRamp<.5&&p.leadSwingRampEnd>=0&&(p.leadSwingRampEnd==0||(p.leadSwingRamp>0&&p.leadSwingRamp+p.leadSwingRampEnd<1))))&&
++    (p.surgeXM==0||(p.type==GaitType::WALK&&p.surgeXM>0&&p.surgeStrideM>0&&p.startCycles>0&&p.stopCycles>0));
+ }
+ double gaitSettleCycles(const GaitParameters& p){
+   if(p.type!=GaitType::WALK||(p.swayXM==0&&p.swayYM==0&&p.comShiftXM==0))return 0;
+@@ -268,9 +282,11 @@
+ }
+ bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParameters& to,double cycles,double terminal){
+   if(!validGaitParameters(from)||!validGaitParameters(to)||!std::isfinite(cycles)||cycles<0||cycles>1e6||!std::isfinite(terminal)||
+-     from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||from.swayXM!=to.swayXM||
++     from.type!=to.type||from.heightM!=to.heightM||from.liftM!=to.liftM||from.duty!=to.duty||
+      from.startCycles!=to.startCycles||from.stopCycles!=to.stopCycles||from.reverse!=to.reverse||from.edgeTiltRad!=to.edgeTiltRad||
+-     from.comShiftXM!=to.comShiftXM||from.swingRamp!=to.swingRamp||from.swingRampEnd!=to.swingRampEnd||from.settleCycles!=to.settleCycles)return false;
++     from.comShiftXM!=to.comShiftXM||from.swingRamp!=to.swingRamp||from.swingRampEnd!=to.swingRampEnd||from.settleCycles!=to.settleCycles||
++     from.leadSwingRamp!=to.leadSwingRamp||from.leadSwingRampEnd!=to.leadSwingRampEnd||
++     from.surgePhase!=to.surgePhase||from.surgeStrideM!=to.surgeStrideM)return false;
+   // Same world pose of the nominal body at this progress under both laws.
+   const double r=progress(from,cycles,terminal,true);
+   const auto world=place(track.frame,nominal(from,r)),next=nominal(to,r);
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.h
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.h
+@@ -52,6 +52,22 @@
+   // above bit for bit. Slows the swing end, where a fast crawl meets the
+   // kHeight UPPER bound and its STOP arrest needs room.
+   double swingRampEnd = 0;
++  // Leading-leg swing ramps (FAST 40 study, 2026-11-12): the legs that reach
++  // forward at touchdown (the front legs; the hind legs with reverse) take
++  // their own trapezoid, the others swingRamp/swingRampEnd. The leading UPPER
++  // rate grows through the swing (it extends towards kHeight), the trailing
++  // LOWER peaks early (lift-off): one shape cannot serve both. Negative keeps
++  // swingRamp/swingRampEnd on all four legs, bit for bit.
++  double leadSwingRamp = -1, leadSwingRampEnd = 0;
++  // WALK body fore/aft speed modulation (FAST 40 study, 2026-11-12): surgeXM
++  // sin(4 pi (cycles - surgePhase)) on the fore/aft offset, zero mean, two
++  // periods per cycle (one per front swing); faded in over startCycles and out
++  // over the decel cycle of a WALK STOP; off for reverse. It slows the
++  // body at the end of each front swing, where the STOP capture point meets
++  // the diagonal support edge, without moving the body back (front reach).
++  // The amplitude scales with the forward stride per cycle (advanceXM over
++  // surgeStrideM, at most 1): no modulation without a forward part.
++  double surgeXM = 0, surgePhase = 0, surgeStrideM = 0;
+   // WALK only: the time reverse of the forward leg order (LF, LH, RF, RH
+   // instead of RH, RF, LH, LF), for backward travel. Same swing and four-contact
+   // windows and fore/aft offsets; the lateral offset still moves away from
+@@ -102,10 +118,11 @@
+ };
+ CartesianSample gaitTrackCartesian(GaitTrack& track,const GaitParameters& p,double cycles,
+                                    double cyclesPerS,double cyclesPerS2,double terminalCycle=-1);
+-// Only advanceXM/advanceYM/yawRad and swayYM may differ (the lateral offset is
+-// applied in the heading frame after the law frame, so a sway change moves the
+-// body by the amplitude difference times the current lateral law value; the
+-// caller rate-limits it). False leaves the track unchanged.
++// Only advanceXM/advanceYM/yawRad, swayYM and (FAST 40 study) swayXM and surgeXM
++// may differ (the lateral and fore/aft offsets are applied in the heading frame
++// after the law frame, so a sway change moves the body by the amplitude
++// difference times the current law value; the caller rate-limits it, the
++// fore/aft one with four contacts). False leaves the track unchanged.
+ bool gaitRetarget(GaitTrack& track,const GaitParameters& from,const GaitParameters& to,
+                   double cycles,double terminalCycle=-1);
+ // Four locked contacts, interpolation between geometric body configurations.
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -88,17 +88,19 @@
+ constexpr WalkModeSpec kWalkModes[]={
+   {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
+   {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,.00125,&kStandardTilt,&kStandardTilt,false},
+-  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.006,.0010,&kFastTilt,&kFastTilt,false}};
++  {"FAST",2.75,.80,.105,.0045,.35,.30,{1950,220},{.080,.095,.110},.005,.00075,&kFastTilt,&kFastTilt,false,.19,.70,.0012,.265}};
+ // Register 85 is configured to cover every drive of the table.
+ static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&
+               kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,"every drive within register 85");
+ // stepWalkMode: the modes are ordered (a faster mode has the higher drive, so
+ // the faster of two drives is one of the table's) and share the fore/aft COM
+-// offsets, which therefore never change inside a walk.
++// shift. The fore/aft sway and the body speed modulation move inside a walk
++// (FAST 40 study), rate-limited; only the fastest mode carries the modulation,
++// so its phase and stride scale change at a shape step only with it at zero.
+ static_assert(kWalkModes[0].drive.speed<kWalkModes[1].drive.speed&&kWalkModes[1].drive.speed<kWalkModes[2].drive.speed&&
+               kWalkModes[0].drive.acc<kWalkModes[1].drive.acc&&kWalkModes[1].drive.acc<kWalkModes[2].drive.acc&&
+               kWalkModes[0].periodS>kWalkModes[1].periodS&&kWalkModes[1].periodS>kWalkModes[2].periodS&&
+-              kWalkModes[0].swayXM==kWalkModes[1].swayXM&&kWalkModes[1].swayXM==kWalkModes[2].swayXM,"WALK modes ordered by speed");
++              kWalkModes[0].swayXM==kWalkModes[1].swayXM&&kWalkModes[0].surgeXM==0&&kWalkModes[1].surgeXM==0,"WALK modes ordered by speed");
+ const WalkModeSpec& walkModeSpec(WalkMode m){return kWalkModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
+ // JOYSTICK per mode (SimpleMotion.h JoystickSpec), per cycle of the mode's own law.
+ // STANDARD (joystick_envelope gate mode 1, scan of 8: lateral 20/15 mm, yaw .16/.12,
+@@ -120,7 +122,7 @@
+ // 1 of 576 STOPs out of the box at the start ramp, 36 seeds; 0.5 mm: 0 of 1008
+ // in the sway-transfer windows); forward decrease
+ // over 3 cycles (joystick_envelope frontal_changes -0.44 mm of static support with 2).
+-  {kJoystickBackM,kJoystickStrideM,.012,.08,kWalkModes[2].swayYM,kJoystickSwayLowM,.0075,.0005,3}};
++  {.066,kJoystickStrideM,.016,.10,kWalkModes[2].swayYM,.0045,.0055,.0005,3}};
+ const JoystickSpec& joystickSpec(WalkMode m){return kJoystickModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
+ bool parseWalkMode(const char* name,WalkMode& m){
+   for(unsigned i=0;i<3;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
+@@ -130,7 +132,8 @@
+   const auto& w=walkModeSpec(mode);
+   GaitParameters g;g.heightM=baseLinkHeightFromNominalM(w.heightM);g.liftM=w.liftM;g.duty=w.duty;g.advanceXM=w.strideM[stride<3?stride:2];
+   g.swayXM=w.swayXM;g.swayYM=w.swayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
+-  g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;return g;
++  g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;
++  g.leadSwingRamp=w.leadSwingRamp;g.leadSwingRampEnd=w.leadSwingRampEnd;g.surgeXM=w.surgeXM;g.surgePhase=w.surgePhase;g.surgeStrideM=w.strideM[2];return g;
+ }
+ GaitParameters steerGait(const double goal[3]){return steerGait(goal,WalkMode::SLOW);}
+ GaitParameters steerGait(const double goal[3],WalkMode mode){
+@@ -1092,14 +1095,16 @@
+     walkTarget_=selectedMode_;requestedHeight_=walkModeSpec(walkTarget_).heightM;}
+   const auto& from=walkModeSpec(walkMode_);const auto& to=walkModeSpec(walkTarget_);
+   const bool shaped=walkMode_==walkTarget_;
+-  if(shaped&&walkPeriod_==to.periodS&&walkHeight_==to.heightM&&gait_.swayYM==to.swayYM&&(joystick_||gait_.advanceXM==to.strideM[stride_])){
++  // FAST 40 study: the fore/aft sway and the body speed modulation are the target's own too.
++  const bool own=gait_.swayYM==to.swayYM&&gait_.swayXM==to.swayXM&&gait_.surgeXM==to.surgeXM;
++  if(shaped&&walkPeriod_==to.periodS&&walkHeight_==to.heightM&&own&&(joystick_||gait_.advanceXM==to.strideM[stride_])){
+     walkDrive_=to.drive;return;}  // settled: the mode's own law
+   if(cycles_<kWalkStartCycles)return;  // after the start ramp
+   auto approach=[](double x,double goal,double step){return std::abs(goal-x)<=step?goal:x+std::copysign(step,goal-x);};
+   // Clock rate (cycles per eased second): the slower law's, never faster than
+   // now, until the law is the target's own (shape, height, sway); then the target's.
+   const double slowPeriod=std::fmax(from.periodS,to.periodS);
+-  const double goalPeriod=shaped&&walkHeight_==to.heightM&&gait_.swayYM==to.swayYM?to.periodS:std::fmax(walkPeriod_,slowPeriod);
++  const double goalPeriod=shaped&&walkHeight_==to.heightM&&own?to.periodS:std::fmax(walkPeriod_,slowPeriod);
+   if(walkPeriod_!=goalPeriod){
+     const double f=approach(1/walkPeriod_,1/goalPeriod,kWalkModeRateSlope*dt);
+     clockCycles_=cycles_;clockEased_=eased;walkPeriod_=f==1/goalPeriod?goalPeriod:1/f;}
+@@ -1119,7 +1124,15 @@
+   const bool geometry=from.periodS<=to.periodS&&walkPeriod_>=slowPeriod;
+   bool fourDown=true;for(const auto& ph:walkPrevious_.cartesian.phases)fourDown=fourDown&&ph.stance;
+   if(fourDown&&(to.swayYM<gait_.swayYM||(shaped&&walkHeight_==to.heightM)))next.swayYM=approach(gait_.swayYM,to.swayYM,kWalkModeSwayRate*dc);
+-  if((next.advanceXM!=gait_.advanceXM||next.swayYM!=gait_.swayYM)&&gaitRetarget(track_,gait_,next,cycles_))gait_=next;
++  // Fore/aft sway (four feet down, as the lateral one) and body speed modulation
++  // (FAST 40 study): the target's, with the faster law's shape at the slower
++  // law's clock: before the shape step of a slower target, after the shape step
++  // of a faster one.
++  if(geometry&&(shaped||to.periodS>from.periodS)){
++    if(fourDown)next.swayXM=approach(gait_.swayXM,to.swayXM,kWalkModeSwayRate*dc);
++    next.surgeXM=approach(gait_.surgeXM,to.surgeXM,kWalkModeSwayRate*dc);}
++  if((next.advanceXM!=gait_.advanceXM||next.swayYM!=gait_.swayYM||next.swayXM!=gait_.swayXM||next.surgeXM!=gait_.surgeXM)&&
++     gaitRetarget(track_,gait_,next,cycles_))gait_=next;
+   const double h=geometry?approach(walkHeight_,to.heightM,kWalkModeHeightRate*dt):walkHeight_;
+   if(h!=walkHeight_){walkHeight_=plannedHeight_=h;gait_.heightM=baseLinkHeightFromNominalM(h);}
+   // Law shape (duty, swing profile, lift): at the first release of a
+@@ -1128,7 +1141,7 @@
+   // at its own height, the applied correction inside the target's envelope (as
+   // regimeHandover).
+   if(shaped||walkPeriod_<slowPeriod||std::abs(gait_.advanceXM)>to.strideM[joystick_?2:stride_]+1e-12)return;
+-  if(to.periodS>from.periodS&&walkHeight_!=to.heightM)return;
++  if(to.periodS>from.periodS&&(walkHeight_!=to.heightM||gait_.swayXM!=to.swayXM||gait_.surgeXM!=to.surgeXM))return;
+   const double since=cycles_-std::floor(cycles_*4)/4;
+   if(since>dc||since>=std::fmin(from.duty,to.duty)-.75)return;
+   auto shape=walkGait(joystick_?2:stride_,walkTarget_);if(joystick_&&walkTarget_==WalkMode::SLOW)shape.edgeTiltRad=kEdgeContactMaxTiltRad;
+@@ -1137,6 +1150,7 @@
+   const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;double rb=c*r+s*p,pb=-s*r+c*p;
+   if(projectWalkTilt(stride_==2?*to.tiltTop:*to.tiltShort,rb,pb))return;
+   gait_.duty=shape.duty;gait_.liftM=shape.liftM;gait_.swingRamp=shape.swingRamp;gait_.swingRampEnd=shape.swingRampEnd;gait_.edgeTiltRad=shape.edgeTiltRad;
++  gait_.leadSwingRamp=shape.leadSwingRamp;gait_.leadSwingRampEnd=shape.leadSwingRampEnd;gait_.surgePhase=shape.surgePhase;gait_.surgeStrideM=shape.surgeStrideM;
+   walkMode_=walkTarget_;
+ }
+ bool SimpleMotion::regimeHandover(bool toSteered) const {
+@@ -1461,15 +1475,17 @@
+ }
+ namespace {
+ // Fields of the law other than the steered displacement per cycle and the
+-// steered sway: a change of these is structural (new walk, WALK STOP terminal,
++// sway amplitudes (lateral; FAST 40 study: fore/aft and the body speed
++// modulation, rate-limited by stepWalkMode): a change of these is structural (new walk, WALK STOP terminal,
+ // the shape step of a WALK mode change); advance, lateral, yaw and sway
+ // amplitude change through gaitRetarget by rate-limited steps that keep the
+ // body pose continuous. Nor is the body height: a WALK mode change moves it by
+ // 0.04 mm per release (kWalkModeHeightRate), interpolated like a retarget.
+ bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
+-  return a.type==b.type&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&
++  return a.type==b.type&&a.liftM==b.liftM&&a.duty==b.duty&&
+     a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition&&
+-    a.comShiftXM==b.comShiftXM&&a.swingRamp==b.swingRamp&&a.swingRampEnd==b.swingRampEnd&&a.settleCycles==b.settleCycles;
++    a.comShiftXM==b.comShiftXM&&a.swingRamp==b.swingRamp&&a.swingRampEnd==b.swingRampEnd&&a.settleCycles==b.settleCycles&&
++    a.leadSwingRamp==b.leadSwingRamp&&a.leadSwingRampEnd==b.leadSwingRampEnd&&a.surgePhase==b.surgePhase&&a.surgeStrideM==b.surgeStrideM;
+ }
+ }
+ // T2: the reference at the release clock, linear in joint space between the
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h
+@@ -310,6 +310,7 @@
+   double liftM,swayYM;
+   const TiltPolygon *tiltShort,*tiltTop;  // IMU envelope of presets 0-1 and of preset 2
+   bool hardwareQualified;
++  double leadSwingRamp=-1,leadSwingRampEnd=0,surgeXM=0,surgePhase=0;  // GaitParameters (FAST 40 study)
+ };
+ const WalkModeSpec& walkModeSpec(WalkMode);
+ const JoystickSpec& joystickSpec(WalkMode);
