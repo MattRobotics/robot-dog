@@ -1980,6 +1980,19 @@ void CommandRouter::printBmsStatus() {
                   sample.state_name,
                   sample.alarms[0], sample.alarms[1], sample.alarms[2], sample.alarms[3]);
   }
+  // D1, last so the fixed line order host parsers read stays intact
+  // (daly_calibration_guard.py): transport facts of the poll behind comm=.
+  // NONE = no byte / no valid reply since boot.
+  const power::DalyBms::TelemetryDiag& d = s->bmsTelemetryDiag();
+  char first[12] = "NONE", last_ok[12] = "NONE";
+  if (d.first_byte_ms != power::DalyBms::kNoByte)
+    snprintf(first, sizeof(first), "%lu", (unsigned long)d.first_byte_ms);
+  if (s->bmsHasValidSample())
+    snprintf(last_ok, sizeof(last_ok), "%lu",
+             (unsigned long)s->uptimeMillis(s->bmsSample().sampled_at_ms));
+  Serial.printf("  rx_bytes=%u first_byte_ms=%s stale_bytes=%u fail_streak=%lu last_ok_uptime_ms=%s\n",
+                (unsigned)d.rx_bytes, first, (unsigned)d.stale_bytes,
+                (unsigned long)d.fail_streak, last_ok);
 }
 
 // Formatting only, from the stored snapshot. Configuration is reported

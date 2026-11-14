@@ -968,6 +968,21 @@ void HttpTransport::statusExtension(
           ? "YES"
           : "NO",
       (unsigned long)power::kDalyTelemetryFreshnessMs);
+  // D1: transport facts of the last poll (outcome = bms_comm); NONE = no byte
+  // / no valid reply since boot.
+  {
+    const power::DalyBms::TelemetryDiag &d = service_->bmsTelemetryDiag();
+    char first[12] = "NONE", last_ok[12] = "NONE";
+    if (d.first_byte_ms != power::DalyBms::kNoByte)
+      snprintf(first, sizeof(first), "%lu", (unsigned long)d.first_byte_ms);
+    if (valid)
+      snprintf(last_ok, sizeof(last_ok), "%lu",
+               (unsigned long)service_->uptimeMillis(bms.sampled_at_ms));
+    add("bms_rx_bytes=%u\nbms_first_byte_ms=%s\nbms_stale_bytes=%u\n"
+        "bms_fail_streak=%lu\nbms_last_ok_uptime_ms=%s\n",
+        (unsigned)d.rx_bytes, first, (unsigned)d.stale_bytes,
+        (unsigned long)d.fail_streak, last_ok);
+  }
   if (valid) {
     add("bms_current_a=%.1f\nbms_state=%s\nbms_charge_mos=%s\n"
         "bms_discharge_mos=%s\nbms_alarms=%04X %04X %04X %04X\n",

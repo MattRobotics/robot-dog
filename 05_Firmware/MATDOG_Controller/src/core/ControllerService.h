@@ -130,6 +130,9 @@ class ControllerService {
   }
   bool bmsHasValidSample() const { return modules_.daly->hasValidSample(); }
   const power::DalySample& bmsSample() const { return modules_.daly->sample(); }
+  const power::DalyBms::TelemetryDiag& bmsTelemetryDiag() const {
+    return modules_.daly->telemetryDiag();
+  }
   power::DalyKeyReadResult bmsKeyConfigReadResult() const {
     return modules_.daly->keyConfigReadResult();
   }

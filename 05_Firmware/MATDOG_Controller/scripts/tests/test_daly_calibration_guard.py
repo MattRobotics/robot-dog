@@ -50,6 +50,15 @@ class GuardTests(unittest.TestCase):
             for line in lines: g.feed(line,11)
         with self.assertRaises(DalyGuardFailure): g.feed(NORMAL[0],12)
 
+    def test_trailing_d1_transport_line_is_inert(self):
+        # @BMS STATUS ends with the D1 line (2026-11-14); the guard reads the four
+        # telemetry lines in their fixed order and ignores what follows.
+        d1="  rx_bytes=129 first_byte_ms=140 stale_bytes=0 fail_streak=0 last_ok_uptime_ms=9200"
+        g=self.sample(NORMAL+[d1]); g.check(10)
+        self.assertEqual(g.snapshot()['pack_v'],10.8)
+        with self.assertRaises(DalyGuardFailure):
+            self.sample([NORMAL[0],"  comm=TIMEOUT age_ms=751",d1.replace('129','0')])
+
     def test_partial_block_cannot_be_replaced(self):
         g=self.sample(NORMAL[:3])
         with self.assertRaisesRegex(DalyGuardFailure,'incomplete'): g.feed(NORMAL[0],10.5)

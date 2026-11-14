@@ -86,9 +86,12 @@ DalyKeyWriteGate DalyBms::requestKeyLogicDischarge(core::OperatingMode mode) {
 void DalyBms::startTransaction(DalyRequest request) {
   // Bounded stale drain. This UART has one owner and no queued TX: update()
   // checks room for the complete eight-byte frame before selecting it.
-  for (size_t n=0; n<kDalyMaxResponseLen && bms_uart_.available(); ++n) {
+  size_t n = 0;
+  for (; n<kDalyMaxResponseLen && bms_uart_.available(); ++n) {
     bms_uart_.read();
   }
+  stale_bytes_ = static_cast<uint16_t>(n);
+  rx_first_ms_ = kNoByte;
   if (request == DalyRequest::KEY_LOGIC_DISCHARGE_WRITE) {
     key_write_.markTransmitted();  // before the bytes: a power loss mid-frame still counts
   }
@@ -115,6 +118,11 @@ void DalyBms::handleTelemetryResponse() {
   // closest fit in the 4-state DetectedState model.
   detected_ = last_result_ == DalyCommResult::OK ? core::DetectedState::ONLINE
                                                  : core::DetectedState::NO_RESPONSE;
+  telemetry_diag_.rx_bytes = static_cast<uint16_t>(rx_len_);
+  telemetry_diag_.first_byte_ms = rx_first_ms_;
+  telemetry_diag_.stale_bytes = stale_bytes_;
+  telemetry_diag_.fail_streak =
+      last_result_ == DalyCommResult::OK ? 0 : telemetry_diag_.fail_streak + 1;
 }
 
 void DalyBms::handleKeyConfigResponse() {
@@ -159,8 +167,12 @@ void DalyBms::update(uint32_t now_ms, core::OperatingMode mode) {
   }
 
   const size_t expected_len = dalyResponseLen(bus_.inFlightRequest());
+  const size_t had = rx_len_;
   while (bms_uart_.available() && rx_len_ < expected_len) {
     rx_buf_[rx_len_++] = static_cast<uint8_t>(bms_uart_.read());
+  }
+  if (had == 0 && rx_len_ > 0) {
+    rx_first_ms_ = now_ms - bus_.sentMs();
   }
 
   const bool complete = (rx_len_ == expected_len);

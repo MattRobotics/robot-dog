@@ -9,6 +9,15 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — DALY telemetry transport diagnostics (Battery P1, D1) — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** the BMS outages after boot (06/11–09/11, 2–5 min, `comm=TIMEOUT`) cannot tell a silent DALY from a partial, late or malformed reply (H0 sessions `MATDOG_1_0_2_DEV3_HW_H0_20261108`, `MATDOG_1_0_2_DEV6_T44FIX_H0_20261109`, `MATDOG_1_0_2_DEV6_ACCDIAG_HW_20261109`; physical cause UNKNOWN).
+- **What:** for the last completed 0xD2 poll, `DalyBms::telemetryDiag()` keeps the bytes read before the deadline, the delay from the request to the first byte `update()` saw, the bytes discarded just before the request (arrived after the previous poll closed) and the consecutive non-OK polls. `@BMS STATUS` prints them on one new last line, so the fixed line order `daly_calibration_guard.py` reads is unchanged; `/status` adds `bms_rx_bytes`, `bms_first_byte_ms`, `bms_stale_bytes`, `bms_fail_streak`, `bms_last_ok_uptime_ms` (`NONE` = no byte / no valid reply). Outcome stays `comm` / `bms_comm`; the last valid reply is the sample's own timestamp.
+- **Unchanged:** requests, 2 s cadence, 750 ms deadline, 5 s freshness, drain bound, KEY/MOS paths, availability, SystemHealth, LED policy, Motion power policy. No UART re-init, no new logging.
+- **Tests (offline):** `test_daly_async` (production `DalyBms`, virtual UART): silence, partial, late after the deadline, late inside it, CRC and header failures, streak reset, 8 TX bytes per poll; 4/4 diagnostic mutations detected. `test_daly_calibration_guard` with the trailing line; DALY audit mutations 52/52; review power chain and night-recovery runners PASS. `static_audit`: every host suite passes up to the Motion source gate, which fails exactly as on `2293a58` (Ground Contact `5472b65`: `FootContact`, `TiltedContactIk`, `GroundContactDiagnostic.h`); no new finding. ROBOT_POWERED build: APP 1 772 848 B (+720 B), layout gate OK.
+
 ## Unreleased — MATDOG Controller 1.0.2-dev.7 integrated candidate: Motion vNext + Battery P1 — 2026-11-11
 
 > Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. New version string `1.0.2-dev.7` (never assigned before; `v1.0.1-dev.7` is a different series). Branch `integ/motion-vnext-battery-p1-dev7-20261111` on the Motion candidate `a7f5c2c`; the two source branches stay unchanged (`feat/motion-multidirectional-vnext-20261111` at `a7f5c2c`, `fix/battery-p1-20261111` at `f5b9d32`). `450d2c7` (APP `82122e06…`) stays the installed reference and the rollback.
