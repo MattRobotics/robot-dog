@@ -225,10 +225,14 @@ class ActuatorLimitTable {
 
   uint8_t size() const { return count_; }
   bool empty() const { return count_ == 0; }
+  // Changes on every clear() and stored admit(): an entry pointer kept from
+  // find() is the current evidence only while it is unchanged.
+  uint32_t revision() const { return revision_; }
 
  private:
   JointLimit entries_[kCapacity];
   uint8_t count_ = 0;
+  uint32_t revision_ = 0;
 };
 
 // The accepted raw<->q transform store. Same shape and same gate as the limit
@@ -252,10 +256,13 @@ class JointTransformTable {
 
   uint8_t size() const { return count_; }
   bool empty() const { return count_ == 0; }
+  // See ActuatorLimitTable::revision().
+  uint32_t revision() const { return revision_; }
 
  private:
   JointTransform entries_[kCapacity];
   uint8_t count_ = 0;
+  uint32_t revision_ = 0;
 };
 
 // ---------------------------------------------------------------------------

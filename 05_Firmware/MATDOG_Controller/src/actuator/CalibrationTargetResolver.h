@@ -128,6 +128,30 @@ TargetResolveStatus resolveRadiansToRaw(const CalibrationGeometryProfile& profil
                                         uint16_t* raw_tick_out,
                                         MicroRad* q_urad_out = nullptr);
 
+// The calibration-invariant half of the conversions above, resolved ONCE for
+// one transform: profile bound, provenance, transform applicability, joint
+// record and encoder direction (the same checks, in the same order, with the
+// same status). It names the table entry and the profile record, it copies no
+// calibration value, and it stays valid only while neither the profile nor the
+// table holding `transform` changes: a holder re-resolves on any revision().
+struct ResolvedJointTransform {
+  const JointTransform* transform = nullptr;
+  const GeometryJointRecord* joint = nullptr;
+  int8_t direction = 0;
+};
+TargetResolveStatus resolveJointTransform(const CalibrationGeometryProfile& profile,
+                                          const GeometryProvenance& expected_provenance,
+                                          const JointTransform& transform,
+                                          ResolvedJointTransform* out);
+// The per-call half on a resolved transform: the same arithmetic, URDF and RAW
+// domain checks (the conversions above are resolveJointTransform + these).
+TargetResolveStatus resolveUrdfQToRaw(const ResolvedJointTransform& resolved,
+                                      MicroRad q_urad, uint16_t* raw_tick_out);
+TargetResolveStatus resolveRawObservation(const ResolvedJointTransform& resolved,
+                                          uint16_t raw_tick, MicroRad* q_urad_out);
+TargetResolveStatus resolveRadiansToRaw(const ResolvedJointTransform& resolved,
+                                        double q_rad, uint16_t* raw_tick_out);
+
 // DIRECTION_VERIFY is a raw excursion around current q0. Its SAFETY envelope
 // is independent of direction, but the absolute ST3215 GoalPosition still
 // needs a current promoted q0. No wrap is permitted.

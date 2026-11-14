@@ -9,6 +9,24 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — Servo conversions: lookups and invariant checks resolved once per calibration revision — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** the hardware timing of 14/11 (dev.8u) measured WALK 14.79 ms and RECOVERY 21.46 ms per release (24 missed releases in RECOVERY), with up to 1.41× the instructions of the QEMU reference. QEMU with the real gen-1 tables:
+  - one `SimpleServoPort::resolve` costs 6 692 instructions and one `decodeRaw` 5 921 (stubs: 551 and 155);
+  - per call: `provenanceMatches` 2 896 (six SHA-256 hex strings compared), `transforms().find` and `limits().find` about 1 000 each, `findJoint` and `jointDirection` about 520 each, the arithmetic only about 100;
+  - a WALK release runs 24 resolves and 26 decodes, a RECOVERY release 36 and 38.
+- **What:**
+  - `CalibrationTargetResolver`: `resolveJointTransform()` is the invariant half of every conversion (profile bound, provenance, transform applicability, joint record, encoder direction: the same checks, order and status as before). Bound overloads of `resolveUrdfQToRaw`, `resolveRawObservation` and `resolveRadiansToRaw` do the per-call half (URDF limit, RAW domain, arithmetic). The full functions are now exactly these two halves in sequence.
+  - `JointTransformTable`, `ActuatorLimitTable` and `CalibrationGeometryProfile` expose `revision()`, changed by every clear/stored admit and every bind/clear.
+  - `SimpleServoPort::slot()` resolves a slot's table entries and invariant checks once per revision of the profile and of both tables, then every `resolve`/`decodeRaw` applies only the per-call half and `limit->contains()`. The binding names the table entries and the profile record; it copies no calibration value, so the calibration stays the single source of truth. Any change of the tables or the profile re-resolves. 12 slots × 32 bytes of RAM.
+- **Unchanged:** every check and status of the conversions, the tables and their admission gates, calibration, NVS, Motion, STOP, limits, frames.
+- **Equivalence (offline):**
+  - Two-tree differential proof (baseline vs this change, port bodies copied from each tree, golden gen-1 tables): 22.7 M resolve and 640 k decode results identical byte for byte, also after cleared tables, re-admission in reverse order, a new q0, a narrowed limit, a cleared, rebound or different geometry. Negative control: without the revision check it diverges at every change.
+  - New `test_servo_port_conversion` (in `run_host_tests.sh`): the production `slot()`, `decodeRaw()` and `resolve()` against the per-call lookup they replace, 13 slots, the whole RAW domain, a quarter-tick q grid, every rounding boundary, URDF limits, non-finite values, 12 table/profile states: 7 740 306 checks, 0 failures. It fails (1.9 M differences) without the revision check.
+- **Timing (QEMU Xtensa, real gen-1 conversions, 14/11 fixture replay, K = 3.088):** identical frames (host = QEMU, digest unchanged). Mean instructions per release: WALK 1 143 k → 864 k (−24 %), RECOVERY 1 768 k → 1 349 k (−24 %), WALK_SETTLE 967 k → 631 k (−35 %). Not a hardware measurement.
+
 ## Unreleased — STOP/SAFE_OFF with torque OFF: an explicit STAND re-arms through ACQUIRE — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.

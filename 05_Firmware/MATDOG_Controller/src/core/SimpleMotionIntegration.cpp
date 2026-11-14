@@ -42,12 +42,24 @@ bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback&
   out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
   return true;
 }
-bool Controller::SimpleServoPort::decodeRaw(unsigned i,uint16_t raw,double& q){
-  if(!owner||i>=12||raw>=4096)return false;auto& c=*owner;
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
+// The lookups and the calibration-invariant checks of resolveRawObservation/
+// resolveRadiansToRaw (provenance, transform, joint, direction) are the same
+// for every call until the profile or a table changes: resolved here once per
+// revision (2026-11-14, ~6k instructions per conversion on the ESP32-S3).
+const Controller::SimpleServoPort::Slot* Controller::SimpleServoPort::slot(unsigned i){
+  if(!owner||i>=12)return nullptr;auto& c=*owner;auto& s=slots[i];
+  const uint32_t revision[3]={c.geometry_profile_.revision(),c.actuator_policy_.transforms().revision(),c.actuator_policy_.limits().revision()};
+  if(s.valid&&std::equal(revision,revision+3,s.revision))return &s;
+  s=Slot{};calibration::JointIdentity id;actuator::slotIdentity(i,&id);
   const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  actuator::MicroRad urad=0;
-  if(!tr||actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  if(!tr||actuator::resolveJointTransform(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,&s.transform)!=actuator::TargetResolveStatus::OK)return nullptr;
+  s.limit=c.actuator_policy_.limits().find(id,c.geometry_profile_.provenanceTag());  // decodeRaw needs none; resolve refuses without
+  std::copy(revision,revision+3,s.revision);s.valid=true;return &s;
+}
+bool Controller::SimpleServoPort::decodeRaw(unsigned i,uint16_t raw,double& q){
+  if(!owner||i>=12||raw>=4096)return false;
+  const Slot* s=slot(i);actuator::MicroRad urad=0;
+  if(!s||actuator::resolveRawObservation(s->transform,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
   q=actuator::microRadToRadians(urad);return true;
 }
 bool Controller::SimpleServoPort::readDeferred() const {
@@ -56,11 +68,9 @@ bool Controller::SimpleServoPort::readDeferred() const {
   return owner&&owner->servo_bus_.lastBusOutcome()==servo::BusOutcome::RX_PENDING;
 }
 bool Controller::SimpleServoPort::resolve(unsigned i,double q,uint16_t& raw){
-  if(!owner||i>=12)return false;auto& c=*owner;
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
-  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  const auto* lim=c.actuator_policy_.limits().find(id,c.geometry_profile_.provenanceTag());
-  return tr&&lim&&actuator::resolveRadiansToRaw(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,q,&raw)==actuator::TargetResolveStatus::OK&&lim->contains(raw);
+  if(!owner||i>=12)return false;
+  const Slot* s=slot(i);
+  return s&&s->limit&&actuator::resolveRadiansToRaw(s->transform,q,&raw)==actuator::TargetResolveStatus::OK&&s->limit->contains(raw);
 }
 bool Controller::SimpleServoPort::frame(const uint16_t raw[12],simple::Drive drive){
   // Only SimpleMotion's scoped, exact STOP frame may pass its operational

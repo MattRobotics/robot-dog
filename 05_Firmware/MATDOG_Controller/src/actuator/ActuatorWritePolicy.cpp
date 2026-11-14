@@ -113,6 +113,7 @@ bool limitMayBeAppliedTo(const JointLimit& limit, const JointIdentity& current) 
 void ActuatorLimitTable::clear() {
   for (uint8_t i = 0; i < kCapacity; ++i) entries_[i] = JointLimit{};
   count_ = 0;
+  ++revision_;
 }
 
 bool ActuatorLimitTable::admit(const JointLimit& limit) {
@@ -128,11 +129,13 @@ bool ActuatorLimitTable::admit(const JointLimit& limit) {
   for (uint8_t i = 0; i < count_; ++i) {
     if (calibration::identityPermitsEvidenceReuse(entries_[i].identity, limit.identity)) {
       entries_[i] = limit;
+      ++revision_;
       return true;
     }
   }
   if (count_ >= kCapacity) return false;
   entries_[count_++] = limit;
+  ++revision_;
   return true;
 }
 
@@ -161,6 +164,7 @@ const JointLimit* ActuatorLimitTable::find(const JointIdentity& joint,
 void JointTransformTable::clear() {
   for (uint8_t i = 0; i < kCapacity; ++i) entries_[i] = JointTransform{};
   count_ = 0;
+  ++revision_;
 }
 
 bool JointTransformTable::admit(const JointTransform& transform) {
@@ -175,11 +179,13 @@ bool JointTransformTable::admit(const JointTransform& transform) {
   for (uint8_t i = 0; i < count_; ++i) {
     if (calibration::identityPermitsEvidenceReuse(entries_[i].identity, transform.identity)) {
       entries_[i] = transform;
+      ++revision_;
       return true;
     }
   }
   if (count_ >= kCapacity) return false;
   entries_[count_++] = transform;
+  ++revision_;
   return true;
 }
 
