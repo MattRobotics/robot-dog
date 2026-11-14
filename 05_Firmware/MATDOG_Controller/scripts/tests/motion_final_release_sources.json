@@ -1,8 +1,8 @@
 {
   "baseline_commit": "4634de8007bd086ce07f8874119f47569f76ea1c",
   "updated_copied_sources": {
-    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "f45fb50b35ff10d4c5d27d35ed3025f6ea58ec0dc832f9f1fd351cd62c020437",
-    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "944e04e45af834f5abfea5975d258ea6691542e55566b49b4423f936c1caa948",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "fb78327903a31a1bcd9d539ff08bc0f2df5eb9c582a7faf850564d14a2d18df1",
+    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "95d3b44b1c5f6b204e3850a381b9895606777381e23eb5bfa1ef2e20be9b6cba",
     "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "df9569a864ad1ff88821536ae5b1ee86a132b44e3a5632cf4f7d7fe0e3950f76",
     "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e6a5935b9d14a21cd983ba0223db3a77fe875e3ffe72ea7c3124a329930dee46",
     "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "483e608253b9514be26000d81b7eeea764c28503ad5640036ec3ba8574f3fa0f",
@@ -11,8 +11,8 @@
     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "bbe099cea1d7b6c52b07ee3f1449c297860f4f072917a34225b43e2ebc83f720",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "80d8d04a7086f10389d7a21884fd1365f154b86ad6df6778fa300e786f2a3626",
-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "c2c685c1168468bfb43e45b6044e0dffc87fc10e0c657234d4d402f913677fd6"
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "d15610d71b803bd41a9f404ca13f876a19ecce3c796eb53d828575a6284f5249",
+    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "531e203030aae28e1bc073c82e3410447d2e0ae2469f73a416d63ad4272cc0c3"
   },
   "removed_copied_sources": [
     "05_Firmware/MATDOG_Controller/src/motion/ActuatorEnvelope.cpp",
