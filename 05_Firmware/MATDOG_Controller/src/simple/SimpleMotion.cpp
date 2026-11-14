@@ -1600,6 +1600,13 @@ void SimpleMotion::generateWalk(uint64_t now){
   if(walkRecover_&&!compensationSafe(f.target,walkBox())){fault("WALK_IK_OR_WORKSPACE");return;}
   if(!send(f.target,walkDrive_,now))return;
   if(done){
+    // The accepted correction is gravity's tilt in the walk's support frame
+    // (headed()); WALK_SETTLE solves in the final gait pose's body frame
+    // (identity heading, generateStand). Express it there, R_z(heading)^T as
+    // in limitWalkTilt: the transmitted pose is unchanged at the handover.
+    // Identity heading (every unsteered walk) keeps roll/pitch bit for bit.
+    {const double c=walkPrevious_.cartesian.body.rotation[0][0],s=walkPrevious_.cartesian.body.rotation[1][0];
+     if(!(c==1&&s==0)){const double r=rollCorrection_,p=pitchCorrection_;rollCorrection_=c*r+s*p;pitchCorrection_=-s*r+c*p;}}
     walkRecover_=false;state_=State::MOVING;reason_="WALK_SETTLING";
     // The gait clock has finished, but native settling still needs live IMU
     // correction and a fixed completion deadline. Reuse the same generator.

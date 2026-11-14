@@ -9,6 +9,32 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — WALK_SETTLE: IMU correction expressed in the settle frame after a steered walk (Patch A) — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** fixture session of 14/11 (build `0526cf6b9d79`): STANDARD joystick yaw, STOP, STAND 120. WALK_SETTLE faulted `NATIVE_TARGET_NOT_REACHED`:
+  - at the exit `refused_by=LOAD_BOX`, correction −10.4/−32.6 mrad never unwound, all 12 joints within 6 ticks;
+  - in WALK the accepted correction is gravity's tilt in the walk's support frame (`headed()`), while WALK_SETTLE solves in the final pose's body frame (identity heading);
+  - after a yaw (heading ≈ −0.84 rad) every unwind candidate jumped 15–26 ticks; LOAD_BOX or STOP_PLAN refused it, the correction never reached 0 and `releasingLevel` held the arrival until the deadline.
+  - RCA: `verification-artifacts/MATDOG_1_0_2_DEV8U_P0_DIAG_20261114/rca_walk_settle/REPORT_RCA_WALK_SETTLE.md`.
+- **What:** at the WALK → WALK_SETTLE handover the correction is rotated by R_z(heading)ᵀ, the transform `limitWalkTilt` uses, so the transmitted pose is unchanged at the handover. With identity heading (every unsteered walk) roll and pitch stay bit for bit.
+- **Unchanged:** kinematics, gait law, STOP/StopPlan, SAFE_OFF, FAULT, LOAD_BOX and every `compensationSafe` check, boxes, limits, thresholds, deadlines, joint↔servo conversions, calibration, NVS.
+- **Tests (offline):**
+  - Replay matrix (34 cases, production `SimpleMotion` on the `qemu_motion` rig; evidence `verification-artifacts/MATDOG_1_0_2_PATCHA_TIMINGBASE_20261114/`):
+    - cases: yaw both ways for 10/22 s, STOP, STAND 120/150; fixture quaternion, dev.8 tilt and level ground; STOP during WALK_SETTLE; joystick release; unsteered walks;
+    - `200a3bd`: 21 FAULT, and the passes carry an accepted 12–40-tick target jump at the handover;
+    - patched: 34/34 STAND_REACHED, 0 settle refusals after a yaw, ≤ 2 ticks per release at the handover (4 after a joystick release), correction exactly 0 before HEIGHT;
+    - unsteered digests identical.
+  - `test_simple_motion` and `test_ground_contact` (ASan/UBSan) PASS.
+  - Frame digest: unsteered scenarios identical. Steered scenarios differ only from the settle handover: the maximum per-release step drops from 14 to 2 and from 10 to 3 ticks.
+  - Servo plant (6 seeds): 0 faults, STOPs 1296/1296, as `200a3bd`. STOP window matrices (three modes): output identical to `200a3bd`.
+  - Joystick envelope with CAD, on top of the FAST stride fix (entry below): SLOW, STANDARD and FAST PASS; FAST minimum 0.77 mm.
+    - Without that fix this patch made FAST `random_6` fail (−0.14 mm). It only shifts the timing after steered settles; the same pose class already failed on `200a3bd` (seed 11, −0.39 mm), and the FAST fix removes the cause.
+  - FAST static support at every lift-off, full resolution, 64 seeds with both changes: minimum 0.53 mm.
+  - STOP window and FAST handover matrices: output identical to `200a3bd`.
+  - QEMU host/Xtensa 18/18 and `static_audit` PASS.
+
 ## Unreleased — FAST joystick: stride changes over 4 cycles in both regimes — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
