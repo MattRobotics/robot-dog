@@ -1,6 +1,7 @@
 #include "FootContact.h"
 #include "FootContactData.h"
 #include "LegKinematicsInternal.h"
+#include "MotionHotPath.h"
 #include <cmath>
 
 namespace matdog { namespace motion {
@@ -30,7 +31,7 @@ ContactStatus convert(KinematicsStatus s) {
 }
 const FootContactModel& footContactModel() { return generated::kContact; }
 const char* contactGeometrySha256() { return generated::kContactSha256; }
-double edgeContactLiftM(double tilt) {
+MATDOG_MOTION_HOT double edgeContactLiftM(double tilt) {
   const auto& m = footContactModel();
   tilt = std::abs(tilt);
   if (!std::isfinite(tilt) || tilt <= m.nominalTiltRad) return 0.0;
@@ -38,7 +39,7 @@ double edgeContactLiftM(double tilt) {
   return rigid(tilt) - rigid(m.nominalTiltRad);
 }
 
-ContactResult contactForwardKinematics(LegId leg, const LegJointAngles& q, Vector3 normal) {
+MATDOG_MOTION_HOT ContactResult contactForwardKinematics(LegId leg, const LegJointAngles& q, Vector3 normal) {
   ContactResult result;
   if (!finite(normal)) return result;
   const double length = norm(normal);
@@ -84,7 +85,7 @@ bool lowestTreadHeightM(const ContactResult& contact, Vector3 up, double& height
   return std::isfinite(heightM);
 }
 
-ContactIkResult contactInverseKinematics(LegId leg, const Vector3& target,
+MATDOG_MOTION_HOT ContactIkResult contactInverseKinematics(LegId leg, const Vector3& target,
                                           const ContactIkOptions& options) {
   ContactIkResult result;
   const auto* original = legModel(leg);

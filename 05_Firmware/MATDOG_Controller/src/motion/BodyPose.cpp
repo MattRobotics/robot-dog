@@ -1,4 +1,5 @@
 #include "BodyPose.h"
+#include "MotionHotPath.h"
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -16,7 +17,7 @@ bool validBodyPose(const BodyPose& p) {
       r[0][1]*(r[1][0]*r[2][2]-r[1][2]*r[2][0])+r[0][2]*(r[1][0]*r[2][1]-r[1][1]*r[2][0]);
   return std::abs(det-1)<1e-10;
 }
-bool pointToWorld(const BodyPose& pose, Vector3 base, Vector3& world) {
+MATDOG_MOTION_HOT bool pointToWorld(const BodyPose& pose, Vector3 base, Vector3& world) {
   if(!validBodyPose(pose)||!finite(base)){world={};return false;}
   const auto& r=pose.rotation;
   Vector3 p={pose.translationM.x+r[0][0]*base.x+r[0][1]*base.y+r[0][2]*base.z,
