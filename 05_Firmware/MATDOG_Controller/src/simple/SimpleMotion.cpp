@@ -1521,9 +1521,13 @@ void SimpleMotion::lerpFrame(LocomotionFrame& f,double u,const GaitParameters& g
 // (target.valid false when a solve failed; the caller faults
 // WALK_IK_OR_WORKSPACE as before). Positions only (A1).
 void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,double terminal,bool clockDone){
-  // The eased recovery clock and the terminal frame are solved exactly at the
-  // release clock, as before T2; the terminal frame also ends the look-ahead.
-  if(walkRecover_||clockDone){
+  // The terminal frame is solved exactly at the release clock, as before T2,
+  // and ends the look-ahead. The STOP recovery (walkRecover_) runs on the same
+  // bracket as the walk (P0 structural, 15/11): its law is the stopped gait on
+  // the eased recovery clock, fixed until the terminal (no steer, no mode step),
+  // so only the clock mapping differs. Its first release is the resync below
+  // (exact at `now`, the frame the held-RAW bridge is computed against).
+  if(clockDone){
     resetLookahead();++lookaheadStats_.exact;
     solveGaitInto(f,g,gaitTrackCartesian(track_,g,cycles_,0,0,terminal),&walkPrevious_,false);return;
   }
@@ -1531,7 +1535,10 @@ void SimpleMotion::nominalRelease(LocomotionFrame& f,const GaitParameters& g,dou
   // before this release): the law's track is sampled in order, two periods
   // at a time, and every release clock falls inside [exact, ahead).
   const uint64_t gridUs=nextUs_-kPeriodUs;
-  auto cyc=[&](uint64_t us){return clockCycles_+(walkClock(double(us-walkStartUs_)/1e6)-clockEased_)/walkPeriod_;};
+  // The same clock generateWalk sets cycles_ from at the release: the walk
+  // clock, or the recovery clock eased in from recoverUs_ (never before it).
+  auto cyc=[&](uint64_t us){return walkRecover_?recoverCycles_+walkClockS(std::fmax(0.,double(int64_t(us)-int64_t(recoverUs_))/1e6))/period():
+                                                clockCycles_+(walkClock(double(us-walkStartUs_)/1e6)-clockEased_)/walkPeriod_;};
   const bool shape=walkExactUs_&&walkExactTerminal_==terminal&&sameLawShape(walkExactGait_,g);
   if(shape&&walkAheadValid_&&gridUs==walkAheadUs_){walkExact_=walkAhead_;walkExactUs_=walkExactGridUs_=walkAheadUs_;walkExactGait_=walkAheadGait_;walkAheadValid_=false;}  // the bracket moves on
   if(!(shape&&walkExactUs_<=gridUs&&gridUs<walkExactGridUs_+2*kPeriodUs)){
