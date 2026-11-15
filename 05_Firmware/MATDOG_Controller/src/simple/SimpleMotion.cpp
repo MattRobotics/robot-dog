@@ -1316,12 +1316,17 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // same law does, and the reused frame still passes compensationSafe here.
   // Offline, with the random joystick runs of run_motion_frame_digest.sh, the
   // light fraction rises from 8 % to 40 % with the same shadow error (1.2 tick).
-  const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&!walkRecover_&&reusePhase_==phase_&&
+  // T2R1 (P0 structural candidate, 15/11): the STOP recovery runs on the T2
+  // bracket (nominalRelease), so the same balance applies to it: a settled
+  // correction is reused on the bracket release that paid the nominal solve.
+  // As on the full path of the recovery, the STOP proof of this release is the
+  // one generateWalk runs on the final target (after the held-RAW fade).
+  const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&reusePhase_==phase_&&
     (phase_==Phase::WALK||phase_==Phase::HOLD)&&(phase_!=Phase::WALK||nominalSolved_)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
     !(up.x==0&&up.y==0&&up.z==0);
   if(reusable){
     auto q=f.target;for(unsigned i=0;i<12;++i)jointSlot(q,i)+=jointSlot(reuseOffset_,i);
-    if(compensationSafe(q,safeBox,true)){
+    if(compensationSafe(q,safeBox,!walkRecover_)){
 #ifdef MATDOG_T1_SHADOW
       {auto body=headed(f.cartesian.body,rollCorrection_,pitchCorrection_);const auto t=f.cartesian.body.translationM;
        body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
