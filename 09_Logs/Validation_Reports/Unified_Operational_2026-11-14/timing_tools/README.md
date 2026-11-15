@@ -45,3 +45,23 @@ The QEMU P0 tracer times the Motion sections in emulated CCOUNT. Instructions = 
   | OTHER | — | DOMINANT `istall_mem`, unchanged |
 
 Evidence: `~/MATDOG/verification-artifacts/MATDOG_1_0_2_PATCHA_TIMINGBASE_20261114/qemu_k/`.
+
+## Fixture validation suite (15/11/2026)
+
+`fixture_suite.py` drives the whole fixture sequence (blocks A–G) from a single start, with the firmware's existing USB commands only: `@STOP`, `@MOTION STAND/PRONE/WALK STANDARD/WALK STOP/WALK MODE`, and `@MOTION JSON` with owner `local` for the joystick and the 32 mm/s preset. It checks every command three ways: its ACK, the real Controller state over HTTP, and its completion.
+
+**Safety**
+- Before every movement it checks: BMS OK, fresh, no alarm; health not FAULT; IMU valid; no STOP or command in progress; power READY; expected state; 12 joints fresh, status 0, < 65 °C, ≥ 10.0 V.
+- A FAULT, a BMS loss, an unexpected state or a timeout ends the suite with one `@STOP`, unless a STOP is already verified.
+- It never resumes automatically, never resets, never retries.
+- Joystick values are checked against the published range of `SimpleMotion::joystickMode()`: `walk_mode.joystick`, else `walk_mode.selected`.
+
+**Usage**
+1. Run `python3 -I fixture_suite.py <run-dir> [--plan]`. Start it first: it is the only USB owner (no-reset opener `cr5_stand50_session.open_serial`, path in `OPENER`) and it creates the run directory.
+2. Then start `http_watch.py <run-dir>` from the dev.8u session tools. It records `http.jsonl` and queues `@MOTION TIMING` only while Motion is not engaged.
+3. To continue after an abort from the held STOP it left: `--start <step> --resume-stand <mm> [--skip <steps>]`.
+4. Analyse with `analyze_diag.py`. To analyse several recordings as one session, concatenate them in time order: the PMU sums are since boot and never reset.
+
+**Summary:** `suite_summary.py <run-dir>...` prints, read-only, every step, D1, joint temperatures, the IMU correction and the last state.
+
+Hardware record of the first run: `../HW_VALIDATION_8530d3a_20261115.md`.

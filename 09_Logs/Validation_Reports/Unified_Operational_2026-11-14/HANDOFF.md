@@ -22,7 +22,7 @@ La stringa `1.0.2-dev.7` non identifica da sola un firmware: la portano sia l'im
 
 | Identità | Valore | Stato |
 |---|---|---|
-| Firmware realmente installato (14/11 sera, letto sul dispositivo) | **`8530d3a11ac9`**, `1.0.2-dev.8` **diagnostica**, APP SHA256 `75fdd3acb3849929b98c5637b8ed8de84de53ad1c6fd93bced2e08b61e0c4d4b`, slot app0. Sorgente `8530d3a` = `539b646` + strumentazione dev.8u: **non** è un commit di questo branch ([installazione](DIAG_INSTALL_8530d3a.md)) | VERIFIED HARDWARE PASSIVE; nessun movimento |
+| Firmware realmente installato (14/11 sera, letto sul dispositivo) | **`8530d3a11ac9`**, `1.0.2-dev.8` **diagnostica**, APP SHA256 `75fdd3acb3849929b98c5637b8ed8de84de53ad1c6fd93bced2e08b61e0c4d4b`, slot app0. Sorgente `8530d3a` = `539b646` + strumentazione dev.8u: **non** è un commit di questo branch ([installazione](DIAG_INSTALL_8530d3a.md), [validazione Motion su fixture 15/11](HW_VALIDATION_8530d3a_20261115.md)) | VERIFIED HARDWARE su fixture (15/11): riarmo STOP → STAND, ripresa dopo yaw, suite A–G 65/65; Timing P0 non chiuso |
 | Sorgente firmware di questo branch | `539b646`: Ground Contact Fase 1 sopra dev.7 `c3b67d0`, più correzione FAST (`05039ca`), Patch A (`4d4b797`), riarmo STOP (`7878be0`) e binding delle conversioni servo (`539b646`). I commit documentali successivi non cambiano il firmware | IMPLEMENTED NOT HARDWARE MOTION VALIDATED |
 | Candidato compilato offline (storico) | `5472b65`, build `5472b65dfa28`, APP SHA256 `d8582e7d57d37e0b8afb9b1fb0f59e105d8a8de788aaaabe8302cf431f6c7a68`, manifest `7c764540…f8d8` | VERIFIED OFFLINE, **mai flashato**, superato |
 | Ricerca MuJoCo | Patch V7/V7L60/C2/T3 su `b561062` + `F40T_JCB66` | VERIFIED OFFLINE nel gemello, nessuna prova hardware |

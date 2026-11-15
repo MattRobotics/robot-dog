@@ -12,6 +12,11 @@
 ## Unreleased — Servo conversions: lookups and invariant checks resolved once per calibration revision — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **Hardware, 15/11/2026** (diagnostic `8530d3a11ac9` = this branch's `539b646` + Timing instrumentation, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - On the 14/11 yaw scenario, NOMINAL+COMPENSATE instructions per release (PMU) dropped 1 005 k → 863 k (WALK, −14 %) and 1 723 k → 1 285 k (RECOVERY, −25 %).
+> - Wall time per release: WALK 11.8–13.5 ms, RECOVERY 17.0–18.5 ms (14/11: 14.79 and 21.46).
+> - Timing P0 stays open: 30 missed releases and 677 overruns in the session, peak 39.67 ms; instruction memory stalls are 0.47–0.50 of the cycles.
 
 - **Why:** the hardware timing of 14/11 (dev.8u) measured WALK 14.79 ms and RECOVERY 21.46 ms per release (24 missed releases in RECOVERY), with up to 1.41× the instructions of the QEMU reference. QEMU with the real gen-1 tables:
   - one `SimpleServoPort::resolve` costs 6 692 instructions and one `decodeRaw` 5 921 (stubs: 551 and 155);
@@ -30,6 +35,11 @@
 ## Unreleased — STOP/SAFE_OFF with torque OFF: an explicit STAND re-arms through ACQUIRE — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **VERIFIED HARDWARE, 15/11/2026** (diagnostic `8530d3a11ac9`, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - STOP at rest → STOPPED, SAFE_OFF 13/13, torque OFF in 0.2 s.
+> - Explicit STAND 120 through ACQUIRE/REFERENCE/ENABLE → `STAND_REACHED` 120.1 mm.
+> - That first STAND after boot had one 147 ms gap before its first release (6 missed releases, cause unknown).
 
 - **Why:** a STOP at rest (READY, torque OFF), a SAFE_OFF, or a STOP at the PRONE rest ended in STOPPED with `operatorStopped_`, and `stand()` refused every later STAND with `SAFE_OFF_STAND_REFUSED` until reboot. The latch prevented any implicit re-enable, but it also blocked the operator's own explicit command: only a reboot cleared it, and after a reboot the same STAND from the same pose is admitted.
 - **What:**
@@ -52,6 +62,11 @@
 ## Unreleased — WALK_SETTLE: IMU correction expressed in the settle frame after a steered walk (Patch A) — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **VERIFIED HARDWARE, 15/11/2026** (diagnostic `8530d3a11ac9`, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - The 14/11 scenario completed: STANDARD yaw clockwise full scale 22 s, STOP, 4 s held, STAND 120.
+> - −8.3/−33.2 mrad were carried into WALK_SETTLE and unwound without refusal; `STAND_REACHED` 119.8 mm in 6.2 s with 6 missed releases (14/11: FAULT, 24 missed).
+> - Three more resumes after a STOP completed.
 
 - **Why:** fixture session of 14/11 (build `0526cf6b9d79`): STANDARD joystick yaw, STOP, STAND 120. WALK_SETTLE faulted `NATIVE_TARGET_NOT_REACHED`:
   - at the exit `refused_by=LOAD_BOX`, correction −10.4/−32.6 mrad never unwound, all 12 joints within 6 ticks;
@@ -102,6 +117,10 @@
 ## Unreleased — DALY telemetry transport diagnostics (Battery P1, D1) — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **Hardware, 14–15/11/2026** (diagnostic builds `0526cf6b9d79` and `8530d3a11ac9`, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)): the D1 fields are live on the device.
+> - On 15/11 they recorded a 440 s DALY silence: `rx_bytes=0` and `stale_bytes=0` with a poll every 2 s, then recovery with 128/129 and 129/129 bytes, without reset.
+> - The cause is unknown and no driver defect was found.
 
 - **Why:** the BMS outages after boot (06/11–09/11, 2–5 min, `comm=TIMEOUT`) cannot tell a silent DALY from a partial, late or malformed reply (H0 sessions `MATDOG_1_0_2_DEV3_HW_H0_20261108`, `MATDOG_1_0_2_DEV6_T44FIX_H0_20261109`, `MATDOG_1_0_2_DEV6_ACCDIAG_HW_20261109`; physical cause UNKNOWN).
 - **What:** for the last completed 0xD2 poll, `DalyBms::telemetryDiag()` keeps the bytes read before the deadline, the delay from the request to the first byte `update()` saw, the bytes discarded just before the request (arrived after the previous poll closed) and the consecutive non-OK polls. `@BMS STATUS` prints them on one new last line, so the fixed line order `daly_calibration_guard.py` reads is unchanged; `/status` adds `bms_rx_bytes`, `bms_first_byte_ms`, `bms_stale_bytes`, `bms_fail_streak`, `bms_last_ok_uptime_ms` (`NONE` = no byte / no valid reply). Outcome stays `comm` / `bms_comm`; the last valid reply is the sample's own timestamp.

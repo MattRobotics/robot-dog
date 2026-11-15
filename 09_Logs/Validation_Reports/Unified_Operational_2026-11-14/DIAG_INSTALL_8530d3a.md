@@ -2,6 +2,8 @@
 
 **DIAGNOSTIC INSTALLED — PASSIVE BOOT VERIFIED — MOTION VALIDATION PENDING.**
 
+> **Aggiornamento 15/11/2026:** la validazione Motion su fixture è stata eseguita: [HW_VALIDATION_8530d3a_20261115.md](HW_VALIDATION_8530d3a_20261115.md). Riarmo STOP → STAND e ripresa dopo yaw VERIFIED HARDWARE; suite 65/65 PASS; Timing P0 non chiuso.
+
 Un solo flash APP-only autorizzato dall'operatore, seguito solo da verifiche passive. Nessun movimento e nessun comando Motion. Nessuna scrittura su NVS, bootloader, tabella partizioni, otadata, BMS o calibrazioni.
 
 ## Identità e provenienza
