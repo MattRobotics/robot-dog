@@ -9,6 +9,21 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — Motion: six hot-path kinematics functions fetched from IRAM (IRAM G1) — 2026-11-15
+
+> Integrated on branch `integ/matdog-unified-operational-20261114` by the merge `f3b0d48` of `cand/timing-iram-20261115` (`5eff171`, `e7b4266`, `f349af9`, on `cfc788a`); version string unchanged. Integrated build (CLEAN, **not flashed**): build `f3b0d48cd56d`, APP SHA256 `a6baacf5d5abc46fc0deb20a6be1664b89f3631c4b0e9c20fbdf74cd64619b99`, sections identical to the `f349af9` build.
+>
+> **Hardware, 15/11/2026:** the same patch, byte for byte, in the diagnostic `e321e8668139` (= `8530d3a` + IRAM G1), installed and validated on the fixture ([record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_e321e86_20261115.md)).
+> - Suite A–G 65/65 in one run; no functional regression.
+> - Against `8530d3a` (same blocks): WALK 11.8–13.5 → 10.8–12.3 ms and RECOVERY 17.0–18.5 → 15.1–16.4 ms per release; instruction memory stalls 0.47–0.50 → 0.37–0.45 of the cycles; missed releases 28 → 10, overruns 648 → 323, peak 39.67 → 36.11 ms.
+> - Internal heap −4.6 KB (static); suite minimum 45 216 B, largest block unchanged.
+> - **Timing P0 stays open** (0 missed, 0 overruns, ≤ 16 ms not met).
+
+- **What:** `src/motion/MotionHotPath.h` defines `MATDOG_MOTION_HOT`, a bare `section(".iram1.motion_hot")` attribute under `ESP_PLATFORM` (empty on host builds), on `legModel`, `edgeContactLiftM`, `pointToWorld`, `contactForwardKinematics`, `contactInverseKinematics` and `forwardWithModel`. The three sources are re-pinned in `scripts/tests/motion_final_release_sources.json`.
+- **Why:** PMU on the fixture (15/11) showed instruction-memory stalls at about half of the NOMINAL+COMPENSATE cycles; the set was chosen by simulated I-cache misses avoided per byte (offline report of 15/11).
+- **Unchanged:** machine code and results (QEMU fixture replay digest and `run_qemu_motion` 18/18 identical to the base), Motion semantics, STOP, limits, calibration, NVS.
+- **Checks:** `static_audit` PASS on `f3b0d48` (host tests PASS, motion source gate PASS).
+
 ## Unreleased — Servo conversions: lookups and invariant checks resolved once per calibration revision — 2026-11-14
 
 > Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
