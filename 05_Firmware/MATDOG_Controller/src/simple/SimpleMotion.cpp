@@ -1317,11 +1317,19 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // Offline, with the random joystick runs of run_motion_frame_digest.sh, the
   // light fraction rises from 8 % to 40 % with the same shadow error (1.2 tick).
   // T2R1 (P0 structural candidate, 15/11): the STOP recovery runs on the T2
-  // bracket (nominalRelease), so the same balance applies to it: a settled
-  // correction is reused on the bracket release that paid the nominal solve.
-  // As on the full path of the recovery, the STOP proof of this release is the
-  // one generateWalk runs on the final target (after the held-RAW fade).
-  const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&reusePhase_==phase_&&
+  // bracket (nominalRelease), so the same balance applies to it: the last
+  // accepted correction is reused on the bracket release that paid the nominal
+  // solve. As on the full path of the recovery, the STOP proof of this release
+  // is the one generateWalk runs on the final target (after the held-RAW fade).
+  // T1M: in WALK (the recovery included) the light release is also taken while
+  // the correction slews. Without it a slewing correction (ENVELOPE retargets of
+  // a steered walk) carried the full solve on the release that already paid the
+  // nominal IK solve: the NOMINAL+COMPENSATE coincidence that made the peaks.
+  // The light release keeps the last accepted correction (one period older); the
+  // next full solve steps it by at most one period, so the slew is slower while
+  // it lasts, never larger per release. HOLD keeps the settled rule
+  // (WALK_IMU_SETTLING slews to the envelope at the full rate).
+  const bool reusable=reuseOffset_.valid&&(reuseSettled_||phase_==Phase::WALK)&&!reuseLight_&&!unwind&&reusePhase_==phase_&&
     (phase_==Phase::WALK||phase_==Phase::HOLD)&&(phase_!=Phase::WALK||nominalSolved_)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
     !(up.x==0&&up.y==0&&up.z==0);
   if(reusable){
