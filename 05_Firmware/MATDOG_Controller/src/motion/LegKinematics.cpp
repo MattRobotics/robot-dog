@@ -1,13 +1,14 @@
 #include "LegKinematics.h"
 #include "LegGeometryData.h"
 #include "LegKinematicsInternal.h"
+#include "MotionHotPath.h"
 
 #include <cmath>
 
 namespace matdog {
 namespace motion {
 
-const LegModel* legModel(LegId leg) {
+MATDOG_MOTION_HOT const LegModel* legModel(LegId leg) {
   const unsigned index = static_cast<unsigned>(leg);
   return index < 4 ? &generated::kLegs[index] : nullptr;
 }
@@ -19,7 +20,7 @@ FkResult forwardKinematics(LegId leg, const LegJointAngles& q) {
   return model ? detail::forwardWithModel(*model, q, 0.0) : FkResult{};
 }
 
-FkResult detail::forwardWithModel(const LegModel& geometry, const LegJointAngles& q,
+MATDOG_MOTION_HOT FkResult detail::forwardWithModel(const LegModel& geometry, const LegJointAngles& q,
                                    double hipFrameZ) {
   FkResult result;
   const LegModel* model = &geometry;
