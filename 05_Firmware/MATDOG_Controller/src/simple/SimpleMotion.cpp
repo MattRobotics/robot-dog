@@ -1407,12 +1407,17 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // releases of gait motion, so the edge model's fillet lift taken from the seed HIP
   // missed by > 20 um and every leg solved twice (8 IK, the WALK peak). The solved
   // contact, tolerance, limits, boxes and STOP proof are unchanged: only the start point.
-  auto seed=goal_.valid?goal_:f.target;
-  if(reuseOffset_.valid&&reusePhase_==phase_&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2)
+  // E1b: the offset also seeds the first releases of a STOP recovery (same WALK phase,
+  // older than the light-release window): the retained correction is the one it holds.
+  // A solve that fails from this seed is solved again from the previous goal, so the
+  // seed never adds a refusal the previous goal would not have given.
+  auto seed=goal_.valid?goal_:f.target;bool predicted=false;
+  if(reuseOffset_.valid&&reusePhase_==phase_&&now>reuseUs_&&(walkRecover_||now-reuseUs_<=2*kPeriodUs+kPeriodUs/2))
     for(unsigned l=0;l<4;++l){const auto& lim=legModel(static_cast<LegId>(l))->limits;LegJointAngles p=nominal.legs[l];
       p.hip+=jointSlot(reuseOffset_,3*l);p.upper+=jointSlot(reuseOffset_,3*l+1);p.lower+=jointSlot(reuseOffset_,3*l+2);
-      if(p.hip>=lim[0].lower&&p.hip<=lim[0].upper&&p.upper>=lim[1].lower&&p.upper<=lim[1].upper&&p.lower>=lim[2].lower&&p.lower<=lim[2].upper)seed.legs[l]=p;}
+      if(p.hip>=lim[0].lower&&p.hip<=lim[0].upper&&p.upper>=lim[1].lower&&p.upper<=lim[1].upper&&p.lower>=lim[2].lower&&p.lower<=lim[2].upper){seed.legs[l]=p;predicted=true;}}
   auto q=compensationTarget(f,body,seed,true,edgeTilt);
+  if(!q.valid&&predicted){seed=goal_.valid?goal_:f.target;q=compensationTarget(f,body,seed,true,edgeTilt);}
   if(compensationSafe(q,safeBox,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{
