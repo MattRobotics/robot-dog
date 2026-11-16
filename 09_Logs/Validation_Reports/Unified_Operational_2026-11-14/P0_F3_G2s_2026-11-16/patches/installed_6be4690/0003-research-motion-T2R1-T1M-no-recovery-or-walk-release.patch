@@ -1,0 +1,53 @@
+From 0fb22b00ebfb1b0f1bb53feac43cbdc2cef245a7 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Sun, 15 Nov 2026 14:28:45 +0100
+Subject: [PATCH 03/19] research(motion): T2R1 + T1M, no recovery or walk
+ release carries both solves (candidate T2R1M)
+
+Measured separately (QEMU rig, 15/11): T2R and T2R1 lower the mean
+RECOVERY cost (-17 %, -39 %) but not its peak, which stays a nominal solve
+plus a full compensation while the correction moves under ENVELOPE; T1M
+removes that coincidence in WALK (max -37 %) but not in the recovery. This
+candidate applies the T1M rule to the walk phase including the recovery on
+the T2 bracket, so the light release carries the bracket solve and the full
+compensation falls on the interpolated release. Quality cost measured on
+T1M: the correction slews at most one step per two releases while it moves
+(mean |wanted - applied| +16 %, maximum unchanged). Research candidate.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/simple/SimpleMotion.cpp                | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index 8558dc0..496ccd9 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1317,11 +1317,19 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
+   // Offline, with the random joystick runs of run_motion_frame_digest.sh, the
+   // light fraction rises from 8 % to 40 % with the same shadow error (1.2 tick).
+   // T2R1 (P0 structural candidate, 15/11): the STOP recovery runs on the T2
+-  // bracket (nominalRelease), so the same balance applies to it: a settled
+-  // correction is reused on the bracket release that paid the nominal solve.
+-  // As on the full path of the recovery, the STOP proof of this release is the
+-  // one generateWalk runs on the final target (after the held-RAW fade).
+-  const bool reusable=reuseOffset_.valid&&reuseSettled_&&!reuseLight_&&!unwind&&reusePhase_==phase_&&
++  // bracket (nominalRelease), so the same balance applies to it: the last
++  // accepted correction is reused on the bracket release that paid the nominal
++  // solve. As on the full path of the recovery, the STOP proof of this release
++  // is the one generateWalk runs on the final target (after the held-RAW fade).
++  // T1M: in WALK (the recovery included) the light release is also taken while
++  // the correction slews. Without it a slewing correction (ENVELOPE retargets of
++  // a steered walk) carried the full solve on the release that already paid the
++  // nominal IK solve: the NOMINAL+COMPENSATE coincidence that made the peaks.
++  // The light release keeps the last accepted correction (one period older); the
++  // next full solve steps it by at most one period, so the slew is slower while
++  // it lasts, never larger per release. HOLD keeps the settled rule
++  // (WALK_IMU_SETTLING slews to the envelope at the full rate).
++  const bool reusable=reuseOffset_.valid&&(reuseSettled_||phase_==Phase::WALK)&&!reuseLight_&&!unwind&&reusePhase_==phase_&&
+     (phase_==Phase::WALK||phase_==Phase::HOLD)&&(phase_!=Phase::WALK||nominalSolved_)&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2&&
+     !(up.x==0&&up.y==0&&up.z==0);
+   if(reusable){
+-- 
+2.43.0
+

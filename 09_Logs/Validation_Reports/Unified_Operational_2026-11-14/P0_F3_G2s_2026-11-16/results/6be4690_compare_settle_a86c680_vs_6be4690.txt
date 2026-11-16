@@ -1,0 +1,23 @@
+1. per block and class: ms/release  N+C ms  k instr  IPC  istall_mem   (before -> after)
+  B    WALK       10.67  7.16   730 0.42 0.40  ->    9.99  6.55   734 0.47 0.35
+  B    OTHER       8.67  5.31   607 0.48 0.32  ->    7.96  4.67   610 0.53 0.23
+2. heaviest release since boot (release, wall us, nominal us, compensate us)
+  WALK      (35467, 19781, 13936, 1774)  ->  (22385, 19421, 7430, 8204)
+  RECOVERY  None  ->  None
+  OTHER     (33300, 21026, 1273, 13617)  ->  (23370, 19323, 926, 12289)
+3. release work per step class (firmware histogram of each command, last sample)
+  before COMMAND_ACCEPTED                           n  11800  >=20 ms  0.00 %  p99 bin < 20 ms
+  before PRONE_REST                                 n    730  >=20 ms  0.14 %  p99 bin < 20 ms
+  before STAND_REACHED                              n   1447  >=20 ms  0.14 %  p99 bin < 20 ms
+  after  COMMAND_ACCEPTED                           n  11211  >=20 ms  0.00 %  p99 bin < 20 ms
+  after  PRONE_REST                                 n    744  >=20 ms  0.00 %  p99 bin < 15 ms
+  after  STAND_REACHED                              n   1416  >=20 ms  0.00 %  p99 bin < 20 ms
+4. missed / overruns
+  before steps 12 PASS 12 missed 5 overruns 3
+     missed +5 at 19:25:21.516  READY/READY -> MOVING/DISENGAGE
+  after  steps 12 PASS 12 missed 0 overruns 0
+5. IMU |wanted - applied| (mrad, 1 Hz)
+  FRONTAL   n   7 mean 0.64 p90 0.78 max 0.89  ->  n   7 mean 1.13 p90 0.94 max 3.62
+  STEER     n  26 mean 1.47 p90 1.27 max 16.12  ->  n  26 mean 2.02 p90 1.84 max 19.24
+  RECOVERY  -  ->  -
+6. STOP verification and resume

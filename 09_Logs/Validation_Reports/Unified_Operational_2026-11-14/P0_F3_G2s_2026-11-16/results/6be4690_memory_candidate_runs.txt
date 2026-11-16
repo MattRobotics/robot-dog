@@ -1,0 +1,5 @@
+cand_settle_20261116_1936: samples 117, heap_min_free min 26540 B (2026-11-16T19:36:41.369+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 50168 B, below 24 KB 0, allocation-failure lines 0
+cand_ab_20261116_1938: samples 155, heap_min_free min 25672 B (2026-11-16T19:39:06.884+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 60936 B, below 24 KB 0, allocation-failure lines 0
+cand_efg_20261116_1941: samples 150, heap_min_free min 25672 B (2026-11-16T19:41:03.003+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 60928 B, below 24 KB 0, allocation-failure lines 0
+cand_h_20261116_1943: samples 113, heap_min_free min 25672 B (2026-11-16T19:43:31.177+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 60568 B, below 24 KB 0, allocation-failure lines 0
+MEMORY_OK (heap_min_free >= 24 KB, no allocation failure)

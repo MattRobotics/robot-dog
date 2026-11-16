@@ -1,0 +1,121 @@
+From 82c1af95e0a5ad3266eb780d4a5d4be2d9a5f464 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 09:11:15 +0100
+Subject: [PATCH 12/19] diag(motion): D3, record the last release lost with
+ Motion idle and what held the loop
+
+On 15-16/11 the only release losses outside the ACC wait came with a STAND
+from PRONE_REST, but none was in that command's count: the timing records
+stay armed by the previous command and the STAND's arm() erases them. The
+log shows a 12.6-12.9 kB @MOTION TIMING dump (24-36 ms on the USB) printed
+about 100 ms before every such STAND; losses followed 3 of 6 large dumps and
+none of the 4 small ones. Diagnostic only, no control effect:
+- the last release lost while Motion is not engaged (stamp, lateness, gap,
+  phase, count since boot), printed first by @MOTION TIMING with the dump's
+  start time, and the dump's own duration as its last line;
+- MOTION_ACC_CEILING adds the register-85 pass duration and how far the next
+  release was when it started.
+BuildConfig names this composition (46b3175 + E1, P3a, E1b, P3b + D3).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h     | 5 +++++
+ 05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp   | 7 ++++++-
+ .../MATDOG_Controller/src/core/SimpleMotionIntegration.cpp | 7 ++++++-
+ 05_Firmware/MATDOG_Controller/src/simple/MotionTiming.h    | 6 ++++++
+ 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp  | 2 ++
+ 5 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index 93c1b58..d2c05a8 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -158,6 +158,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   T2R1M (STOP recovery on the T2 bracket, T1 light release in WALK and in the
+ //   recovery also while the correction slews) and the D2 read-only UART2 line
+ //   counters of the DALY. Still a diagnostic build, never operational.
++// P0-peaks diagnostic (composed 2026-11-16 on 46b3175): the same build plus
++//   the research candidates E1/E1b (compensation IK seeded from the nominal
++//   plus the accepted offset), P3a (bit-identical ViaPlan::plan), P3b (plan
++//   release keeps the probe) and D3 (last release lost with Motion idle, the
++//   @MOTION TIMING dump duration, the register-85 pass duration).
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+diff --git a/05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp b/05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp
+index d948652..e11dc97 100644
+--- a/05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp
++++ b/05_Firmware/MATDOG_Controller/src/core/CommandRouter.cpp
+@@ -269,6 +269,10 @@ void CommandRouter::handleLine(String line) {
+   if(upper=="@MOTION TIMING"){
+     if(!modules_.service||modules_.service->motionEngaged()){Serial.println("MOTION_TIMING=REFUSED reason=MOTION_ACTIVE");return;}
+     const auto& t=simple::timing::state;
++    const uint64_t dumpStartUs=esp_timer_get_time();  // D3 diagnostic: this dump holds the loop
++    {const auto& u=simple::timing::lastIdleSkip;  // D3 diagnostic
++     Serial.printf("MOTION_TIMING record=LAST_IDLE_SKIP dump_start_us=%llu count=%lu stamp_us=%llu release=%lu lateness_us=%llu gap_us=%llu skipped=%lu phase=%s\n",
++       (unsigned long long)dumpStartUs,(unsigned long)u.count,(unsigned long long)u.stampUs,(unsigned long)u.release,(unsigned long long)u.latenessUs,(unsigned long long)u.gapUs,(unsigned long)u.skipped,u.phase);}
+     for(unsigned i=0;i<2;++i){const auto& r=i?t.maximum:t.firstMiss;
+       Serial.printf("MOTION_TIMING record=%s valid=%u phase=%s previous_phase=%s stamp_us=%llu release=%lu lateness_us=%llu missed=%lu skipped=%lu work_us=%lu visit_gap_us=%llu outside_visit_us=%llu fast_reads=%lu control_reads=%lu frames=%lu",
+         i?"MAX_WORK":"FIRST_MISS",r.valid,r.phase,r.previousPhase,(unsigned long long)r.stampUs,(unsigned long)r.release,(unsigned long long)r.latenessUs,(unsigned long)r.missed,(unsigned long)r.skipped,(unsigned long)r.workUs,(unsigned long long)r.visitGapUs,(unsigned long long)r.outsideVisitUs,(unsigned long)r.fastReads,(unsigned long)r.controlReads,(unsigned long)r.frames);
+@@ -306,7 +310,8 @@ void CommandRouter::handleLine(String line) {
+     // Distributions of the armed command's releases: work (<5,<10,<15,<20,<25,<30,<40,>=40 ms), READ section (<2.5,<4,<6,>=6 ms), lateness (<1,<5,<10,<20,<40,>=40 ms).
+     Serial.printf("MOTION_TIMING hist work=");for(unsigned k=0;k<8;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.workHist[k]);
+     Serial.printf(" read=");for(unsigned k=0;k<4;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.readHist[k]);
+-    Serial.printf(" lateness=");for(unsigned k=0;k<6;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.latenessHist[k]);Serial.println();return;
++    Serial.printf(" lateness=");for(unsigned k=0;k<6;++k)Serial.printf("%s%lu",k?",":"",(unsigned long)t.latenessHist[k]);Serial.println();
++    Serial.printf("MOTION_TIMING dump_us=%llu\n",(unsigned long long)(esp_timer_get_time()-dumpStartUs));return;  // D3: loop held by the dump
+   }
+   if(upper.startsWith("@SERVO SAFE_OFF")){
+     int id=-1;char extra=0;
+diff --git a/05_Firmware/MATDOG_Controller/src/core/SimpleMotionIntegration.cpp b/05_Firmware/MATDOG_Controller/src/core/SimpleMotionIntegration.cpp
+index 10bfc1c..07ad0b9 100644
+--- a/05_Firmware/MATDOG_Controller/src/core/SimpleMotionIntegration.cpp
++++ b/05_Firmware/MATDOG_Controller/src/core/SimpleMotionIntegration.cpp
+@@ -121,8 +121,13 @@ const char* Controller::prepareSimpleMotion(){
+   // releases the authority, as for any refusal). Never while engaged.
+   if(!simple_motion_.engaged()){
+     uint8_t ids[12];for(unsigned i=0;i<12;++i)ids[i]=slotId(i);
++    // D3 (diagnostic): how long the synchronous register-85 pass holds the loop,
++    // and how far the next Motion release was when it started.
++    const uint64_t accStart=esp_timer_get_time(),nextRelease=simple_motion_.nextReleaseUs();
+     simple_inputs_.accCeiling=servo_bus_.configureAccCeiling(ids,12,simple::kAccCeilingTarget);
+-    Serial.printf("MOTION_ACC_CEILING verified=%u target=%u\n",unsigned(simple_inputs_.accCeiling),unsigned(simple::kAccCeilingTarget));
++    const uint64_t accEnd=esp_timer_get_time();
++    Serial.printf("MOTION_ACC_CEILING verified=%u target=%u us=%llu next_release_in_us=%lld\n",unsigned(simple_inputs_.accCeiling),unsigned(simple::kAccCeilingTarget),
++                  (unsigned long long)(accEnd-accStart),(long long)nextRelease-(long long)accStart);
+   }
+   simple_inputs_.authorityOk=true;simple_motion_.inputs(simple_inputs_);return nullptr;
+ }
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/MotionTiming.h b/05_Firmware/MATDOG_Controller/src/simple/MotionTiming.h
+index dcae43d..d7e8183 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/MotionTiming.h
++++ b/05_Firmware/MATDOG_Controller/src/simple/MotionTiming.h
+@@ -99,6 +99,12 @@ inline void pmuArm(unsigned g){const auto& p=kPmuGroups[g];xtensa_perfmon_stop()
+   for(int i=0;i<2;++i)xtensa_perfmon_init(i,p.select[i],p.mask[i],p.kernel[i],p.level[i]);xtensa_perfmon_start();}
+ #endif
+ inline uint32_t overrunsTotal=0;  // since boot, never re-armed
++// D3 (diagnostic, 16/11): the last release period lost while Motion was not
++// engaged (torque OFF). The records above stay armed by the last command, so a
++// later command's arm() erases such a loss from its own count. Since boot,
++// never re-armed; read by @MOTION TIMING with the duration of that dump.
++struct IdleSkip { uint64_t stampUs=0,latenessUs=0,gapUs=0;uint32_t skipped=0,count=0,release=0;const char* phase="IDLE"; };
++inline IdleSkip lastIdleSkip{};
+ struct Record {
+   bool valid=false;
+   const char* phase="IDLE";
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index 8eff24f..de5da4c 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1677,6 +1677,8 @@ void SimpleMotion::update(uint64_t now){
+   maxGapUs_=std::max(maxGapUs_,gap);lastReleaseUs_=now;++releases_;
+   const uint64_t lateness=now-nextUs_;
+   const auto skipped=(now-nextUs_)/kPeriodUs;missed_+=skipped;nextUs_+=(skipped+1)*kPeriodUs;
++  if(skipped&&!engaged()){auto& u=timing::lastIdleSkip;  // D3 diagnostic
++    u.stampUs=now;u.latenessUs=lateness;u.gapUs=gap;u.skipped=static_cast<uint32_t>(skipped);++u.count;u.release=releases_;u.phase=phase();}
+ #ifdef MATDOG_DIAG_PMU
+   timing::state.pmuClass=walkRecover_?timing::PMU_RECOVERY:phase_==Phase::WALK?timing::PMU_WALK:timing::PMU_OTHER;  // diagnostic build only
+ #endif
+-- 
+2.43.0
+

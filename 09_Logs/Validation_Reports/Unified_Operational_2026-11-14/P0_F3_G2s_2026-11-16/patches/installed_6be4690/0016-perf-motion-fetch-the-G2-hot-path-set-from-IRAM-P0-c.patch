@@ -1,0 +1,293 @@
+From e3fe5a034099bcced0ee5003ac2e47607a0f6f5a Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 17:42:34 +0100
+Subject: [PATCH 16/19] perf(motion): fetch the G2 hot-path set from IRAM (P0,
+ candidate G2)
+
+QEMU flash trace of a86c680 (production Motion, rig, 5 596 releases of the five
+P0 paths: WALK, WALK with IMU compensation, WALK STOP/SETTLE, STAND/HEIGHT with
+two solves, RECOVERY) streamed into the 16 KB 8-way I-cache model of G1. With
+G1 already in IRAM a release still touches 24-36 KB of flash code and misses
+762-1 334 lines on average. Nineteen more functions, chosen by misses avoided
+per byte (rank over the five paths, exact replay of the set): mean misses -34 %
+(WALK), -34 % (compensation), -36 % (WALK STOP), -71 % (STAND/HEIGHT), -39 %
+(RECOVERY); 9 966 B of text in the rig ELF.
+
+- Motion library: contactInverseKinematicsGroundNormal, worldContactInverse-
+  KinematicsTilted, validBodyPose, pointToBase, bodyPoseFromRollPitch, invert3,
+  gaitOffset, legPhase, validGaitParameters, tiltFromQuaternion, the contact
+  status convert.
+- SimpleMotion: compensationTarget, readTimed, frameTimed, pointSafe, send,
+  rememberReference, rateFromHistory, measured.
+- Not placed: StopPlan::build and jointSlot (inline in headers: the l32r
+  literal pool of a COMDAT function stays in flash, "literal placed after use"
+  at link). StopPlan::build alone is another -7 points on the walking paths if
+  it is ever defined out of line.
+- Same machine code and results, a different section; no statement, value or
+  signature changes. Each IRAM byte is a byte less of internal heap.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../MATDOG_Controller/src/motion/BodyPose.cpp   |  4 ++--
+ .../src/motion/FootContact.cpp                  |  2 +-
+ .../MATDOG_Controller/src/motion/Gait.cpp       |  7 ++++---
+ .../src/motion/ImuAttitude.cpp                  |  3 ++-
+ .../src/motion/LegKinematics.cpp                |  2 +-
+ .../src/motion/MotionHotPath.h                  |  7 +++++++
+ .../src/motion/TiltCompensation.cpp             |  3 ++-
+ .../src/motion/TiltedContactIk.cpp              |  5 +++--
+ .../src/simple/SimpleMotion.cpp                 | 17 +++++++++--------
+ 9 files changed, 31 insertions(+), 19 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp b/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp
+index cef5847..dce2dbf 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp
+@@ -5,7 +5,7 @@ namespace matdog { namespace motion {
+ namespace {
+ bool finite(Vector3 p) { return std::isfinite(p.x)&&std::isfinite(p.y)&&std::isfinite(p.z); }
+ }
+-bool validBodyPose(const BodyPose& p) {
++MATDOG_MOTION_HOT bool validBodyPose(const BodyPose& p) {
+   if (!finite(p.translationM)) return false;
+   const auto& r=p.rotation;
+   for(unsigned i=0;i<3;++i) for(unsigned j=0;j<3;++j) if(!std::isfinite(r[i][j])) return false;
+@@ -26,7 +26,7 @@ MATDOG_MOTION_HOT bool pointToWorld(const BodyPose& pose, Vector3 base, Vector3&
+   if(!finite(p)){world={};return false;}
+   world=p;return true;
+ }
+-bool pointToBase(const BodyPose& pose, Vector3 world, Vector3& base) {
++MATDOG_MOTION_HOT bool pointToBase(const BodyPose& pose, Vector3 world, Vector3& base) {
+   if(!validBodyPose(pose)||!finite(world)){base={};return false;}
+   Vector3 d={world.x-pose.translationM.x,world.y-pose.translationM.y,world.z-pose.translationM.z};
+   const auto& r=pose.rotation;
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp b/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp
+index c4ca6c4..e02d4b2 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp
+@@ -18,7 +18,7 @@ Vector3 rotate(const double r[3][3], Vector3 a) {
+           r[1][0]*a.x+r[1][1]*a.y+r[1][2]*a.z,
+           r[2][0]*a.x+r[2][1]*a.y+r[2][2]*a.z};
+ }
+-ContactStatus convert(KinematicsStatus s) {
++MATDOG_MOTION_HOT ContactStatus convert(KinematicsStatus s) {
+   switch (s) {
+     case KinematicsStatus::OK: return ContactStatus::OK;
+     case KinematicsStatus::JOINT_LIMIT: return ContactStatus::JOINT_LIMIT;
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+index 004457f..cc25fba 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+@@ -1,5 +1,6 @@
+ #include "Gait.h"
+ #include "LegKinematicsInternal.h"
++#include "MotionHotPath.h"
+ #include <cmath>
+ #include <limits>
+ namespace matdog { namespace motion {
+@@ -230,7 +231,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
+ Vector3 rotateBack(const BodyPose& b,Vector3 v){return {b.rotation[0][0]*v.x+b.rotation[1][0]*v.y,b.rotation[0][1]*v.x+b.rotation[1][1]*v.y,v.z};}
+ Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
+ }
+-bool validGaitParameters(const GaitParameters& p) {
++MATDOG_MOTION_HOT bool validGaitParameters(const GaitParameters& p) {
+   const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles};
+   for(double v:values)if(!std::isfinite(v))return false;
+   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
+@@ -245,11 +246,11 @@ double gaitSettleCycles(const GaitParameters& p){
+   return p.settleCycles>0?p.settleCycles:p.duty-.75;
+ }
+ bool validGaitPeriod(double t){double v=1/t;return std::isfinite(t)&&t>0&&std::isfinite(v*v)&&v*v>0;}
+-double gaitOffset(GaitType t,LegId l){
++MATDOG_MOTION_HOT double gaitOffset(GaitType t,LegId l){
+   const unsigned i=static_cast<unsigned>(l);if(i>3||(t!=GaitType::WALK&&t!=GaitType::TROT))return std::numeric_limits<double>::quiet_NaN();
+   const double walk[4]={0,.5,.75,.25},trot[4]={0,.5,0,.5};return t==GaitType::WALK?walk[i]:trot[i];
+ }
+-LegPhase legPhase(const GaitParameters& p,LegId leg,double cycles){
++MATDOG_MOTION_HOT LegPhase legPhase(const GaitParameters& p,LegId leg,double cycles){
+   LegPhase r;double x=cycles+offset(p,static_cast<unsigned>(leg));
+   if(!validGaitParameters(p)||!std::isfinite(x)||cycles<0||cycles>1e6){r.phase=std::numeric_limits<double>::quiet_NaN();return r;}
+   r.phase=x-std::floor(x);
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp b/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp
+index 3ce4389..edacb9a 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp
+@@ -1,4 +1,5 @@
+ #include "ImuAttitude.h"
++#include "MotionHotPath.h"
+ #include <cmath>
+ namespace matdog { namespace motion {
+ bool validAttitudePolicy(const AttitudePolicy& p) {
+@@ -6,7 +7,7 @@ bool validAttitudePolicy(const AttitudePolicy& p) {
+          p.minAccuracyStatus <= 3 && std::isfinite(p.normTolerance) && p.normTolerance > 0 && p.normTolerance < 1e-2 &&
+          std::isfinite(p.maxPlausibleTiltRad) && p.maxPlausibleTiltRad > 0 && p.maxPlausibleTiltRad < 1.5707963267948966;
+ }
+-bool tiltFromQuaternion(double w, double x, double y, double z, Attitude& out) {
++MATDOG_MOTION_HOT bool tiltFromQuaternion(double w, double x, double y, double z, Attitude& out) {
+   if (!std::isfinite(w) || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return false;
+   const double n = std::sqrt(w*w + x*x + y*y + z*z);
+   if (!(std::abs(n - 1.0) <= 1e-6)) return false;
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp b/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp
+index e8dc191..9e04e87 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp
+@@ -61,7 +61,7 @@ MATDOG_MOTION_HOT FkResult detail::forwardWithModel(const LegModel& geometry, co
+ }  // namespace matdog
+ 
+ namespace matdog { namespace motion { namespace detail {
+-bool invert3(const double j[3][3], double inverse[3][3]) {
++MATDOG_MOTION_HOT bool invert3(const double j[3][3], double inverse[3][3]) {
+   double m[3][6];
+   for (unsigned r = 0; r < 3; ++r) for (unsigned c = 0; c < 3; ++c) { m[r][c] = j[r][c]; m[r][3+c] = r == c ? 1.0 : 0.0; }
+   for (unsigned c = 0; c < 3; ++c) {
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h b/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
+index 7027d94..b363623 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
++++ b/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
+@@ -13,6 +13,13 @@
+ // compiler attribute only. ".iram1.*" is the ESP-IDF linker script's input
+ // section for IRAM text, the one IRAM_ATTR expands to. Host builds (tests,
+ // rigs) leave the attribute empty.
++//
++// G2 (16/11/2026, offline): nineteen more functions (motion library and SimpleMotion
++// members) of the five P0 paths (WALK, IMU compensation, WALK STOP, STAND/HEIGHT
++// with two solves, RECOVERY), chosen by misses avoided per byte on a QEMU trace of
++// a86c680 (16 KB 8-way LRU replay). Inline header functions (StopPlan::build,
++// jointSlot) cannot take the attribute: their literal pools keep a COMDAT section
++// the linker script places in flash (l32r "literal placed after use").
+ #if defined(ESP_PLATFORM)
+ #define MATDOG_MOTION_HOT __attribute__((section(".iram1.motion_hot")))
+ #else
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp b/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp
+index ef8aa44..0ba1409 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp
+@@ -1,4 +1,5 @@
+ #include "TiltCompensation.h"
++#include "MotionHotPath.h"
+ #include <cmath>
+ namespace matdog { namespace motion {
+ namespace {
+@@ -49,7 +50,7 @@ bool supportLevelTarget(const Vector3 anchors[4],const JointTargetFrame& measure
+   pitch=std::atan2(upSupport.x,upSupport.z);
+   return std::isfinite(roll)&&std::isfinite(pitch);
+ }
+-BodyPose bodyPoseFromRollPitch(const Vector3& t, double roll, double pitch) {
++MATDOG_MOTION_HOT BodyPose bodyPoseFromRollPitch(const Vector3& t, double roll, double pitch) {
+   BodyPose p; p.translationM = t;
+   const double cr = std::cos(roll), sr = std::sin(roll), cp = std::cos(pitch), sp = std::sin(pitch);
+   // R = Ry(pitch) * Rx(roll)
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp b/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
+index e4924e3..888336f 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
+@@ -1,5 +1,6 @@
+ #include "TiltedContactIk.h"
+ #include "LegKinematicsInternal.h"
++#include "MotionHotPath.h"
+ #include <cmath>
+ namespace matdog { namespace motion {
+ namespace {
+@@ -95,7 +96,7 @@ bool contactReferenceJacobian(LegId leg,const LegJointAngles& q,Vector3 normal,
+   if(!finite(normal)||!finiteQ(q)||!std::isfinite(length)||length<=1e-12)return false;
+   return contactJacobian(leg,q,scale(normal,1.0/length),contact,J);
+ }
+-TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
++MATDOG_MOTION_HOT TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
+   TiltedIkResult out;
+   if (!legModel(leg) || !finite(target) || !finite(normal) || !finiteQ(o.seed) || !(o.toleranceM > 0) || o.maxIterations == 0) return out;
+   const double nl = norm(normal);
+@@ -154,7 +155,7 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
+   out.status = TiltedIkResult::Status::OK;
+   return out;
+ }
+-WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, const TiltedIkOptions& o) {
++MATDOG_MOTION_HOT WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, const TiltedIkOptions& o) {
+   WorldTiltedIkResult out;
+   Vector3 base;
+   if (!pointToBase(pose, worldTarget, base)) return out;
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index 37ba983..2a78df2 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1,4 +1,5 @@
+ #include "SimpleMotion.h"
++#include "../motion/MotionHotPath.h"
+ #include "MotionTiming.h"
+ #include "../motion/PairedProneData.h"
+ #include "../motion/GaitTiming.h"
+@@ -150,7 +151,7 @@ GaitParameters steerGait(const double goal[3],WalkMode mode){
+   g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
+   g.swayYM=joystickSwayYM(goal[1],goal[2],j.swayBaseYM,j);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
+ }
+-bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
++MATDOG_MOTION_HOT bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
+   timing::Section section(timing::READ);
+   if(timing::state.active){if(control)++timing::state.working.controlReads;else ++timing::state.working.fastReads;}
+   // A latched FAULT still permits these bounded, read-only observations after
+@@ -160,7 +161,7 @@ bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
+   if(port_->tempCheck(tempCheck_[tempChecks_%2]))++tempChecks_;
+   return ok;
+ }
+-bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
++MATDOG_MOTION_HOT bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
+   timing::Section section(timing::FRAME);
+   if(timing::state.active)++timing::state.working.frames;
+   const bool previous=stopIo_;
+@@ -230,7 +231,7 @@ bool SimpleMotion::serviceStop(){
+   if(stopActive_)return false; // duplicate never restarts the clock or dwell
+   holdReason_=nullptr;beginStop(esp_timer_get_time());return true;
+ }
+-void SimpleMotion::rememberReference(uint64_t now){
++MATDOG_MOTION_HOT void SimpleMotion::rememberReference(uint64_t now){
+   // Called BEFORE commandedRaw_ is replaced following a successful TX, or
+   // for an unchanged RAW goal. Never publish a failed/preempted frame.
+   // now is the instant the reference was sampled at, not TX completion:
+@@ -253,7 +254,7 @@ void SimpleMotion::rememberReference(uint64_t now){
+ // as ~1 rad/s, a rate no law commands), so the window is never shorter than
+ // the reference's own sampling period when the history allows it. The span
+ // is bounded to 100 ms (stale history); only C0 is claimed at the handoff.
+-bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
++MATDOG_MOTION_HOT bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
+   const uint16_t* raws[3]={commandedRaw_,previousRaw_,previous2Raw_};const uint64_t times[3]={issuedUs_,previousUs_,previous2Us_};
+   const uint16_t* far=nullptr;uint64_t farUs=0;
+   for(unsigned k=skip;k<3;++k){if(!times[k]||atUs<=times[k])break;far=raws[k];farUs=times[k];if(atUs-times[k]>=kPeriodUs)break;}
+@@ -391,7 +392,7 @@ const char* SimpleMotion::poseRegion(uint64_t now) const {
+   }
+   return "OUTSIDE_CERTIFIED";
+ }
+-bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
++MATDOG_MOTION_HOT bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
+   timing::Section section(timing::CONVERT);
+   if(!q.valid)return false;
+   for(unsigned i=0;i<12;++i){const double v=jointSlot(q,i);if(!std::isfinite(v)||v<input_.minRad[i]||v>input_.maxRad[i])return false;}
+@@ -716,7 +717,7 @@ void SimpleMotion::walkStop(){
+     reason_="WALK_STOPPING";
+   }
+ }
+-bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference){
++MATDOG_MOTION_HOT bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference){
+   timing::Section section(timing::CONVERT);
+   if(stopActive_&&!stopFrame_)return false;
+   uint16_t raw[12]{};double distance=0;
+@@ -841,7 +842,7 @@ void SimpleMotion::updateTelemetry(uint64_t now){
+   if(now<nextTelemetryUs_)return;
+   nextTelemetryUs_=now+100000;measureHeight();
+ }
+-JointTargetFrame SimpleMotion::measured() const {
++MATDOG_MOTION_HOT JointTargetFrame SimpleMotion::measured() const {
+   JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=fb_[i].q;return q;
+ }
+ bool SimpleMotion::via(const JointTargetFrame& q,double pitch,double x,double z){
+@@ -1233,7 +1234,7 @@ bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) c
+   double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(steerTilt(walkMode_),rb,pb);
+   if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;
+ }
+-JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
++MATDOG_MOTION_HOT JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
+   timing::count(timing::SOLVES);
+   JointTargetFrame q;q.valid=true;
+   for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=seed.legs[l];opt.toleranceM=1e-6;opt.maxIterations=8;opt.requireNominalStrip=nominalStrip&&edgeTilt==0;
+-- 
+2.43.0
+

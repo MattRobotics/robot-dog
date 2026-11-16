@@ -1,0 +1,27 @@
+From c3bb3e099c09a4ffc7ac379be38e4ca1c55e779c Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 18:04:18 +0100
+Subject: [PATCH 17/19] diag(build): name the composition of the F3 + IRAM G2
+ candidate in BuildConfig
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index 3e2029d..82256ed 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -169,6 +169,8 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   accept/refuse, same plans). Still diagnostic.
+ // F3 candidate (2026-11-16, on a86c680): FAST top stride 80 -> 74 mm (29.6 mm/s),
+ //   the STOP proof's secant margin at the swing peak; no other change. Still diagnostic.
++// P0 F3+G2 candidate (2026-11-16, on a86c680): the F3 FAST stride (6146ef1) and the
++//   IRAM G2 placement (3fd8758), each qualified offline on its own. Still diagnostic.
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+-- 
+2.43.0
+

@@ -1,0 +1,100 @@
+From 6be46906d069787f3305aa7661d2c55fa118e78c Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 19:52:44 +0100
+Subject: [PATCH 19/19] perf(motion): F3+G2s candidate, G2 with two functions
+ back in flash (P0)
+
+cb9ed85 (F3 + G2) stopped on the 24 KB heap threshold in its hardware session
+(16/11). Same change as the G2s branch: contactInverseKinematicsGroundNormal and
+validGaitParameters lose MATDOG_MOTION_HOT (-4.1 KB IRAM, +4 KB internal heap),
+their source-gate pins are updated, and the composition note names G2s. F3 is
+unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../scripts/tests/motion_final_release_sources.json          | 4 ++--
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h       | 1 +
+ 05_Firmware/MATDOG_Controller/src/motion/Gait.cpp            | 2 +-
+ 05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h     | 5 +++++
+ 05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp | 2 +-
+ 5 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json b/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+index c53c555..fbada93 100644
+--- a/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
++++ b/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+@@ -3,7 +3,7 @@
+   "updated_copied_sources": {
+     "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "ed1203fcb17e29d03de70780ecd512a06c20fb08bbd9faba9ec03be8679679ae",
+     "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "95d3b44b1c5f6b204e3850a381b9895606777381e23eb5bfa1ef2e20be9b6cba",
+-    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "421dd69801bdb1f3854a24d48b24645e396a4bede0a51c28fafcafc18da7d9fc",
++    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "9530fabd8882f1dac79cf287c3cde1c646cf7b150c456b01f9a6cdb6abc35d1e",
+     "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e6a5935b9d14a21cd983ba0223db3a77fe875e3ffe72ea7c3124a329930dee46",
+     "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "483e608253b9514be26000d81b7eeea764c28503ad5640036ec3ba8574f3fa0f",
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
+@@ -11,7 +11,7 @@
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "b0925394bb13d29991dc243375df4b3b47a92f3ce6955d3b43c0257d709db7d5",
++    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "531e203030aae28e1bc073c82e3410447d2e0ae2469f73a416d63ad4272cc0c3",
+     "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "930d12f7ed580cc10b45e265ba848b5dd2fc986e1aac0f0a37a2666aaa1295c3",
+     "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp": "a6c9106a04d30080526639e6cc9f9b93a8c402850f7b246f23639fce02d6e953"
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index 82256ed..1e0b3be 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -171,6 +171,7 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   the STOP proof's secant margin at the swing peak; no other change. Still diagnostic.
+ // P0 F3+G2 candidate (2026-11-16, on a86c680): the F3 FAST stride (6146ef1) and the
+ //   IRAM G2 placement (3fd8758), each qualified offline on its own. Still diagnostic.
++// P0 F3+G2s (same day, after the cb9ed85 MEMSTOP): G2 with two functions back in flash (-4.1 KB IRAM).
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+index cc25fba..582adf7 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+@@ -231,7 +231,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
+ Vector3 rotateBack(const BodyPose& b,Vector3 v){return {b.rotation[0][0]*v.x+b.rotation[1][0]*v.y,b.rotation[0][1]*v.x+b.rotation[1][1]*v.y,v.z};}
+ Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
+ }
+-MATDOG_MOTION_HOT bool validGaitParameters(const GaitParameters& p) {
++bool validGaitParameters(const GaitParameters& p) {
+   const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles};
+   for(double v:values)if(!std::isfinite(v))return false;
+   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h b/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
+index b363623..fc4fcd6 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
++++ b/05_Firmware/MATDOG_Controller/src/motion/MotionHotPath.h
+@@ -20,6 +20,11 @@
+ // a86c680 (16 KB 8-way LRU replay). Inline header functions (StopPlan::build,
+ // jointSlot) cannot take the attribute: their literal pools keep a COMDAT section
+ // the linker script places in flash (l32r "literal placed after use").
++//
++// G2s (16/11/2026, after the hardware MEMSTOP of cb9ed85): G2 without
++// contactInverseKinematicsGroundNormal and validGaitParameters, 17 functions and
++// 5 844 B of rig text instead of 9 966 B (-4.1 KB IRAM, +4 KB heap); replay: mean
++// misses -26/-27/-28/-45/-28 % instead of -34/-34/-36/-71/-39 %.
+ #if defined(ESP_PLATFORM)
+ #define MATDOG_MOTION_HOT __attribute__((section(".iram1.motion_hot")))
+ #else
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp b/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
+index 888336f..d7c2e24 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp
+@@ -96,7 +96,7 @@ bool contactReferenceJacobian(LegId leg,const LegJointAngles& q,Vector3 normal,
+   if(!finite(normal)||!finiteQ(q)||!std::isfinite(length)||length<=1e-12)return false;
+   return contactJacobian(leg,q,scale(normal,1.0/length),contact,J);
+ }
+-MATDOG_MOTION_HOT TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
++TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
+   TiltedIkResult out;
+   if (!legModel(leg) || !finite(target) || !finite(normal) || !finiteQ(o.seed) || !(o.toleranceM > 0) || o.maxIterations == 0) return out;
+   const double nl = norm(normal);
+-- 
+2.43.0
+

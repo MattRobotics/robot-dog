@@ -1,0 +1,28 @@
+1. per block and class: ms/release  N+C ms  k instr  IPC  istall_mem   (before -> after)
+  A    OTHER       2.02  0.00     - 0.00 0.00  ->    2.01  0.00     - 0.00 0.00
+  B    OTHER       8.67  5.30   615 0.49 0.32  ->    7.84  4.56   608 0.55 0.23
+  C    WALK       10.81  7.31   741 0.42 0.40  ->    9.99  6.55   737 0.47 0.34
+  C    RECOVERY   10.57  7.10   723 0.43 0.40  ->    9.96  6.52   719 0.48 0.35
+  C    OTHER       7.46  4.28   502 0.48 0.32  ->    6.90  3.79   503 0.53 0.23
+2. heaviest release since boot (release, wall us, nominal us, compensate us)
+  WALK      (41584, 21156, 14840, 1974)  ->  (22385, 19421, 7430, 8204)
+  RECOVERY  (42570, 18306, 2227, 9867)  ->  (30267, 19052, 14603, 439)
+  OTHER     (43308, 22100, 1316, 14327)  ->  (27678, 19363, 1113, 11961)
+3. release work per step class (firmware histogram of each command, last sample)
+  before COMMAND_ACCEPTED                           n  14933  >=20 ms  0.07 %  p99 bin < 20 ms
+  before PRONE_REST                                 n   4358  >=20 ms  0.07 %  p99 bin < 15 ms
+  before STAND_REACHED                              n    418  >=20 ms  0.00 %  p99 bin < 15 ms
+  before STOPPED_SUPPORT_UNVERIFIED                 n   1490  >=20 ms  0.07 %  p99 bin < 20 ms
+  after  COMMAND_ACCEPTED                           n  14054  >=20 ms  0.00 %  p99 bin < 20 ms
+  after  PRONE_REST                                 n   4600  >=20 ms  0.00 %  p99 bin < 15 ms
+  after  STAND_REACHED                              n    622  >=20 ms  0.00 %  p99 bin < 20 ms
+  after  STOPPED_SUPPORT_UNVERIFIED                 n   1464  >=20 ms  0.00 %  p99 bin < 20 ms
+4. missed / overruns
+  before steps 18 PASS 18 missed 0 overruns 3
+  after  steps 18 PASS 18 missed 0 overruns 0
+5. IMU |wanted - applied| (mrad, 1 Hz)
+  FRONTAL   -  ->  -
+  STEER     n  22 mean 0.66 p90 0.92 max 5.02  ->  n  22 mean 0.66 p90 0.91 max 3.04
+  RECOVERY  n   4 mean 1.24 p90 0.61 max 3.81  ->  n   4 mean 0.72 p90 0.86 max 1.20
+6. STOP verification and resume
+  B4   stop 2.6 -> 2.6 s (STAND_RECOVERY_AVAILABLE -> STAND_RECOVERY_AVAILABLE); B6 6.8 -> 6.4 s

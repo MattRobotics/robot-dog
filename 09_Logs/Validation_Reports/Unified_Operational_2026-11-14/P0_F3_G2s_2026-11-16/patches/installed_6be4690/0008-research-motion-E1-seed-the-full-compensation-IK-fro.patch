@@ -1,0 +1,62 @@
+From ae9b6d105424cf893f17747eeec4cede232bb660 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 07:57:53 +0100
+Subject: [PATCH 08/19] research(motion): E1, seed the full compensation IK
+ from this release's nominal plus the accepted offset
+
+The full compensation solved every leg's contact IK from the previous goal,
+which lags one or two releases of gait motion. In the steered edge model the
+fillet lift is taken from the seed HIP, so the first solve missed it by more
+than 20 um and every leg solved twice: 8 IK, the WALK peak (~1.06 M instr.).
+The seed is now, per leg, this release's nominal plus the last accepted
+correction offset (the T1 light target) when it is recent and inside the URDF
+limits; otherwise the previous goal as before. Contact model, tolerance,
+limits, boxes and STOP proof are unchanged: only the Newton start point.
+
+Host rig (64 scenarios): same state/reason sequences and ends; WALK releases
+with >= 7 IK 713 -> 8, Newton steps -31 %, FK -14 %. Open-loop shadow on
+54 044 full solves: validity identical, RAW differs by at most 1 tick in 6.1 %
+of frames, and the solution is closer to the edge model's own fixed point
+(mean 27.4 -> 4.3 urad). Research candidate, not validated on hardware.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../MATDOG_Controller/src/simple/SimpleMotion.cpp | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index 6457cd4..c4c5512 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1401,7 +1401,18 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
+   // 2026-11-08: +63.7/-66.5 mrad, NATIVE_TARGET_NOT_REACHED). Every other
+   // check of compensationSafe is unchanged.
+   const double edgeTilt=walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:unwind?kEdgeContactMaxTiltRad:0;
+-  auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
++  // E1 (P0 peaks, 16/11): Newton seed per leg = this release's nominal plus the last
++  // accepted correction offset (the T1 light target), when it is recent and inside the
++  // URDF limits; otherwise the previous goal as before. The previous goal lags one or two
++  // releases of gait motion, so the edge model's fillet lift taken from the seed HIP
++  // missed by > 20 um and every leg solved twice (8 IK, the WALK peak). The solved
++  // contact, tolerance, limits, boxes and STOP proof are unchanged: only the start point.
++  auto seed=goal_.valid?goal_:f.target;
++  if(reuseOffset_.valid&&reusePhase_==phase_&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2)
++    for(unsigned l=0;l<4;++l){const auto& lim=legModel(static_cast<LegId>(l))->limits;LegJointAngles p=nominal.legs[l];
++      p.hip+=jointSlot(reuseOffset_,3*l);p.upper+=jointSlot(reuseOffset_,3*l+1);p.lower+=jointSlot(reuseOffset_,3*l+2);
++      if(p.hip>=lim[0].lower&&p.hip<=lim[0].upper&&p.upper>=lim[1].lower&&p.upper<=lim[1].upper&&p.lower>=lim[2].lower&&p.lower<=lim[2].upper)seed.legs[l]=p;}
++  auto q=compensationTarget(f,body,seed,true,edgeTilt);
+   if(compensationSafe(q,safeBox,!walkRecover_)){
+     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
+   }else{
+@@ -1417,7 +1428,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
+       const uint8_t refused=safeRefusal_;  // the refused step stays the recorded cause
+       if(oldRoll!=0||oldPitch!=0){body=headed(f.cartesian.body,oldRoll,oldPitch);  // locals reused: loop-task stack
+         body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
+-        q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);}else q=nominal;
++        q=compensationTarget(f,body,seed,true,edgeTilt);}else q=nominal;
+       if(q.valid&&compensationSafe(q,safeBox,!walkRecover_)){
+         safeRefusal_=refused;f.target=q;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=true;imuLimited_=true;imuReason_="WORKSPACE";return;}
+       safeRefusal_=refused;
+-- 
+2.43.0
+

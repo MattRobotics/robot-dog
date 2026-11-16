@@ -1,0 +1,54 @@
+From db6d621ee01c2056bc32944ed2b5f9c963b8cabc Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 07:59:20 +0100
+Subject: [PATCH 09/19] research(motion): P3a, recompute a ViaPlan blend only
+ where its segment speeds changed
+
+ViaPlan::plan recomputed every blend length b[k] on every pass, two cruise
+rows per blend, although b[k] depends only on v[k] and v[k+1] and most passes
+slow down one or two segments. The ~2 100 soft-double divisions of a DEPLOY
+plan (11 vias, 8 passes) were most of the ~1.1 M instructions of the release
+that builds it (ALIGN->DEPLOY, DEPLOY->LIFT: 2.0 M with the compensation).
+A pass now recomputes b[k] only where v[k] or v[k+1] changed, each cruise row
+once, with the same expressions: v, b, t, duration and iterations are bit
+identical (200 000 random plans, -O0 and -O2; 64 rig scenarios with every RAW
+frame identical). Research candidate, not validated on hardware.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../MATDOG_Controller/src/simple/ViaPlan.h       | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/ViaPlan.h b/05_Firmware/MATDOG_Controller/src/simple/ViaPlan.h
+index 0e4f366..6add962 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/ViaPlan.h
++++ b/05_Firmware/MATDOG_Controller/src/simple/ViaPlan.h
+@@ -35,11 +35,23 @@ struct ViaPlan {
+     // Short or sharply turning segments slow down until neighbouring blends
+     // fit without overlap. Blend length scales with speed and the segment
+     // time inversely, so a square-root step converges in a few passes.
++    // b[k] depends only on v[k] and v[k+1]: a pass recomputes it only where
++    // one of them changed, each cruise row once, with the same arithmetic
++    // (P0 peaks 16/11: the soft-double divisions of the unchanged segments
++    // were most of the ~1.1 M instructions of a DEPLOY/LIFT plan).
++    bool changed[kMax+1];for(unsigned k=0;k<=n;++k)changed[k]=true;
+     for(iterations=0;;++iterations){
+-      for(unsigned k=0;k<n;++k){double m=0;for(unsigned i=0;i<kJoints;++i)m=std::fmax(m,std::abs(cruise(k+1,i)-cruise(k,i)));b[k]=1.875*m/amax;}
++      double prev[kJoints],cur[kJoints];bool prevRow=false;
++      for(unsigned k=0;k<n;++k){
++        if(!changed[k]&&!changed[k+1]){prevRow=false;continue;}
++        if(!prevRow)for(unsigned i=0;i<kJoints;++i)prev[i]=cruise(k,i);
++        double m=0;for(unsigned i=0;i<kJoints;++i){cur[i]=cruise(k+1,i);m=std::fmax(m,std::abs(cur[i]-prev[i]));prev[i]=cur[i];}
++        b[k]=1.875*m/amax;prevRow=true;
++      }
++      for(unsigned k=0;k<=n;++k)changed[k]=false;
+       bool fits=true;
+       for(unsigned k=1;k<n;++k){const double need=.5*(b[k-1]+b[k]),time=d[k]/v[k];
+-        if(time<need-1e-12){v[k]*=std::fmax(.25,.98*std::sqrt(time/need));fits=false;}}
++        if(time<need-1e-12){v[k]*=std::fmax(.25,.98*std::sqrt(time/need));changed[k]=true;fits=false;}}
+       if(fits)break;
+       if(iterations==64)return false;
+     }
+-- 
+2.43.0
+

@@ -1,0 +1,34 @@
+From 5672323723a601087e7f9b477db6e7bf71ddbe9e Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Sun, 15 Nov 2026 14:32:16 +0100
+Subject: [PATCH 06/19] diag(build): name the composition of the next-fixture
+ diagnostic in BuildConfig
+
+Comment only: this branch is the operational f3b0d48 (539b646 + IRAM G1)
+with the research candidate T2R1M, the dev.8 timing instrumentation and D2.
+Version string unchanged (1.0.2-dev.8 diagnostic). Not for merge.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index 7a5301f..93c1b58 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -153,6 +153,11 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   other-task time per release, read by @MOTION TIMING with torque OFF. Motion
+ //   law, IK, STOP, limits and protections are those of 539b646; never an
+ //   operational candidate. Identify it by build ID and APP SHA256.
++// Next-fixture diagnostic (composed 2026-11-15 on the operational f3b0d48 =
++//   539b646 + IRAM G1): the same instrumentation plus the research candidate
++//   T2R1M (STOP recovery on the T2 bracket, T1 light release in WALK and in the
++//   recovery also while the correction slews) and the D2 read-only UART2 line
++//   counters of the DALY. Still a diagnostic build, never operational.
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+-- 
+2.43.0
+

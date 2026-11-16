@@ -1,0 +1,31 @@
+From 2638204fb4ef7de50b97ddbd810d1100a06bc66a Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 10:46:27 +0100
+Subject: [PATCH 2/2] diag(build): name the composition of the P4 diagnostic in
+ BuildConfig
+
+82c1af9 (installed and validated on the fixture on 16/11) plus P4 (e57dd89 on
+research/p0-peaks-20261116, cherry-picked unchanged). Still a diagnostic build.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index d2c05a8..6fa79ce 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -163,6 +163,9 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   plus the accepted offset), P3a (bit-identical ViaPlan::plan), P3b (plan
+ //   release keeps the probe) and D3 (last release lost with Motion idle, the
+ //   @MOTION TIMING dump duration, the register-85 pass duration).
++// P4 diagnostic (composed 2026-11-16 on 82c1af9, validated on the chip the same
++//   day): plus P4, every attenuated release keeps the probe when its scale does
++//   not exceed the projection (one solve instead of two). Still diagnostic.
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+-- 
+2.43.0
+

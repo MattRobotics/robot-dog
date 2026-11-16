@@ -1,0 +1,68 @@
+{
+ "utc": "2026-11-16T19:45:42.636676+00:00",
+ "build_id": "6be46906d069",
+ "firmware_version": "1.0.2-dev.8",
+ "system_health": "READY",
+ "bms": {
+  "bms_comm": "OK",
+  "bms_age_ms": "1288",
+  "bms_valid": "YES",
+  "bms_pack_v": "11.1",
+  "bms_soc_percent": "43.8",
+  "bms_alarms": "0000 0000 0000 0000"
+ },
+ "heap": {
+  "status_heap_free": "64024",
+  "status_heap_min_free": "25672",
+  "heap_free": 63928,
+  "heap_min_free": 25672,
+  "heap_largest": 31732
+ },
+ "motion": {
+  "state": "READY",
+  "phase": "IDLE",
+  "pose_region": "PRONE_ENTRY",
+  "ready": true,
+  "reason": "PRONE_REST",
+  "fault": false,
+  "safe_off_verified": true,
+  "safe_off_mask": 8191,
+  "torque_active": false,
+  "missed_releases": 1,
+  "overrun_releases": 2
+ },
+ "joint_torque": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "stop": {
+  "active": false,
+  "in_progress": false,
+  "motion_verified": false,
+  "support_verified": false,
+  "stand_resume_allowed": false,
+  "stand_resume_reason": "STOP_NOT_ACTIVE"
+ },
+ "walk_mode": {
+  "selected": "SLOW",
+  "active": "STANDARD",
+  "target": "STANDARD",
+  "servo_read": [
+   480,
+   480,
+   13,
+   13,
+   1372
+  ]
+ }
+}

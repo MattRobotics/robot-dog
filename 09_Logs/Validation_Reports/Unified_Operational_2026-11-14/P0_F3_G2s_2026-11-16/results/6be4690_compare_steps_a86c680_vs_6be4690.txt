@@ -1,0 +1,31 @@
+step  name (after)                                   | miss_b  ovr_b   maxw_b | miss_a  ovr_a   maxw_a
+M0    memory gate (read only, both HTTP clients acti |      0      0        0 |      0      0        0
+S0    TIMING dump (since boot, Motion inactive)      |      0      0        0 |      0      0        0
+S1    STAND 120 from PRONE_REST                      |      5      2    21026 |      0      0    18516
+S2    MODE STANDARD                                  |      0      0    21026 |      0      0    18516
+S2b   MODE STANDARD published (read only)            |      0      0    21026 |      0      0    18516
+S3    joystick yaw counter-clockwise full scale 12 s |      0      0    17864 |      0      0    18483
+S4    release (as D9)                                |      0      0    19613 |      0      0    19014
+S5    joystick yaw clockwise full scale 12 s (as D10 |      0      0    18381 |      0      0    19421
+S6    release (as D11)                               |      0      0    19781 |      0      0    19421
+S7    MODE SLOW (default restored, as F9)            |      0      0    19781 |      0      0    19421
+S8    PRONE to PRONE_REST                            |      0      1    20774 |      0      0    19323
+S9    TIMING dump (since boot: PMU sums and heaviest |      0      0    20774 |      0      0    19323
+A0    TIMING dump (baseline, Motion inactive)        |      0      0    20774 |      0      0    19323
+A1    STOP at rest (READY, torque OFF)               |      0      0    20774 |      0      0    19323
+A2    STAND 120 after the STOP (ACQUIRE/REFERENCE/EN |      0      0    19199 |      0      0    18362
+A3    STAND 150                                      |      0      0    14899 |      0      0    18829
+A4    STAND 80                                       |      0      0    17322 |      0      0    18505
+A5    STAND 120                                      |      0      0    14280 |      0      0    13535
+A6    PRONE to PRONE_REST                            |      0      1    20010 |      0      0    19363
+A7    TIMING dump (block A)                          |      0      0    20010 |      0      0    19363
+A8    STAND 120 from PRONE_REST                      |      0      0    19607 |      0      0    17789
+B1    MODE STANDARD                                  |      0      0    19607 |      0      0    17789
+B2    STAND 110                                      |      0      0    17803 |      0      0    17085
+B3    joystick yaw clockwise full scale 22 s         |      0      1    21156 |      0      0    17635
+B4    STOP during the yaw walk                       |      0      0    21156 |      0      0    17635
+B5    wait 4 s held                                  |      0      0    21156 |      0      0    17635
+B6    STAND 120 resume (WALK recovery, WALK_SETTLE,  |      0      0    18306 |      0      0    19052
+B7    PRONE to PRONE_REST                            |      0      1    22100 |      0      0    17660
+B8    TIMING dump (block B)                          |      0      0    22100 |      0      0    17660
+TOTAL steps before 29 after 29 | missed 5 -> 0 | overruns 6 -> 0
