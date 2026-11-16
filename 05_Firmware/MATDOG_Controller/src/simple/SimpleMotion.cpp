@@ -85,10 +85,16 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
 }
 // SLOW is the WALK STANDARD v2 constants above; STANDARD and FAST: SimpleMotion.h.
 // Envelopes: walk_tilt_envelope_check --mode N --stride 1|2 --search 16.
+// FAST top stride 74 mm (29.6 mm/s; F3 2026-11-16): at 80 mm the swing peak of the
+// front UPPER (and, with the swing shifted, the hind LOWER) reached 31 RAW ticks per
+// release, under the STOP proof's 31.36 at this drive (0.35 rad residual, braking 84):
+// one tick more refused the correction step and its retry, FAULT WALK_IK_OR_WORKSPACE
+// on the fixture. No swing profile at 80 mm stays two ticks under (rig scan 30-31);
+// 74 mm peaks at 29 (run_stop_secant_gate.sh). It is also the frontal joystick top.
 constexpr WalkModeSpec kWalkModes[]={
   {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
   {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,.00125,&kStandardTilt,&kStandardTilt,false},
-  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.080},.006,.0010,&kFastTilt,&kFastTilt,false}};
+  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.074},.006,.0010,&kFastTilt,&kFastTilt,false}};
 // Register 85 is configured to cover every drive of the table.
 static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&
               kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,"every drive within register 85");

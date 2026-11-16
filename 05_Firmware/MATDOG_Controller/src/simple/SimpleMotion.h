@@ -278,6 +278,10 @@ inline double stopAccelerationRadS2(Drive d){return (d.acc<kStopBrakeAcc?d.acc:k
 //   stance (loaded) peak   0.61 5.81    0.77 7.31       0.87 10.8
 //   static support         2.12         1.99            1.71 mm
 //   STOP capture point     1.41         1.51            1.41 mm
+// F3 2026-11-16: FAST top preset 74 mm (29.6 mm/s). The 80 mm swing joint peak above
+// (2.350 rad/s) read 31 RAW ticks per release against the STOP proof's 2.405 rad/s
+// (31.36 ticks); one tick more refused it (fixture FAULT). 74 mm: 29 ticks
+// (scripts/offline_motion/run_stop_secant_gate.sh).
 //   kHeight margin HIP     9.3          10.0            11.1 ticks
 // RAM drive: the law peak / 0.8 (speed up to 50 step/s, ACC up to 10); SLOW
 // keeps {1000,50}. The joystick walks forward on the selected mode's law (its
