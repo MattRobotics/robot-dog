@@ -84,3 +84,7 @@ Hardware record: `../HW_VALIDATION_46b3175_20261116.md` (19/19 PASS).
 ## D3: losses with Motion idle (`analyze_d3.py`, builds with D3 from 82c1af9)
 
 `analyze_d3.py <serial.log>` reads the D3 lines of each `@MOTION TIMING` dump (`record=LAST_IDLE_SKIP dump_start_us=… count=… stamp_us=…` first, `dump_us=` last) and the `MOTION_ACC_CEILING … us= next_release_in_us=` line of each activation. It attributes each new loss with Motion not engaged to the preceding dump when its stamp falls inside `[dump start, dump start + dump_us + 40 ms]`, else reports it UNEXPLAINED. Self-test on a synthetic log: `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/candidate_82c1af9/d3_selftest/`.
+
+## Session comparison (`session_compare.py`, `overrun_causes.py`)
+
+`session_compare.py <before-suite> <after-suite> [<before-H> <after-H>]` compares two fixture sessions at equal blocks: per-class ms/release, N+C, instructions, IPC and `istall_mem` from `analyze_diag.txt`; the heaviest release per class; the firmware's per-command work histogram; missed/overrun increments; IMU wanted − applied at 1 Hz; STOP verification and resume. On 15/11 vs 16/11 it reproduces the published tables. `overrun_causes.py <suite>[,<H>] …` groups each step's overruns by the phase of its heaviest release (attenuated STAND/PRONE/HEIGHT, WALK_SETTLE, steered walk, resume, other).

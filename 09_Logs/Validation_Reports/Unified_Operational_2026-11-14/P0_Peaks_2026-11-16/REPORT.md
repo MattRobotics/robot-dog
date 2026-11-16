@@ -1,4 +1,4 @@
-> Copia del rapporto offline. I percorsi relativi (`rig/`, `tools/`, `out/`, `trees/`, `suites/`, `audit/`, `p3a/`, `loco/`, `candidate_82c1af9/`) si riferiscono alla cartella delle evidenze `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/` (sigillata, `SHA256SUMS`), non a questo repository. Il codice è sui branch locali `research/p0-peaks-20261116` e `cand/diag-p0-peaks-20261116` (bundle `backups/git/robot-dog-p0-peaks-20261116.bundle`).
+> Copia del rapporto offline. I percorsi relativi (`rig/`, `tools/`, `out/`, `trees/`, `suites/`, `audit/`, `p3a/`, `loco/`, `candidate_82c1af9/`, `candidate_2638204/`) si riferiscono alla cartella delle evidenze `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/` (sigillata, `SHA256SUMS`), non a questo repository. Il codice è sui branch locali `research/p0-peaks-20261116`, `cand/diag-p0-peaks-20261116` e `cand/diag-p0-p4-20261116` (bundle `backups/git/robot-dog-p0-peaks-20261116.bundle`).
 
 # Motion Timing P0 — picchi residui dopo T2R1M, sviluppo offline (16/11/2026)
 
@@ -6,38 +6,41 @@ Lavoro offline svolto durante e dopo la validazione hardware di `46b3175` (`../M
 
 Le istruzioni Xtensa contate in QEMU (`-icount 3`, ×3,088) **non sono millisecondi**. P0 si chiude solo sul chip: **non è chiuso**.
 
-## Sintesi per stato (fine giornata 16/11)
+## Sintesi per stato (aggiornata dopo la validazione di `82c1af9`, 16/11 sera)
 
-**1. Risultati hardware verificati** (`46b3175`, fixture, 16/11):
-- Suite A–G 65/65 + blocco H (STOP durante la ripresa) 19/19; STOP, calibrazioni e NVS invariati.
-- RECOVERY 15,1–16,4 → 10,9–12,0 ms per release (istruzioni −40/−45 %); WALK invariato in tempo.
-- Picco 36,1 → 27,0 ms; overrun 323 → 157; 0 perse in WALK/RECOVERY (15/11: 3).
-- Costo IMU di T2R1M: errore sterzato medio +16 %.
-- DALY: tre avvii senza silenzio (freddo `e321e86`, boot dopo il flash, freddo B8 `46b3175`: 601/601 poll ciascuno a freddo); D2 attiva con baseline registrata.
+**1. Risultati hardware verificati**
+- **`46b3175`** (fixture, 16/11 mattina): suite A–G 65/65 + blocco H 19/19; RECOVERY 15,1–16,4 → 10,9–12,0 ms; picco 36,1 → 27,0 ms; overrun 323 → 157.
+- **`82c1af9` = E1 + E1b + P3a + P3b + D3** (fixture, 16/11 pomeriggio; `../MATDOG_1_0_2_DIAG_82C1AF9_HW_20261116/REPORT.md`):
+  - un solo flash; A–G 65/65 + H 19/19; NVS, calibrazione e STOP invariati;
+  - WALK −10/−12 % per release (9,8–10,7 ms), RECOVERY −10/−11 % (9,8–10,6 ms);
+  - overrun **161 → 31** (suite + H);
+  - picco WALK 27,0 → 23,7 ms, RECOVERY 22,5 → 19,8 ms, OTHER 25,5 → 26,8 ms;
+  - **0 perse operative** (6 dell'attesa ACC);
+  - D3: dump grande 20,7–21,4 ms sul chip, passaggio del registro 85 ~4 ms, 0 perse a riposo.
+- **DALY:** cinque avvii il 16/11 senza silenzio. Causa UNKNOWN, non risolta.
 
-**2. Miglioramenti dimostrati soltanto offline** (non flashati):
-- **E1/E1b:** seme dell'IK di compensazione.
-  - QEMU: WALK max 1 430 → 1 172 k; release WALK > 1,27 M 73 → 0; RECOVERY max 2 156 → 1 562 k.
-  - Stato IK identico su 216 196 soluzioni, nessun cambio di ramo, Newton −29/−35 %.
-- **P3a:** `ViaPlan::plan` identico bit per bit, ~440 k in meno nella release del piano.
-- **P3b:** release del piano con una sola soluzione. Con P3a, OTHER max 2 045 → 1 376 k.
-- **Nessuna regressione su 64 scenari:** stesse sequenze; STOP, IMU, WORKSPACE e traiettorie entro i valori di T2R1M; `static_audit` e quattro suite Motion PASS.
-- **Candidato:** `82c1af9`, costruito e auditato, pre-flash pronto e non autorizzato (§7.5).
+**2. Miglioramenti dimostrati soltanto offline**
+- **P4** (`e57dd89`; candidato `2638204` = `82c1af9` + P4; §9):
+  - una sola soluzione nelle release attenuate quando la scala accettata non supera la proiezione;
+  - release OTHER a 2 soluzioni: host 5 376 → 904, QEMU 3 917 → 697;
+  - stesse sequenze di stato, RAW ≤ 1 tick, STOP e IMU invariati;
+  - `static_audit` e quattro suite Motion PASS;
+  - **non flashato**.
 
-**3. Cause ancora ipotetiche:**
-- **Perse «all'attivazione da PRONE_REST»:** probabile artefatto della dump diagnostica `@MOTION TIMING` a Motion non attivo (§7.4). Il legame è forte nei log ma non misurato sul chip; D3 lo decide.
-- **Picco WALK sterzato di 27,0 ms** (soluzione + compensazione piena nella stessa release): sul chip non si sa se la release leggera manca per un rifiuto di `compensationSafe` o per il calendario T2.
-- **Silenzi DALY:** causa UNKNOWN.
+**3. Cause ancora ipotetiche**
+- **WALK_SETTLE dopo un rilascio sterzato** (fino a 26,8 ms; compensazione 21 ms con sole 4 IK):
+  - QEMU, con lo stesso lavoro IK, dà ~0,7 M istruzioni;
+  - l'eccesso sul chip non è spiegato. Il rig non riproduce la fase lunga del chip (correzione fino a 58 mrad);
+  - ipotesi non dimostrate: ricerca lunga della prova STOP (`StopPlan::build`) o ramo della posa caricata con correzioni grandi.
+- **Perse a riposo dopo la dump `@MOTION TIMING`:** compatibili con i dati (la dump grande supera il periodo), non confermate da un evento.
+- **Silenzi DALY.**
 
-**4. Problemi residui per chiudere P0** (0 perse operative, 0 overrun, ≤ 16 ms):
-- stallo di istruzioni dominante;
-- inizio della ripresa 1 562 k;
-- DEPLOY → LIFT 1 376 k;
-- release sterzate con doppia soluzione sul chip;
-- ~3,6 ms per release fuori da N+C;
-- conferma D3 sulle perse a riposo.
-
-Il modello QEMU sottostima i picchi del chip: ogni guadagno va misurato con `82c1af9` (`candidate_82c1af9/NEXT_SESSION_PLAN.md`).
+**4. Problemi residui per chiudere P0** (0 perse operative, 0 overrun, ≤ 16 ms)
+- Release attenuate di STAND/PRONE/HEIGHT (18 overrun su 31): affrontate da P4, da misurare sul chip.
+- WALK_SETTLE dopo rilasci sterzati (8): causa da misurare prima di qualsiasi patch.
+- Cammini sterzati (4) e WALK STOP (1): soluzione e compensazione nella stessa release.
+- Attesa ACC di 100 ms alla prima attivazione dopo il boot (6 perse a ogni avvio).
+- Stallo di istruzioni dominante; ~3,6–4 ms di lettura per release.
 
 ## Esito
 
@@ -272,6 +275,72 @@ Una sola sessione fixture, con un nuovo mandato e l'operatore presente:
 
 Rollback: `46b3175`.
 
+## 9. Dopo la validazione sul chip di `82c1af9`: P4
+
+### 9.1 Effetto misurato di E1/E1b/P3a/P3b (VERIFIED HARDWARE, stessi blocchi del 16/11)
+
+- **Overrun** 161 → 31 (suite + H):
+  - STAND/PRONE/HEIGHT 78 → 18;
+  - cammini sterzati con rilascio e WALK_SETTLE 73 → 12;
+  - riprese 9 → 0;
+  - altro 1 → 1 (`../MATDOG_1_0_2_DIAG_82C1AF9_HW_20261116/overrun_causes_vs_46b3175.txt`).
+- **Per release:** WALK −10/−12 %, RECOVERY −10/−11 %. Istruzioni WALK −5/−8 % (E1: meno Newton e FK), IPC +0,02/+0,05 e `istall_mem` −0,03/−0,11.
+- **Effetto di layout:** le release OTHER, con istruzioni invariate, sono più veloci del 7–9 %. Una parte del guadagno viene dal layout del codice nella cache, non dalle patch.
+- **Picchi:** sterzati 25,7–27,0 → 18,8–20,9 ms; WALK 23,7 ms (E8 WALK STOP); RECOVERY 19,8 ms (la soluzione esatta all'inizio della ripresa vale da sola 13,1 ms); OTHER 26,8 ms (WALK_SETTLE).
+- **Perse:** 6 dell'attesa ACC, 0 operative.
+
+### 9.2 Prima causa residua misurata: compensazione attenuata a 2 soluzioni
+
+- **Sul chip:** 18 overrun su 31 sono release di STAND/PRONE/HEIGHT con `max_work_solves = 2`, 13,5–16 ms di compensazione e 20–22 ms per release (`residual_by_step.txt`).
+- **Meccanismo:**
+  - nel ramo non WALK di `compensate` la sonda alla scala accettata (`correctionScale_`) basta solo se la proiezione resta entro ±2 %;
+  - altrimenti si risolve una seconda volta alla proiezione.
+  - Durante l'innesto C2 di 1 s e mentre il segmento si avvicina ai limiti, la proiezione si sposta a ogni release.
+- **Offline:** 5 376 release a 2 soluzioni sull'host, 3 917 in QEMU.
+
+### 9.3 P4 (`e57dd89` sul branch di ricerca; candidato `2638204`)
+
+- **Patch:** la sonda è tenuta quando la sua scala **non supera** la proiezione; la proiezione diventa la scala della sonda della release successiva.
+  - Un'attenuazione che cresce segue con una release di ritardo, sempre con una correzione non più grande di quanto l'attenuazione consente.
+  - Una proiezione che si restringe risolve subito come prima.
+  - Nessuno stato nuovo; generalizza P3b.
+- **Verifiche offline:**
+
+| Verifica | Esito |
+|---|---|
+| Host, 64 scenari, contro `719912a` | stesse sequenze stato/causa ed esiti; RAW diverso in 1 680 release, al massimo di 1 tick; STOP (durata, posa tenuta) e ripresa identici; statistiche IMU invariate (`cmp_p4_vs_719912a.txt`, `seg_p4_vs_719912a.txt`, `imu_track_p4_vs_719912a.txt`) |
+| Release OTHER a 2 soluzioni | host 5 376 → 904; QEMU 3 917 → 697 |
+| Costo QEMU OTHER | media 369 → 338 k, p99 966 → 852 k, massimo invariato (1 376 k, la release DEPLOY → LIFT); WALK e RECOVERY invariati (`qemu_cost_p4.txt`) |
+| QEMU = host | 46/46 digest |
+| Stack Motion (rig) | 7 376 → 7 392 B |
+| `static_audit` su `e57dd89` | PASS |
+| Suite Motion su `e57dd89` | `simple_motion`, `stop_support`, `prone`, `night_recovery` PASS |
+| Candidato `2638204` | build CLEAN `2638204fb4ef`, APP `79018a28…c6f4`; sezioni IRAM/DRAM identiche a `82c1af9`; `static_audit` e suite: §9.4 |
+
+- **Costo di qualità:** nelle fasi attenuate la correzione applicata può arrivare con una release di ritardo, quando cresce. Sull'host la differenza della correzione applicata è ≤ 0,04 mrad.
+
+### 9.4 Candidato `2638204`
+
+| Voce | Valore |
+|---|---|
+| Branch | `cand/diag-p0-p4-20261116` (locale) = `82c1af9` + P4 `785bcec` (cherry-pick identico a `e57dd89`) + commento di composizione `2638204` |
+| Build | CLEAN `2638204fb4ef`, APP `79018a28eb7876b7fbc768b8558d9d8bb31788b31f9d961739633054be39c6f4`, 1 783 680 B; IRAM e DRAM identiche a `82c1af9`, `.flash.text` −60 B |
+| `static_audit` | **PASS** |
+| Suite Motion | `simple_motion` PASS 139 s, `stop_support` PASS 47 s, `prone` PASS 137 s, `night_recovery` PASS 275 s |
+| Pre-flash | `candidate_2638204/` (`NEXT_SESSION_PLAN.md`, `preflash/`, `tools/`, `image/`): script derivato solo nei valori pinnati; dry gates PASS; 4 controlli negativi REFUSE; rifiuto senza autorizzazione; `image-info` valido |
+| Rollback | `82c1af9` (installato, script che l'ha installato, dry gates PASS) |
+| Stato | **non flashato, non autorizzato** |
+
+### 9.5 Prossima patch realmente necessaria
+
+1. **P4**, già sviluppata: è l'unica giustificata da una causa misurata e completamente spiegata.
+2. **WALK_SETTLE dopo rilasci sterzati:** nessuna patch prima di misurare dove va il tempo.
+   - Il record `MOTION_PMU_HEAVIEST` di un'altra sessione (gruppi PMU a rotazione) può dare le istruzioni di quel tipo di release.
+   - Se sono ~0,7 M come in QEMU, la causa sono gli stalli; se sono molte di più, è un percorso di codice che il rig non riproduce (ipotesi: prova STOP o posa caricata con correzioni grandi).
+3. **Attesa ACC alla prima attivazione** (6 perse a ogni avvio):
+   - nota dal 15/11, di 100 ms sincroni, nel loop;
+   - va valutata a parte con l'operatore, perché tocca la verifica del registro 85: è una protezione e non si cambia senza mandato.
+
 ## File
 
 - **Rig e strumenti:** `rig/`, `tools/`, `run.sh`, `run_e1sh.sh`, `run_p0only.sh`.
@@ -283,4 +352,5 @@ Rollback: `46b3175`.
 - **Convergenza e regressioni:**
   - `trees/conv` + `run_conv.sh`, uscite in `out/conv/host.txt`;
   - `seg_719912a_vs_t2r1m.txt`, `cmp_719912a_vs_t2r1m.txt`, `imu_track_719912a_vs_t2r1m.txt`.
-- **Candidato:** `candidate_82c1af9/` (`NEXT_SESSION_PLAN.md`, `preflash/`, `tools/`, `TOOLS.sha256`, `d3_selftest/`).
+- **Candidati:** `candidate_82c1af9/` (installato il 16/11) e `candidate_2638204/` (P4, non flashato): `NEXT_SESSION_PLAN.md`, `preflash/`, `tools/`, `TOOLS.sha256`, `image/`.
+- **WALK_SETTLE (tentativo di riproduzione):** `rig/settle_scenarios.h`, `run_settle.sh`, `out/settle_*`.
