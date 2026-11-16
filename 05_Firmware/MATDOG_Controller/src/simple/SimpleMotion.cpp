@@ -1401,7 +1401,18 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
   // 2026-11-08: +63.7/-66.5 mrad, NATIVE_TARGET_NOT_REACHED). Every other
   // check of compensationSafe is unchanged.
   const double edgeTilt=walk||phase_==Phase::WALK_HOLD?gait_.edgeTiltRad:unwind?kEdgeContactMaxTiltRad:0;
-  auto q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);
+  // E1 (P0 peaks, 16/11): Newton seed per leg = this release's nominal plus the last
+  // accepted correction offset (the T1 light target), when it is recent and inside the
+  // URDF limits; otherwise the previous goal as before. The previous goal lags one or two
+  // releases of gait motion, so the edge model's fillet lift taken from the seed HIP
+  // missed by > 20 um and every leg solved twice (8 IK, the WALK peak). The solved
+  // contact, tolerance, limits, boxes and STOP proof are unchanged: only the start point.
+  auto seed=goal_.valid?goal_:f.target;
+  if(reuseOffset_.valid&&reusePhase_==phase_&&now>reuseUs_&&now-reuseUs_<=2*kPeriodUs+kPeriodUs/2)
+    for(unsigned l=0;l<4;++l){const auto& lim=legModel(static_cast<LegId>(l))->limits;LegJointAngles p=nominal.legs[l];
+      p.hip+=jointSlot(reuseOffset_,3*l);p.upper+=jointSlot(reuseOffset_,3*l+1);p.lower+=jointSlot(reuseOffset_,3*l+2);
+      if(p.hip>=lim[0].lower&&p.hip<=lim[0].upper&&p.upper>=lim[1].lower&&p.upper<=lim[1].upper&&p.lower>=lim[2].lower&&p.lower<=lim[2].upper)seed.legs[l]=p;}
+  auto q=compensationTarget(f,body,seed,true,edgeTilt);
   if(compensationSafe(q,safeBox,!walkRecover_)){
     f.target=q;rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=roll==oldRoll&&pitch==oldPitch;
   }else{
@@ -1417,7 +1428,7 @@ void SimpleMotion::compensateLevel(LocomotionFrame& f,const Vector3& up,uint64_t
       const uint8_t refused=safeRefusal_;  // the refused step stays the recorded cause
       if(oldRoll!=0||oldPitch!=0){body=headed(f.cartesian.body,oldRoll,oldPitch);  // locals reused: loop-task stack
         body.translationM={t.x+t.z*body.rotation[0][2],t.y+t.z*body.rotation[1][2],t.z*body.rotation[2][2]};
-        q=compensationTarget(f,body,goal_.valid?goal_:f.target,true,edgeTilt);}else q=nominal;
+        q=compensationTarget(f,body,seed,true,edgeTilt);}else q=nominal;
       if(q.valid&&compensationSafe(q,safeBox,!walkRecover_)){
         safeRefusal_=refused;f.target=q;correctionScale_=1;rememberCorrection(q,nominal,now);reuseSettled_=true;imuLimited_=true;imuReason_="WORKSPACE";return;}
       safeRefusal_=refused;
