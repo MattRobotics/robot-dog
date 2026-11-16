@@ -65,3 +65,18 @@ Evidence: `~/MATDOG/verification-artifacts/MATDOG_1_0_2_PATCHA_TIMINGBASE_202611
 **Summary:** `suite_summary.py <run-dir>...` prints, read-only, every step, D1, joint temperatures, the IMU correction and the last state.
 
 Hardware record of the first run: `../HW_VALIDATION_8530d3a_20261115.md`.
+
+## Block H: STOP inside the stopped-walk recovery (16/11/2026)
+
+`fixture_block_h.py` is a separate tool; it imports `fixture_suite.py` from its own directory without changing it and adds one step, `stop_in_recovery`. Run it after the A–G suite has ended in PRONE_REST.
+- Sequence: STAND 120, STANDARD, WALK, STOP, then STAND 120 and `@STOP` 1.0 s after it (~50 releases into the recovery), held, STAND 120 to STAND_REACHED; the same with the STOP 0.3 s after the STAND (~15 releases); SLOW, PRONE_REST, Timing dump.
+- The STOP is sent only if a status read taken after the STAND shows `MOVING`/`STAND_FROM_STOPPED_WALK` for that STAND; otherwise the step ends `RECOVERY_WINDOW_MISSED`.
+- The STOP is verified only on a status sampled on the device after it (`now_ms`): a cached sample of the previous held STOP must not satisfy the check. This was found on a simulator dry run before the first hardware use.
+- Firmware coverage offline: host scenarios `R2_IN_RECOVERY_d1..d80` on the production `SimpleMotion`.
+- `EXPECT_BUILD` comes from the `fixture_suite.py` it imports: pin it to the installed build first. The copy here pins `8530d3a11ac9`; the 16/11 run used `46b31757eb81`.
+
+Hardware record: `../HW_VALIDATION_46b3175_20261116.md` (19/19 PASS).
+
+## D1 + D2 per DALY poll
+
+`analyze_d2.py <serial.log> [<out.tsv>]` reads, read-only, the `@BMS STATUS` blocks (also printed by `@BMS STREAM ON`): D1 (`rx_bytes`, `first_byte_ms`, `stale_bytes`, `fail_streak`) and, on builds with D2, the `d2` line (UART2 `rx_low`, `rx_edges`, `tx_low_idle`, `fifo_nonzero`, `fifo_max` per poll period). It classifies each poll as OK / PARTIAL / SILENT and a silence as RX_IDLE_HIGH, RX_HELD_LOW, RX_ACTIVITY, FIFO_UNREAD or TX_LOW_IDLE (classes fixed before the 16/11 session). D2 shows the ESP side only: it cannot locate a fault on the RS485 bus.
