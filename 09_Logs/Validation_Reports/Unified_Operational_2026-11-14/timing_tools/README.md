@@ -88,3 +88,11 @@ Hardware record: `../HW_VALIDATION_46b3175_20261116.md` (19/19 PASS).
 ## Session comparison (`session_compare.py`, `overrun_causes.py`)
 
 `session_compare.py <before-suite> <after-suite> [<before-H> <after-H>]` compares two fixture sessions at equal blocks: per-class ms/release, N+C, instructions, IPC and `istall_mem` from `analyze_diag.txt`; the heaviest release per class; the firmware's per-command work histogram; missed/overrun increments; IMU wanted − applied at 1 Hz; STOP verification and resume. On 15/11 vs 16/11 it reproduces the published tables. `overrun_causes.py <suite>[,<H>] …` groups each step's overruns by the phase of its heaviest release (attenuated STAND/PRONE/HEIGHT, WALK_SETTLE, steered walk, resume, other).
+
+## Per-overrun attribution and targeted runs (16/11 P0 closure)
+
+- `overrun_timeline.py <run> …`: every increment of the since-boot overrun counter in the 1 Hz HTTP status, with the phases of the interval; exact work, phase, COMPENSATE and solves when the overrun raised the command maximum.
+- `fixture_settle.py <pinned fixture_suite copy> <run>`: steps D8–D11 of the qualified suite (same Suite class, commands and checks), with a read-only wait for the walk mode to be published (S2b).
+- `analyze_settle.py <run> …`: WALK_SETTLE peaks, the heaviest OTHER release with its PMU group against the class, HTTP samples in WALK_SETTLE.
+- `session_compare.py` now drops the boot → A0 window from the block table when a targeted run preceded the suite on the same boot (reproduces the 16/11 comparison byte for byte).
+- `daly_timeline.py <serial.log> …`: every DALY D1/D2 block as TSV, with the close time of the poll it describes.

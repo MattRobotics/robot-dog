@@ -18,12 +18,17 @@ from pathlib import Path
 BINS_MS = [5, 10, 15, 20, 25, 30, 40, float('inf')]
 
 
-def trials(path):
-    out, trial, cur = {}, None, None
+def trials(path, align=False):
+    # align (suite block table only, 16/11 P4 session): when a targeted run precedes the suite on the same
+    # boot, analyze_diag reports the first dump as already holding PMU sums and trial 1 = boot -> A0, not a
+    # suite block; the blocks are then trials 2.. and are renumbered so that block A is trial 1.
+    out, trial, cur, shift = {}, None, None, 0
     for l in open(path):
+        if align and l.startswith('NOTE: the first dump already holds PMU sums'):
+            shift = 1; continue
         m = re.match(r'== trial (\d+)', l)
         if m:
-            trial = int(m.group(1)); continue
+            trial = int(m.group(1)) - shift; continue
         m = re.match(r'\s+(WALK|RECOVERY|OTHER)\s+releases (\d+), wall ([\d.]+) ms/release \(N\+C ([\d.]+) ms\)', l)
         if m and trial:
             cur = (trial, m.group(1)); out[cur] = {'n': int(m.group(2)), 'wall': float(m.group(3)), 'nc': float(m.group(4))}; continue
@@ -111,7 +116,7 @@ def results(run):
 
 def main():
     a, b = sys.argv[1], sys.argv[2]
-    A, B = trials(Path(a) / 'analyze_diag.txt'), trials(Path(b) / 'analyze_diag.txt')
+    A, B = trials(Path(a) / 'analyze_diag.txt', True), trials(Path(b) / 'analyze_diag.txt', True)
     names = {1: 'A', 2: 'B', 3: 'C', 4: 'D', 5: 'E-F'}
     print('1. per block and class: ms/release  N+C ms  k instr  IPC  istall_mem   (before -> after)')
     for t in range(1, 6):
