@@ -78,14 +78,18 @@ Nei cammini sterzati la zampa «in swing» porta l'8–9 % del peso: senza il su
 
 ## 5. FAST 40, CRAWL, TROT
 
-- **FAST 40: non fattibile** (VERIFIED OFFLINE, 14–15/11).
-  - Alla frenata qualificata (ACC 84) LF_HIP, LF_UPPER o LH_HIP escono dal box in tutte le 396 configurazioni a 40 mm/s che rispettano supporto, ZMP e cattura.
-  - Lo swing medio cresce come v/(1−d): 229 mm/s a 40 mm/s con d 0,825.
-  - Capacità credibile: **~30 mm/s utili** con la legge FAST attuale, risolto il contatto in swing.
+- **FAST 40: non certificabile con i box e la frenata qualificata di oggi**, non un'impossibilità fisica dimostrata (VERIFIED OFFLINE, 14–15/11; i limiti distinti sono nel `GROUND_MEASUREMENT_PLAN.md` §0).
+  - Alla frenata qualificata (ACC 84) LF_HIP, LF_UPPER o LH_HIP escono dal **box certificato** in tutte le 396 configurazioni a 40 mm/s che rispettano supporto, ZMP e cattura. È un vincolo di certificazione (B) e di frenata qualificata (C), non del limite meccanico (A): i giunti restano a 550–900 mrad dai limiti URDF e servo.
+  - Lo swing medio cresce come v/(1−d): 229 mm/s a 40 mm/s con d 0,825 (legge, D).
+  - Capacità credibile con la legge FAST attuale: **~30 mm/s utili**, risolto il contatto in swing.
+  - FAST 40 diventa rivalutabile con la frenata reale sotto carico, C per giunto, la clearance reale e una certificazione CAD della traiettoria.
 - **CRAWL (modo distinto):**
   - prototipo C2 (13/11, gemello dev.7, con compensazione della cedevolezza): supporto 4,61 mm contro 2,1, clearance 9 mm, laterale 77 %, rotazione 80 %, STOP 9/9;
   - richiede C per giunto, box sterzati nuovi e prove STOP nuove.
-- **TROT: non fattibile** con servo di posizione solo-P a 50 Hz (T3 del 13/11: 9,4 mm/s su 40, fault alla WALK STOP). Nessuna promessa di dinamica.
+- **TROT: non supportato dalle evidenze attuali**, non escluso:
+  - nel gemello T3 (13/11) ha dato 9,4 mm/s su 40 e un fault alla WALK STOP, ma il modello attuatore non è identificato dinamicamente;
+  - il dato che decide è il ritardo di inseguimento sotto carico degli ST3215 a 50 Hz (M5 del piano a terra), oggi non misurabile con la telemetria esistente;
+  - nessuna promessa di dinamica prima di quella misura.
 
 ## 6. Confronto di scala con Spot e Go2
 
@@ -124,9 +128,11 @@ Nessuno di questi è stato portato sul firmware oggi.
 
 ## 9. Prossima prova fisica strettamente necessaria per la locomozione
 
-Una sessione a terra, sola misura, senza modifiche hardware e con la build installata:
-- HOLD statici a 3 quote;
-- una zampa alla volta scaricata con il gait esistente, nella finestra a tre appoggi;
-- lettura della posizione presente contro il RAW comandato per giunto e PresentLoad, a riposo.
+Piano dettagliato: `GROUND_MEASUREMENT_PLAN.md` (16/11, seconda parte).
 
-Chiude C per giunto e l'attrito, il blocco comune a V7, CRAWL e gate. Va decisa con un mandato dedicato: non è una prova di fixture.
+La prima misura è **M1**, una sessione a terra di sola misura, senza modifiche hardware e con la build installata:
+- STAND 80, 120 e 150 mm, ciascuna raggiunta salendo e scendendo;
+- HOLD di 30 s per quota;
+- osservazione passiva `GROUND_CONTACT.OBSERVE` su ogni zampa: angoli misurati contro riferimento, PresentLoad, Jacobiano.
+
+Chiude C per giunto e l'attrito, il blocco comune a V7, CRAWL e gate. Seguono M2–M4 (velocità al suolo, clearance, frenata reale) con i soli modi qualificati. Va decisa con un mandato dedicato: non è una prova di fixture.

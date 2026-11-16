@@ -1,10 +1,43 @@
-> Copia del rapporto offline. I percorsi relativi (`rig/`, `tools/`, `out/`, `trees/`, `suites/`, `p3a/`, `loco/`) si riferiscono alla cartella delle evidenze `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/` (sigillata, `SHA256SUMS`), non a questo repository. Il codice dei candidati è sul branch locale `research/p0-peaks-20261116` (bundle `backups/git/robot-dog-p0-peaks-20261116.bundle`).
+> Copia del rapporto offline. I percorsi relativi (`rig/`, `tools/`, `out/`, `trees/`, `suites/`, `audit/`, `p3a/`, `loco/`, `candidate_82c1af9/`) si riferiscono alla cartella delle evidenze `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/` (sigillata, `SHA256SUMS`), non a questo repository. Il codice è sui branch locali `research/p0-peaks-20261116` e `cand/diag-p0-peaks-20261116` (bundle `backups/git/robot-dog-p0-peaks-20261116.bundle`).
 
 # Motion Timing P0 — picchi residui dopo T2R1M, sviluppo offline (16/11/2026)
 
 Lavoro offline svolto durante e dopo la validazione hardware di `46b3175` (`../MATDOG_1_0_2_DIAG_46B3175_HW_20261116/REPORT.md`). Nessun flash di questi candidati.
 
 Le istruzioni Xtensa contate in QEMU (`-icount 3`, ×3,088) **non sono millisecondi**. P0 si chiude solo sul chip: **non è chiuso**.
+
+## Sintesi per stato (fine giornata 16/11)
+
+**1. Risultati hardware verificati** (`46b3175`, fixture, 16/11):
+- Suite A–G 65/65 + blocco H (STOP durante la ripresa) 19/19; STOP, calibrazioni e NVS invariati.
+- RECOVERY 15,1–16,4 → 10,9–12,0 ms per release (istruzioni −40/−45 %); WALK invariato in tempo.
+- Picco 36,1 → 27,0 ms; overrun 323 → 157; 0 perse in WALK/RECOVERY (15/11: 3).
+- Costo IMU di T2R1M: errore sterzato medio +16 %.
+- DALY: tre avvii senza silenzio (freddo `e321e86`, boot dopo il flash, freddo B8 `46b3175`: 601/601 poll ciascuno a freddo); D2 attiva con baseline registrata.
+
+**2. Miglioramenti dimostrati soltanto offline** (non flashati):
+- **E1/E1b:** seme dell'IK di compensazione.
+  - QEMU: WALK max 1 430 → 1 172 k; release WALK > 1,27 M 73 → 0; RECOVERY max 2 156 → 1 562 k.
+  - Stato IK identico su 216 196 soluzioni, nessun cambio di ramo, Newton −29/−35 %.
+- **P3a:** `ViaPlan::plan` identico bit per bit, ~440 k in meno nella release del piano.
+- **P3b:** release del piano con una sola soluzione. Con P3a, OTHER max 2 045 → 1 376 k.
+- **Nessuna regressione su 64 scenari:** stesse sequenze; STOP, IMU, WORKSPACE e traiettorie entro i valori di T2R1M; `static_audit` e quattro suite Motion PASS.
+- **Candidato:** `82c1af9`, costruito e auditato, pre-flash pronto e non autorizzato (§7.5).
+
+**3. Cause ancora ipotetiche:**
+- **Perse «all'attivazione da PRONE_REST»:** probabile artefatto della dump diagnostica `@MOTION TIMING` a Motion non attivo (§7.4). Il legame è forte nei log ma non misurato sul chip; D3 lo decide.
+- **Picco WALK sterzato di 27,0 ms** (soluzione + compensazione piena nella stessa release): sul chip non si sa se la release leggera manca per un rifiuto di `compensationSafe` o per il calendario T2.
+- **Silenzi DALY:** causa UNKNOWN.
+
+**4. Problemi residui per chiudere P0** (0 perse operative, 0 overrun, ≤ 16 ms):
+- stallo di istruzioni dominante;
+- inizio della ripresa 1 562 k;
+- DEPLOY → LIFT 1 376 k;
+- release sterzate con doppia soluzione sul chip;
+- ~3,6 ms per release fuori da N+C;
+- conferma D3 sulle perse a riposo.
+
+Il modello QEMU sottostima i picchi del chip: ogni guadagno va misurato con `82c1af9` (`candidate_82c1af9/NEXT_SESSION_PLAN.md`).
 
 ## Esito
 
@@ -149,14 +182,95 @@ Basso = N+C / 102,5 k + 3,6 ms; alto = istruzioni × 16 µs/k.
 
 Log in `suites/719912a/`. Le altre 7 suite Motion rimandate falliscono già sul baseline per cause preesistenti (rapporto P0 strutturale §4) e non sono state rieseguite.
 
-## 7. Prossima prova fisica strettamente necessaria (P0)
+## 7. Prosecuzione del 16/11: verifiche e candidato
 
-Una sola sessione fixture, se l'operatore la decide, con una diagnostica = `46b3175` + E1 + E1b + P3a + P3b:
-- stessa suite A–G + blocco H;
-- stessi criteri;
-- obiettivo: misurare sul chip il picco WALK sterzato, l'inizio della ripresa e DEPLOY → LIFT.
+### 7.1 Ripinnatura e `static_audit`
 
-Richiede un nuovo mandato, una build CLEAN, `static_audit` con il nuovo pin e le suite Motion.
+- **Nessuna ripinnatura necessaria.** Il gate dei sorgenti Motion (`motion_final_release_sources.json`) pinna solo 13 file di `src/motion/`. `SimpleMotion.cpp` e `ViaPlan.h` stanno in `src/simple/` e non sono pinnati: E1, E1b, P3a e P3b non toccano file pinnati.
+- `static_audit` sul branch di ricerca `719912a`: **STATIC_AUDIT = PASS**, `MOTION_CONVERGENCE_SOURCE = PASS`, `HOST_TESTS = PASS` (`audit/static_audit_719912a.txt`).
+- Le righe `FAIL` nel log sono i test di mutazione che devono fallire (`USB_FRAMING_MUTATIONS = PASS, both historical defects detected`), identiche nell'audit di `46b3175`.
+- `static_audit` sul candidato `82c1af9`: **PASS** (§7.5).
+
+### 7.2 Correttezza IK e convergenza di E1/E1b (VERIFIED OFFLINE)
+
+Copia di misura `trees/conv` (= `719912a` + shadow). A ogni soluzione piena risolve ogni gamba sia dal seme vecchio (`goal_`) sia dal seme E1/E1b, sugli stessi ingressi. La build è inerte: digest identici a `719912a` in 64/64 scenari.
+
+| | WALK | RECOVERY |
+|---|---|---|
+| Soluzioni di gamba confrontate | 185 960 | 30 236 |
+| Stato diverso tra i due semi | **0** | **0** |
+| Converge solo con il seme nuovo / solo con il vecchio | 0 / 0 | 0 / 0 |
+| Cambio di ramo cinematico (\|Δq\| > 50 mrad) | **0** | **0** |
+| \|Δq\| massimo tra le due soluzioni | 0,33 mrad | 0,31 mrad |
+| Residuo massimo (tolleranza 1e-6 m) | 9,999e-7 → 9,995e-7 m | 1,000e-6 → 9,999e-7 m |
+| Condizionamento massimo | 7,0 → 7,0 | 6,3 → 6,3 |
+| Passi di Newton | 257 811 → 181 961 (−29 %) | 39 445 → 25 634 (−35 %) |
+| Valutazioni FK | 449 469 → 367 921 | 70 155 → 55 870 |
+| Istogramma passi (vecchio → nuovo) | 1 passo 64 % → 98 %; 2 passi 33 % → < 0,01 %; 3 passi 3 % → 0 | analogo |
+
+- **Fallback di E1b:** scatta 87 volte, tutte nello scenario fixture (fase HOLD, causa `SLEW`), dove anche il seme vecchio fallisce identicamente. In quelle release il fallback aggiunge una seconda soluzione (~0,4 M istruzioni) senza soluzione nominale nella stessa release: non è un picco. Non cambia mai l'esito.
+- **Rispetto al punto fisso esatto del modello di bordo** (§1): E1 è più vicino nel 78 % delle gambe, con errore medio 27,4 → 4,3 µrad.
+
+### 7.3 Regressioni contro il Motion installato (T2R1M) (VERIFIED OFFLINE, 64 scenari host)
+
+| Verifica | T2R1M `0fb22b0` | `719912a` |
+|---|---|---|
+| Sequenze stato/causa diverse, esiti finali diversi | — | **0 / 0** |
+| Fault | 1 (scenario di latch previsto) | lo stesso |
+| STOP: durata / posa tenuta / assestamento | — | durata identica, posa ≤ 6 tick, assestamento identico (`seg_719912a_vs_t2r1m.txt`) |
+| Ripresa: lunghezza / seconda differenza | — | identica / 11 → 11 tick |
+| Velocità e accelerazione massime dei target | 28/31, 11/14 tick | identiche |
+| IMU voluta − applicata, WALK media / p99 / max | 0,926 / 9,456 / 32,971 mrad | 0,922 / 9,441 / 32,971 |
+| IMU, RECOVERY media / p99 / max | 0,494 / 3,162 / 15,450 | 0,492 / 3,124 / 15,450 |
+| Limiti `WORKSPACE` WALK / altri | 10 / 287 | 10 / 288 |
+| Frazione leggera T1 WALK / ripresa | 49,9 % / 49,4 % | 49,9 % / 49,4 % |
+| Suite host e Motion (§6.1) e `static_audit` | PASS | PASS |
+
+Ad anello chiuso il RAW differisce al massimo di 3 tick, salvo lo scenario a riferimento non unico `JOYSTICK_HELD_SEQUENCE` (55 tick); ad anello aperto, al massimo di 1 tick (§1).
+
+### 7.4 Picchi residui e le 2 perse «da PRONE_REST»
+
+**Perse all'attivazione: probabile artefatto della diagnostica** (VERIFIED OFFLINE dai log; da confermare sul chip).
+- `timing::state.armed` non torna mai falso. Una persa a riposo dopo un comando resta nel conteggio di quel comando e il `arm()` della STAND successiva la cancella: per questo C1 ed E1 hanno `command_timing.missed = 0` mentre il contatore dall'avvio sale di 1.
+- Ogni STAND da PRONE_REST della suite è preceduta di ~100 ms da una dump `@MOTION TIMING`. È diagnostica, accettata solo a coppia OFF, e stampa in un'unica volta nel loop.
+- Durata della dump (dal log dell'host):
+  - 12,6–12,9 KB in 24–36 ms dopo blocchi con WALK/RECOVERY;
+  - 2,7–6,1 KB in 9–18 ms dopo il solo blocco A.
+- Sul 15 e 16/11 le perse seguono **3 delle 6 dump grandi e nessuna delle 4 piccole**.
+- Un blocco di B ms fa perdere una release con probabilità ~(B − 20)/20 secondo la fase: ~30 % a 26 ms, ~80 % a 36 ms. È coerente: 36 ms → persa, 28 → persa, 26/26/30 → 1 su 3.
+- Il passaggio sincrono del registro 85 (`configureAccCeiling`, 12 letture) è visibile ~10 ms dopo ogni STAND in tutti e 5 i casi: da solo non spiega perché solo C1 ed E1.
+- **D3** (nel candidato, §7.5) registra l'ultima persa a Motion non attivo e la durata della dump: la prossima sessione può confermare o smentire.
+- In una build operativa la dump non esiste.
+
+**Picchi di calcolo residui** (§5, invariati): il caso sterzato con soluzione + compensazione piena visto sul chip (27,0 ms), l'inizio della ripresa (1 562 k), DEPLOY → LIFT (1 376 k).
+
+**Nessuna nuova ottimizzazione aggiunta:** la necessità di ulteriori patch va dimostrata sul chip con il candidato.
+
+### 7.5 Candidato minimo per il prossimo collaudo hardware (IMPLEMENTED NOT VALIDATED, non flashato)
+
+| Voce | Valore |
+|---|---|
+| Branch | `cand/diag-p0-peaks-20261116` (locale), worktree `~/MATDOG/worktrees/matdog-diag-p0-peaks-20261116` |
+| Commit | **`82c1af9`** = `46b3175` (installato) + E1 `ae9b6d1` + P3a `db6d621` + E1b `447082c` + P3b `e6ee46b` (cherry-pick, diff identici a `8346b48..719912a`) + D3 `82c1af9` (solo diagnostica: ultima persa a Motion non attivo, durata della dump, durata del passaggio del registro 85; commento di composizione in `BuildConfig.h`) |
+| Build | CLEAN `82c1af95e0a5`, ROBOT_POWERED, OTA ingest 0. APP `93c61562fdcf1d79206565a9dc440debd2bc8dbd7e2fa91176d7aefd2f966ace`, 1 783 744 B; tabella `8f756ecb…`, bootloader e sdkconfig identici a `46b3175` |
+| Sezioni contro `46b3175` | IRAM identica; `.dram0.data` +32 B (record D3); `.dram0.bss` invariata; `.flash.text` +1 088 B; `.flash.rodata` +212 B (`audit/sections_46b3175_vs_82c1af9.txt`) |
+| `static_audit` | **PASS** (`audit/static_audit_diag_82c1af9.txt`) |
+| Suite Motion | `simple_motion` PASS 144 s, `stop_support` PASS 49 s, `prone` PASS 141 s, `night_recovery` PASS 280 s (`audit/motion_suites_82c1af9.txt`, log `audit/suite_82c1af9_*.log`) |
+| Pre-flash (preparato, **non autorizzato**) | `candidate_82c1af9/preflash/`: script derivato da quello di `46b3175` cambiando solo i valori pinnati, autorizzazione `MATDOG_DIAG82C_FLASH_AUTHORIZED`; dry gates PASS; controlli negativi SHA, dimensione, commit, NVS → REFUSE; rifiuto senza autorizzazione; `image-info` valido |
+| Rollback | `46b3175` con il suo script pinnato; dry gates ripetuti oggi: PASS |
+| Strumenti della sessione | quelli del 16/11: A–G con `EXPECT_BUILD='82c1af95e0a5'` e blocco H. `analyze_diag.py` ignora le righe D3 nuove; `fixture_suite.py` attende sempre `MOTION_TIMING hist`, e la riga `dump_us` arriva dopo |
+| Criteri | P0 chiuso solo con 0 perse operative, 0 overrun, massimo ≤ 16 ms (invariato). Da misurare: picco WALK sterzato, inizio ripresa, DEPLOY → LIFT, natura delle perse a riposo (D3) |
+
+## 8. Prossima prova fisica strettamente necessaria (P0)
+
+Una sola sessione fixture, con un nuovo mandato e l'operatore presente:
+- un solo flash APP-only del candidato `82c1af9` (§7.5), già costruito, auditato e con il pre-flash pronto;
+- stessa suite A–G + blocco H, stessi criteri;
+- obiettivi:
+  - misurare sul chip il picco WALK sterzato, l'inizio della ripresa e DEPLOY → LIFT;
+  - confermare con D3 che le perse a riposo vengono dalla dump diagnostica.
+
+Rollback: `46b3175`.
 
 ## File
 
@@ -164,5 +278,9 @@ Richiede un nuovo mandato, una build CLEAN, `static_audit` con il nuovo pin e le
 - **Uscite:** `out/<albero>/host.txt`, `target.txt`.
 - **Confronti:** `cmp_*.txt`, `qemu_cost_summary.txt`.
 - **P3a:** `p3a/` (test di equivalenza).
-- **Locomozione:** `loco/` (`LOCO_EVAL.md`, `workspace_use.cpp`, `workspace_use_e1b.txt`).
-- **Test:** `suites/`.
+- **Locomozione:** `loco/` (`LOCO_EVAL.md`, `GROUND_MEASUREMENT_PLAN.md`, `workspace_use.cpp`, `workspace_use_e1b.txt`).
+- **Test:** `suites/` (branch di ricerca); `audit/` (`static_audit` di `719912a` e `82c1af9`, suite Motion e sezioni del candidato).
+- **Convergenza e regressioni:**
+  - `trees/conv` + `run_conv.sh`, uscite in `out/conv/host.txt`;
+  - `seg_719912a_vs_t2r1m.txt`, `cmp_719912a_vs_t2r1m.txt`, `imu_track_719912a_vs_t2r1m.txt`.
+- **Candidato:** `candidate_82c1af9/` (`NEXT_SESSION_PLAN.md`, `preflash/`, `tools/`, `TOOLS.sha256`, `d3_selftest/`).

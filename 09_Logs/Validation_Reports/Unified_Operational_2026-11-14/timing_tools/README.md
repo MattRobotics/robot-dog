@@ -80,3 +80,7 @@ Hardware record: `../HW_VALIDATION_46b3175_20261116.md` (19/19 PASS).
 ## D1 + D2 per DALY poll
 
 `analyze_d2.py <serial.log> [<out.tsv>]` reads, read-only, the `@BMS STATUS` blocks (also printed by `@BMS STREAM ON`): D1 (`rx_bytes`, `first_byte_ms`, `stale_bytes`, `fail_streak`) and, on builds with D2, the `d2` line (UART2 `rx_low`, `rx_edges`, `tx_low_idle`, `fifo_nonzero`, `fifo_max` per poll period). It classifies each poll as OK / PARTIAL / SILENT and a silence as RX_IDLE_HIGH, RX_HELD_LOW, RX_ACTIVITY, FIFO_UNREAD or TX_LOW_IDLE (classes fixed before the 16/11 session). D2 shows the ESP side only: it cannot locate a fault on the RS485 bus.
+
+## D3: losses with Motion idle (`analyze_d3.py`, builds with D3 from 82c1af9)
+
+`analyze_d3.py <serial.log>` reads the D3 lines of each `@MOTION TIMING` dump (`record=LAST_IDLE_SKIP dump_start_us=… count=… stamp_us=…` first, `dump_us=` last) and the `MOTION_ACC_CEILING … us= next_release_in_us=` line of each activation. It attributes each new loss with Motion not engaged to the preceding dump when its stamp falls inside `[dump start, dump start + dump_us + 40 ms]`, else reports it UNEXPLAINED. Self-test on a synthetic log: `verification-artifacts/MATDOG_1_0_2_P0_PEAKS_20261116/candidate_82c1af9/d3_selftest/`.
