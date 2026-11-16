@@ -1,5 +1,10 @@
 # MATDOG Controller — Changelog
 
+> **Branch `integ/matdog-unified-operational-20261114`, current as of 2026-11-16 evening:**
+> - **Installed on the robot:** the diagnostic `1.0.2-dev.8` build `6be46906d069` (`a86c680` + F3 + IRAM G2s), APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`, validated on the fixture.
+> - **This branch's source** carries its Motion law without the diagnostic instrumentation (entry below). The verification build `33134ae28260` was **never installed**.
+> - The block that follows describes `main` on 10/11 and is historical for this branch.
+>
 > **Current as of 2026-11-10:** the installed APP is the development build `1.0.2-dev.6` operational ACC 220.
 > - **Identity:** source `450d2c7`, merged into `main` by PR #67; build `450d2c793dcb`; SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Hardware validation of 10/11:** fixture Q1–Q8 qualified; ground check positive but out of protocol ([report](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
@@ -8,6 +13,34 @@
 >
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
+
+## Unreleased — Motion Timing P0: T2R1M, E1/E1b, P3a/P3b, P5, F3 (FAST 29.6 mm/s) and IRAM G2s integrated — 2026-11-16
+
+> Integrated on branch `integ/matdog-unified-operational-20261114` as 12 traced cherry-picks onto `f1f3914` (`4d02b80` … `33134ae`; each message names its source commit). The version string stays `1.0.2-dev.7`; identify builds by build ID and APP SHA256.
+>
+> - **Verification build:** CLEAN `33134ae28260`, ROBOT_POWERED, APP `0e07a4ac0b5764076670b8310b07f44eee15d957ec33703f18f9e30ea1b9b7b6`, 1 775 280 B. **Not installed.**
+> - **Hardware, 16/11 evening:** the same Motion law, with the dev.8 instrumentation, is the installed diagnostic `6be46906d069` ([report](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md)).
+>   - Fixture runs: targeted 12/12, A/B 18/18, FAST E–G 20/20, H 20/20; no fault.
+>   - Against `a86c680` in the same session: −6…−10 % per release; missed 5 → 0 and overruns 6 → 0 on the 29 common steps.
+>   - Internal-heap minimum 25 672 B, i.e. 1 096 B above the 24 KB threshold with two HTTP clients.
+>   - **Motion Timing P0 stays open:** 2 overruns at 20.8 ms, both two-solve STAND/HEIGHT/PRONE releases.
+
+- **What:**
+  - **T2R/T2R1/T2R1M** (`bb5520b`, `4757fa0`, `0fb22b0`): the STOP recovery runs on the T2 bracket and the T1 light release also applies while the correction slews, so no recovery or walk release carries both solves.
+  - **E1/E1b** (`ae9b6d1`, `447082c`): the compensation IK, and the STOP recovery's full solves, are seeded from this release's nominal plus the accepted offset.
+  - **P3a/P3b** (`db6d621`, `e6ee46b`): `ViaPlan` recomputes a blend only where its segment speeds changed (bit-identical plans); the plan release keeps the probe at the accepted scale.
+  - **P5** (`b104f00`): a refused STOP proof stops at the first duration with a control outside the box. Same accept/refuse results and same plans.
+  - **F3** (`a0451de`, originally `6146ef1`): the FAST preset 2 stride goes 80 → 74 mm, **32 → 29.6 mm/s**. This puts the peak reference secant at 29 RAW ticks against the STOP-proof frontier of 31.36 (margin +1.36); the old 31 caused the F3 FAULT of 16/11.
+    - New offline gate `scripts/offline_motion/run_stop_secant_gate.sh`.
+    - Dashboard labels changed to 30 mm/s.
+  - **IRAM G2 + G2s** (`e3fe5a0`, `cb9ed85`, `6be4690`): 17 more Motion hot-path functions carry `MATDOG_MOTION_HOT`. Cost: +6 148 B of IRAM and −6 144 B of internal heap (ELF).
+- **Left out:** the dev.8 diagnostic instrumentation (PMU, extended `@MOTION TIMING`, D2, D3) and the diagnostic composition notes in `BuildConfig.h`. They are kept as patches with the report; P4 is excluded (no measured gain).
+- **Unchanged:** STOP, limits, calibration, NVS, workspace and every other mode or preset. Outside FAST the frames are bit-identical (offline).
+- **Checks on `33134ae`:**
+  - `run_host_tests.sh` PASS;
+  - `static_audit` PASS, including the motion source gate with the re-pinned sources;
+  - `run_stop_secant_gate.sh` PASS;
+  - Motion suites `simple_motion`, `stop_support`, `prone` and `night_recovery` PASS (`results/motion_suites_33134ae.txt` of the report).
 
 ## Unreleased — Motion: six hot-path kinematics functions fetched from IRAM (IRAM G1) — 2026-11-15
 

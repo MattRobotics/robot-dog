@@ -13,6 +13,7 @@ Chronology: [`HISTORY_INDEX.md`](../HISTORY_INDEX.md).
 | [ADR-002](ADR-002_MATDOG_Repository_and_Station_Integration.md) | 2026-06-25 | `robot-dog` is the MATDOG reference repository; boundary with NormaCore Station | **Accepted, partially superseded** (annotation 2026-10-08) | Still valid: `robot-dog` is the source of truth for MATDOG. Superseded: direct servo-bus control by NormaCore Station. See the "Status update" section of the ADR. |
 | [ADR-003](ADR-003_URDF_REV00_Kinematic_Baseline.md) | 2026-06-30 | URDF REV00 kinematic baseline | **Accepted** | Canonical robot description used by geometry, kinematics and motion code. |
 | [ADR-004](ADR-004_Third-Party_Reverse_Engineering_Material_Boundary.md) | 2026-10-08 | Third-party reverse-engineering material stays out of MATDOG history | **Accepted** (annotation 2026-10-09: branches deleted, exposure not guaranteed removed) | Boundary applied by PR #39 and PR #40. Deferred material is recorded by path and SHA-256 only. Not to be weakened without a separate owner decision. |
+| [ADR-007](ADR-007_Motion_Timing_Integration_and_Heap_Margin.md) | 2026-11-16 | Motion Timing optimisations enter the operational branch as traced cherry-picks without diagnostic instrumentation; IRAM placement bounded by the internal-heap margin; at most 2 HTTP clients and a memory gate before Motion in hardware sessions | **Accepted** (branch `integ/matdog-unified-operational-20261114`) | Context: the `cb9ed85` MEMSTOP and the `6be4690` (G2s) qualification of 16/11. |
 
 Related dated decisions kept outside the ADR series:
 

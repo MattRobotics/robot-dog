@@ -1,3 +1,23 @@
+# Stato operativo corrente — 16/11/2026 sera (branch `integ/matdog-unified-operational-20261114`)
+
+**Installata:** `1.0.2-dev.8` **diagnostica** `6be46906d069` (`a86c680` + F3 + IRAM G2s), APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`.
+- **VERIFIED HARDWARE il 16/11 su fixture:** mirata 12/12, A/B 18/18, FAST E–G 20/20, H 20/20, nessun fault. Copre STAND 80–150, WALK STANDARD/SLOW/FAST 29,6 mm/s, STOP (a riposo, in camminata, nel FAST, dentro la RECOVERY) e RECOVERY.
+- **Calibrazioni:** NVS gen-1 e restore 12/12 invariati.
+- **Rollback:** `a86c680`.
+- **Sorgente del branch:** integra la stessa legge Motion senza strumentazione (build `33134ae28260`, non installata).
+- **Riferimenti:** [rapporto](Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md) · [handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md) · [ADR-007](Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md).
+
+## Residui al 16/11/2026
+
+| Area | Stato |
+|---|---|
+| Motion Timing P0 | **Aperto.** Su `6be4690` restano 2 overrun e release fino a 20,8 ms: STAND/HEIGHT/PRONE attenuate a 2 soluzioni; picchi WALK e RECOVERY 19,5–20 ms. Criterio di chiusura: 0 perse operative, 0 overrun, massimo ≤ 16 ms |
+| Margine di heap interno | 1 096 B sopra 24 KB con 2 client HTTP sulla build diagnostica. Un terzo client (dashboard o watcher) lo annulla. Build operativa: +8 168 B di heap statico (ELF), margine non misurato |
+| DALY all'accensione | Silenzi con RX idle-high, fino a 182 s, uno anche dal primo poll; causa **UNKNOWN**. Manca la misura RS485 in solo ascolto su A/B durante un silenzio. Precauzione: QON + 6 min e 150 poll validi prima di Motion |
+| Blocchi C e D su `6be4690` | Non ripetuti (frame invariati fuori dal FAST, VERIFIED OFFLINE); ultima esecuzione su `a86c680` il 16/11 pomeriggio |
+| Prove a terra delle build dev.8 | Non eseguite |
+| Build operativa integrata `33134ae` | Solo VERIFIED OFFLINE; mai installata |
+
 # Stato operativo corrente — 10/11/2026: `1.0.2-dev.6` ACC 220 installata (build di sviluppo)
 
 **Installata:** `1.0.2-dev.6`, sorgente `450d2c7` (in `main` dalla PR #67), build `450d2c793dcb`, APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.

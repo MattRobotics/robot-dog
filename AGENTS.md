@@ -2,6 +2,16 @@
 
 > **Branch operativo unico (14/11/2026):** `integ/matdog-unified-operational-20261114`. La baseline qui sotto è quella di `main` al 10/11; leggi prima l'[handoff](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md).
 
+> **Stato del branch al 16/11/2026 sera.**
+> - **Installato:** diagnostica `6be46906d069` (F3 + IRAM G2s), APP `be678d83…3b68`, VERIFIED HARDWARE su fixture.
+> - **Sorgente:** la sua legge Motion è integrata nel branch senza strumentazione; build `33134ae28260`, mai installata.
+> - **Sessioni hardware** ([ADR-007](09_Logs/Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md)):
+>   - al massimo 2 client HTTP;
+>   - controllo di memoria M0 prima di Motion;
+>   - processi solo tramite `timing_tools/session_proc.py`.
+> - **Aperti:** Motion Timing P0, margine di heap 1 096 B con 2 client, silenzi DALY (manca la misura RS485).
+> - **Rapporto:** [P0 F3 G2s](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md).
+
 > **Baseline attuale (10/11/2026).**
 > - **Firmware installato:** build di sviluppo `1.0.2-dev.6` ACC 220. Sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Validazione:** fixture Q1–Q8 qualificata; a terra verifica positiva ma fuori protocollo ([dossier HW](09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).

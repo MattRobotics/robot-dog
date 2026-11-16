@@ -1,5 +1,13 @@
 > **Branch operativo unico (14/11/2026) — `integ/matdog-unified-operational-20261114`:** [handoff](Unified_Operational_2026-11-14/HANDOFF.md) — Battery P1 + Motion dev.7, Ground Contact Fase 1 e ricerca MuJoCo vNext in un solo branch; consolidamento solo Git, nessun flash.
 
+> **Robot installato (16/11/2026 sera) — diagnostica `6be46906d069` (`a86c680` + F3 + IRAM G2s, APP `be678d83…3b68`):** [rapporto P0 F3 G2s](Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md).
+> - **Validazione su fixture:** mirata 12/12, A/B 18/18, FAST E–G 20/20 (29,6 mm/s, STOP nel FAST 2,2 s), H 20/20, nessun fault.
+> - **Rispetto ad `a86c680` nella stessa sessione:** −6…−10 % per release, release perse 5 → 0, overrun 6 → 0.
+> - **Memoria:** heap minimo 25 672 B, margine 1 096 B con 2 client HTTP.
+> - **Timing P0 non chiuso:** 2 overrun, 20,8 ms.
+> - **Nello stesso giorno:** P5 su `a86c680` (FAULT F3 nel FAST 32 mm/s) e MEMORY_STOP di `cb9ed85` (G2) con rollback.
+> - **Branch:** la legge Motion qualificata è integrata qui senza strumentazione diagnostica ([ADR-007](../Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md)); build di verifica `33134ae28260` non installata.
+
 > **Robot installato (14/11/2026 sera) — `1.0.2-dev.8` diagnostica / `8530d3a11ac9` (APP SHA256 `75fdd3ac…0c4d4b`):** [installazione APP-only e boot](Unified_Operational_2026-11-14/DIAG_INSTALL_8530d3a.md) — VERIFIED HARDWARE PASSIVE (boot, NVS gen-1, census 13/13, IMU, DALY + D1, SAFE_OFF, 8 min stabili) · [validazione Motion su fixture del 15/11](Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md): riarmo STOP → STAND e ripresa dopo yaw (Patch A) VERIFIED HARDWARE; suite A–G 65/65 PASS; Timing: ≤ 7 perse in 30 s ma 30 perse e 677 overrun, picco 39,67 ms, stallo istruzioni dominante → **Timing P0 non chiuso**; interruzione DALY di 440 s prima della suite, causa UNKNOWN. Sorgente = branch operativo `539b646` + strumentazione Timing, non pubblicata.
 
 > **Robot installato (15/11/2026 pomeriggio) — diagnostica IRAM `e321e8668139` (APP `b88c448d…`):** [validazione hardware e RCA DALY](Unified_Operational_2026-11-14/HW_VALIDATION_e321e86_20261115.md) — flash APP-only PASS; suite A–G 65/65 in un'unica esecuzione; Timing −8/−11 % per release (stalli istruzione 0,47–0,50 → 0,37–0,45), perse 28 → 10, overrun 648 → 323, picco 39,67 → 36,11 ms, heap −4,6 KB → **Timing P0 non chiuso**. DALY: guasto a freddo con risposte troncate a metà frame (98/129, 61/129), rientro spontaneo, BMS vivo (SOC continuo); **causa UNKNOWN circoscritta**, nessun difetto software dimostrato, nessuna patch.
