@@ -96,7 +96,7 @@ bool contactReferenceJacobian(LegId leg,const LegJointAngles& q,Vector3 normal,
   if(!finite(normal)||!finiteQ(q)||!std::isfinite(length)||length<=1e-12)return false;
   return contactJacobian(leg,q,scale(normal,1.0/length),contact,J);
 }
-MATDOG_MOTION_HOT TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
+TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
   TiltedIkResult out;
   if (!legModel(leg) || !finite(target) || !finite(normal) || !finiteQ(o.seed) || !(o.toleranceM > 0) || o.maxIterations == 0) return out;
   const double nl = norm(normal);

@@ -20,6 +20,11 @@
 // a86c680 (16 KB 8-way LRU replay). Inline header functions (StopPlan::build,
 // jointSlot) cannot take the attribute: their literal pools keep a COMDAT section
 // the linker script places in flash (l32r "literal placed after use").
+//
+// G2s (16/11/2026, after the hardware MEMSTOP of cb9ed85): G2 without
+// contactInverseKinematicsGroundNormal and validGaitParameters, 17 functions and
+// 5 844 B of rig text instead of 9 966 B (-4.1 KB IRAM, +4 KB heap); replay: mean
+// misses -26/-27/-28/-45/-28 % instead of -34/-34/-36/-71/-39 %.
 #if defined(ESP_PLATFORM)
 #define MATDOG_MOTION_HOT __attribute__((section(".iram1.motion_hot")))
 #else
