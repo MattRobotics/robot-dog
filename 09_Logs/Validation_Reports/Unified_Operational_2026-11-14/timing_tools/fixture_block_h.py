@@ -31,6 +31,10 @@ if os.environ.get('MATDOG_SIM_PTY'):          # offline dry run against sim_devi
     fs.PORT = os.environ['MATDOG_SIM_PTY']
     fs.BASE = os.environ['MATDOG_SIM_BASE']
 Abort = fs.Abort
+# M0 memory gate (16/11 MEMSTOP), loaded by path (python3 -I does not put this folder on sys.path)
+_ms = importlib.util.spec_from_file_location('memgate', str(Path(__file__).resolve().parent / 'memgate.py'))
+memgate = importlib.util.module_from_spec(_ms)
+_ms.loader.exec_module(memgate)
 RELEASE_S = 0.020                              # period_us 20000
 
 
@@ -120,7 +124,7 @@ def sequence_h(s):
 def main():
     run = ROOT / sys.argv[1]
     s = fs.Suite(run)
-    seq = sequence_h(s)
+    seq = memgate.with_gate(sequence_h, Abort)(s)  # M0 before any Motion command (16/11 MEMSTOP)
     if '--plan' in sys.argv:
         for name, _ in seq:
             print(name)

@@ -49,5 +49,9 @@ if __name__ == '__main__':
         sys.exit(2)
     suite = load(sys.argv[1])
     suite.sequence = targeted
+    _ms = importlib.util.spec_from_file_location('memgate', str(Path(__file__).resolve().parent / 'memgate.py'))
+    memgate = importlib.util.module_from_spec(_ms)
+    _ms.loader.exec_module(memgate)
+    suite.sequence = memgate.with_gate(suite.sequence, suite.Abort)  # M0 before any Motion command (16/11 MEMSTOP)
     sys.argv = [sys.argv[1]] + sys.argv[2:]
     sys.exit(suite.main())

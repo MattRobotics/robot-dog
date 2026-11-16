@@ -1,0 +1,139 @@
+{
+ "version": 1,
+ "motion_stack": "MATDOG_SIMPLE_V1",
+ "ready": true,
+ "reason": "READY",
+ "height": {
+  "nominal_min_mm": 0,
+  "nominal_max_mm": 150,
+  "workspace_min_mm": 50,
+  "workspace_max_mm": 150
+ },
+ "walk": {
+  "nominal_height_mm": 120,
+  "period_s": 5.0,
+  "lift_m": 0.008,
+  "strides_m": [
+   0.05,
+   0.075,
+   0.1
+  ]
+ },
+ "commands": [
+  "STAND",
+  "WALK_STANDARD",
+  "GAIT_SELECT",
+  "JOYSTICK",
+  "WALK_STOP",
+  "PRONE",
+  "STOP"
+ ],
+ "joystick": {
+  "vx_max_m_s": 0.02,
+  "vy_max_m_s": 0.004,
+  "yaw_rate_max_rad_s": 0.032,
+  "envelope": "ELLIPSOID",
+  "timeout_ms": 1000,
+  "ramp_cycles": 2,
+  "vx_back_max_m_s": 0.01,
+  "frontal_band": 0.2,
+  "vx_steered_max_m_s": 0.009
+ },
+ "prone": {
+  "available": true,
+  "reason": "IMPLEMENTED_NOT_VALIDATED",
+  "terminal": "REST_TORQUE_OFF_SUPPORT_UNVERIFIED",
+  "automatic_safe_off": true,
+  "automatic_recovery": false
+ },
+ "hardware_qualified": {
+  "stand": false,
+  "walk": false,
+  "imu_compensation": false
+ },
+ "walk_mode_default": "SLOW",
+ "walk_modes": [
+  {
+   "name": "SLOW",
+   "period_s": 5.0,
+   "strides_mm": [
+    50,
+    75,
+    100
+   ],
+   "top_speed_mm_s": 20.0,
+   "height_mm": 120,
+   "lift_mm": 8,
+   "duty": 0.8,
+   "drive": {
+    "speed": 1000,
+    "acc": 50
+   },
+   "stop_brake_acc": 50,
+   "hardware_qualified": true,
+   "joystick": {
+    "vx_back_max_m_s": 0.01,
+    "vy_max_m_s": 0.004,
+    "yaw_rate_max_rad_s": 0.032,
+    "vx_steered_max_m_s": 0.009
+   }
+  },
+  {
+   "name": "STANDARD",
+   "period_s": 3.0,
+   "strides_mm": [
+    60,
+    75,
+    90
+   ],
+   "top_speed_mm_s": 30.0,
+   "height_mm": 110,
+   "lift_mm": 8,
+   "duty": 0.825,
+   "drive": {
+    "speed": 1800,
+    "acc": 180
+   },
+   "stop_brake_acc": 84,
+   "hardware_qualified": false,
+   "joystick": {
+    "vx_back_max_m_s": 0.016666666666666666,
+    "vy_max_m_s": 0.006666666666666667,
+    "yaw_rate_max_rad_s": 0.04,
+    "vx_steered_max_m_s": 0.015
+   }
+  },
+  {
+   "name": "FAST",
+   "period_s": 2.5,
+   "strides_mm": [
+    60,
+    70,
+    80
+   ],
+   "top_speed_mm_s": 32.0,
+   "height_mm": 105,
+   "lift_mm": 6,
+   "duty": 0.825,
+   "drive": {
+    "speed": 1950,
+    "acc": 220
+   },
+   "stop_brake_acc": 84,
+   "hardware_qualified": false,
+   "joystick": {
+    "vx_back_max_m_s": 0.02,
+    "vy_max_m_s": 0.0048000000000000004,
+    "yaw_rate_max_rad_s": 0.032,
+    "vx_steered_max_m_s": 0.018
+   }
+  }
+ ],
+ "ground_contact": {
+  "observe_command": "GROUND_CONTACT.OBSERVE",
+  "samples": 12,
+  "probing_available": false,
+  "probing_reason": "THREE_SUPPORT_TRANSFER_UNAVAILABLE",
+  "ground_height_available": false
+ }
+}

@@ -96,3 +96,23 @@ Hardware record: `../HW_VALIDATION_46b3175_20261116.md` (19/19 PASS).
 - `analyze_settle.py <run> …`: WALK_SETTLE peaks, the heaviest OTHER release with its PMU group against the class, HTTP samples in WALK_SETTLE.
 - `session_compare.py` now drops the boot → A0 window from the block table when a targeted run preceded the suite on the same boot (reproduces the 16/11 comparison byte for byte).
 - `daly_timeline.py <serial.log> …`: every DALY D1/D2 block as TSV, with the close time of the poll it describes.
+
+## Session discipline and memory (16/11 MEMSTOP, ADR-007)
+
+- **`session_proc.py`, the process registry.**
+  - `start <name> <role> <run> <console> [--also <exec'd program>] -- <cmd>` launches with `Popen`; the PID recorded is the process itself, checked on `/proc`.
+  - It refuses a second USB owner, watcher, tool or guard, any unregistered session process and a USB port held by an unregistered process.
+  - `stop <name>` closes through the registered PID (the USB recorder through its own `QUIT`) and verifies the closure. `check [--expect-none]` lists only; it never kills by pattern.
+  - Reason: on 16/11 a stray `http_watch.py` survived because the PID saved for it was the forking `setsid`, so three HTTP clients ran at once.
+- **`run_acquisition.py <run> <tool.py> <args>`.** One fixture run from start to verified closure. It refuses unless the session is clean and `heap_min_free` ≥ 24 KB, then starts the tool, the run's single `http_watch.py` and `heap_guard.py`. It waits, closes and verifies; exit code 4 if anything is left.
+- **`memgate.py`, step M0** (in `fixture_settle.py`, `fixture_blocks.py`, `fixture_block_h.py`), read only and before any Motion command:
+  - waits 20 s with both HTTP clients active;
+  - requires `heap_min_free` ≥ 24 KB on every sample and no allocation-failure line;
+  - otherwise it aborts with no STOP sent to a robot that is not engaged.
+- **`heap_check.py <run> …`, `heap_guard.py <run> <pid-file>`.** The threshold on a run's files. The live guard sends SIGTERM to the run's tool, i.e. its existing external stop: Abort, then `safe_end` sends one STOP if engaged.
+- **`fixture_blocks.py <pinned suite> <run> --blocks A,B|E,F,G`.** Runs only those blocks of the pinned suite, nothing new.
+- **Read-only analysis:**
+  - `heap_survey.py <root>` gives, per run, the steady internal heap, the minimum and the transient;
+  - `min_drops.py <session>` lists each watermark drop with the watchers and tools active at that moment;
+  - `eval3.py <iram2 dir> <budgets>` gives the exact replay of IRAM sets over placeable functions only.
+- **`sim_memstop/`:** the offline simulator and the six tool cases T1–T6 (`RESULTS.md`).
