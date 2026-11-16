@@ -61,7 +61,7 @@ MATDOG_MOTION_HOT FkResult detail::forwardWithModel(const LegModel& geometry, co
 }  // namespace matdog
 
 namespace matdog { namespace motion { namespace detail {
-bool invert3(const double j[3][3], double inverse[3][3]) {
+MATDOG_MOTION_HOT bool invert3(const double j[3][3], double inverse[3][3]) {
   double m[3][6];
   for (unsigned r = 0; r < 3; ++r) for (unsigned c = 0; c < 3; ++c) { m[r][c] = j[r][c]; m[r][3+c] = r == c ? 1.0 : 0.0; }
   for (unsigned c = 0; c < 3; ++c) {

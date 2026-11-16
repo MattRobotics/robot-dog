@@ -1,4 +1,5 @@
 #include "TiltCompensation.h"
+#include "MotionHotPath.h"
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -49,7 +50,7 @@ bool supportLevelTarget(const Vector3 anchors[4],const JointTargetFrame& measure
   pitch=std::atan2(upSupport.x,upSupport.z);
   return std::isfinite(roll)&&std::isfinite(pitch);
 }
-BodyPose bodyPoseFromRollPitch(const Vector3& t, double roll, double pitch) {
+MATDOG_MOTION_HOT BodyPose bodyPoseFromRollPitch(const Vector3& t, double roll, double pitch) {
   BodyPose p; p.translationM = t;
   const double cr = std::cos(roll), sr = std::sin(roll), cp = std::cos(pitch), sp = std::sin(pitch);
   // R = Ry(pitch) * Rx(roll)

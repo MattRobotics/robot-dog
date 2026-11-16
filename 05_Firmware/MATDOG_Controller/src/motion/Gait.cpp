@@ -1,5 +1,6 @@
 #include "Gait.h"
 #include "LegKinematicsInternal.h"
+#include "MotionHotPath.h"
 #include <cmath>
 #include <limits>
 namespace matdog { namespace motion {
@@ -230,7 +231,7 @@ bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 accelerati
 Vector3 rotateBack(const BodyPose& b,Vector3 v){return {b.rotation[0][0]*v.x+b.rotation[1][0]*v.y,b.rotation[0][1]*v.x+b.rotation[1][1]*v.y,v.z};}
 Vector3 sub(Vector3 a,Vector3 b){return {a.x-b.x,a.y-b.y,a.z-b.z};}
 }
-bool validGaitParameters(const GaitParameters& p) {
+MATDOG_MOTION_HOT bool validGaitParameters(const GaitParameters& p) {
   const double values[]={p.heightM,p.liftM,p.duty,p.advanceXM,p.advanceYM,p.yawRad,p.swayXM,p.swayYM,p.startCycles,p.stopCycles,p.maxCondition,p.comShiftXM,p.swingRamp,p.swingRampEnd,p.settleCycles};
   for(double v:values)if(!std::isfinite(v))return false;
   return (p.type==GaitType::WALK||p.type==GaitType::TROT)&&p.heightM>0&&p.liftM>0&&p.duty<1&&
@@ -245,11 +246,11 @@ double gaitSettleCycles(const GaitParameters& p){
   return p.settleCycles>0?p.settleCycles:p.duty-.75;
 }
 bool validGaitPeriod(double t){double v=1/t;return std::isfinite(t)&&t>0&&std::isfinite(v*v)&&v*v>0;}
-double gaitOffset(GaitType t,LegId l){
+MATDOG_MOTION_HOT double gaitOffset(GaitType t,LegId l){
   const unsigned i=static_cast<unsigned>(l);if(i>3||(t!=GaitType::WALK&&t!=GaitType::TROT))return std::numeric_limits<double>::quiet_NaN();
   const double walk[4]={0,.5,.75,.25},trot[4]={0,.5,0,.5};return t==GaitType::WALK?walk[i]:trot[i];
 }
-LegPhase legPhase(const GaitParameters& p,LegId leg,double cycles){
+MATDOG_MOTION_HOT LegPhase legPhase(const GaitParameters& p,LegId leg,double cycles){
   LegPhase r;double x=cycles+offset(p,static_cast<unsigned>(leg));
   if(!validGaitParameters(p)||!std::isfinite(x)||cycles<0||cycles>1e6){r.phase=std::numeric_limits<double>::quiet_NaN();return r;}
   r.phase=x-std::floor(x);

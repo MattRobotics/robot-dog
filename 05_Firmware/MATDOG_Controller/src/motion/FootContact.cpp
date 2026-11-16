@@ -18,7 +18,7 @@ Vector3 rotate(const double r[3][3], Vector3 a) {
           r[1][0]*a.x+r[1][1]*a.y+r[1][2]*a.z,
           r[2][0]*a.x+r[2][1]*a.y+r[2][2]*a.z};
 }
-ContactStatus convert(KinematicsStatus s) {
+MATDOG_MOTION_HOT ContactStatus convert(KinematicsStatus s) {
   switch (s) {
     case KinematicsStatus::OK: return ContactStatus::OK;
     case KinematicsStatus::JOINT_LIMIT: return ContactStatus::JOINT_LIMIT;

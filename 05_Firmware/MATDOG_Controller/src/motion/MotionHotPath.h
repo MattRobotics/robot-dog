@@ -13,6 +13,13 @@
 // compiler attribute only. ".iram1.*" is the ESP-IDF linker script's input
 // section for IRAM text, the one IRAM_ATTR expands to. Host builds (tests,
 // rigs) leave the attribute empty.
+//
+// G2 (16/11/2026, offline): nineteen more functions (motion library and SimpleMotion
+// members) of the five P0 paths (WALK, IMU compensation, WALK STOP, STAND/HEIGHT
+// with two solves, RECOVERY), chosen by misses avoided per byte on a QEMU trace of
+// a86c680 (16 KB 8-way LRU replay). Inline header functions (StopPlan::build,
+// jointSlot) cannot take the attribute: their literal pools keep a COMDAT section
+// the linker script places in flash (l32r "literal placed after use").
 #if defined(ESP_PLATFORM)
 #define MATDOG_MOTION_HOT __attribute__((section(".iram1.motion_hot")))
 #else

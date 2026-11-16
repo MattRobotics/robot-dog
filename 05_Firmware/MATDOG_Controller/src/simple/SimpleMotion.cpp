@@ -1,4 +1,5 @@
 #include "SimpleMotion.h"
+#include "../motion/MotionHotPath.h"
 #include "MotionTiming.h"
 #include "../motion/PairedProneData.h"
 #include "../motion/GaitTiming.h"
@@ -150,7 +151,7 @@ GaitParameters steerGait(const double goal[3],WalkMode mode){
   g.advanceXM=goal[0];g.advanceYM=goal[1];g.yawRad=goal[2];g.reverse=goal[0]<0;
   g.swayYM=joystickSwayYM(goal[1],goal[2],j.swayBaseYM,j);g.edgeTiltRad=kEdgeContactMaxTiltRad;return g;
 }
-bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
+MATDOG_MOTION_HOT bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   timing::Section section(timing::READ);
   if(timing::state.active){if(control)++timing::state.working.controlReads;else ++timing::state.working.fastReads;}
   // A latched FAULT still permits these bounded, read-only observations after
@@ -160,7 +161,7 @@ bool SimpleMotion::readTimed(unsigned slot,bool control,Feedback& out){
   if(port_->tempCheck(tempCheck_[tempChecks_%2]))++tempChecks_;
   return ok;
 }
-bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
+MATDOG_MOTION_HOT bool SimpleMotion::frameTimed(const uint16_t raw[12],Drive drive){
   timing::Section section(timing::FRAME);
   if(timing::state.active)++timing::state.working.frames;
   const bool previous=stopIo_;
@@ -230,7 +231,7 @@ bool SimpleMotion::serviceStop(){
   if(stopActive_)return false; // duplicate never restarts the clock or dwell
   holdReason_=nullptr;beginStop(esp_timer_get_time());return true;
 }
-void SimpleMotion::rememberReference(uint64_t now){
+MATDOG_MOTION_HOT void SimpleMotion::rememberReference(uint64_t now){
   // Called BEFORE commandedRaw_ is replaced following a successful TX, or
   // for an unchanged RAW goal. Never publish a failed/preempted frame.
   // now is the instant the reference was sampled at, not TX completion:
@@ -253,7 +254,7 @@ void SimpleMotion::rememberReference(uint64_t now){
 // as ~1 rad/s, a rate no law commands), so the window is never shorter than
 // the reference's own sampling period when the history allows it. The span
 // is bounded to 100 ms (stale history); only C0 is claimed at the handoff.
-bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
+MATDOG_MOTION_HOT bool SimpleMotion::rateFromHistory(const double q[12],uint64_t atUs,unsigned skip,double vmax,double v[12]) const {
   const uint16_t* raws[3]={commandedRaw_,previousRaw_,previous2Raw_};const uint64_t times[3]={issuedUs_,previousUs_,previous2Us_};
   const uint16_t* far=nullptr;uint64_t farUs=0;
   for(unsigned k=skip;k<3;++k){if(!times[k]||atUs<=times[k])break;far=raws[k];farUs=times[k];if(atUs-times[k]>=kPeriodUs)break;}
@@ -391,7 +392,7 @@ const char* SimpleMotion::poseRegion(uint64_t now) const {
   }
   return "OUTSIDE_CERTIFIED";
 }
-bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
+MATDOG_MOTION_HOT bool SimpleMotion::pointSafe(const JointTargetFrame& q) const {
   timing::Section section(timing::CONVERT);
   if(!q.valid)return false;
   for(unsigned i=0;i<12;++i){const double v=jointSlot(q,i);if(!std::isfinite(v)||v<input_.minRad[i]||v>input_.maxRad[i])return false;}
@@ -716,7 +717,7 @@ void SimpleMotion::walkStop(){
     reason_="WALK_STOPPING";
   }
 }
-bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference){
+MATDOG_MOTION_HOT bool SimpleMotion::send(const JointTargetFrame& q,Drive drive,uint64_t now,bool holdReference){
   timing::Section section(timing::CONVERT);
   if(stopActive_&&!stopFrame_)return false;
   uint16_t raw[12]{};double distance=0;
@@ -841,7 +842,7 @@ void SimpleMotion::updateTelemetry(uint64_t now){
   if(now<nextTelemetryUs_)return;
   nextTelemetryUs_=now+100000;measureHeight();
 }
-JointTargetFrame SimpleMotion::measured() const {
+MATDOG_MOTION_HOT JointTargetFrame SimpleMotion::measured() const {
   JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=fb_[i].q;return q;
 }
 bool SimpleMotion::via(const JointTargetFrame& q,double pitch,double x,double z){
@@ -1233,7 +1234,7 @@ bool SimpleMotion::limitWalkTilt(double& roll,double& pitch,double c,double s) c
   double rb=c*roll+s*pitch,pb=-s*roll+c*pitch;const bool limited=projectWalkTilt(steerTilt(walkMode_),rb,pb);
   if(limited){roll=c*rb-s*pb;pitch=s*rb+c*pb;}return limited;
 }
-JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
+MATDOG_MOTION_HOT JointTargetFrame SimpleMotion::compensationTarget(const LocomotionFrame& f,const BodyPose& body,const JointTargetFrame& seed,bool nominalStrip,double edgeTilt){
   timing::count(timing::SOLVES);
   JointTargetFrame q;q.valid=true;
   for(unsigned l=0;l<4;++l){TiltedIkOptions opt;opt.seed=seed.legs[l];opt.toleranceM=1e-6;opt.maxIterations=8;opt.requireNominalStrip=nominalStrip&&edgeTilt==0;

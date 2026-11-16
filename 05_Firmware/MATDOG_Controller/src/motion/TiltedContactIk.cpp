@@ -1,5 +1,6 @@
 #include "TiltedContactIk.h"
 #include "LegKinematicsInternal.h"
+#include "MotionHotPath.h"
 #include <cmath>
 namespace matdog { namespace motion {
 namespace {
@@ -95,7 +96,7 @@ bool contactReferenceJacobian(LegId leg,const LegJointAngles& q,Vector3 normal,
   if(!finite(normal)||!finiteQ(q)||!std::isfinite(length)||length<=1e-12)return false;
   return contactJacobian(leg,q,scale(normal,1.0/length),contact,J);
 }
-TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
+MATDOG_MOTION_HOT TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& target, const Vector3& normal, const TiltedIkOptions& o) {
   TiltedIkResult out;
   if (!legModel(leg) || !finite(target) || !finite(normal) || !finiteQ(o.seed) || !(o.toleranceM > 0) || o.maxIterations == 0) return out;
   const double nl = norm(normal);
@@ -154,7 +155,7 @@ TiltedIkResult contactInverseKinematicsGroundNormal(LegId leg, const Vector3& ta
   out.status = TiltedIkResult::Status::OK;
   return out;
 }
-WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, const TiltedIkOptions& o) {
+MATDOG_MOTION_HOT WorldTiltedIkResult worldContactInverseKinematicsTilted(LegId leg, const Vector3& worldTarget, const BodyPose& pose, const TiltedIkOptions& o) {
   WorldTiltedIkResult out;
   Vector3 base;
   if (!pointToBase(pose, worldTarget, base)) return out;

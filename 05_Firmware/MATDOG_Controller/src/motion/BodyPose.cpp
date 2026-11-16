@@ -5,7 +5,7 @@ namespace matdog { namespace motion {
 namespace {
 bool finite(Vector3 p) { return std::isfinite(p.x)&&std::isfinite(p.y)&&std::isfinite(p.z); }
 }
-bool validBodyPose(const BodyPose& p) {
+MATDOG_MOTION_HOT bool validBodyPose(const BodyPose& p) {
   if (!finite(p.translationM)) return false;
   const auto& r=p.rotation;
   for(unsigned i=0;i<3;++i) for(unsigned j=0;j<3;++j) if(!std::isfinite(r[i][j])) return false;
@@ -26,7 +26,7 @@ MATDOG_MOTION_HOT bool pointToWorld(const BodyPose& pose, Vector3 base, Vector3&
   if(!finite(p)){world={};return false;}
   world=p;return true;
 }
-bool pointToBase(const BodyPose& pose, Vector3 world, Vector3& base) {
+MATDOG_MOTION_HOT bool pointToBase(const BodyPose& pose, Vector3 world, Vector3& base) {
   if(!validBodyPose(pose)||!finite(world)){base={};return false;}
   Vector3 d={world.x-pose.translationM.x,world.y-pose.translationM.y,world.z-pose.translationM.z};
   const auto& r=pose.rotation;

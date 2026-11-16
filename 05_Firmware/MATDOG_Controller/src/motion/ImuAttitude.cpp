@@ -1,4 +1,5 @@
 #include "ImuAttitude.h"
+#include "MotionHotPath.h"
 #include <cmath>
 namespace matdog { namespace motion {
 bool validAttitudePolicy(const AttitudePolicy& p) {
@@ -6,7 +7,7 @@ bool validAttitudePolicy(const AttitudePolicy& p) {
          p.minAccuracyStatus <= 3 && std::isfinite(p.normTolerance) && p.normTolerance > 0 && p.normTolerance < 1e-2 &&
          std::isfinite(p.maxPlausibleTiltRad) && p.maxPlausibleTiltRad > 0 && p.maxPlausibleTiltRad < 1.5707963267948966;
 }
-bool tiltFromQuaternion(double w, double x, double y, double z, Attitude& out) {
+MATDOG_MOTION_HOT bool tiltFromQuaternion(double w, double x, double y, double z, Attitude& out) {
   if (!std::isfinite(w) || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z)) return false;
   const double n = std::sqrt(w*w + x*x + y*y + z*z);
   if (!(std::abs(n - 1.0) <= 1e-6)) return false;
