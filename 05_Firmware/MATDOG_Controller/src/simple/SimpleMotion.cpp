@@ -1492,7 +1492,12 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
   // same Motion epoch, not a second timer or a servo acceleration controller.
   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
-  if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
+  // P3b (P0 peaks, 16/11): the release that has just built a segment plan (beginPlan,
+  // ~0.5-1.1 M instructions) keeps the probe at the last accepted scale when that scale
+  // does not exceed the projection: a correction no larger than the attenuation allows,
+  // for that one release; the next release takes the projection as before.
+  const bool planRelease=planned_&&segmentStartUs_==now&&trialScale<=projection;
+  if(projection>0&&(planRelease||std::abs(projection-trialScale)<=.02*projection)&&pointSafe(probe)&&contains(box,probe)){
     keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;if(imuLimited_)imuReason_="ATTENUATED";return;}
   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
     const auto q=solve(scale,probe.valid?probe:f.target);
