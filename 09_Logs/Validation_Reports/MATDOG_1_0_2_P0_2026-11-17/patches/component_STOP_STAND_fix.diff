@@ -1,0 +1,15 @@
+--- a/src/simple/SimpleMotion.cpp	2026-11-17 15:38:33.029167729 +0100
++++ b/src/simple/SimpleMotion.cpp	2026-11-17 17:21:20.444511913 +0100
+@@ -308,6 +308,12 @@
+   // q starts exactly at the decoded accepted RAW. All times use the ESP
+   // clock; no unwritten nominal point or asynchronous encoder pose is used.
+   stopOrigin_=source;walkStopping_=walkRecover_=false;
++  // A pending start whose plan is active but whose first frame was never accepted (send() serviced this STOP before or
++  // instead of its TX): the held reference is still HOLD's. The resume keeps HOLD's nominal stand (the plan's first
++  // via) and its zero correction (a pending start begins only at zero), not the never-commanded endpoint and correction
++  // step that beginHeight/beginProne, activatePlan and compensate wrote for that frame.
++  if(source==Phase::HOLD&&planned_){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[0][i];
++    segmentTo_=q;plannedHeight_=plan_.p[0][14];rollCorrection_=pitchCorrection_=0;}
+   stopActive_=true;stopVerified_=false;stopStartUs_=now;stopTerminalUs_=stopDwellUs_=0;
+   // One existing control-read population takes 1.44 s, plus the 0.5 s dwell.
+   stopDeadlineUs_=now+static_cast<uint64_t>(std::ceil(stopPlan_.duration*1e6))+3000000;

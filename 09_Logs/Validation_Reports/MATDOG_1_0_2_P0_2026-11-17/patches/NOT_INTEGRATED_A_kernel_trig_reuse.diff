@@ -1,0 +1,88 @@
+diff -ru a/src/motion/FootContact.cpp b/src/motion/FootContact.cpp
+--- a/src/motion/FootContact.cpp	2026-11-16 21:18:36.100521643 +0100
++++ b/src/motion/FootContact.cpp	2026-11-17 10:31:21.390302934 +0100
+@@ -48,6 +48,7 @@
+   const auto fk = forwardKinematics(leg, q);
+   result.status = convert(fk.status);
+   if (fk.status != KinematicsStatus::OK) return result;
++  result.sinHip = fk.sinHip; result.cosHip = fk.cosHip; result.sinUpper = fk.sinUpper; result.cosUpper = fk.cosUpper;
+   const auto& m = footContactModel();
+   result.cylinderAxis = rotate(fk.baseFromFootRotation, m.axisInFoot);
+   result.cylinderAxis = scale(result.cylinderAxis, 1.0/norm(result.cylinderAxis));
+diff -ru a/src/motion/FootContact.h b/src/motion/FootContact.h
+--- a/src/motion/FootContact.h	2026-11-14 09:57:23.217582269 +0100
++++ b/src/motion/FootContact.h	2026-11-17 10:31:21.390142967 +0100
+@@ -31,6 +31,8 @@
+   // cylinder the lowest support-strip endpoint is a different point.
+   Vector3 referenceM{}, stripEndAM{}, stripEndBM{}, lowestCoreM{};
+   double axisTiltRad = 0.0;
++  // From the FK at these joints (FkResult), reused by the contact Jacobian.
++  double sinHip = 0.0, cosHip = 0.0, sinUpper = 0.0, cosUpper = 0.0;
+ };
+ // Every output is in base_link. The supplied ground normal is normalized.
+ // No assumption that the reference equals foot_link or lies on a ground plane.
+diff -ru a/src/motion/LegKinematics.cpp b/src/motion/LegKinematics.cpp
+--- a/src/motion/LegKinematics.cpp	2026-11-16 21:18:36.101521661 +0100
++++ b/src/motion/LegKinematics.cpp	2026-11-17 10:31:21.389982060 +0100
+@@ -53,6 +53,7 @@
+   for (unsigned r = 0; r < 3; ++r)
+     for (unsigned c = 0; c < 3; ++c)
+       result.baseFromFootRotation[r][c] = rotation[r][c];
++  result.sinHip = sh; result.cosHip = ch; result.sinUpper = su; result.cosUpper = cu;
+   result.status = KinematicsStatus::OK;
+   return result;
+ }
+diff -ru a/src/motion/LegKinematics.h b/src/motion/LegKinematics.h
+--- a/src/motion/LegKinematics.h	2026-11-14 09:57:23.222582332 +0100
++++ b/src/motion/LegKinematics.h	2026-11-17 10:31:21.389763938 +0100
+@@ -31,6 +31,9 @@
+   KinematicsStatus status = KinematicsStatus::INVALID_INPUT;
+   Vector3 footOriginM{};
+   double baseFromFootRotation[3][3]{};
++  // sin/cos of q.hip and q.upper computed by this FK, for the contact Jacobian
++  // at the same q (the same four calls, not repeated).
++  double sinHip = 0.0, cosHip = 0.0, sinUpper = 0.0, cosUpper = 0.0;
+ };
+ 
+ // FK always enforces the canonical URDF limits (not operational safety limits).
+diff -ru a/src/motion/TiltedContactIk.cpp b/src/motion/TiltedContactIk.cpp
+--- a/src/motion/TiltedContactIk.cpp	2026-11-16 21:18:36.102473434 +0100
++++ b/src/motion/TiltedContactIk.cpp	2026-11-17 10:31:21.390478456 +0100
+@@ -57,8 +57,9 @@
+     const double qj = get(q, j);
+     if (qj-h < m->limits[j].lower || qj+h > m->limits[j].upper) return false;
+   }
+-  const double sh = std::sin(q.hip), ch = std::cos(q.hip);
+-  const double su = std::sin(q.upper), cu = std::cos(q.upper);
++  // c is the contact FK at this q: the same sin/cos of the same angles.
++  const double sh = c.sinHip, ch = c.cosHip;
++  const double su = c.sinUpper, cu = c.cosUpper;
+   const Vector3 hip = m->hipOrigin;
+   const Vector3 u = m->upperOrigin;
+   const Vector3 upper = add(hip, {u.x, ch*u.y-sh*u.z, sh*u.y+ch*u.z});
+--- a/scripts/tests/motion_final_release_sources.json	2026-11-17 08:12:23.748241717 +0100
++++ b/scripts/tests/motion_final_release_sources.json	2026-11-17 10:38:00.726233875 +0100
+@@ -1,18 +1,19 @@
+ {
+   "baseline_commit": "4634de8007bd086ce07f8874119f47569f76ea1c",
+   "updated_copied_sources": {
+-    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "ed1203fcb17e29d03de70780ecd512a06c20fb08bbd9faba9ec03be8679679ae",
+-    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "95d3b44b1c5f6b204e3850a381b9895606777381e23eb5bfa1ef2e20be9b6cba",
++    "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "698b9935739d2d40d4649b4efc5d5dbea993aed8acabaf274f702c9f73e3ffb8",
++    "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "ac6d838addbe74229a859c2cd662095903c0035926c4bbcb80c1753481d99cd6",
+     "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "9530fabd8882f1dac79cf287c3cde1c646cf7b150c456b01f9a6cdb6abc35d1e",
+     "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e6a5935b9d14a21cd983ba0223db3a77fe875e3ffe72ea7c3124a329930dee46",
+     "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "483e608253b9514be26000d81b7eeea764c28503ad5640036ec3ba8574f3fa0f",
+-    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
++    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "577789ca7586ad8d65c855f1d24c5513fb00eeeb7aaebf333dd475a2ef3491f1",
++    "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.h": "5165ecdc9a1f056434cb56a8df7aa781d09cf6e46df1302ea70ac0abc6d1a7f2",
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "32a493833c609a8c40c26849f80ed467bbcc1f8be2c065d068b30ea2e8b5c97e",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",
++    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "08e0f74b98c5b59ebc0c10ac7f6dddd97c96cc8b60c2366e378d41ec51d2f3a2",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "531e203030aae28e1bc073c82e3410447d2e0ae2469f73a416d63ad4272cc0c3",
+     "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "930d12f7ed580cc10b45e265ba848b5dd2fc986e1aac0f0a37a2666aaa1295c3",
+     "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp": "a6c9106a04d30080526639e6cc9f9b93a8c402850f7b246f23639fce02d6e953"

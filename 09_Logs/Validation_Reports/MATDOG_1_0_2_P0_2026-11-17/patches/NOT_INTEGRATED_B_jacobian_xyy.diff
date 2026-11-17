@@ -1,0 +1,66 @@
+--- a/src/motion/TiltedContactIk.cpp
++++ b/src/motion/TiltedContactIk.cpp
+@@ -57,35 +57,35 @@
+     const double qj = get(q, j);
+     if (qj-h < m->limits[j].lower || qj+h > m->limits[j].upper) return false;
+   }
+-  const double sh = std::sin(q.hip), ch = std::cos(q.hip);
+-  const double su = std::sin(q.upper), cu = std::cos(q.upper);
+-  const Vector3 hip = m->hipOrigin;
+-  const Vector3 u = m->upperOrigin;
+-  const Vector3 upper = add(hip, {u.x, ch*u.y-sh*u.z, sh*u.y+ch*u.z});
+-  const Vector3 l = m->lowerOrigin;
+-  const Vector3 rotatedLower = {cu*l.x+su*l.z, l.y, -su*l.x+cu*l.z};
+-  const Vector3 lower = add(upper,
+-      {rotatedLower.x, ch*rotatedLower.y-sh*rotatedLower.z,
+-       sh*rotatedLower.y+ch*rotatedLower.z});
+-  const Vector3 axes[3] = {{1,0,0}, {0,ch,sh}, {0,ch,sh}};
+-  const Vector3 origins[3] = {hip, upper, lower};
++  // Exporter-verified X/Y/Y geometry: the cylinder axis is Rx(hip)*ey.
++  // UPPER/LOWER leave it invariant, so their radial-contact derivatives
++  // vanish. The upper-origin displacement is parallel to the same axis.
++  const Vector3 axis = c.cylinderAxis;
++  const Vector3 v = sub(c.cylinderCenterM, m->hipOrigin);
++  const Vector3 upper = cross(axis, v);
++  const double ls = m->lowerOrigin.z * std::sin(q.upper);
++  const double lc = m->lowerOrigin.z * std::cos(q.upper);
++  J[0][1] = upper.x; J[1][1] = upper.y; J[2][1] = upper.z;
++  J[0][2] = upper.x-lc;
++  J[1][2] = upper.y-axis.z*ls;
++  J[2][2] = upper.z+axis.y*ls;
+ 
+-  const Vector3 axis = c.cylinderAxis;
++  // Only HIP changes the ground-normal projection onto the cylinder plane.
+   const double component = dot(axis, n);
+   const Vector3 perpendicular = sub(n, scale(axis, component));
+   const double d = norm(perpendicular);
+   if (!(d > 1e-9)) return false;
+   const double invD = 1.0/d, invD3 = invD*invD*invD;
+   const double radius = footContactModel().radiusM;
+-  for (unsigned j = 0; j < 3; ++j) {
+-    const Vector3 dc = cross(axes[j], sub(c.cylinderCenterM, origins[j]));
+-    const Vector3 da = cross(axes[j], axis);
++  {
++    const Vector3 dc = cross({1,0,0}, v);
++    const Vector3 da = cross({1,0,0}, axis);
+     const Vector3 dp = add(scale(da, -component),
+                            scale(axis, -dot(da, n)));
+     const Vector3 dUnit = add(scale(dp, invD),
+                               scale(perpendicular, -dot(perpendicular, dp)*invD3));
+     const Vector3 deriv = add(dc, scale(dUnit, -radius));
+-    J[0][j] = deriv.x; J[1][j] = deriv.y; J[2][j] = deriv.z;
++    J[0][0] = deriv.x; J[1][0] = deriv.y; J[2][0] = deriv.z;
+   }
+   return true;
+ }
+--- a/scripts/tests/motion_final_release_sources.json
++++ b/scripts/tests/motion_final_release_sources.json
+@@ -12,7 +12,7 @@
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "32a493833c609a8c40c26849f80ed467bbcc1f8be2c065d068b30ea2e8b5c97e",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+-    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",
++    "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "4f6cbb9aab106b335b3538a74d365c01501f4f70349976d11fec6e94051b0286",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.h": "531e203030aae28e1bc073c82e3410447d2e0ae2469f73a416d63ad4272cc0c3",
+     "05_Firmware/MATDOG_Controller/src/motion/BodyPose.cpp": "930d12f7ed580cc10b45e265ba848b5dd2fc986e1aac0f0a37a2666aaa1295c3",
+     "05_Firmware/MATDOG_Controller/src/motion/ImuAttitude.cpp": "a6c9106a04d30080526639e6cc9f9b93a8c402850f7b246f23639fce02d6e953"
