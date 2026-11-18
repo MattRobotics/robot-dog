@@ -198,7 +198,7 @@ class Controller {
   MotionService motion_service_;
   AuthorityLease motion_authority_lease_{};
   calibration::RecordInspection simple_record_{};
-  bool simple_limits_ready_=false,preflight_started_=false;
+  bool simple_limits_ready_=false,preflight_started_=false,acc_tried_=false;  // register 85 prepared while idle (attempt, not proof)
   struct SimpleServoPort : simple::ServoPort {
     Controller* owner=nullptr;
     bool read(unsigned,bool,simple::Feedback&) override;

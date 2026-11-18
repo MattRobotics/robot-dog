@@ -194,12 +194,22 @@ void Controller::updateSimpleMotion(uint64_t now){
     !profile?"SERVO_PREFLIGHT_REQUIRED":!mapping?"CALIBRATION_RESTORE_REQUIRED":!simple_limits_ready_?"GEN1_LIMITS_OR_FINGERPRINT":maintenance?"MAINTENANCE_BUSY":
     authority_.inhibited()||wifi_.configBusy()?"SYSTEM_CONFIGURATION_BUSY":!power?simple_inputs_.powerReason:!simple_inputs_.imuValid?"IMU_UNAVAILABLE":!feedback?"SERVO_FEEDBACK_STALE":"READY";
   simple_inputs_.refusal=reason;
+  const bool admissible=simple_inputs_.ready&&power&&simple_inputs_.imuValid&&feedback;
+  // Register 85 is volatile (trace 45): after a servo power-on the first activation wrote it on the 12 servos and
+  // waited kAccCeilingSettleMs inside the STAND, holding this loop and Motion for 126 ms (5-6 releases lost, HW 17-18/11).
+  // The same preparation runs once while admissible and idle in RUN: the 126 ms and the IDLE releases it skips move
+  // there (counted in missed_releases, outside any command window). acc_tried_ marks the attempt only: the verified
+  // value is simple_inputs_.accCeiling and every activation still reads register 85 back (12 ms on HW). Silent
+  // servos (rail off) re-arm it. This update releases the grant.
+  if(!feedback)acc_tried_=false;
+  else if(!acc_tried_&&admissible&&operating_mode_.mode()==OperatingMode::RUN&&!simple_motion_.engaged()&&
+          authority_.current()==ActuatorAuthority::NONE&&!prepareSimpleMotion())acc_tried_=true;
   simple_motion_.inputs(simple_inputs_);
   if(build::kServoPowerAvailable)simple_motion_.update(now);
   if(!simple_motion_.engaged()&&authority_.current()==ActuatorAuthority::MOTION){
     authority_.release(motion_authority_lease_);motion_authority_lease_={};servo_bus_.setValidationDrive(0,0);servo_bus_.setValidationTimeout(0);
   }
-  motion_service_.setReady(simple_inputs_.ready&&power&&simple_inputs_.imuValid&&feedback,reason);motion_service_.update();
+  motion_service_.setReady(admissible,reason);motion_service_.update();
   ControllerService::ReadinessView view;view.system_health=toString(system_state_.systemHealth());
   view.calibration=mapping?"RESTORED_GEN1":"NOT_RESTORED";view.joint_feedback=feedback?"AVAILABLE":"UNAVAILABLE";
   view.motion_authority=simple_motion_.energized()?"MOTION":"IDLE";view.phase=simple::name(simple_motion_.state());view.reason=reason;service_.setReadinessView(view);
