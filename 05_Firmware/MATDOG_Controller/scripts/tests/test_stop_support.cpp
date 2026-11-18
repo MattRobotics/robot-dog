@@ -276,7 +276,10 @@ void supportPlaneLevelTarget(){
         upSupport.x*current.rotation[0][2]+upSupport.y*current.rotation[1][2]+upSupport.z*current.rotation[2][2]};
       for(unsigned omitted=0;omitted<=4;++omitted){bool stance[4];for(unsigned i=0;i<4;++i)stance[i]=i!=omitted;
         double roll=9,pitch=9;assert(motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,upBody,current,roll,pitch));
-        assert(std::abs(roll-expectedRoll)<1e-7&&std::abs(pitch-expectedPitch)<1e-7);++cases;
+        // FP32 core: each contact verifies within 1e-6 m (Newton tolerance), which tilts a
+        // support triangle with >= 0.1 m sides by <= 2e-5 rad (0.013 tick, 1/50 of the
+        // 1 mrad leveling dead band); measured 1.6e-6 rad (18/11/2026).
+        assert(std::abs(roll-expectedRoll)<2e-5&&std::abs(pitch-expectedPitch)<2e-5);++cases;
       }
     }
   }

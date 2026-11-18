@@ -17,7 +17,7 @@ bool contactReferenceJacobian(LegId, const LegJointAngles&, Vector3 normal,
 // branch exactly as the analytic solver's seed-nearest rule. For ground normal +Z the result agrees with the analytic IK.
 struct TiltedIkOptions {
   LegJointAngles seed{};
-  double toleranceM = 1e-9;
+  double toleranceM = 1e-6;  // >= 1e-6 (FP32 core residual floor, detail::kResidualM)
   unsigned maxIterations = 40;
   bool requireNominalStrip = true;
 };

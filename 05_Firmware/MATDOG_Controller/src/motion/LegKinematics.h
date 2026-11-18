@@ -40,7 +40,9 @@ struct IkOptions {
   // Select the in-limit solution closest to this seed in squared joint radians.
   // A seed outside the limits is rejected, never silently clamped.
   LegJointAngles seed{};
-  double toleranceM = 1e-9;
+  // FK residual accepted for a solution, in [1e-6, 1e-3]: the FP32 core
+  // verifies to 1 um (detail::kResidualM), 1/50 of half a RAW tick at the foot.
+  double toleranceM = 1e-6;
 };
 struct IkResult {
   KinematicsStatus status = KinematicsStatus::INVALID_INPUT;

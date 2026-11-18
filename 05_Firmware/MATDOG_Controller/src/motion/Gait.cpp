@@ -197,34 +197,35 @@ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double 
   out.valid=true;return out;
 }
 bool finite(Vector3 v){return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z);}
-bool solve3(const double j[3][3],const double b[3],double x[3]) {
-  double m[3][4];for(unsigned r=0;r<3;++r){for(unsigned c=0;c<3;++c)m[r][c]=j[r][c];m[r][3]=b[r];}
+bool solve3(const float j[3][3],const float b[3],float x[3]) {
+  float m[3][4];for(unsigned r=0;r<3;++r){for(unsigned c=0;c<3;++c)m[r][c]=j[r][c];m[r][3]=b[r];}
   for(unsigned c=0;c<3;++c){unsigned p=c;for(unsigned r=c+1;r<3;++r)if(std::abs(m[r][c])>std::abs(m[p][c]))p=r;
-    if(std::abs(m[p][c])<1e-12||!std::isfinite(m[p][c]))return false;
-    for(unsigned k=0;k<4;++k){double t=m[p][k];m[p][k]=m[c][k];m[c][k]=t;}
-    double d=m[c][c];for(unsigned k=c;k<4;++k)m[c][k]/=d;
-    for(unsigned r=0;r<3;++r)if(r!=c){double f=m[r][c];for(unsigned k=c;k<4;++k)m[r][k]-=f*m[c][k];}}
+    if(std::abs(m[p][c])<detail::kPivot||!std::isfinite(m[p][c]))return false;
+    for(unsigned k=0;k<4;++k){float t=m[p][k];m[p][k]=m[c][k];m[c][k]=t;}
+    float d=m[c][c];for(unsigned k=c;k<4;++k)m[c][k]/=d;
+    for(unsigned r=0;r<3;++r)if(r!=c){float f=m[r][c];for(unsigned k=c;k<4;++k)m[r][k]-=f*m[c][k];}}
   for(unsigned r=0;r<3;++r){x[r]=m[r][3];if(!std::isfinite(x[r]))return false;}return true;
 }
-bool differential(LegId leg,LegJointAngles q,Vector3 velocity,Vector3 acceleration,
+// FP32 core (velocity and acceleration only for derivatives=true).
+bool differential(LegId leg,const detail::JointsF& q,Vector3 velocity,Vector3 acceleration,
                   LegJointAngles& qv,LegJointAngles& qa,double& condition,bool derivatives) {
-  const auto& m=*legModel(leg);double a=-m.lowerOrigin.z,f=m.footOrigin.x;
-  double r=footContactModel().radiusM,g=m.footOrigin.z+r,d=m.upperOrigin.y+m.footOrigin.y;
-  double ch=std::cos(q.hip),sh=std::sin(q.hip),su=std::sin(q.upper),cu=std::cos(q.upper);
-  double st=std::sin(q.upper+q.lower),ct=std::cos(q.upper+q.lower);
-  double v=-a*cu-f*st+g*ct-r,xu=v+r,xl=-f*st+g*ct;
-  double vu=a*su-f*ct-g*st,vl=-f*ct-g*st;
-  double j[3][3]={{0,xu,xl},{-d*sh-v*ch,-vu*sh,-vl*sh},{d*ch-v*sh,vu*ch,vl*ch}};
-  double inverse[3][3],norm=0,inorm=0;
+  const auto& m=*detail::modelF(leg);const float a=-m.lowerOrigin.z,f=m.footOrigin.x;
+  const float r=detail::kContactF.radiusM,g=m.footOrigin.z+r,d=m.upperOrigin.y+m.footOrigin.y;
+  const float ch=std::cos(q.hip),sh=std::sin(q.hip),su=std::sin(q.upper),cu=std::cos(q.upper);
+  const float st=std::sin(q.upper+q.lower),ct=std::cos(q.upper+q.lower);
+  const float v=-a*cu-f*st+g*ct-r,xu=v+r,xl=-f*st+g*ct;
+  const float vu=a*su-f*ct-g*st,vl=-f*ct-g*st;
+  const float j[3][3]={{0,xu,xl},{-d*sh-v*ch,-vu*sh,-vl*sh},{d*ch-v*sh,vu*ch,vl*ch}};
+  float inverse[3][3],norm=0,inorm=0;
   if(!detail::invert3(j,inverse))return false;
-  for(unsigned k=0;k<3;++k){double n=0,in=0;for(unsigned c=0;c<3;++c){n+=std::abs(j[k][c]);in+=std::abs(inverse[k][c]);}norm=std::fmax(norm,n);inorm=std::fmax(inorm,in);}
+  for(unsigned k=0;k<3;++k){float n=0,in=0;for(unsigned c=0;c<3;++c){n+=std::abs(j[k][c]);in+=std::abs(inverse[k][c]);}norm=std::fmax(norm,n);inorm=std::fmax(inorm,in);}
   condition=norm*inorm;
   if(!derivatives)return true;
-  double bv[3]={velocity.x,velocity.y,velocity.z},qs[3],qss[3];if(!solve3(j,bv,qs))return false;
-  double h=qs[0],u=qs[1],t=u+qs[2],vp=vu*u+vl*qs[2];
-  double xpp=a*su*u*u-(f*ct+g*st)*t*t,vpp=a*cu*u*u+(f*st-g*ct)*t*t;
-  double ba[3]={acceleration.x-xpp,acceleration.y-(-d*ch*h*h+v*sh*h*h-2*vp*ch*h-vpp*sh),
-               acceleration.z-(-d*sh*h*h-v*ch*h*h-2*vp*sh*h+vpp*ch)};
+  const float bv[3]={float(velocity.x),float(velocity.y),float(velocity.z)};float qs[3],qss[3];if(!solve3(j,bv,qs))return false;
+  const float h=qs[0],u=qs[1],t=u+qs[2],vp=vu*u+vl*qs[2];
+  const float xpp=a*su*u*u-(f*ct+g*st)*t*t,vpp=a*cu*u*u+(f*st-g*ct)*t*t;
+  const float ba[3]={float(acceleration.x)-xpp,float(acceleration.y)-(-d*ch*h*h+v*sh*h*h-2*vp*ch*h-vpp*sh),
+                     float(acceleration.z)-(-d*sh*h*h-v*ch*h*h-2*vp*sh*h+vpp*ch)};
   if(!solve3(j,ba,qss))return false;
   qv={qs[0],qs[1],qs[2]};qa={qss[0],qss[1],qss[2]};return true;
 }
@@ -302,36 +303,46 @@ void solveGaitInto(LocomotionFrame& out,const GaitParameters& p,const CartesianS
      !std::isfinite(s.yawVelocity)||!std::isfinite(s.yawAcceleration)){out.status=GaitStatus::NONFINITE;return;}
   for(const auto& row:s.body.rotation)for(double value:row)if(!std::isfinite(value)){out.status=GaitStatus::NONFINITE;return;}
   if(!supportsFlatContactIk(s.body)){out.status=GaitStatus::INVALID_PARAMETER;return;}
+  // FP32 core: the body pose is validated once; each leg's world target is
+  // moved to base_link in double, then solved in float.
+  detail::PoseF pose;detail::poseF(s.body,pose);
+  // Diagnostics (no decision reads them): accumulated in float, stored per leg.
+  float minMargin=std::numeric_limits<float>::infinity(),maxResidual=0;
   out.minJointMarginRad=std::numeric_limits<double>::infinity();
   for(unsigned i=0;i<4;++i){out.failedLeg=i;LegId leg=static_cast<LegId>(i);
     if(!std::isfinite(s.phases[i].phase)||!std::isfinite(s.phases[i].swingProgress)){out.status=GaitStatus::NONFINITE;return;}
     if(s.phases[i].phase<0||s.phases[i].phase>=1||s.phases[i].swingProgress<0||s.phases[i].swingProgress>1){out.status=GaitStatus::INVALID_PARAMETER;return;}
     if(!finite(s.feet[i])||!finite(s.velocity[i])||!finite(s.acceleration[i])){out.status=GaitStatus::NONFINITE;return;}
-    ContactIkOptions opts;opts.kinematics.seed=prev?prev->target.legs[i]:canonicalStandDefinition().standSeed[i];
-    opts.requireNominalStrip=p.edgeTiltRad==0&&(s.phases[i].stance||s.phases[i].boundary);
+    detail::JointsF seed;
+    const auto seedStatus=detail::jointsF(leg,prev?prev->target.legs[i]:canonicalStandDefinition().standSeed[i],seed);
+    if(seedStatus!=KinematicsStatus::OK){out.status=seedStatus==KinematicsStatus::JOINT_LIMIT?GaitStatus::JOINT_LIMIT:GaitStatus::IK_UNREACHABLE;return;}
+    const bool strip=p.edgeTiltRad==0&&(s.phases[i].stance||s.phases[i].boundary);
     // Edge contact: the fillet point, not the strip reference, meets the
     // target. The flat body keeps the foot axis tilt equal to |HIP|; the seed's
     // lift is kept within 5e-5 m of the solved tilt's, else one more solve with it:
     // half a RAW tick at the joint most sensitive to the vertical target (|J^-1 e_z|
     // <= 15.3 rad/m in the SLOW/STANDARD/FAST steered walks, 18/11).
-    double lift=p.edgeTiltRad>0?edgeContactLiftM(opts.kinematics.seed.hip):0;
-    auto ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);
-    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>5e-5){
-      lift=edgeContactLiftM(ik.baseResult.joints.hip);opts.kinematics.seed=ik.baseResult.joints;
-      ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);}
-    const auto& b=ik.baseResult;
-    if(ik.status==WorldContactIkResult::Status::OK&&p.edgeTiltRad>0&&b.contact.axisTiltRad>p.edgeTiltRad){out.status=GaitStatus::CONTACT_INVALID;return;}
-    if(ik.status!=WorldContactIkResult::Status::OK){out.status=b.status==ContactStatus::UNREACHABLE_LIMITS||b.status==ContactStatus::JOINT_LIMIT?GaitStatus::JOINT_LIMIT:
+    const bool edge=p.edgeTiltRad>0;
+    auto solve=[&](float lift,const detail::JointsF& from){
+      return detail::contactInverse(leg,detail::toBase(pose,{s.feet[i].x,s.feet[i].y,s.feet[i].z+double(lift)}),from,detail::kResidualM,strip);};
+    float lift=edge?detail::edgeContactLift(seed.hip):0.0f;
+    auto b=solve(lift,seed);
+    if(edge&&b.status==ContactStatus::OK&&std::abs(detail::edgeContactLift(b.joints.hip)-lift)>5e-5f){
+      lift=detail::edgeContactLift(b.joints.hip);b=solve(lift,b.joints);}
+    if(b.status==ContactStatus::OK&&edge&&double(b.contact.axisTiltRad)>p.edgeTiltRad){out.status=GaitStatus::CONTACT_INVALID;return;}
+    if(b.status!=ContactStatus::OK){out.status=b.status==ContactStatus::UNREACHABLE_LIMITS||b.status==ContactStatus::JOINT_LIMIT?GaitStatus::JOINT_LIMIT:
       b.status==ContactStatus::CONTACT_MODE?GaitStatus::CONTACT_INVALID:GaitStatus::IK_UNREACHABLE;return;}
     if(prev&&(prev->branches[i].hip!=b.branch.hip||prev->branches[i].elbow!=b.branch.elbow)){out.status=GaitStatus::BRANCH_CHANGE;return;}
-    Vector3 r;pointToBase(s.body,s.feet[i],r);Vector3 vr=rotateBack(s.body,sub(s.velocity[i],s.bodyVelocity)),ar=rotateBack(s.body,sub(s.acceleration[i],s.bodyAcceleration));
-    double w=s.yawVelocity,wa=s.yawAcceleration;
-    Vector3 velocity={vr.x+w*r.y,vr.y-w*r.x,vr.z};
-    Vector3 acceleration={ar.x+2*w*vr.y+wa*r.y-w*w*r.x,ar.y-2*w*vr.x-wa*r.x-w*w*r.y,ar.z};
+    Vector3 velocity{},acceleration{};
+    if(derivatives){Vector3 r;pointToBase(s.body,s.feet[i],r);Vector3 vr=rotateBack(s.body,sub(s.velocity[i],s.bodyVelocity)),ar=rotateBack(s.body,sub(s.acceleration[i],s.bodyAcceleration));
+      double w=s.yawVelocity,wa=s.yawAcceleration;
+      velocity={vr.x+w*r.y,vr.y-w*r.x,vr.z};
+      acceleration={ar.x+2*w*vr.y+wa*r.y-w*w*r.x,ar.y-2*w*vr.x-wa*r.x-w*w*r.y,ar.z};}
     if(!differential(leg,b.joints,velocity,acceleration,out.velocityRadS[i],out.accelerationRadS2[i],out.condition[i],derivatives)||out.condition[i]>p.maxCondition){out.status=GaitStatus::ILL_CONDITIONED;return;}
-    out.target.legs[i]=b.joints;out.branches[i]=b.branch;out.maxResidualM=std::fmax(out.maxResidualM,b.residualM);
-    const auto& m=*legModel(leg);double q[3]={b.joints.hip,b.joints.upper,b.joints.lower};
-    for(unsigned j=0;j<3;++j)out.minJointMarginRad=std::fmin(out.minJointMarginRad,std::fmin(q[j]-m.limits[j].lower,m.limits[j].upper-q[j]));
+    out.target.legs[i]=detail::toD(b.joints);out.branches[i]=b.branch;maxResidual=std::fmax(maxResidual,b.residualM);
+    const auto& m=*detail::modelF(leg);const float q[3]={b.joints.hip,b.joints.upper,b.joints.lower};
+    for(unsigned j=0;j<3;++j)minMargin=std::fmin(minMargin,std::fmin(q[j]-m.lower[j],m.upper[j]-q[j]));
+    out.minJointMarginRad=minMargin;out.maxResidualM=maxResidual;
   }
   out.failedLeg=255;out.target.valid=true;out.status=GaitStatus::OK;return;
 }
