@@ -311,10 +311,12 @@ void solveGaitInto(LocomotionFrame& out,const GaitParameters& p,const CartesianS
     opts.requireNominalStrip=p.edgeTiltRad==0&&(s.phases[i].stance||s.phases[i].boundary);
     // Edge contact: the fillet point, not the strip reference, meets the
     // target. The flat body keeps the foot axis tilt equal to |HIP|; the seed's
-    // lift is exact to ~1e-5 m, else one more solve with the solved tilt.
+    // lift is kept within 5e-5 m of the solved tilt's, else one more solve with it:
+    // half a RAW tick at the joint most sensitive to the vertical target (|J^-1 e_z|
+    // <= 15.3 rad/m in the SLOW/STANDARD/FAST steered walks, 18/11).
     double lift=p.edgeTiltRad>0?edgeContactLiftM(opts.kinematics.seed.hip):0;
     auto ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);
-    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>1e-5){
+    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>5e-5){
       lift=edgeContactLiftM(ik.baseResult.joints.hip);opts.kinematics.seed=ik.baseResult.joints;
       ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);}
     const auto& b=ik.baseResult;
