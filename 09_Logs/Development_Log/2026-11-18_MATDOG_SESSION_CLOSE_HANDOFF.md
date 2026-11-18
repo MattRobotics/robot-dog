@@ -20,7 +20,7 @@ Fonte: `verification-artifacts/MATDOG_BMS_DALY_AB_FABLE_20261118/REPORT_AB.md`.
 
 ## 2. A/B BMS (DALY)
 
-**Esito: INCONCLUSIVE.** Il criterio era 3 avvii a freddo; ne sono stati fatti 2, per decisione dell'operatore.
+**Esito: INCONCLUSIVE, favorevole all'ipotesi di regressione firmware (non dimostrata).** Il criterio era 3 avvii a freddo; ne sono stati fatti 2, per decisione dell'operatore. A/B concluso; nessun test, flash o build successivo.
 
 | Firmware | Avvii a freddo | Silenzi DALY |
 |---|---|---|
@@ -28,6 +28,8 @@ Fonte: `verification-artifacts/MATDOG_BMS_DALY_AB_FABLE_20261118/REPORT_AB.md`.
 | `30c894a` | 1 | 1 (~92 s) |
 
 **Il BMS non è risolto.** L'indicazione a favore di una regressione firmware non è dimostrata.
+
+Copia del rapporto: `09_Logs/Validation_Reports/BMS_DALY_AB_2026-11-18/REPORT_AB.md`. Registro GitHub: issue #70.
 
 Passi proposti da Fable:
 1. Registrare dall'accensione il prossimo avvio a freddo di `30c894a`, in sola lettura.
