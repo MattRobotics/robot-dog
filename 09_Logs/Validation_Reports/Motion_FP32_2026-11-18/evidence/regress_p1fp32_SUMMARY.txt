@@ -1,0 +1,5 @@
+simple_motion exit=0 seconds=176
+stop_secant_gate exit=0 seconds=34
+perturbation exit=0 seconds=131
+stop_support exit=0 seconds=97
+prone exit=0 seconds=242

@@ -1,0 +1,19 @@
+FRAMES {'identical': 32980, 'COMPENSATION': 5014, 'different_no_nominal(MOVING/HEIGHT)': 126, 'different_no_nominal(MOVING/STOP)': 3}
+NOMINAL      max dRAW=0  max |dNOM|=0.000 ticks  max |dCOMP|=0.000 ticks
+COMPENSATION max dRAW=8  max |dNOM|=0.485 ticks  max |dCOMP|=7.998 ticks
+TIME_SHIFT   max dRAW=0  max |dNOM|=0.000 ticks  max |dCOMP|=0.000 ticks
+frames with dRAW>=3 by class and phase: {('COMPENSATION', 'WALK_STANDARD'): 232, ('COMPENSATION', 'WALK_SETTLE'): 12, ('COMPENSATION', 'HOLD'): 23}
+COMPENSATION applied IMU correction difference: max 3.946 mrad overall, max 3.946 mrad where dRAW>=3 (267 frames); frames with dRAW>=3 and correction difference <0.05 mrad: 0
+CONTINUITY (run a/b): phase  max_step  max_2nd_diff  frames_2nd_diff>=3 / frames
+  HEIGHT             8/  8    4/  4    70/  69 of 6467/6465
+  HOLD               2/  2    2/  2     0/   0 of 1624/1627
+  PRONE_DEPLOY       6/  6    2/  2     0/   0 of 465/466
+  PRONE_HEIGHT       8/  8    7/  7     9/   9 of 472/472
+  PRONE_LAND         2/  2    2/  2     0/   0 of 353/353
+  PRONE_LIFT         7/  7    2/  2     0/   0 of 332/332
+  STAND_DEPLOY       6/  6    2/  2     0/   0 of 3179/3179
+  STAND_LIFT         7/  7    3/  3     6/   6 of 2120/2120
+  STOP              20/ 20    4/  4    13/  13 of 24/24
+  WALK_SETTLE        2/  2    2/  2     0/   0 of 140/140
+  WALK_STANDARD     25/ 25   11/ 11  6230/6273 of 22498/22503
+NOMINAL 2nd difference in WALK (ticks): max a=8.627 b=8.640 over 22638/22643 frames

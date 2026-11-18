@@ -1,0 +1,5 @@
+envelope mode0 exit=0
+envelope mode1 exit=0
+envelope mode2 exit=0
+stop_secant_gate exit=0
+perturbation exit=0
