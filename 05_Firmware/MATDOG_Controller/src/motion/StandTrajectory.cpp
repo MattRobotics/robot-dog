@@ -5,13 +5,24 @@
 
 namespace matdog { namespace motion {
 namespace {
+// The checks forwardKinematics() makes before it computes, and the only part of it a
+// definition used (its status): a model, three finite angles, each inside the
+// generated URDF limits inclusive. The FK trigonometry is no longer computed here.
+bool seedInsideModel(LegId leg, const LegJointAngles& q) {
+  const LegModel* model = legModel(leg);
+  if (!model || !std::isfinite(q.hip) || !std::isfinite(q.upper) || !std::isfinite(q.lower)) return false;
+  const double values[3] = {q.hip, q.upper, q.lower};
+  for (unsigned j=0; j<3; ++j)
+    if (values[j] < model->limits[j].lower || values[j] > model->limits[j].upper) return false;
+  return true;
+}
 bool validDefinition(const StandDefinition& d) {
   if (!std::isfinite(d.lowBodyHeightM) || !std::isfinite(d.standBodyHeightM) ||
       d.lowBodyHeightM <= 0 || d.lowBodyHeightM >= d.standBodyHeightM || d.samples < 2) return false;
   for (unsigned i=0; i<4; ++i) {
     const auto p = d.contactsWorldM[i];
     if (!std::isfinite(p.x) || !std::isfinite(p.y) || p.z != 0.0 ||
-        forwardKinematics(static_cast<LegId>(i), d.standSeed[i]).status != KinematicsStatus::OK) return false;
+        !seedInsideModel(static_cast<LegId>(i), d.standSeed[i])) return false;
   }
   return true;
 }

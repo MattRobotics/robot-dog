@@ -308,6 +308,12 @@ void SimpleMotion::beginStop(uint64_t now){
   // q starts exactly at the decoded accepted RAW. All times use the ESP
   // clock; no unwritten nominal point or asynchronous encoder pose is used.
   stopOrigin_=source;walkStopping_=walkRecover_=false;
+  // A pending start whose plan is active but whose first frame was never accepted (send() serviced this STOP before or
+  // instead of its TX): the held reference is still HOLD's. The resume keeps HOLD's nominal stand (the plan's first
+  // via) and its zero correction (a pending start begins only at zero), not the never-commanded endpoint and correction
+  // step that beginHeight/beginProne, activatePlan and compensate wrote for that frame.
+  if(source==Phase::HOLD&&planned_){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[0][i];
+    segmentTo_=q;plannedHeight_=plan_.p[0][14];rollCorrection_=pitchCorrection_=0;}
   stopActive_=true;stopVerified_=false;stopStartUs_=now;stopTerminalUs_=stopDwellUs_=0;
   // One existing control-read population takes 1.44 s, plus the 0.5 s dwell.
   stopDeadlineUs_=now+static_cast<uint64_t>(std::ceil(stopPlan_.duration*1e6))+3000000;
@@ -858,15 +864,27 @@ bool SimpleMotion::heightVias(double from,double to){
     if(k>=160&&std::fmin(from,to)+1e-6<z&&z<std::fmax(from,to)-1e-6&&!knotVia(k))return false;}
   JointTargetFrame q;return heightTarget(to,q)&&via(q,0,0,to);
 }
+bool SimpleMotion::heightPlan(const JointTargetFrame& from,double fromHeight,double to){
+  plan_.clear();return via(from,0,0,fromHeight)&&heightVias(fromHeight,to);
+}
 void SimpleMotion::beginPlan(Phase next,const collision::Box& box,uint64_t now,double speed,double acc){
+  if(const char* r=preparePlan(box,speed,acc)){fault(r);return;}
+  activatePlan(next,box,now);
+}
+const char* SimpleMotion::preparePlan(const collision::Box& box,double speed,double acc){
   // The whole time-continuous group lies in one certified box: each joint
   // stays within the range of its via points, which are all checked here.
-  if(plan_.n<1||!plan_.plan(speed,acc)){fault("STAND_PLAN_UNAVAILABLE");return;}
-  double distance=0;
+  if(plan_.n<1||!plan_.plan(speed,acc))return "STAND_PLAN_UNAVAILABLE";
   for(unsigned k=0;k<plan_.n;++k){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[k][i];
-    if(!contains(box,q)||!pointSafe(q)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
-    for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(plan_.p[k][i]-plan_.p[0][i]));
-    segmentTo_=q;}
+    if(!contains(box,q)||!pointSafe(q))return "STAND_CLEARANCE_UNAVAILABLE";}
+  return nullptr;
+}
+void SimpleMotion::activatePlan(Phase next,const collision::Box& box,uint64_t now){
+  // preparePlan proved at least one via: the segment ends at the last one.
+  double distance=0;
+  for(unsigned k=0;k<plan_.n;++k)for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(plan_.p[k][i]-plan_.p[0][i]));
+  JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[plan_.n-1][i];
+  segmentTo_=q;
   phase_=next;planned_=true;segmentBox_=&box;segmentStartUs_=now;loadedSinceUs_=0;
   segmentDurationUs_=static_cast<uint64_t>(std::ceil(plan_.duration*1e6));settleUs_=now+segmentDurationUs_;
   segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
@@ -904,12 +922,22 @@ void SimpleMotion::beginLift(const JointTargetFrame* start,uint64_t now){
   JointTargetFrame q;if(!heightTarget(h,q)||!via(q,0,0,h)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
   plannedHeight_=h;beginPlan(Phase::LIFT,collision::kLift,now);
 }
-void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,const collision::Box& box,uint64_t now){
-  plan_.clear();
-  if(!via(from,0,0,fromHeight)||!heightVias(fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
-  plannedHeight_=requestedHeight_;beginPlan(Phase::HEIGHT,box,now);
+void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,const collision::Box& box,uint64_t now,bool prepared){
+  if(!prepared&&!heightPlan(from,fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+  plannedHeight_=requestedHeight_;
+  if(prepared)activatePlan(Phase::HEIGHT,box,now);else beginPlan(Phase::HEIGHT,box,now);
 }
-void SimpleMotion::beginProne(Phase next,uint64_t now){
+// P0 split (F6/H18 peaks, 16/11): the release that ends the IMU unwind of a pending HEIGHT/PRONE_HEIGHT knows the
+// next release starts the move. That plan reads only the nominal stand (segmentTo_, plannedHeight_), the requested
+// height, frozen knots and the qualified limits (constant while energized): no feedback, IMU or clock. Build and
+// verify it here, after this release's frame. The next release still checks the measured pose, takes its own now
+// as the epoch and sends the first frame (activatePlan); any later release ignores it.
+void SimpleMotion::preparePending(){
+  const bool prone=phase_==Phase::PRONE_HEIGHT;
+  if(prone&&plannedHeight_<=kProneHandoverM)return;  // a PRONE_LIFT start plans in its own release
+  if(heightPlan(segmentTo_,plannedHeight_,prone?kProneHandoverM:requestedHeight_)&&!preparePlan(collision::kHeight))preparedRelease_=releases_;
+}
+void SimpleMotion::beginProne(Phase next,uint64_t now,bool prepared){
   // Same ViaPlan/FK/IK, native RAM profile and independent-joint box proof as
   // STAND. No target is based on the loaded encoder sag as a new nominal pose.
   // PRONE-only front LOWER floor: +20 mrad from the stand route's folded
@@ -921,10 +949,11 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
     return q;};
   auto proneVia=[&](unsigned k){const auto* p=paired_data::kKnots[k].p;
     return via(pronePoint(k),p[4],p[5],p[6]);};
-  plan_.clear();const collision::Box* box=nullptr;
+  if(!prepared)plan_.clear();
+  const collision::Box* box=nullptr;
   if(next==Phase::PRONE_HEIGHT){
     box=&collision::kHeight;
-    if(!via(segmentTo_,0,0,plannedHeight_)||!heightVias(plannedHeight_,kProneHandoverM)){fault("PRONE_PATH_NOT_CLEAR");return;}
+    if(!prepared&&!heightPlan(segmentTo_,plannedHeight_,kProneHandoverM)){fault("PRONE_PATH_NOT_CLEAR");return;}
     plannedHeight_=kProneHandoverM;
   }else if(next==Phase::PRONE_LIFT){
     box=&collision::kLift;
@@ -943,6 +972,7 @@ void SimpleMotion::beginProne(Phase next,uint64_t now){
   // Check the measured handover too, even when ordinary arrival (12 ticks)
   // rather than loaded-settle completed the preceding segment. No box bypass.
   if(!pointSafe(measured())||!contains(*box,measured())){fault("PRONE_PATH_NOT_CLEAR");return;}
+  if(prepared){activatePlan(next,*box,now);return;}
   beginPlan(next,*box,now,next==Phase::PRONE_LAND?.10:kStandSpeedRadS,
                          next==Phase::PRONE_LAND?.20:kStandAccelerationRadS2);
 }
@@ -1832,17 +1862,22 @@ void SimpleMotion::update(uint64_t now){
     if((phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)&&holdNominal_.target.valid&&
        (rollCorrection_!=0||pitchCorrection_!=0)){
       if(now>segmentDeadlineUs_){if(returningProne())proneNotCompleted(now,"PRONE_NOT_COMPLETED_SUPPORT_HELD");else fault("NATIVE_TARGET_NOT_REACHED");return;}
-      timing::Section section(timing::COMPENSATE);
-      auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);return;
+      {timing::Section section(timing::COMPENSATE);
+       auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);}
+      // This frame ended the unwind: the next release starts the move. Prepare its plan now, unless revoked.
+      if(rollCorrection_==0&&pitchCorrection_==0&&pendingGoalValid_&&!offPending_&&!stop_.load()&&!safeOffRequest_.load())preparePending();
+      return;
     }
     pendingGoalValid_=false;
-    if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>kProneHandoverM?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
+    const bool prepared=preparedRelease_&&preparedRelease_+1==releases_;preparedRelease_=0;
+    if(phase_==Phase::PRONE_HEIGHT){const Phase next=plannedHeight_>kProneHandoverM?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT;
+      beginProne(next,now,prepared&&next==Phase::PRONE_HEIGHT);return;}
     JointTargetFrame actual;actual.valid=true;
     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
     if(!heightStartClear(actual,pendingGoal_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
     // Start from the preceding NOMINAL stand: an already compensated encoder
     // pose fed back as nominal would apply the IMU correction twice.
-    if(transitionSafe(actual,pendingGoal_,collision::kHeight)||entersHeight(actual,pendingGoal_)){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
+    if(transitionSafe(actual,pendingGoal_,collision::kHeight)||entersHeight(actual,pendingGoal_)){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now,prepared);return;}
     plan_.clear();if(!via(segmentTo_,0,0,plannedHeight_)||!via(pendingGoal_,0,0,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
     plannedHeight_=requestedHeight_;beginPlan(Phase::LIFT,collision::kLift,now);return;
   }

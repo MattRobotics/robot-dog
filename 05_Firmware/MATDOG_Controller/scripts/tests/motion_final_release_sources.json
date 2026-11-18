@@ -9,6 +9,7 @@
     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
     "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
+    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "32a493833c609a8c40c26849f80ed467bbcc1f8be2c065d068b30ea2e8b5c97e",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",

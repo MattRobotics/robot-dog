@@ -558,8 +558,15 @@ class SimpleMotion {
   bool via(const motion::JointTargetFrame&,double pitch,double x,double z);
   bool knotVia(unsigned knot);
   bool heightVias(double from,double to);
+  // Via points of a level height move into plan_, from the nominal stand `from` (HEIGHT and PRONE_HEIGHT).
+  bool heightPlan(const motion::JointTargetFrame& from,double fromHeight,double to);
   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
-  void beginProne(Phase,uint64_t);
+  // beginPlan in two parts: preparePlan times plan_ and proves its via points (changes plan_ only; the fault reason or
+  // nullptr), activatePlan takes `now` as the segment epoch and generates the first frame.
+  const char* preparePlan(const collision::Box&,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
+  void activatePlan(Phase,const collision::Box&,uint64_t);
+  void preparePending();
+  void beginProne(Phase,uint64_t,bool prepared=false);
   bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_LAND; }
   void proneNotCompleted(uint64_t now,const char* held);
   // A STOP in a planned route segment (the PRONE descent or the STAND_DEPLOY/
@@ -570,7 +577,7 @@ class SimpleMotion {
   const char* proneRecovery(motion::JointTargetFrame& held,InitialRoute& route) const;
   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
   void beginLift(const motion::JointTargetFrame* measured,uint64_t);
-  void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);
+  void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t,bool prepared=false);
   motion::JointTargetFrame measured() const;
   void generateStand(uint64_t);
   void generateWalk(uint64_t);
@@ -659,6 +666,9 @@ class SimpleMotion {
   motion::JointTargetFrame segmentTo_{};
   const collision::Box* segmentBox_=nullptr;
   ViaPlan plan_{};
+  // P0 split: the release that left in plan_ the verified plan of the pending HEIGHT/PRONE_HEIGHT start (0: none).
+  // Only the next release may activate it (preparePending).
+  uint32_t preparedRelease_=0;
   bool planned_=false;
   double nativePitch_=0,nativeX_=0,nativeZ_=0,plannedHeight_=0;
   uint64_t segmentStartUs_=0,segmentDurationUs_=0,settleUs_=0,segmentDeadlineUs_=0;
