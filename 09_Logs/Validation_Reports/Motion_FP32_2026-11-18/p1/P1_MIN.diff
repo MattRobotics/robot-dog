@@ -1,0 +1,30 @@
+diff -ru base/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json p1min/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+--- base/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json	2026-11-18 11:41:46.000000000 +0100
++++ p1min/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json	2026-11-18 19:19:05.185604289 +0100
+@@ -3,7 +3,7 @@
+   "updated_copied_sources": {
+     "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "ed1203fcb17e29d03de70780ecd512a06c20fb08bbd9faba9ec03be8679679ae",
+     "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "95d3b44b1c5f6b204e3850a381b9895606777381e23eb5bfa1ef2e20be9b6cba",
+-    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "9530fabd8882f1dac79cf287c3cde1c646cf7b150c456b01f9a6cdb6abc35d1e",
++    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "c2bfb7547d6f0e6ddec13cecf5c1f65f2a7a25e3e94d99da729e3a7c44c36213",
+     "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e6a5935b9d14a21cd983ba0223db3a77fe875e3ffe72ea7c3124a329930dee46",
+     "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "483e608253b9514be26000d81b7eeea764c28503ad5640036ec3ba8574f3fa0f",
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
+diff -ru base/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp p1min/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+--- base/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-18 11:41:46.000000000 +0100
++++ p1min/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-18 19:19:05.149939517 +0100
+@@ -311,10 +311,12 @@
+     opts.requireNominalStrip=p.edgeTiltRad==0&&(s.phases[i].stance||s.phases[i].boundary);
+     // Edge contact: the fillet point, not the strip reference, meets the
+     // target. The flat body keeps the foot axis tilt equal to |HIP|; the seed's
+-    // lift is exact to ~1e-5 m, else one more solve with the solved tilt.
++    // lift is kept within 5e-5 m of the solved tilt's, else one more solve with it:
++    // half a RAW tick at the joint most sensitive to the vertical target (|J^-1 e_z|
++    // <= 15.3 rad/m in the SLOW/STANDARD/FAST steered walks, 18/11).
+     double lift=p.edgeTiltRad>0?edgeContactLiftM(opts.kinematics.seed.hip):0;
+     auto ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);
+-    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>1e-5){
++    if(p.edgeTiltRad>0&&ik.status==WorldContactIkResult::Status::OK&&std::abs(edgeContactLiftM(ik.baseResult.joints.hip)-lift)>5e-5){
+       lift=edgeContactLiftM(ik.baseResult.joints.hip);opts.kinematics.seed=ik.baseResult.joints;
+       ik=worldContactInverseKinematics(leg,{s.feet[i].x,s.feet[i].y,s.feet[i].z+lift},s.body,opts);}
+     const auto& b=ik.baseResult;

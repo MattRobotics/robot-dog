@@ -1,0 +1,26 @@
+Scenario | variant | heaviest release | NOMINAL mean / max (WALK) | releases >280k / >320k | stack min free
+B3  base    max= 403600  nominal=106066/285533  >280k= 163 >320k=  25  stack=7476
+B3  p1      max= 403614  nominal=101097/284748  >280k= 152 >320k=   5  stack=7276
+B3  fp32    max= 248106  nominal= 22514/ 40189  >280k=   0 >320k=   0  stack=8228
+B3  p1fp32  max= 248085  nominal= 22140/ 40197  >280k=   0 >320k=   0  stack=8372
+D8  base    max= 439865  nominal=105196/287714  >280k= 230 >320k=  44  stack=7476
+D8  p1      max= 442115  nominal= 99408/286947  >280k= 198 >320k=  17  stack=7276
+D8  fp32    max= 248099  nominal= 22010/ 40197  >280k=   0 >320k=   0  stack=8228
+D8  p1fp32  max= 248085  nominal= 21598/ 40190  >280k=   0 >320k=   0  stack=8372
+H   base    max= 403657  nominal= 97238/253775  >280k= 140 >320k=   6  stack=7476
+H   p1      max= 403670  nominal= 97230/254443  >280k= 140 >320k=   6  stack=7276
+H   fp32    max= 248787  nominal= 32063/ 76264  >280k=   0 >320k=   0  stack=8228
+H   p1fp32  max= 248098  nominal= 32084/ 75538  >280k=   0 >320k=   0  stack=8372
+E   base    max= 403625  nominal= 84446/253754  >280k= 116 >320k=   9  stack=7476
+E   p1      max= 404303  nominal= 84442/253790  >280k= 116 >320k=   9  stack=7276
+E   fp32    max= 248113  nominal= 17962/ 39088  >280k=   0 >320k=   0  stack=8228
+E   p1fp32  max= 248085  nominal= 17970/ 39060  >280k=   0 >320k=   0  stack=8372
+S   base    max= 528877  nominal=     0/     0  >280k= 224 >320k= 190  stack=7476
+S   p1      max= 528877  nominal=     0/     0  >280k= 224 >320k= 190  stack=7276
+S   fp32    max= 269583  nominal=     0/     0  >280k=   0 >320k=   0  stack=8228
+S   p1fp32  max= 268853  nominal=     0/     0  >280k=   0 >320k=   0  stack=8372
+
+Heaviest recorded release per P0 class (all scenarios):
+  1_double_comp      base=528877(S PRONE_DEPLOY)  p1=528877(S PRONE_DEPLOY)  fp32=269583(S PRONE_DEPLOY)  p1fp32=268853(S PRONE_DEPLOY)
+  2_nominal+comp     base=439865(D8 WALK_STANDARD)  p1=442115(D8 WALK_STANDARD)  fp32=108492(D8 WALK_STANDARD)  p1fp32=110857(D8 WALK_STANDARD)
+  3_walk_double_ik   base=439865(D8 WALK_STANDARD)  p1=442115(D8 WALK_STANDARD)  fp32=110281(B3 WALK_STANDARD)  p1fp32=110857(D8 WALK_STANDARD)

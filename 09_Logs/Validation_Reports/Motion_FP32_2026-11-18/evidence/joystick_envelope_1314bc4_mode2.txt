@@ -1,0 +1,2 @@
+summary: min support 0.95 mm (frontal_random_2), min non-foot clearance 2.32 mm (octant_pmm), max compensated stance-foot tilt 7.55 deg
+JOYSTICK envelope mode 2 PASS: geometry and sequencing only, no hardware motion validation (/home/matteo-manicardi/MATDOG/verification-artifacts/MATDOG_1_0_2_MOTION_FP32_20261118/regress/ksteer/mode2)
