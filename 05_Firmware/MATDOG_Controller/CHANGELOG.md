@@ -16,6 +16,21 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
+## Unreleased — 1.0.3-dev.2: TROT58, a fourth WALK mode (offline candidate, not flashed) — 2026-11-19
+
+> **Offline only.** Built on Stable `v1.0.2` (`main` `7c7c4e2`). Not merged, not flashed, not qualified on hardware: every result below is host, QEMU or twin evidence. It supersedes the offline TROT46 candidate `1.0.3-dev.1` (`ee0756b`), which was never flashed and stays a study artifact.
+
+- **TROT** (`WalkMode::TROT`, table row 4): the diagonal law of the same `Gait` generator through the same Motion pipeline (walk clock, IMU correction, `compensationSafe`, StopPlan, WALK STOP, STOP recovery).
+  - Diagonal pairs LF+RH / RF+LH with four feet down at every pair change (duty 0.60); 39 / 49 / 58 mm per 0.9 s cycle (43.3 / 54.4 / 64.4 mm/s nominal); 115 mm; lift 8.5 mm (closed-loop twin swing clearance p10 3.0 mm; at 7.5 mm one swing in ten peaked under 1.7 mm).
+  - Constant-acceleration vertical swing ramps (`GaitParameters::liftRise/liftFall`, 0.50/0.45; 0 keeps the crawl bell bit for bit); trapezoidal horizontal swing 0.30; COM +20 mm over the diagonal crossing; drive {1950,220}, the FAST pair already admitted by `ServoBus` and register 85.
+  - Its own IMU envelope `kTrotTilt` (geometric search on its law, servo plant, every preset rechecked).
+  - WALK STOP terminal at the next pair touchdown (half cycle, `walkTouchdownStep`); 0.5-cycle four-contact recentring.
+  - Forward only in this increment: its `JoystickSpec` publishes no backward, lateral or yaw (the existing per-mode certification; refused with the existing codes).
+- **Transitions:** TROT and the crawl never change into each other inside a walk (`walkModeChain`, `walkModeFollows`). A selection of the other family is the next walk's (`WALK_MODE_NEXT_WALK`); the walk keeps its law and joystick limits, and a SLOW/STANDARD/FAST change already in progress completes. `static_audit.py`: the `stepWalkMode()` retarget literal now also requires `walkModeChain` (the register-85 condition unchanged).
+- **Dashboard:** a gait selector WALK / TROT58 beside the unchanged SLOW / STANDARD / FAST selector; TROT keeps the last WALK preset for a return to WALK. Mode speeds with one decimal where they have one (FAST 29,6, TROT58 64,4 mm/s); capabilities `lift_mm` with one decimal (8.5).
+- **Studied, not integrated:** a WALK FAST at 40 mm/s. The crawl reaches it nowhere inside the STOP proof, drive and capture limits; the staggered-diagonal-pair walk (four beats) passed the law and plant gates but not the dynamic criteria registered for it in the closed-loop twin (attitude and touchdown worse than both accepted laws). It stays a study; FAST remains the 29.6 mm/s crawl.
+- **Unchanged:** SLOW, STANDARD and FAST (their gate outputs and RAW frame digests are byte-identical to `v1.0.2`), STOP, boxes, protections, tolerances, NVS, calibration, ID mapping, geometry, IK, EEPROM and servo gains.
+
 ## v1.0.2 — Stable GitHub Release: firmware 1.0.2-dev.7 `1314bc4` promoted unchanged, Motion fixture-qualified — 2026-11-19
 
 > **Promotion without recompilation** of the APP installed and qualified on the fixture on 19/11/2026.

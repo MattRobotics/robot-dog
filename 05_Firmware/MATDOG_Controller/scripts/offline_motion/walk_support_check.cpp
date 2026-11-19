@@ -74,9 +74,9 @@ double inside(std::vector<Vector3> pts,double x,double y){
 struct Sample{double c,rate,accel;};
 }
 int main(int argc,char** argv){
-  unsigned stride=2,modeIndex=0;  // --mode 0|1|2: SLOW, STANDARD, FAST (SimpleMotion.h WalkModeSpec)
+  unsigned stride=2,modeIndex=0;  // --mode 0|1|2|3: SLOW, STANDARD, FAST, TROT (SimpleMotion.h WalkModeSpec)
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);if(!std::strcmp(argv[i],"--mode"))modeIndex=std::atoi(argv[i+1]);}
-  if(stride>2||modeIndex>2)return 2;
+  if(stride>2||modeIndex>=simple::kWalkModeCount)return 2;
   const auto mode=static_cast<simple::WalkMode>(modeIndex);const auto& spec=simple::walkModeSpec(mode);
   GaitParameters g=simple::walkGait(stride,mode);double period=spec.periodS,comDx=0,comDy=0,reverse=0,height=spec.heightM,proofAcc=-1,driveSpeed=spec.drive.speed,driveAcc=spec.drive.acc;
   struct Opt{const char* name;double* value;double scale;};
@@ -94,6 +94,7 @@ int main(int argc,char** argv){
   const double vDrive=driveSpeed*simple::kTickRad,aDrive=driveAcc*100*simple::kTickRad,settle=gaitSettleCycles(g);
   double support=1e9,supportC=0,zmp=1e9,vmax=0,amax=0,margin[12];int vJ=0,aJ=0;unsigned fails=0;for(double& m:margin)m=1e9;
   double phaseMin[3]={1e9,1e9,1e9};  // start ramp, steady cycles, WALK STOP segments
+  unsigned samples=0,twoFoot=0;  // TROT: diagonal (two-foot) samples, outside every static support figure
   auto run=[&](const std::vector<Sample>& seg,double terminal){
     std::vector<double> cx,cy,cz;std::vector<std::vector<Vector3>> polygons;LocomotionFrame prev;bool have=false;
     for(const auto& smp:seg){
@@ -110,6 +111,7 @@ int main(int argc,char** argv){
       double cb[3];com(f.target,cb);cb[0]+=comDx;cb[1]+=comDy;const auto& t=s.body.translationM;const auto& r=s.body.rotation;
       const double w[3]={t.x+r[0][0]*cb[0]+r[0][1]*cb[1]+r[0][2]*cb[2],t.y+r[1][0]*cb[0]+r[1][1]*cb[1]+r[1][2]*cb[2],t.z+r[2][0]*cb[0]+r[2][1]*cb[1]+r[2][2]*cb[2]};
       std::vector<Vector3> pts;for(unsigned l=0;l<4;++l)if(s.phases[l].stance)pts.push_back(s.feet[l]);
+      ++samples;twoFoot+=pts.size()==2;
       if(pts.size()>=3){const double k=w[2]/gravity*1.5/tStop,bv=std::hypot(s.bodyVelocity.x,s.bodyVelocity.y);
         stopZmp=std::fmin(stopZmp,inside(pts,w[0]+k*s.bodyVelocity.x,w[1]+k*s.bodyVelocity.y));
         const double tc=std::sqrt(w[2]/gravity),cp=inside(pts,w[0]+tc*s.bodyVelocity.x,w[1]+tc*s.bodyVelocity.y);if(cp<capture){capture=cp;captureC=smp.c;}
@@ -125,11 +127,15 @@ int main(int argc,char** argv){
   {std::vector<Sample> s;for(double t=0;;t+=dt){const double u=std::fmin(1.,t),c=simple::walkClockS(t)/period;if(c>g.startCycles+2)break;
      s.push_back({c,(t<1?u*u*u*(10+u*(-15+6*u)):1)/period,(t<1?30*u*u*(1-u)*(1-u):0)/period});}run(s,-1);}
   // Every quarter WALK STOP from the end of the start ramp through the first steady cycle.
-  for(double q=0;q<1.5;q+=.25){const double terminal=g.startCycles+q+g.stopCycles;std::vector<Sample> s;
+  for(double q=0;q<1.5;q+=simple::walkTouchdownStep(g)){const double terminal=g.startCycles+q+g.stopCycles;std::vector<Sample> s;  // TROT: pair touchdowns
     for(double c=std::fmax(0.,terminal-g.stopCycles-.3);c<=terminal+settle+1e-12;c+=dt/period)s.push_back({std::fmin(c,terminal+settle),1/period,0});run(s,terminal);}
   double hip=1e9,upper=1e9,lower=1e9;
   for(unsigned i=0;i<12;++i)(i%3==0?hip:i%3==1?upper:lower)=std::fmin(i%3==0?hip:i%3==1?upper:lower,margin[i]);
   const bool pass=!fails&&support>0&&zmp>0&&capture>0&&vmax<vDrive&&amax<aDrive&&hip>0&&upper>0&&lower>0;
+  // TROT: the support, ZMP and capture figures above cover its four-contact windows only;
+  // the diagonal phases have no static support polygon (a dynamic gait, twin and fixture).
+  if(g.type==GaitType::TROT)std::printf("TROT: two-foot (diagonal) samples %u of %u (%.1f %%): static support, ZMP and capture NOT APPLICABLE there; the PASS below covers law kinematics, drive and box only\n",
+                                       twoFoot,samples,samples?100.*twoFoot/samples:0.);
   std::printf("mode=%s stride=%.0f period=%.2f v=%.2f mm/s height=%.0f duty=%.3f com=%.1f swayx/y=%.1f/%.1f ramp=%.2f/%.2f settle=%.2f | solve fails=%u | static support min %.2f mm (c%.3f) | ZMP min %.2f mm | STOP capture min %.2f mm (c%.3f) | STOP ZMP min %.2f mm (proof acc %.0f, peak body decel %.3f m/s2, arrest %.2f s) | "
               "start/steady/stop %.2f/%.2f/%.2f mm | joint vmax %.3f rad/s %s (drive %.3f) amax %.2f rad/s2 %s (drive %.2f) stance (loaded) vmax %.3f amax %.2f arrest %.2f rad/s2 | box margin ticks HIP %.1f UPPER %.1f LOWER %.1f | %s\n",
     spec.name,g.advanceXM*1000,period,g.advanceXM/period*1000,height*1000,g.duty,g.comShiftXM*1000,g.swayXM*1000,g.swayYM*1000,g.swingRamp,g.swingRampEnd,settle,fails,support*1000,supportC,zmp*1000,capture*1000,captureC,stopZmp*1000,proofAcc,stopDecel,stopT,

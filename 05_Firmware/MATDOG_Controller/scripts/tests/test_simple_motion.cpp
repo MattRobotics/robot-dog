@@ -42,6 +42,7 @@ struct StopReferenceProbe {
   static const uint16_t* commandedRaw(const SimpleMotion& m){return m.commandedRaw_;}
   static const uint16_t* previous2Raw(const SimpleMotion& m){return m.previous2Raw_;}
   static bool limitWalkTilt(const SimpleMotion& m,double& roll,double& pitch,double c,double s){return m.limitWalkTilt(roll,pitch,c,s);}
+  static double stopCycle(const SimpleMotion& m){return m.stopCycle_;}  // WALK STOP terminal (trotMode)
 };
 } }
 struct ScriptedObservationPort: simple::ServoPort {
@@ -1343,7 +1344,8 @@ static void walkModes(){
   assert(simple::stopAccelerationRadS2(simple::kWalkDrive)==simple::kWalkDrive.acc*100*simple::kTickRad&&
          simple::stopAccelerationRadS2(simple::kStandDrive)==simple::kStandDrive.acc*100*simple::kTickRad&&
          simple::stopAccelerationRadS2({1850,150})==simple::kStopBrakeAcc*100*simple::kTickRad);
-  simple::WalkMode m;assert(simple::parseWalkMode("FAST",m)&&m==WalkMode::FAST&&!simple::parseWalkMode("fast",m)&&!simple::parseWalkMode("TROT",m));
+  // TROT (2026-11-19) is a mode name now (trotMode); the strictness stays checked on PACE.
+  simple::WalkMode m;assert(simple::parseWalkMode("FAST",m)&&m==WalkMode::FAST&&!simple::parseWalkMode("fast",m)&&!simple::parseWalkMode("PACE",m));
   // Final dev.6 RCA: whatever correction HOLD carries at the WALK height
   // (here a 30 mrad board roll during a STOP recovery; STANDARD roll limit ~9
   // mrad), the walk starts only inside its own envelope (WALK_IMU_SETTLING
@@ -1590,6 +1592,127 @@ static void multidirectionalJoystick(){
    r.p.flexTicks[9]=0;hold(r,ahead,unsigned(4*T/.02));assert(!r.m.walkSteered()&&r.m.state()==State::WALKING);stopNow(r);++runs;}
   std::printf("multidirectional joystick: %u runs, %u STOPs verified without fault; a backward walk keeps its law with a new selection (2 pairs x 3, STOP verified); a steered walk takes the selection at its forward handover; joystick limits of the walking law, backward saturated at its limit, below-band starts refused, ACC ceiling at selection, handover deferred under flex (%u) PASS (software only)\n",runs,stops,deferred);
 }
+// TROT (2026-11-19): the diagonal law of the same Gait generator as a fourth
+// WALK mode of the same pipeline (walk clock, IMU correction, compensationSafe,
+// StopPlan, WALK STOP, STOP recovery). Its own table row and envelope; the crawl
+// rows unchanged (motion_frame_digest: their RAW frames bit for bit). TROT and the
+// crawl never change into each other inside a walk: a selection of the other
+// family is the next walk's, and a crawl change in progress completes
+// (walkModeFollows). Forward only in this increment (its JoystickSpec: backward,
+// lateral and yaw not yet certified). Ideal tracking, software only.
+static void trotMode(){
+  using simple::State;const auto& t=simple::walkModeSpec(WalkMode::TROT);const double top=topSpeed(WalkMode::TROT);
+  WalkMode parsed;assert(simple::parseWalkMode("TROT",parsed)&&parsed==WalkMode::TROT&&!simple::parseWalkMode("trot",parsed));
+  for(unsigned s=0;s<3;++s){const auto g=simple::walkGait(s,WalkMode::TROT);
+    assert(g.type==motion::GaitType::TROT&&g.duty==t.duty&&g.advanceXM==t.strideM[s]&&g.swayXM==0&&g.swayYM==0&&g.comShiftXM==t.trotComShiftXM&&
+           g.settleCycles==simple::kTrotSettleCycles&&g.liftRise==t.liftRise&&g.liftFall==t.liftFall&&motion::validGaitParameters(g)&&simple::walkTouchdownStep(g)==.5);
+    for(unsigned k=0;k<3;++k){const auto c=simple::walkGait(s,static_cast<WalkMode>(k));
+      assert(c.type==motion::GaitType::WALK&&c.liftRise==0&&c.liftFall==0&&simple::walkTouchdownStep(c)==.25);}}
+  assert(simple::walkModeChain(WalkMode::SLOW,WalkMode::FAST)&&simple::walkModeChain(WalkMode::TROT,WalkMode::TROT)&&
+         !simple::walkModeChain(WalkMode::FAST,WalkMode::TROT)&&!simple::walkModeChain(WalkMode::TROT,WalkMode::SLOW));
+  // A TROT walk: its height, period, drive and speed; diagonal pairs (LF+RH,
+  // RF+LH), never fewer than two feet down; RAW step inside the drive.
+  unsigned four=0,two=0,maxStep=0,stops=0;
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(WalkMode::TROT));assert(!r.m.walk(2,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){r.tick();assert(r.m.state()!=State::FAULT);}
+   assert(r.m.state()==State::WALKING&&r.m.walkMode()==WalkMode::TROT&&r.m.period()==t.periodS&&std::abs(r.m.requestedHeightM()-t.heightM)<1e-12);
+   const size_t from=r.p.sent.size();const uint64_t start=r.p.now;
+   for(unsigned n=0;n<unsigned(30*t.periodS/.02);++n){r.tick();assert(r.m.state()==State::WALKING&&r.p.drive.speed==t.drive.speed&&r.p.drive.acc==t.drive.acc);
+     const auto& ph=simple::StopReferenceProbe::walkNominal(r.m).cartesian.phases;
+     assert(ph[0].stance==ph[2].stance&&ph[1].stance==ph[3].stance&&(ph[0].stance||ph[1].stance));(ph[0].stance&&ph[1].stance?four:two)++;}
+   for(size_t k=from+1;k<r.p.sent.size();++k)for(unsigned i=0;i<12;++i)maxStep=std::max(maxStep,unsigned(std::abs(int(r.p.sent[k][i])-int(r.p.sent[k-1][i]))));
+   assert(four>0&&two>0&&maxStep<=t.drive.speed*simple::kPeriodUs/1000000&&std::abs(r.m.walkVelocityX()-top)<1e-12);
+   assert(std::abs(r.m.walkCycles()-simple::walkClockS((r.p.now-start)/1e6)/t.periodS)<.02);
+   // STOP at eight instants of a cycle (pair swings and four-contact windows):
+   // verified on the TROT drive; the resumed walk keeps TROT whatever is selected.
+   const unsigned cycleReleases=unsigned(t.periodS/.02);
+   for(unsigned k=0;k<8;++k){
+     for(unsigned n=0;n<cycleReleases/8+3;++n)r.tick();
+     r.m.stop();for(unsigned n=0;n<400&&!r.m.stopVerified();++n){r.tick();assert(r.m.state()!=State::FAULT);}
+     assert(r.m.stopVerified()&&simple::StopReferenceProbe::stopPlan(r.m).duration>0&&r.p.drive.speed==t.drive.speed&&r.p.drive.acc==t.drive.acc);++stops;
+     r.m.selectWalkMode(k%2?WalkMode::FAST:WalkMode::SLOW);assert(!r.m.walk(2,r.p.now));r.m.selectWalkMode(WalkMode::TROT);
+     for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){r.tick();assert(r.m.state()!=State::FAULT);}
+     assert(r.m.state()==State::WALKING&&r.m.walkMode()==WalkMode::TROT);}
+   r.m.walkStop();assert(r.reachStand());}
+  // WALK STOP at four instants of a cycle: the terminal is the next pair
+  // touchdown (half cycle), then the four-contact recentring; continuous RAW,
+  // STANDING at the TROT height.
+  for(unsigned k=0;k<4;++k){Rig r;startIn(r,WalkMode::TROT);for(unsigned n=0;n<k*12+5;++n)r.tick();
+    const double c=r.m.walkCycles();const size_t from=r.p.sent.size();r.m.walkStop();const double terminal=simple::StopReferenceProbe::stopCycle(r.m);
+    assert(terminal>=c&&terminal-c<=.5+1e-12&&std::abs(terminal*2-std::round(terminal*2))<1e-12);
+    unsigned n=0;for(;n<4000&&r.m.state()!=State::STANDING;++n){r.tick();assert(r.m.state()!=State::FAULT&&!r.m.stopActive());}
+    assert(r.m.state()==State::STANDING&&std::abs(r.m.requestedHeightM()-t.heightM)<1e-12);
+    for(size_t f=from+1;f<r.p.sent.size();++f)for(unsigned i=0;i<12;++i)assert(unsigned(std::abs(int(r.p.sent[f][i])-int(r.p.sent[f-1][i])))<=t.drive.speed*simple::kPeriodUs/1000000);}
+  // Family independence. A TROT walk keeps TROT with a crawl selected (its joystick
+  // limits too); the next walk takes the selection.
+  {Rig r;startIn(r,WalkMode::TROT);
+   assert(!r.m.selectWalkMode(WalkMode::SLOW)&&r.m.walkModeLive()&&!r.m.walkModeFollows()&&r.m.joystickMode()==WalkMode::TROT);
+   for(unsigned n=0;n<600;++n){r.tick();assert(settled(r,WalkMode::TROT,top));}
+   r.m.walkStop();assert(r.reachStand());assert(!r.m.walk(1,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){r.tick();assert(r.m.state()!=State::FAULT);}
+   assert(r.m.walkMode()==WalkMode::SLOW&&std::abs(r.m.requestedHeightM()-simple::walkModeSpec(WalkMode::SLOW).heightM)<1e-12);
+   r.m.walkStop();assert(r.reachStand());}
+  // A crawl walk keeps its law with TROT selected; the next walk trots.
+  {Rig r;startIn(r,WalkMode::SLOW);Watch w(r);
+   assert(!r.m.selectWalkMode(WalkMode::TROT)&&r.m.walkModeLive()&&!r.m.walkModeFollows()&&r.m.walkTarget()==WalkMode::SLOW);
+   for(unsigned n=0;n<600;++n){w.tick();assert(settled(r,WalkMode::SLOW,topSpeed(WalkMode::SLOW)));}
+   r.m.walkStop();assert(r.reachStand());assert(!r.m.walk(2,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){r.tick();assert(r.m.state()!=State::FAULT);}
+   assert(r.m.walkMode()==WalkMode::TROT&&r.m.period()==t.periodS);r.m.walkStop();assert(r.reachStand());}
+  // A crawl change in progress completes to its target with TROT selected
+  // (never frozen between two laws), all walkModeChange invariants held.
+  unsigned completed=0;
+  {Rig r;startIn(r,WalkMode::SLOW);Watch w(r);assert(!r.m.selectWalkMode(WalkMode::STANDARD));
+   for(unsigned n=0;n<40;++n)w.tick();assert(r.m.walkTarget()==WalkMode::STANDARD&&!settled(r,WalkMode::STANDARD,topSpeed(WalkMode::STANDARD)));
+   assert(!r.m.selectWalkMode(WalkMode::TROT)&&!r.m.walkModeFollows());
+   for(;completed<6000&&!settled(r,WalkMode::STANDARD,topSpeed(WalkMode::STANDARD));++completed){w.tick();assert(r.m.walkTarget()==WalkMode::STANDARD);}
+   assert(completed<6000&&r.m.selectedWalkMode()==WalkMode::TROT);
+   r.m.walkStop();assert(r.reachStand());assert(!r.m.walk(2,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){r.tick();assert(r.m.state()!=State::FAULT);}
+   assert(r.m.walkMode()==WalkMode::TROT);r.m.walkStop();assert(r.reachStand());}
+  // Joystick: a TROT walk keeps TROT's limits with STANDARD selected; the next
+  // joystick walk is STANDARD's. A crawl joystick walk keeps its own with TROT selected.
+  {Rig r;startIn(r,WalkMode::TROT,1.);
+   assert(!r.m.selectWalkMode(WalkMode::STANDARD)&&r.m.joystickMode()==WalkMode::TROT);
+   for(unsigned n=0;n<600;++n){if(n%12==0)assert(!r.m.drive(top,0,0,r.p.now));r.tick();assert(settled(r,WalkMode::TROT,top));}
+   r.m.walkStop();assert(r.reachStand());assert(r.m.joystickMode()==WalkMode::STANDARD);
+   assert(!r.m.drive(topSpeed(WalkMode::STANDARD),0,0,r.p.now));
+   for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){if(n%12==0)r.m.drive(topSpeed(WalkMode::STANDARD),0,0,r.p.now);r.tick();assert(r.m.state()!=State::FAULT);}
+   for(unsigned n=0;n<24;++n){if(n%12==0)r.m.drive(topSpeed(WalkMode::STANDARD),0,0,r.p.now);r.tick();}
+   assert(r.m.walkMode()==WalkMode::STANDARD);r.m.walkStop();assert(r.reachStand());}
+  {Rig r;startIn(r,WalkMode::SLOW,.5);assert(!r.m.selectWalkMode(WalkMode::TROT)&&r.m.joystickMode()==WalkMode::SLOW);
+   for(unsigned n=0;n<600;++n){if(n%12==0)assert(!r.m.drive(.5*topSpeed(WalkMode::SLOW),0,0,r.p.now));r.tick();assert(settled(r,WalkMode::SLOW,.5*topSpeed(WalkMode::SLOW)));}
+   r.m.walkStop();assert(r.reachStand());assert(r.m.joystickMode()==WalkMode::TROT);}
+  // MotionService: the selection's answer names when it applies.
+  {Rig r;core::MotionService service;service.begin(&r.m,nullptr,nullptr);service.setReady(true,"READY");assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+   uint32_t seq=0;auto select=[&](const char* gait){motion::MotionCommand c;c.owner=motion::ClientOwner::DASHBOARD;c.intent=motion::Intent::GAIT_SELECT;c.sequence=++seq;
+     c.issued_at_ms=r.p.now/1000;c.ttl_ms=1000;std::snprintf(c.id,sizeof(c.id),"trot-%u",unsigned(seq));std::strcpy(c.gait,gait);test_clock_us=r.p.now;return service.command(c,r.p.now/1000);};
+   auto ok=[](const motion::MotionAck& a,const char* why){return a.outcome==motion::CommandOutcome::ACCEPTED&&!std::strcmp(a.reason,why);};
+   assert(ok(select("TROT"),"WALK_MODE_SELECTED")&&ok(select("SLOW"),"WALK_MODE_SELECTED"));
+   assert(!r.m.walk(2,r.p.now));for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n)r.tick();
+   assert(ok(select("TROT"),"WALK_MODE_NEXT_WALK")&&ok(select("STANDARD"),"WALK_MODE_CHANGING"));
+   r.m.walkStop();assert(r.reachStand());}
+  // Forward only (this increment): backward and steering refused at rest; a
+  // backward demand in a TROT walk ends it (JOYSTICK_REVERSING); range checked.
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(WalkMode::TROT));
+   assert(!std::strcmp(r.m.drive(-.2*top,0,0,r.p.now),"JOYSTICK_BACKWARD_UNAVAILABLE")&&!std::strcmp(r.m.drive(.5*top,.001,0,r.p.now),"JOYSTICK_STEERING_UNAVAILABLE")&&
+          !std::strcmp(r.m.drive(.5*top,0,.01,r.p.now),"JOYSTICK_STEERING_UNAVAILABLE")&&!std::strcmp(r.m.drive(1.01*top,0,0,r.p.now),"JOYSTICK_VELOCITY_RANGE"));
+   for(unsigned n=0;n<100;++n){r.tick();assert(r.m.state()==State::STANDING);}
+   assert(!r.m.drive(.6*top,0,0,r.p.now));for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n){if(n%12==0)r.m.drive(.6*top,0,0,r.p.now);r.tick();}
+   for(unsigned n=0;n<200;++n){if(n%12==0)r.m.drive(.6*top,0,0,r.p.now);r.tick();assert(r.m.state()==State::WALKING);}
+   assert(!r.m.drive(-.6*top,0,0,r.p.now)&&!std::strcmp(r.m.reason(),"JOYSTICK_REVERSING"));assert(r.reachStand());
+   assert(!std::strcmp(r.m.drive(-.6*top,0,0,r.p.now),"JOYSTICK_BACKWARD_UNAVAILABLE"));}
+  // ACC ceiling below its drive: refused before any change, and as a selection during a crawl walk.
+  {Rig r;r.in.accCeiling=180;r.m.inputs(r.in);assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());
+   assert(!r.m.selectWalkMode(WalkMode::TROT));const auto enables=r.p.enables;
+   assert(!std::strcmp(r.m.walk(2,r.p.now),"SERVO_ACC_CEILING_BELOW_DRIVE")&&!std::strcmp(r.m.drive(.5*top,0,0,r.p.now),"SERVO_ACC_CEILING_BELOW_DRIVE"));
+   for(unsigned n=0;n<100;++n){r.tick();assert(r.m.state()==State::STANDING);}assert(r.p.enables==enables);
+   assert(!r.m.selectWalkMode(WalkMode::SLOW)&&!r.m.walk(2,r.p.now));for(unsigned n=0;n<4000&&r.m.state()!=State::WALKING;++n)r.tick();
+   assert(!std::strcmp(r.m.selectWalkMode(WalkMode::TROT),"SERVO_ACC_CEILING_BELOW_DRIVE")&&r.m.selectedWalkMode()==WalkMode::SLOW);
+   r.m.walkStop();assert(r.reachStand());}
+  std::printf("TROT: %.0f mm / %.2f s = %.1f mm/s at %.0f mm, drive %u/%u; diagonal pairs, four-contact %u / two-foot %u releases, RAW step <= %u ticks; %u STOPs verified + resume keeps TROT; WALK STOP at pair touchdowns; families independent (a crawl change completes in %.2f s with TROT selected); forward only, ACC ceiling refusals PASS (software only)\n",
+    t.strideM[2]*1e3,t.periodS,top*1e3,t.heightM*1e3,unsigned(t.drive.speed),unsigned(t.drive.acc),four,two,maxStep,stops,completed*.02);
+}
 // dev.6 consolidation: the first exit of a WALK keeps its cause (walk clock,
 // law, applied/wanted IMU correction, the release's compensationSafe check):
 // enterOff resets the correction right after, a later STOP keeps the record.
@@ -1703,7 +1826,7 @@ static void operatorStopRearm(){
     assert(!std::strcmp(r.m.stand(.15,r.p.now),"INITIAL_POSE_OUTSIDE_SAFE_ENTRY"));}
   std::puts("OPERATOR STOP REARM PASS: STOP/SAFE_OFF at rest, in WALK (held resume unchanged; SAFE_OFF then STAND re-acquires), repeated STOPs; STOPPED never READY, WALK and joystick refused, explicit STAND re-arms via ACQUIRE; fault, incomplete SAFE_OFF, unsafe inputs, servo alarm and entry pose still refuse");
 }
-int main(){walkModes();accCeilingGate();walkModeChange();multidirectionalJoystick();exitCause();longWalk100();proneRest();entryRecovery();operatorStopRearm();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
+int main(){walkModes();accCeilingGate();walkModeChange();multidirectionalJoystick();trotMode();exitCause();longWalk100();proneRest();entryRecovery();operatorStopRearm();temperatureChecks();standHoldTilt();lookaheadWalk();stopRateHistory();swayMap();steeredEnvelopeHeading();
   stopThenWalk();
   proneStopRecovery();
   imuSlewTime();

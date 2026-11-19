@@ -125,5 +125,17 @@ inline void run(Sim& s){
   // 8: one release of feedback lag and loaded sag in WALK100 SLOW and WALK75 FAST.
   {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::SLOW,2);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK100_SLOW",s);}
   {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::FAST,2);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK80_FAST",s);}
+  // 9 (TROT 2026-11-19, appended: every earlier digest unchanged): a 90 s TROT100
+  // walk with the board tilt, the forward joystick at full scale, STOP at eight
+  // instants (start ramp and steady pairs) each with the STAND recovery, lag+sag.
+  {stand(s);s.tilt(.005,.008);walk(s,WalkMode::TROT,2);for(unsigned k=0;k<4500;++k)s.tick();report("WALK100_TROT_90s",s);}
+  {stand(s);s.tilt(.005,.008);s.m.selectWalkMode(WalkMode::TROT);const auto& w=simple::walkModeSpec(WalkMode::TROT);
+   for(unsigned k=0;k<3000;++k){if(k%12==0)s.m.drive(w.strideM[2]/w.periodS,0,0,gClock);s.tick();}report("JOY_FWD_TROT",s);}
+  {unsigned ok=0;Sim& x=s;stand(x);walk(x,WalkMode::TROT,2);for(unsigned k=0;k<300;++k)x.tick();
+   for(unsigned j=0;j<8;++j){for(unsigned k=0;k<25+j*11;++k)x.tick();x.m.stop();for(unsigned k=0;k<400&&!x.m.stopVerified();++k)x.tick();
+     if(!x.m.stopVerified()||x.m.walk(2,gClock)||!x.until(State::WALKING,4000))break;
+   ++ok;}
+   x.m.walkStop();x.until(State::STANDING,3000);char n[32];std::snprintf(n,sizeof n,"STOP_TROT_%u_of_8",ok);report(n,x);}
+  {stand(s);s.p.lag=1;s.p.sag=true;walk(s,WalkMode::TROT,2);for(unsigned k=0;k<3000;++k)s.tick();report("LAG_SAG_WALK100_TROT",s);}
 }
 }

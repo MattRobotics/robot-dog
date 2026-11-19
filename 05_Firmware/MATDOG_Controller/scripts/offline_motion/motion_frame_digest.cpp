@@ -124,6 +124,23 @@ int main(int argc,char** argv){
     else{r.m.walkStop();for(unsigned n=0;n<3000&&r.m.state()!=simple::State::STANDING&&r.m.state()!=simple::State::FAULT;++n)release();
       if(r.m.state()!=simple::State::STANDING)std::printf("  FAULT in WALK STOP settle: %s phase=%s cycles=%.4f\n",r.m.reason(),r.m.phase(),r.m.walkCycles());
       std::printf("  (skipped releases=%u, missed counter=%u)\n",skipped,r.m.missed());report(name,r,from);}}
+  // TROT (2026-11-19), appended after every earlier scenario (their digests are
+  // the Stable's): a TROT100 walk on a tilted board with WALK STOP, a STOP in it,
+  // and a seeded forward joystick sequence on its law (forward only).
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(simple::WalkMode::TROT));assert(!r.m.walk(2,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
+    for(unsigned n=0;n<975;++n)r.tick();assert(r.m.state()==simple::State::WALKING);r.m.walkStop();assert(r.reachStand());report("TROT100_tilted_stop",r,from);}
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(simple::WalkMode::TROT));assert(!r.m.walk(2,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);const size_t from=r.p.sent.size();
+    for(unsigned n=0;n<300;++n)r.tick();stopLatency(r,[&](){r.tick();});assert(r.m.stopVerified());report("TROT100_STOP_at300",r,from);}
+  {Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());assert(!r.m.selectWalkMode(simple::WalkMode::TROT));Lcg g(21);
+    const auto& w=simple::walkModeSpec(simple::WalkMode::TROT);const double top=w.strideM[2]/w.periodS;double v=.6*top;
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(v,0,0,r.p.now);r.tick();}
+    tilt(r,.2*degree,.5*degree);const size_t from=r.p.sent.size();
+    for(unsigned n=0;n<1800;++n){if(n%60==0)v=top*(.05+.85*g.next());
+      if(n%12==0){const char* why=r.m.drive(v,0,0,r.p.now);assert(!why||!std::strcmp(why,"WALK_STOPPING"));}
+      r.tick();assert(r.m.state()!=simple::State::FAULT);}
+    r.m.walkStop();assert(r.reachStand());report("JOYSTICK_TROT_random_21",r,from);}
   if(dump)std::fclose(dump);
   std::puts("digest complete (host replay only, no hardware)");
 }

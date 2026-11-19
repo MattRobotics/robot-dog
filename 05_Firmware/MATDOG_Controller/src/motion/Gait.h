@@ -58,6 +58,14 @@ struct GaitParameters {
   // the swinging side, so its switches come one quarter later.
   bool reverse = false;
   double maxCondition = 10000;
+  // Vertical swing profile (TROT, 2026-11-19). 0 keeps the bell 64 liftM
+  // u^3 (1-u)^3 bit for bit. liftRise, liftFall in (0, .5]: z = liftM
+  // A(u/liftRise) A((1-u)/liftFall), A the constant-acceleration ramp clamped
+  // at 1 (C1, as the trapezoidal swingRamp): flat at liftM between the ramps,
+  // peak vertical acceleration 4 liftM/(ramp time)^2 against the bell's 5.77.
+  // TROT: comShiftXM is its constant fore/aft body offset over the diagonal
+  // crossing (eased in over startCycles, recentred over settleCycles).
+  double liftRise = 0, liftFall = 0;
 };
 struct LegPhase { double phase=0, swingProgress=0; bool stance=true, boundary=false; };
 bool validGaitParameters(const GaitParameters& p);

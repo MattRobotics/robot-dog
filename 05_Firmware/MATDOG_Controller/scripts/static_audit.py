@@ -735,8 +735,10 @@ def check_acc_ceiling_runtime_path(files):
             ("constchar*r=stand(law.heightM,now,law.drive.acc,false);",))
     ordered(motion_path, "selectWalkMode()", function_body(motion, "const char* SimpleMotion::selectWalkMode(WalkMode m)") or "",
             ('if(walkModeLive()&&walkModeSpec(m).drive.acc>input_.accCeiling)return"SERVO_ACC_CEILING_BELOW_DRIVE";', "selectedMode_=m;"))
+    # A walk takes a selection only while it can change its law, within register 85
+    # and (TROT, 2026-11-19) of its own family: TROT and the crawl never morph into each other.
     ordered(motion_path, "stepWalkMode()", function_body(motion, "void SimpleMotion::stepWalkMode(double eased)") or "",
-            ("if(!walkModeLive())return;", "if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling){"))
+            ("if(!walkModeLive())return;", "if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling&&walkModeChain(walkMode_,selectedMode_)){"))
     for required in ("if(!send(f.target,walkDrive_,now))return;", "constDrivedrive=phase_==Phase::WALK?walkDrive_:kStandDrive;"):
         if compact.count(required) != 1:
             fail(f"{motion_path}: the walk must send walkDrive_ and its STOP proof assume it ({required!r})")

@@ -56,4 +56,8 @@ int main(){
     for(unsigned n=0;n<3000&&r.m.state()!=simple::State::WALKING;++n){if(n%12==0)r.m.drive(.0069,jit[k++%6],0,r.p.now);r.tick();}
     tilt(r,.3*degree,.8*degree);Stat s;for(unsigned n=0;n<975;++n){if(n%12==0)r.m.drive(.0069,jit[k++%6],0,r.p.now);s.release(r);}
     assert(r.m.state()==simple::State::WALKING);s.print("JOY fore/aft jit");}
+  // TROT (2026-11-19), appended: TROT100 and FAST100 on the same tilted board (same pipeline, two laws).
+  for(auto mode:{simple::WalkMode::FAST,simple::WalkMode::TROT}){Rig r;assert(!r.m.stand(.15,r.p.now));assert(r.reachStand());r.m.selectWalkMode(mode);assert(!r.m.walk(2,r.p.now));
+    for(unsigned n=0;n<4000&&r.m.state()!=simple::State::WALKING;++n)r.tick();tilt(r,.3*degree,.8*degree);Stat s;
+    for(unsigned n=0;n<975;++n)s.release(r);assert(r.m.state()==simple::State::WALKING);s.print(mode==simple::WalkMode::TROT?"TROT100 tilted":"FAST100 tilted");}
 }

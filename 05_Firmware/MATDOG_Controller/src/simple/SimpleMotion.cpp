@@ -95,10 +95,22 @@ template<unsigned N> bool projectWalkTilt(const TiltVertex (&vertices)[N],double
 constexpr WalkModeSpec kWalkModes[]={
   {"SLOW",kWalkPeriodS,kWalkDuty,kWalkHeightM,kWalkSwayXM,kWalkSwingRamp,0,kWalkDrive,{kStrideM[0],kStrideM[1],kStrideM[2]},kWalkLiftM,kWalkSwayYM,&kWalkTilt75,&kWalkTilt100,true},
   {"STANDARD",3.0,.825,.110,kWalkSwayXM,.35,.55,{1800,180},{.060,.075,.090},kWalkLiftM,.00125,&kStandardTilt,&kStandardTilt,false},
-  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.074},.006,.0010,&kFastTilt,&kFastTilt,false}};
+  {"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},{.060,.070,.074},.006,.0010,&kFastTilt,&kFastTilt,false},
+// TROT (2026-11-19, TROT58): diagonal pairs LF+RH / RF+LH, four feet down at
+// every pair change (duty .60), the COM over the diagonal crossing (+20 mm),
+// constant-acceleration vertical swing ramps over the first 50 % and last 45 % of
+// the swing, symmetric trapezoidal horizontal swing (ramps .30). Strides 39/49/58
+// mm per 0.9 s cycle: 43.3/54.4/64.4 mm/s. Lift 8.5 mm: at 7.5 mm one swing in ten
+// peaked under 1.7 mm in the closed-loop twin (8.5: 3.0 mm, TROT46's level) with the
+// same STOP proof (29-30 of 31.36 RAW ticks per release) and 27.6 rad/s^2 peak joint
+// acceleration under the 33.75 of {1950,220}. Forward only (kJoystickModes: no
+// steering, no backward); outside the progressive chain (walkModeChain). Offline only.
+  {"TROT",.9,.60,.115,0,.30,0,{1950,220},{.039,.049,.058},.0085,0,&kTrotTilt,&kTrotTilt,false,GaitType::TROT,.50,.45,.020}};
 // Register 85 is configured to cover every drive of the table.
 static_assert(kStandDrive.acc<=kAccCeilingTarget&&kWalkModes[0].drive.acc<=kAccCeilingTarget&&
               kWalkModes[1].drive.acc<=kAccCeilingTarget&&kWalkModes[2].drive.acc<=kAccCeilingTarget,"every drive within register 85");
+static_assert(kWalkModes[3].drive.acc<=kAccCeilingTarget,"the TROT drive within register 85");
+static_assert(sizeof(kWalkModes)/sizeof(kWalkModes[0])==kWalkModeCount,"one row per WALK mode");
 // stepWalkMode: the modes are ordered (a faster mode has the higher drive, so
 // the faster of two drives is one of the table's) and share the fore/aft COM
 // offsets, which therefore never change inside a walk.
@@ -106,7 +118,7 @@ static_assert(kWalkModes[0].drive.speed<kWalkModes[1].drive.speed&&kWalkModes[1]
               kWalkModes[0].drive.acc<kWalkModes[1].drive.acc&&kWalkModes[1].drive.acc<kWalkModes[2].drive.acc&&
               kWalkModes[0].periodS>kWalkModes[1].periodS&&kWalkModes[1].periodS>kWalkModes[2].periodS&&
               kWalkModes[0].swayXM==kWalkModes[1].swayXM&&kWalkModes[1].swayXM==kWalkModes[2].swayXM,"WALK modes ordered by speed");
-const WalkModeSpec& walkModeSpec(WalkMode m){return kWalkModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
+const WalkModeSpec& walkModeSpec(WalkMode m){return kWalkModes[static_cast<unsigned>(m)<kWalkModeCount?static_cast<unsigned>(m):0];}
 // JOYSTICK per mode (SimpleMotion.h JoystickSpec), per cycle of the mode's own law.
 // STANDARD (joystick_envelope gate mode 1, scan of 8: lateral 20/15 mm, yaw .16/.12,
 // sway 10/9/7.5 mm): 10 mm faults STOP_PLAN in random sequences (the 0.225 s
@@ -131,17 +143,24 @@ constexpr JoystickSpec kJoystickModes[]={kSlowJoystick,
 // sequences at full resolution (14/11, 32 seeds) -0.39 mm steered (stride over 2)
 // and -0.20 mm fore/aft (decrease over 3); 4 and 4: min 0.53 mm (steady steering
 // >= 2.1 mm, unchanged).
-  {kJoystickBackM,kJoystickStrideM,.012,.08,kWalkModes[2].swayYM,kJoystickSwayLowM,.0075,.0005,4}};
-const JoystickSpec& joystickSpec(WalkMode m){return kJoystickModes[static_cast<unsigned>(m)<3?static_cast<unsigned>(m):0];}
+  {kJoystickBackM,kJoystickStrideM,.012,.08,kWalkModes[2].swayYM,kJoystickSwayLowM,.0075,.0005,4},
+// TROT: forward only (no backward, no steered regime: lateral and yaw 0), no sway;
+// the forward decrease over 4 cycles as FAST.
+  {0,kJoystickStrideM,0,0,0,0,0,0,4}};
+static_assert(sizeof(kJoystickModes)/sizeof(kJoystickModes[0])==kWalkModeCount,"one joystick row per WALK mode");
+const JoystickSpec& joystickSpec(WalkMode m){return kJoystickModes[static_cast<unsigned>(m)<kWalkModeCount?static_cast<unsigned>(m):0];}
 bool parseWalkMode(const char* name,WalkMode& m){
-  for(unsigned i=0;i<3;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
+  for(unsigned i=0;i<kWalkModeCount;++i)if(name&&!std::strcmp(name,kWalkModes[i].name)){m=static_cast<WalkMode>(i);return true;}
   return false;
 }
 GaitParameters walkGait(unsigned stride,WalkMode mode){
   const auto& w=walkModeSpec(mode);
   GaitParameters g;g.heightM=baseLinkHeightFromNominalM(w.heightM);g.liftM=w.liftM;g.duty=w.duty;g.advanceXM=w.strideM[stride<3?stride:2];
   g.swayXM=w.swayXM;g.swayYM=w.swayYM;g.startCycles=kWalkStartCycles;g.stopCycles=kWalkStopCycles;
-  g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;return g;
+  g.comShiftXM=kWalkComShiftXM;g.swingRamp=w.swingRamp;g.swingRampEnd=w.swingRampEnd;g.settleCycles=kWalkSettleCycles;
+  g.liftRise=w.liftRise;g.liftFall=w.liftFall;
+  if(w.type==GaitType::TROT){g.type=GaitType::TROT;g.swayXM=g.swayYM=0;g.comShiftXM=w.trotComShiftXM;g.settleCycles=kTrotSettleCycles;}
+  return g;
 }
 GaitParameters steerGait(const double goal[3]){return steerGait(goal,WalkMode::SLOW);}
 GaitParameters steerGait(const double goal[3],WalkMode mode){
@@ -467,7 +486,8 @@ bool SimpleMotion::walkRecoveryStart(WalkRecoveryStart& start) const {
   for(unsigned i=0;i<12;++i)if(!port_->decodeRaw(i,commandedRaw_[i],jointSlot(held,i)))return false;
   const auto& g=gait_;
   c=cycles_+.5*stopPlan_.duration/period();
-  stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c*4)/4);
+  const double step=walkTouchdownStep(g);
+  stopCycle=stopCycle_>=0?stopCycle_:std::fmax(kWalkStartCycles,std::ceil(c/step)*step);
   c=std::fmin(c,stopCycle+g.stopCycles+gaitSettleCycles(g));
   auto track=track_;  // the admission check never advances the live track
   first=solveGait(g,gaitTrackCartesian(track,g,c,0,0,stopCycle+g.stopCycles),&walkPrevious_,false).target;
@@ -717,9 +737,10 @@ void SimpleMotion::joystickGoal(bool frontal,double goal[3]) const {
 void SimpleMotion::walkStop(){
   walkRequested_=false;
   if(state_==State::WALKING&&!walkStopping_){
-    // Decelerate from the next touchdown (quarter cycle) after the start
-    // ramp. Feet already planted or in flight keep their targets.
-    stopCycle_=std::fmax(kWalkStartCycles,std::ceil(cycles_*4)/4);walkStopping_=true;
+    // Decelerate from the next touchdown (quarter cycle; TROT: half, a pair)
+    // after the start ramp. Feet already planted or in flight keep their targets.
+    const double step=walkTouchdownStep(gait_);
+    stopCycle_=std::fmax(kWalkStartCycles,std::ceil(cycles_/step)*step);walkStopping_=true;
     reason_="WALK_STOPPING";
   }
 }
@@ -1138,7 +1159,8 @@ const char* SimpleMotion::selectWalkMode(WalkMode m){
 void SimpleMotion::stepWalkMode(double eased){
   const double dt=eased-modeEased_,dc=dt/walkPeriod_;modeEased_=eased;
   if(!walkModeLive())return;
-  if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling){
+  // TROT and the crawl never change into each other inside a walk (walkModeFollows).
+  if(selectedMode_!=walkTarget_&&walkModeSpec(selectedMode_).drive.acc<=input_.accCeiling&&walkModeChain(walkMode_,selectedMode_)){
     walkTarget_=selectedMode_;requestedHeight_=walkModeSpec(walkTarget_).heightM;}
   const auto& from=walkModeSpec(walkMode_);const auto& to=walkModeSpec(walkTarget_);
   const bool shaped=walkMode_==walkTarget_;
@@ -1187,6 +1209,7 @@ void SimpleMotion::stepWalkMode(double eased){
   const double r=rollCorrection_*correctionScale_,p=pitchCorrection_*correctionScale_;double rb=c*r+s*p,pb=-s*r+c*p;
   if(projectWalkTilt(stride_==2?*to.tiltTop:*to.tiltShort,rb,pb))return;
   gait_.duty=shape.duty;gait_.liftM=shape.liftM;gait_.swingRamp=shape.swingRamp;gait_.swingRampEnd=shape.swingRampEnd;gait_.edgeTiltRad=shape.edgeTiltRad;
+  gait_.liftRise=shape.liftRise;gait_.liftFall=shape.liftFall;
   walkMode_=walkTarget_;
 }
 bool SimpleMotion::regimeHandover(bool toSteered) const {
@@ -1551,7 +1574,7 @@ namespace {
 // body pose continuous. Nor is the body height: a WALK mode change moves it by
 // 0.04 mm per release (kWalkModeHeightRate), interpolated like a retarget.
 bool sameLawShape(const GaitParameters& a,const GaitParameters& b){
-  return a.type==b.type&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&
+  return a.type==b.type&&a.liftM==b.liftM&&a.duty==b.duty&&a.swayXM==b.swayXM&&a.liftRise==b.liftRise&&a.liftFall==b.liftFall&&
     a.startCycles==b.startCycles&&a.stopCycles==b.stopCycles&&a.reverse==b.reverse&&a.edgeTiltRad==b.edgeTiltRad&&a.maxCondition==b.maxCondition&&
     a.comShiftXM==b.comShiftXM&&a.swingRamp==b.swingRamp&&a.swingRampEnd==b.swingRampEnd&&a.settleCycles==b.settleCycles;
 }

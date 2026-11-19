@@ -60,7 +60,7 @@ struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0
 int main(int argc,char** argv){
   // scenario: holds "seconds:vx[,vy,yaw_rate]" (SI); vx '-' = silent client;
   // "rand:SEED:SECONDS" = random commands inside the Controller ellipsoid.
-  // JOY_MODE 0|1|2 (vNext): the joystick walks that WALK mode's own law; limits per
+  // JOY_MODE 0|1|2|3 (vNext; 3 TROT, 2026-11-19): the joystick walks that WALK mode's own law; limits per
   // cycle of its period (JoystickSpec). "--limits" prints them (m/s, rad/s) for the script:
   // steered fore/aft, lateral, yaw, published forward top, backward.
   const auto mode=static_cast<simple::WalkMode>(std::getenv("JOY_MODE")?std::atoi(std::getenv("JOY_MODE")):0);
@@ -80,6 +80,7 @@ int main(int argc,char** argv){
       for(double t=0;t<total;){Step s{.25+std::rand()%700/100.,{0,0,0},false};double n=0;
         for(double& v:s.v){v=std::rand()%2001/1000.-1;n+=v*v;}
         n=std::sqrt(n);const double radius=std::rand()%3==0?1:std::rand()%1001/1000.;for(unsigned j=0;j<3;++j)s.v[j]*=radius/n*lim[j];
+        if(js.backM<=0)s.v[0]=std::abs(s.v[0]);  // a mode without backward (TROT): forward demands, the page sends no other
         steps.push_back(s);t+=s.seconds;}
       steps.push_back({1,{0,0,0},false});}
     else if(std::sscanf(argv[a],"walk:%d:%lf",&seed,&total)==2){Step s{total,{0,0,0},false};s.walk=int(seed);steps.push_back(s);}  // "walk:<preset>:<seconds>"

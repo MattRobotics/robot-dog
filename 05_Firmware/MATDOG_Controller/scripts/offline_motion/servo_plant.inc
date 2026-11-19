@@ -74,7 +74,10 @@ static Param draw(std::mt19937& g,double volt){std::uniform_real_distribution<do
 // then the walk resumed (STAND recovery); 2: IMU at the mode's pitch-down vertex;
 // 3 (2026-11-10): the selector moved four times during the walk (every mode
 // change up and down), a STOP 1 s into the second and the fourth change, each
-// verified, then the walk resumed.
+// verified, then the walk resumed; 8 (TROT, 2026-11-19): the other family selected
+// during the walk (the next walk's), a STOP 17 s later (verified, resumed in the
+// walk's own mode), WALK STOP, then the next walk in the selected family and a STOP
+// 12 s into it.
 static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
   std::mt19937 g(seed);Rig r;Out o;double boxOut=0;  // real joint beyond the WALK box during a STOP, ticks
   if(r.m.stand(.15,r.p.now)){o.faults=1;o.reason="STAND_REFUSED";return o;}
@@ -95,7 +98,13 @@ static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
   const unsigned cycleReleases=unsigned(w.periodS/.02);
   for(unsigned n=0;n<4500&&!o.faults;++n){pl.tick();watch();if(r.m.state()==simple::State::WALKING){++o.walkReleases;o.maxTrack=std::max(o.maxTrack,pl.tracking());}
     if(scenario==3&&(n==300||n==1100||n==1900||n==2700))r.m.selectWalkMode(static_cast<simple::WalkMode>((unsigned(mode)+1+n/800)%3));
-    if((scenario==1&&n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8)||(scenario==3&&(n==1150||n==2750))){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;
+    if(scenario==8&&n==300)r.m.selectWalkMode(mode==simple::WalkMode::TROT?simple::WalkMode::STANDARD:simple::WalkMode::TROT);
+    if(scenario==8&&n==2000&&r.m.state()==simple::State::WALKING){r.m.walkStop();
+      for(unsigned k=0;k<4000&&r.m.state()!=simple::State::STANDING&&!o.faults;++k){pl.tick();watch();}
+      if(!o.faults&&r.m.walk(2,r.p.now)){o.faults=1;o.reason="NEXT_WALK_REFUSED";break;}
+      for(unsigned k=0;k<4000&&r.m.state()!=simple::State::WALKING&&!o.faults;++k){pl.tick();watch();}
+      if(!o.faults&&r.m.walkMode()!=r.m.selectedWalkMode()){o.faults=1;o.reason="NEXT_WALK_NOT_SELECTED_MODE";break;}}
+    if((scenario==1&&n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8)||(scenario==3&&(n==1150||n==2750))||(scenario==8&&(n==1150||n==2600))){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;
       for(unsigned k=0;k<600&&!r.m.stopVerified()&&!o.faults;++k){pl.tick();watch();boxOut=std::max(boxOut,measuredOut(r,simple::kWalkBox));}
       o.maxStopBoxOut=std::max(o.maxStopBoxOut,boxOut);
       if(o.faults||!r.m.stopVerified())break;
@@ -149,15 +158,18 @@ static Out runJoy(simple::WalkMode mode,int scenario,unsigned seed,double volt){
 }
 static void matrix(){
   const int onlyMode=getenv("MODE")?atoi(getenv("MODE")):-1,onlyScenario=getenv("SCENARIO")?atoi(getenv("SCENARIO")):-1;
-  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX","MODE_CHANGES","JOY_STEER_STOP8","JOY_BACK_STOP8","JOY_STEER_IMU","JOY_BACK_MODES"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
-  for(unsigned m=0;m<3;++m)for(int sc=0;sc<8;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario))continue;
+  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX","MODE_CHANGES","JOY_STEER_STOP8","JOY_BACK_STOP8","JOY_STEER_IMU","JOY_BACK_MODES","FAMILY_NEXT_WALK"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
+  // Scenario 8 (2026-11-19) runs only when asked for (SCENARIO=8): the default matrix is the Stable one, plus TROT.
+  for(unsigned m=0;m<simple::kWalkModeCount;++m)for(int sc=0;sc<9;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario)||(onlyScenario<0&&sc==8))continue;
     if((sc==5||sc==7)&&simple::joystickSpec(static_cast<simple::WalkMode>(m)).backM<=0){
-      std::printf("PLANT %-8s %-16s %4.1fV NOT_APPLICABLE (no backward on this law)\n",simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt);continue;}unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
+      std::printf("PLANT %-8s %-16s %4.1fV NOT_APPLICABLE (no backward on this law)\n",simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt);continue;}
+    if((sc==4||sc==6)&&simple::joystickSpec(static_cast<simple::WalkMode>(m)).lateralM<=0){
+      std::printf("PLANT %-8s %-16s %4.1fV NOT_APPLICABLE (no steering on this law)\n",simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt);continue;}unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
     // vNext audit: every planned STOP counts (8 in scenarios 1, 4, 5, 6; 2 in 3
     // and 7); one never attempted (the walk was not walking then) is MISSED, and
     // each failing seed is listed with its cause.
-    const unsigned planned=sc==1||sc==4||sc==5||sc==6?8:sc==3||sc==7?2:0;unsigned missed=0;
-    for(unsigned seed=1;seed<=seeds;++seed){const auto o=sc<4?run(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt):runJoy(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt);f+=o.faults;stopsOk+=o.stopsOk;stopsTried+=o.stopsTried;
+    const unsigned planned=sc==1||sc==4||sc==5||sc==6?8:sc==3||sc==7||sc==8?2:0;unsigned missed=0;
+    for(unsigned seed=1;seed<=seeds;++seed){const auto o=sc<4||sc==8?run(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt):runJoy(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt);f+=o.faults;stopsOk+=o.stopsOk;stopsTried+=o.stopsTried;
       if(!o.faults&&o.stopsTried<planned)missed+=planned-o.stopsTried;
       if(o.faults||o.stopsTried<planned)std::printf("  seed %u (%u) %.1fV: %s stops %u/%u of %u planned at c%.3f\n",seed,seed*7919+sc*31+m,volt,o.faults?o.reason:"STOP_NOT_ATTEMPTED",o.stopsOk,o.stopsTried,planned,o.cycles);
       track=std::max(track,o.maxTrack);over=std::max(over,o.maxStopOvershoot);settle=std::max(settle,o.maxStopSettleS);boxOut=std::max(boxOut,o.maxStopBoxOut);sb+=o.speedBound;mv+=o.moving;

@@ -3,8 +3,8 @@
   "updated_copied_sources": {
     "05_Firmware/MATDOG_Controller/src/motion/FootContact.cpp": "697cd9adc1705361241aa2397ae67053c7fe4097cfa098b03a03ea97abad2896",
     "05_Firmware/MATDOG_Controller/src/motion/FootContact.h": "95d3b44b1c5f6b204e3850a381b9895606777381e23eb5bfa1ef2e20be9b6cba",
-    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "e3ae6c1336eedc792444b78fa61df8900b9ee0dd2a58b0a1515d43563b923581",
-    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "e6a5935b9d14a21cd983ba0223db3a77fe875e3ffe72ea7c3124a329930dee46",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.cpp": "a862f52c1852097494a650406ab89e9fe916b3bfc13c55d1c3ff00036c6e6366",
+    "05_Firmware/MATDOG_Controller/src/motion/Gait.h": "ed26993ce82f5c9bd9c85fb11a5d2bc83004250a2937481990502c92ba2786b7",
     "05_Firmware/MATDOG_Controller/src/motion/LegInverseKinematics.cpp": "872796214342e0c9b6651636cd7cbf1aec1ac80ee68b444699e31007fcffdf5e",
     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "ac30b3cd9edd2ef5aee1d4902d3fc857e0328897af05c9f984befdd454547d45",
     "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "0d31049cd8c82b8d16c217cb0d1ebe4f17655f7adef113b0e70c9206e647f80c",

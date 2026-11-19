@@ -49,8 +49,15 @@ constexpr double kStrideM[]={.050,.075,.100};
 // first second (start and STOP recovery), then real time minus 0.5 s.
 inline double walkClockS(double t){const double u=std::fmin(1.,t);return t<1?u*u*u*u*(2.5+u*(-3+u)):t-.5;}
 // The two walking laws (single definition for the firmware and offline tools).
-// WALK modes: see WalkModeSpec below.
-enum class WalkMode : uint8_t { SLOW, STANDARD, FAST };
+// WALK modes: see WalkModeSpec below. SLOW, STANDARD and FAST are one crawl law
+// at three time scales; TROT (2026-11-19) is the diagonal law of the same Gait
+// generator, a mode of its own (it never replaces or reorders the crawl modes).
+enum class WalkMode : uint8_t { SLOW, STANDARD, FAST, TROT };
+constexpr unsigned kWalkModeCount=4;
+// The progressive chain (stepWalkMode): SLOW, STANDARD and FAST change into each
+// other inside a walk. TROT and the crawl do not: a walk of one family never takes
+// a selection of the other, which is the next walk's (as a backward walk keeps its law).
+inline bool walkModeChain(WalkMode a,WalkMode b){return (a==WalkMode::TROT)==(b==WalkMode::TROT);}
 motion::GaitParameters walkGait(unsigned stride,WalkMode mode=WalkMode::SLOW);
 motion::GaitParameters steerGait(const double goal[3]);
 // The steered regime of a mode's own law (SLOW: steerGait above, bit for bit).
@@ -171,6 +178,14 @@ constexpr TiltVertex kWalkTilt100[]={{0.019019,0.000000},{0.019297,0.007993},{0.
 // mrad (SLOW100 -12.8; dev.4 on the ground asked -15 to -18 in WALK100).
 constexpr TiltVertex kStandardTilt[16]={{0.009136,0.000000},{0.009274,0.003841},{0.009478,0.009478},{0.008380,0.020231},{0.000000,0.020591},{-0.008380,0.020231},{-0.009498,0.009498},{-0.009289,0.003847},{-0.009136,0.000000},{-0.008987,-0.003723},{-0.008771,-0.008771},{-0.006111,-0.014753},{-0.000000,-0.017136},{0.006111,-0.014753},{0.008771,-0.008771},{0.008987,-0.003723}};
 constexpr TiltVertex kFastTilt[16]={{0.011837,0.000000},{0.012562,0.005203},{0.013663,0.013663},{0.011042,0.026656},{0.000000,0.026850},{-0.011042,0.026656},{-0.013663,0.013663},{-0.012562,0.005203},{-0.011837,0.000000},{-0.011122,-0.004607},{-0.010201,-0.010201},{-0.008215,-0.019833},{-0.000000,-0.034234},{0.008215,-0.019833},{0.010201,-0.010201},{0.011122,-0.004607}};
+// TROT (2026-11-19, TROT58): its own envelope, derived the same way on its own law
+// (TROT46's procedure). The geometric search (--mode 3 --stride 2 --search 16
+// --phases 8, x0.85): pitch-down -127.5, up +96.1, roll +-26.9 mrad (TROT46: up
+// +110.4; the longer, higher swing narrows it upwards). Servo plant MODE=3 (WALK
+// 90 s, 8 STOP + recovery, IMU at 0.9 of the pitch-down vertex, selections of the
+// other family; 11.1 and 9.6 V): see the integration report. Rechecked on every
+// preset (--stride 0|1|2). Geometry and the plant only.
+constexpr TiltVertex kTrotTilt[16]={{0.026926,0.000000},{0.026860,0.011126},{0.026457,0.026457},{0.025516,0.061601},{0.000000,0.096092},{-0.025686,0.062011},{-0.026545,0.026545},{-0.026918,0.011150},{-0.026926,0.000000},{-0.026487,-0.010971},{-0.025885,-0.025885},{-0.024538,-0.059241},{-0.000000,-0.127469},{0.024538,-0.059241},{0.025885,-0.025885},{0.026487,-0.010971}};
 // Steered IMU envelope (heading frame): inner convex envelope of kSteer, gen-1
 // RAW, the tread fillet up to kEdgeContactMaxTiltRad and STOP over the steered
 // phase set (offline rays, run_joystick_envelope.sh). Shared with the gate.
@@ -314,7 +329,16 @@ struct WalkModeSpec {
   double liftM,swayYM;
   const TiltPolygon *tiltShort,*tiltTop;  // IMU envelope of presets 0-1 and of preset 2
   bool hardwareQualified;
+  // TROT (2026-11-19): the law's type, its vertical swing profile (Gait.h
+  // liftRise/liftFall; 0: the bell) and its COM offset over the diagonal
+  // crossing. The defaults are the crawl rows' own law, unchanged.
+  motion::GaitType type=motion::GaitType::WALK;double liftRise=0,liftFall=0,trotComShiftXM=0;
 };
+// TROT: the recentring window after its terminal touchdown (four feet down), cycles.
+constexpr double kTrotSettleCycles=.5;
+// Touchdown instants a WALK STOP terminal can take: every quarter cycle for the
+// crawl (one leg at a time), every half cycle for TROT (a diagonal pair).
+inline double walkTouchdownStep(const motion::GaitParameters& g){return g.type==motion::GaitType::TROT?.5:.25;}
 const WalkModeSpec& walkModeSpec(WalkMode);
 const JoystickSpec& joystickSpec(WalkMode);
 bool parseWalkMode(const char*,WalkMode&);
@@ -452,18 +476,24 @@ class SimpleMotion {
   // stays out (run_servo_plant scenario 7, 2026-11-11: a STOP 1 s into a backward
   // STANDARD->FAST change met STOP_MEASURED_OUTSIDE_BOX in 2 of 6 seeds per voltage).
   bool walkModeLive() const { return phase_==Phase::WALK&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&!steered_; }
+  // TROT (2026-11-19): such a walk follows a selection of its own family only
+  // (walkModeChain); one of the other family is the next walk's, and this walk
+  // keeps following the latest of its own (walkTarget_, a change in progress included).
+  bool walkModeFollows() const { return walkModeLive()&&walkModeChain(walkMode_,selectedMode_); }
   bool walkSteered() const { return phase_==Phase::WALK&&steered_; }
   // A steered forward joystick walk, not stopping: it takes the selection at its
   // handover back to the fore/aft regime (a steered backward walk returns to a
   // backward walk, which keeps its law: the next walk takes it).
-  bool walkModeAtHandover() const { return walkSteered()&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse; }
+  bool walkModeAtHandover() const { return walkSteered()&&state_==State::WALKING&&!walkStopping_&&!walkRecover_&&!gait_.reverse&&walkModeChain(walkMode_,selectedMode_); }
   // The mode whose joystick limits apply now (drive(), status walk_mode.joystick):
   // a walk rising to start, its latched mode; a joystick walk that cannot take
   // the selection now (steered, backward, stopping), its own law's until it can;
-  // otherwise the selection (a live change, or the next walk).
+  // a walk following its own family while the other is selected, the mode it moves
+  // to; otherwise the selection (a live change, or the next walk).
   WalkMode joystickMode() const {
     if(joystick_&&walkRequested_&&phase_!=Phase::WALK)return pendingMode_;
-    return phase_==Phase::WALK&&state_==State::WALKING&&!walkModeLive()?walkMode_:selectedMode_;}
+    if(phase_==Phase::WALK&&state_==State::WALKING&&!walkModeFollows())return walkModeLive()?walkTarget_:walkMode_;
+    return selectedMode_;}
   double walkHeightM() const { return walkHeight_; }  // nominal height of that walk's law
   // Gait time t s after the start: eased in (walkClockS, its first four-contact
   // window carries the COM offset).

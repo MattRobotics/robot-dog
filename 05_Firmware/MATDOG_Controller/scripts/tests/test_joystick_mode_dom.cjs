@@ -41,7 +41,8 @@ async function boot() {
   // law: the walk's mode; a backward walk keeps it (joystickMode) until the walk ends.
   // fail503: the next joystick refreshes the transport answers 503 MOTION_BUDGET_UNAVAILABLE (outcome unknown).
   const ctl = { selected: 'SLOW', law: 'SLOW', backward: false, walking: false, stop: false, rejected: 0, lastJoystick: 0, maxGap: 0, holdNext: false, held: [], fail503: 0 };
-  const held = () => ctl.walking && ctl.backward;
+  // TROT (2026-11-19): a walk of the other family (TROT or the crawl) keeps its law too.
+  const held = () => ctl.walking && (ctl.backward || (ctl.law === 'TROT') !== (ctl.selected === 'TROT'));
   const joyMode = () => held() ? ctl.law : ctl.selected;
   const statusBody = () => { const s = JSON.parse(ctl.stop ? fx.status_stopped_on : ctl.walking ? fx.status_joystick_walking : fx.status_ready);
     s.walk_mode = Object.assign({}, s.walk_mode, { selected: ctl.selected, target: held() ? ctl.law : ctl.selected, active: held() ? ctl.law : ctl.selected });
@@ -54,7 +55,8 @@ async function boot() {
       if (ctl.stop) return withAck(fx.ack_walk_accepted, 'REJECTED', 'STOP_LATCHED');  // SimpleMotion::drive while stopping
       if (!p.vx && !p.vy && !p.yaw_rate) { ctl.walking = false; ctl.backward = false; return fx.ack_walk_stop; }
       const j = lim[joyMode()], r = [top[joyMode()], j.vy_max_m_s, j.yaw_rate_max_rad_s];
-      const norm = (p.vx / r[0]) ** 2 + (p.vy / r[1]) ** 2 + (p.yaw_rate / r[2]) ** 2;
+      // A zero range (TROT: no lateral or yaw) admits only a zero component, as SimpleMotion::drive.
+      const norm = [p.vx, p.vy, p.yaw_rate].reduce((n, v, k) => n + (r[k] > 0 ? (v / r[k]) ** 2 : v ? Infinity : 0), 0);
       if (norm > 1 + 1e-9 || -p.vx > j.vx_back_max_m_s + 1e-12) { ++ctl.rejected; return withAck(fx.ack_walk_accepted, 'REJECTED', 'JOYSTICK_VELOCITY_RANGE'); }
       if (ctl.walking && ctl.lastJoystick) ctl.maxGap = Math.max(ctl.maxGap, clock - ctl.lastJoystick);
       if (!ctl.walking) { ctl.law = ctl.selected; ctl.backward = p.vx < 0; }
@@ -232,5 +234,45 @@ async function boot() {
   assert(ctl.fail503 === 0 && last().params.vx === top.SLOW && ctl.walking, 'answered again: the held stick continues');
   pointer('pointerup', 0, 0); await settle();
   assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'release after the loss: neutral');
-  console.log(`JOYSTICK_MODE_DOM = PASS (full scale SLOW/STANDARD/FAST ${top.SLOW * 1e3}/${top.STANDARD * 1e3}/${top.FAST * 1e3} mm/s, half stick ${(fraction(.5) * 100).toFixed(1)} %, lateral on every mode's own limits, backward where the law has it; held-stick change in order with refreshes at most ${changeGap} ms apart (deadline 1 s); timeout explicit; release and STOP first; repeated selections consistent; shipped page, real fixtures, no device)`);
+  // 8. TROT (2026-11-19): its own gait selector, apart from the three WALK presets.
+  //    Selected at rest it is the next walk's law: the stick's full scale is its
+  //    top speed, forward only (no lateral, yaw or backward: neutral). A WALK
+  //    preset clicked in TROT returns the gait to WALK on that preset. During a
+  //    crawl walk a TROT selection is the next walk's (WALK_MODE_NEXT_WALK): the
+  //    held stick keeps the crawl's limits until the walk ends.
+  assert(top.TROT > 0 && lim.TROT && lim.TROT.vy_max_m_s === 0 && lim.TROT.yaw_rate_max_rad_s === 0 && lim.TROT.vx_back_max_m_s === 0, 'TROT publishes forward only');
+  const gait = () => q('input[name="simple-gait"]:checked').value;
+  const clickGait = g => q(`input[name="simple-gait"][value="${g}"]`).click();
+  assert.strictEqual(q('#simple-walk-mode').querySelectorAll('input').length, 3, 'the WALK selector keeps its three presets');
+  click('STANDARD'); await settle(); await p.poll();
+  const mark9 = cmds().length; clickGait('TROT'); await settle(); await p.poll();
+  assert.deepStrictEqual(cmds().slice(mark9).map(c => c.type + ':' + c.params.gait), ['GAIT.SELECT:TROT'], 'the gait selector sends GAIT.SELECT TROT');
+  assert(ctl.selected === 'TROT' && gait() === 'TROT' && radio() === 'STANDARD', 'TROT selected; the WALK preset kept for a return to WALK');
+  pointer('pointerdown', 1, 0); await settle(); await p.tick();
+  assert.deepStrictEqual(last().params, { vx: top.TROT, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'TROT full scale = its top speed');
+  await p.poll(); assert(ctl.walking && ctl.law === 'TROT', 'the walk trots');
+  pointer('pointermove', .7071, -.7071); await p.tick();
+  assert(last().params.vx > 0 && last().params.vy === 0 && last().params.yaw_rate === 0, 'diagonal stick: the forward part alone');
+  pointer('pointermove', 0, 1); await p.tick();
+  assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'lateral stick in TROT: neutral');
+  pointer('pointermove', 1, 0); await p.tick(); await p.poll();
+  pointer('pointermove', -1, 0); await p.tick();
+  assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'backward stick in TROT: neutral (no backward on this law)');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+  click('SLOW'); await settle(); await p.poll();
+  assert(gait() === 'WALK' && radio() === 'SLOW' && ctl.selected === 'SLOW' && last().type === 'GAIT.SELECT' && last().params.gait === 'SLOW', 'a WALK preset clicked in TROT: back to WALK on it');
+  pointer('pointerdown', 1, 0); await settle(); await p.tick(); await p.poll();
+  assert(ctl.walking && ctl.law === 'SLOW' && last().params.vx === top.SLOW, 'walking SLOW');
+  clickGait('TROT'); await settle(); await p.tick();
+  assert(ctl.selected === 'TROT' && last().type === 'BASE_VELOCITY' && last().params.vx === top.SLOW, 'TROT during the SLOW walk: next walk, the held stick keeps SLOW\'s scale (' + last().params.vx + ')');
+  await p.poll(); await p.tick();
+  assert(last().params.vx === top.SLOW && ctl.walking && ctl.law === 'SLOW' && gait() === 'TROT', 'still SLOW\'s scale after the status');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+  pointer('pointerdown', 1, 0); await settle(); await p.tick();
+  assert(last().params.vx === top.TROT && ctl.law === 'TROT', 'the next walk trots at its full scale');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+  clickGait('WALK'); await settle(); await p.poll();
+  assert(ctl.selected === 'SLOW' && gait() === 'WALK' && radio() === 'SLOW', 'back to WALK on its kept preset');
+  assert.strictEqual(ctl.rejected, 0, 'no TROT demand beyond the limits the Controller applies');
+  console.log(`JOYSTICK_MODE_DOM = PASS (TROT gait selector apart from the three WALK presets, forward only at ${top.TROT * 1e3} mm/s, next-walk between gaits; full scale SLOW/STANDARD/FAST ${top.SLOW * 1e3}/${top.STANDARD * 1e3}/${top.FAST * 1e3} mm/s, half stick ${(fraction(.5) * 100).toFixed(1)} %, lateral on every mode's own limits, backward where the law has it; held-stick change in order with refreshes at most ${changeGap} ms apart (deadline 1 s); timeout explicit; release and STOP first; repeated selections consistent; shipped page, real fixtures, no device)`);
 })().catch(e => { console.error(e); process.exit(1); });
