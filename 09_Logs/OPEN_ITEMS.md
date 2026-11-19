@@ -1,4 +1,98 @@
-# Stato operativo corrente — 10/11/2026: `1.0.2-dev.6` ACC 220 installata (build di sviluppo)
+# Stato operativo corrente — 19/11/2026: Stable `v1.0.2` (`1314bc4`)
+
+**Installata e rilasciata:** `1.0.2-dev.7`, build `1314bc411c58`, commit `1314bc411c589c4216e95629f4665d9d01f05781`, APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
+- È promossa senza ricompilazione come GitHub Release [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2): Stable, Motion fixture-qualified.
+- **Rollback:** `30c894a`, APP `03c863cc…`.
+- **Stable precedente:** `v1.0.1`, immutabile.
+- **Evidenze:** [Motion_1314bc4_HW_2026-11-19](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest della release](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md) · [ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md).
+
+## Chiusi (VERIFIED HARDWARE sulla fixture, 19/11/2026)
+
+| Area | Stato |
+|---|---|
+| Motion Timing P0 | **CLOSED — VERIFIED HARDWARE nel perimetro delle prove del 19/11.** Massimo 12 729 µs su 16 000 µs (margine 3 271 µs); 0 overrun; 0 release perse in catena 8/8, D1, D2, blocco D, S9. Congelato: si riapre solo con nuove evidenze di regressione ([ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md)). Non è un WCET né una qualifica a terra |
+| STOP | USB 17/17: 14 in catena, 3 nel completamento, verificati in 2,2–3,2 s. HTTP dalla dashboard 2/2, con ripresa STAND |
+| Joystick indietro, laterale e in rotazione | STANDARD nel blocco D (27/27) e SLOW sterzato in S9 (15/15), sulla fixture. Velocità eseguite solo sull'asse richiesto; nessun `WALK_IK_OR_WORKSPACE` |
+| Dashboard D1/D2 | STAND, HEIGHT, WALK STANDARD, WALK STOP, STOP HTTP e ripresa: PASS con 1 e 2 client HTTP |
+| Margine di heap interno con 2 client | Misurato sulla build operativa: `heap_min_free` minimo 43 368 B, soglia 24 576. Il 16/11 la diagnostica aveva 1 096 B di margine |
+| Prima ACQUIRE dopo il reset del flash | 5,0 ms, 0 release perse (B, S, W PASS) |
+| Blocco D | Eseguito su `1314bc4` (27/27). Il blocco C, la finestra di 30 s in avanti, non è stato ripetuto: il cammino in avanti è coperto da E, F e H |
+
+## Sospesi
+
+| Area | Stato |
+|---|---|
+| Silenzi DALY all'accensione | **RCA congelata il 19/11.** A/B dev.5 contro `30c894a` INCONCLUSIVE; B2 del 19/11 CLEAN 358/358; dopo il flash di `1314bc4`, 692 letture valide senza errori. Causa **UNKNOWN**; nessuna modifica BMS né soluzione dimostrata. Si osserva con la telemetria esistente e si riapre su una nuova anomalia documentata. Precauzione invariata: QON + 6 min e 150 poll validi prima di Motion ([B2](Validation_Reports/BMS_DALY_B2_2026-11-19/README.md)) |
+
+## Da qualificare
+
+| Area | Stato | Issue |
+|---|---|---|
+| Locomozione a terra G0–G5 | Mai qualificata. STANDARD e FAST hanno `hardware_qualified=false`; la v1.0.2 è qualificata solo sulla fixture | #52 |
+| STOP a terra a fine swing anteriore; camminate lunghe a terra; frenata sotto carico | Non provati | #52 |
+| Condizione `random_3` di `kSteer` (beccheggio ≈ +55 mrad, passo 40 mm) | Certificata solo offline; S9 è rimasto entro ±31 mrad | #52 |
+| Ciclo a freddo S7 su `1314bc4` (ACQUIRE B dopo freddo) | Non eseguito il 19/11; ACQUIRE è invariato rispetto a `30c894a` | — |
+| Temperature spurie | Picchi isolati di un campione (fino a 65–69 °C) su giunti diversi, in `1314bc4` come in `30c894a`; nessuna protezione scattata | #52 |
+| Joystick dalla dashboard (pressione tenuta) | Non provato il 19/11; via USB è coperto | #62 |
+| HTTP con coppia ON, STOP su telefono durante il caricamento del Twin, UX del Twin, LED | Come al 07/11 | #62 |
+| RESTORE manuale e manutenzione | Come al 07/11 | #48 |
+| Gemello MuJoCo: carichi a terra | Come al 10/11 | — |
+
+## Prossima milestone: Ground Locomotion & Gait Performance
+
+**Non è sviluppata oggi:** qui si registrano solo il punto di partenza e i limiti da misurare.
+
+**Punto di partenza (`v1.0.2`, solo fixture):**
+
+| Modo | Velocità massima | Alzata del piede |
+|---|---|---|
+| SLOW | 20 mm/s | 8 mm |
+| STANDARD | 30 mm/s | 8 mm |
+| FAST | 29,6 mm/s | 6 mm |
+
+- Joystick in avanti, indietro, laterale e in rotazione.
+- Margine P0 di 3,3 ms, con READ e FRAME come costi principali.
+
+**Limiti da misurare a terra, con criteri da fissare prima delle prove:**
+- velocità reale rispetto a quella comandata, per modo;
+- fluidità: oscillazioni del corpo, continuità dei frame;
+- ampiezza dell'alzata e distacco reale del piede (nel gemello il piede in swing tocca);
+- tracking dei giunti sotto carico e cedimento delle anche;
+- stabilità e margine di supporto;
+- STOP a terra;
+- prova G0–G5 con batteria ≥ 11,0 V e anticaduta.
+
+**Riferimento:** issue [#52](https://github.com/MattRobotics/robot-dog/issues/52).
+
+# Stato al 18/11/2026 (storico)
+
+**Installata:** `30c894a` (`1.0.2-dev.7`, APP `03c863cc…`), VERIFIED HARDWARE su fixture (catena 140/140).
+- **P0:** ancora aperto (20 761 µs, 2 overrun).
+- **Candidati offline:** P1, FP32 e `kSteer`.
+- **DALY:** A/B INCONCLUSIVE.
+- **Riferimenti:** [handoff del 18/11](Development_Log/2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md) · [qualifica di `30c894a`](Validation_Reports/Motion_30c894a_HW_2026-11-18/README.md) · [campagna P0 del 17/11](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/REPORT.md).
+
+# Stato al 16/11/2026 sera (storico, branch `integ/matdog-unified-operational-20261114`)
+
+**Installata:** `1.0.2-dev.8` **diagnostica** `6be46906d069` (`a86c680` + F3 + IRAM G2s), APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`.
+- **VERIFIED HARDWARE il 16/11 su fixture:** mirata 12/12, A/B 18/18, FAST E–G 20/20, H 20/20, nessun fault. Copre STAND 80–150, WALK STANDARD/SLOW/FAST 29,6 mm/s, STOP (a riposo, in camminata, nel FAST, dentro la RECOVERY) e RECOVERY.
+- **Calibrazioni:** NVS gen-1 e restore 12/12 invariati.
+- **Rollback:** `a86c680`.
+- **Sorgente del branch:** integra la stessa legge Motion senza strumentazione (build `33134ae28260`, non installata).
+- **Riferimenti:** [rapporto](Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md) · [handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md) · [ADR-007](Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md).
+
+## Residui al 16/11/2026
+
+| Area | Stato |
+|---|---|
+| Motion Timing P0 | **Aperto.** Su `6be4690` restano 2 overrun e release fino a 20,8 ms: STAND/HEIGHT/PRONE attenuate a 2 soluzioni; picchi WALK e RECOVERY 19,5–20 ms. Criterio di chiusura: 0 perse operative, 0 overrun, massimo ≤ 16 ms |
+| Margine di heap interno | 1 096 B sopra 24 KB con 2 client HTTP sulla build diagnostica. Un terzo client (dashboard o watcher) lo annulla. Build operativa: +8 168 B di heap statico (ELF), margine non misurato |
+| DALY all'accensione | Silenzi con RX idle-high, fino a 182 s, uno anche dal primo poll; causa **UNKNOWN**. Manca la misura RS485 in solo ascolto su A/B durante un silenzio. Precauzione: QON + 6 min e 150 poll validi prima di Motion |
+| Blocchi C e D su `6be4690` | Non ripetuti (frame invariati fuori dal FAST, VERIFIED OFFLINE); ultima esecuzione su `a86c680` il 16/11 pomeriggio |
+| Prove a terra delle build dev.8 | Non eseguite |
+| Build operativa integrata `33134ae` | Solo VERIFIED OFFLINE; mai installata |
+
+# Stato al 10/11/2026 (storico): `1.0.2-dev.6` ACC 220 installata (build di sviluppo)
 
 **Installata:** `1.0.2-dev.6`, sorgente `450d2c7` (in `main` dalla PR #67), build `450d2c793dcb`, APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 - **VERIFIED HARDWARE il 10/11:** fixture Q1–Q8 qualificata; 14/14 STOP verificati (8 fixture, 6 terra); 0 fault Motion; registro 85 = 220 su 12/12.

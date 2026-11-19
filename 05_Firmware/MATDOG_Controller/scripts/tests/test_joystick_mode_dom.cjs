@@ -4,7 +4,10 @@
 // Controller model answers like MotionService/SimpleMotion: a selection takes
 // effect only when ACCEPTED (refused while STOP is latched), a joystick demand
 // is ACCEPTED only inside the ellipsoid of the Controller's selected mode
-// (forward only off SLOW), otherwise REJECTED. Same harness and dependency
+// (vNext: lateral, yaw and backward of that mode's capabilities joystick
+// limits), otherwise REJECTED. vNext audit: a backward walk keeps its own law's
+// limits after a selection (ACK WALK_MODE_NEXT_WALK, status walk_mode.joystick);
+// the page keeps the held stick on them. Same harness and dependency
 // (jsdom) as test_simple_dashboard_dom.cjs. No device, no network.
 const { JSDOM } = require('jsdom');
 const fs = require('fs');
@@ -17,8 +20,16 @@ const portal = fs.readFileSync(path.join(src, 'network/PortalPage.h'), 'utf8');
 const motion = fs.readFileSync(path.join(src, 'network/MotionDashboard.h'), 'utf8');
 const html = portal.split('R"MATDOG(')[1].split(')MATDOG"')[0] + motion.split('R"MOTION(')[1].split(')MOTION"')[0] + '</html>';
 const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
+// The transport's own JSON error body (HttpTransport::sendJsonError), as test_simple_dashboard_dom.
+const http = fs.readFileSync(path.join(src, 'network/HttpTransport.cpp'), 'utf8');
+const errorFormat = http.split('esp_err_t HttpTransport::sendJsonError')[1].match(/snprintf\(body,sizeof\(body\),"((?:[^"\\]|\\.)*)"/)[1].replace(/\\"/g, '"');
+const jsonError = (code, ms = 0) => errorFormat.replace('%s', code).replace('%lu', String(ms));
 const caps = JSON.parse(fx.capabilities);
 const top = Object.fromEntries(caps.walk_modes.map(m => [m.name, m.top_speed_mm_s / 1000]));
+const lim = Object.fromEntries(caps.walk_modes.map(m => [m.name, m.joystick]));  // vNext: per-mode joystick limits
+assert(['SLOW', 'STANDARD', 'FAST'].every(m => lim[m] && lim[m].vy_max_m_s > 0 && lim[m].yaw_rate_max_rad_s > 0 && lim[m].vx_back_max_m_s >= 0), 'every mode publishes its joystick limits');
+assert(['SLOW', 'STANDARD', 'FAST'].every(m => lim[m].vx_back_max_m_s > 0), 'backward on every law (vNext audit: STANDARD too)');
+assert(lim.SLOW.vy_max_m_s === caps.joystick.vy_max_m_s && lim.SLOW.yaw_rate_max_rad_s === caps.joystick.yaw_rate_max_rad_s && lim.SLOW.vx_back_max_m_s === caps.joystick.vx_back_max_m_s, 'SLOW limits equal the dev.6 joystick object');
 const CSRF = 'c'.repeat(64);
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise(r => setImmediate(r)); };
 const withAck = (body, outcome, reason) => { const a = JSON.parse(body); a.outcome = outcome; a.reason = reason; return JSON.stringify(a); };
@@ -27,20 +38,26 @@ async function boot() {
   let clock = 1000;
   const timers = [], intervals = [], calls = [];
   // The Controller model. holdNext keeps the next command pending until release().
-  const ctl = { selected: 'SLOW', walking: false, stop: false, rejected: 0, lastJoystick: 0, maxGap: 0, holdNext: false, held: [] };
+  // law: the walk's mode; a backward walk keeps it (joystickMode) until the walk ends.
+  // fail503: the next joystick refreshes the transport answers 503 MOTION_BUDGET_UNAVAILABLE (outcome unknown).
+  const ctl = { selected: 'SLOW', law: 'SLOW', backward: false, walking: false, stop: false, rejected: 0, lastJoystick: 0, maxGap: 0, holdNext: false, held: [], fail503: 0 };
+  const held = () => ctl.walking && ctl.backward;
+  const joyMode = () => held() ? ctl.law : ctl.selected;
   const statusBody = () => { const s = JSON.parse(ctl.stop ? fx.status_stopped_on : ctl.walking ? fx.status_joystick_walking : fx.status_ready);
-    s.walk_mode = Object.assign({}, s.walk_mode, { selected: ctl.selected, target: ctl.selected }); return JSON.stringify(s); };
+    s.walk_mode = Object.assign({}, s.walk_mode, { selected: ctl.selected, target: held() ? ctl.law : ctl.selected, active: held() ? ctl.law : ctl.selected });
+    if (joyMode() !== ctl.selected) s.walk_mode.joystick = joyMode(); else delete s.walk_mode.joystick; return JSON.stringify(s); };
   const answer = body => {
     const c = JSON.parse(body), p = c.params;
     if (c.type === 'MOTION.STOP') { ctl.stop = true; ctl.walking = false; return fx.ack_stop; }
-    if (c.type === 'GAIT.SELECT') { if (ctl.stop) return fx.ack_gait_select_latched; ctl.selected = p.gait; return fx.ack_gait_select; }
+    if (c.type === 'GAIT.SELECT') { if (ctl.stop) return fx.ack_gait_select_latched; ctl.selected = p.gait; return held() ? withAck(fx.ack_gait_select, 'ACCEPTED', 'WALK_MODE_NEXT_WALK') : fx.ack_gait_select; }
     if (c.type === 'BASE_VELOCITY' && p.gait === 'JOYSTICK') {
       if (ctl.stop) return withAck(fx.ack_walk_accepted, 'REJECTED', 'STOP_LATCHED');  // SimpleMotion::drive while stopping
-      if (!p.vx && !p.vy && !p.yaw_rate) { ctl.walking = false; return fx.ack_walk_stop; }
-      const r = [top[ctl.selected], caps.joystick.vy_max_m_s, caps.joystick.yaw_rate_max_rad_s];
+      if (!p.vx && !p.vy && !p.yaw_rate) { ctl.walking = false; ctl.backward = false; return fx.ack_walk_stop; }
+      const j = lim[joyMode()], r = [top[joyMode()], j.vy_max_m_s, j.yaw_rate_max_rad_s];
       const norm = (p.vx / r[0]) ** 2 + (p.vy / r[1]) ** 2 + (p.yaw_rate / r[2]) ** 2;
-      if (norm > 1 + 1e-9 || (ctl.selected !== 'SLOW' && (p.vy || p.yaw_rate || p.vx < 0))) { ++ctl.rejected; return withAck(fx.ack_walk_accepted, 'REJECTED', 'JOYSTICK_VELOCITY_RANGE'); }
+      if (norm > 1 + 1e-9 || -p.vx > j.vx_back_max_m_s + 1e-12) { ++ctl.rejected; return withAck(fx.ack_walk_accepted, 'REJECTED', 'JOYSTICK_VELOCITY_RANGE'); }
       if (ctl.walking && ctl.lastJoystick) ctl.maxGap = Math.max(ctl.maxGap, clock - ctl.lastJoystick);
+      if (!ctl.walking) { ctl.law = ctl.selected; ctl.backward = p.vx < 0; }
       ctl.walking = true; ctl.lastJoystick = clock; return fx.ack_walk_accepted;
     }
     return fx.ack_rejected;
@@ -63,6 +80,7 @@ async function boot() {
         if (url === '/api/motion/status') return reply(statusBody());
         if (url === '/api/motion/command') {
           if (ctl.holdNext) { ctl.holdNext = false; await new Promise(r => ctl.held.push(r)); }
+          if (ctl.fail503 && JSON.parse(init.body).type === 'BASE_VELOCITY') { --ctl.fail503; return reply(jsonError('MOTION_BUDGET_UNAVAILABLE', 100), 503); }
           const a = JSON.parse(answer(init.body)), c = JSON.parse(init.body); a.id = c.id; a.sequence = c.sequence;
           return reply(JSON.stringify(a));
         }
@@ -104,12 +122,15 @@ async function boot() {
     pointer('pointermove', .5, 0); await p.tick();
     assert(Math.abs(last().params.vx - fraction(.5) * top[mode]) < 1e-12, mode + ': 50 % of the stick = ' + fraction(.5).toFixed(3) + ' of full scale');
     pointer('pointermove', 0, .6); await p.tick();
-    if (mode === 'SLOW') assert(last().params.vy > 0 && last().params.vx === 0, 'SLOW: lateral sent');
-    else assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, mode + ': sideways is neutral (WALK STOP)');
+    assert(last().params.vy > 0 && last().params.vx === 0 && Math.abs(last().params.vy - fraction(.6) * lim[mode].vy_max_m_s) < 1e-12, mode + ': lateral sent, proportional to the mode\'s own limit');
+    pointer('pointermove', 0, 1); await p.tick();
+    assert(last().params.vy === lim[mode].vy_max_m_s, mode + ': full lateral = the mode\'s lateral limit');
     pointer('pointermove', 1, 0); await p.tick(); await p.poll();
     pointer('pointermove', -.6, 0); await p.tick();
-    if (mode === 'SLOW') assert(last().params.vx < 0 && last().params.vx >= -caps.joystick.vx_back_max_m_s - 1e-12, 'SLOW: backward sent, at most the back limit');
-    else assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, mode + ': backward is neutral (WALK STOP)');
+    if (lim[mode].vx_back_max_m_s > 0) assert(last().params.vx < 0 && Math.abs(last().params.vx + fraction(.6) * lim[mode].vx_back_max_m_s) < 1e-12, mode + ': backward sent, proportional to the mode\'s back limit');
+    else assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, mode + ': no backward on this law, neutral (WALK STOP)');
+    pointer('pointermove', .7071, -.7071); await p.tick();
+    assert(last().params.vx > 0 && last().params.vy < 0, mode + ': diagonal forward-right sent');
     pointer('pointermove', 1, 0); await p.tick(); await p.poll();
     pointer('pointermove', 0, 0); await p.tick();
     assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, mode + ': back to centre is neutral (WALK STOP)');
@@ -171,6 +192,45 @@ async function boot() {
   await p.poll();
   assert(ctl.selected === 'SLOW' && radio() === 'SLOW', 'repeated: Controller and selector agree on the last one');
   assert.strictEqual(ctl.rejected, 0, 'no joystick demand ever beyond the Controller\'s accepted mode');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+
+  // 6. vNext audit: FAST backward held, STANDARD selected: the Controller defers it
+  //    (WALK_MODE_NEXT_WALK) and keeps FAST's limits (status walk_mode.joystick);
+  //    the held stick stays on FAST's backward limit, never neutral, before and
+  //    after the next status; after the release the next walk is STANDARD's.
+  click('FAST'); await settle(); await p.poll();
+  pointer('pointerdown', -1, 0); await settle(); await p.tick(); await p.poll();
+  assert(ctl.walking && ctl.backward && ctl.law === 'FAST' && last().params.vx === -lim.FAST.vx_back_max_m_s, 'FAST backward at its limit');
+  const mark7 = cmds().length; click('STANDARD'); await settle(); await p.fire20(2); await p.tick();
+  assert(ctl.selected === 'STANDARD' && cmds().slice(mark7).some(c => c.type === 'GAIT.SELECT'), 'selection accepted (deferred)');
+  assert(last().type === 'BASE_VELOCITY' && last().params.vx === -lim.FAST.vx_back_max_m_s, 'deferred: the held stick keeps FAST\'s backward limit before the status (' + last().params.vx + ')');
+  await p.poll(); await p.tick();
+  assert(last().params.vx === -lim.FAST.vx_back_max_m_s && ctl.walking && ctl.law === 'FAST', 'deferred: still FAST\'s limit after the status, the walk goes on');
+  assert(/limiti FAST/.test(q('#joy-state').textContent), 'the page names the limits it applies (' + q('#joy-state').textContent + ')');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+  pointer('pointerdown', -1, 0); await settle(); await p.tick();
+  assert(last().params.vx === -lim.STANDARD.vx_back_max_m_s && ctl.law === 'STANDARD', 'the next walk takes STANDARD and its backward limit');
+  assert.strictEqual(ctl.rejected, 0, 'no joystick demand beyond the limits the Controller applies');
+  pointer('pointerup', 0, 0); await settle(); await p.poll();
+
+  // 7. Prolonged refresh loss (hardware 10/11: one 503 at the end of a steered
+  //    walk): the transport answers five refreshes in a row with 503
+  //    MOTION_BUDGET_UNAVAILABLE. With the status link alive the page keeps the
+  //    stick held and sends a fresh refresh every tick, never neutral, shows
+  //    the outcome as unknown (not executed), then continues when answered.
+  //    The Controller's own 1 s deadline (JOYSTICK_TIMEOUT, host test) ends a
+  //    walk whose refreshes stop arriving.
+  click('SLOW'); await settle(); await p.poll();
+  pointer('pointerdown', 1, 0); await settle(); await p.tick(); await p.poll();
+  assert(ctl.walking && last().params.vx === top.SLOW, 'walking forward before the loss');
+  const mark8 = cmds().length; ctl.fail503 = 5;
+  for (let k = 0; k < 5; ++k) { await p.tick(); if (k % 2) await p.poll(); }
+  const lost = cmds().slice(mark8);
+  assert(lost.length === 5 && lost.every(c => c.type === 'BASE_VELOCITY' && c.params.vx === top.SLOW), 'a fresh non-neutral refresh every tick during the loss (' + lost.map(c => c.params.vx).join(',') + ')');
+  assert(/MOTION_BUDGET_UNAVAILABLE/.test(q('#message').textContent) && /ESITO SCONOSCIUTO/.test(q('#message').textContent), 'the 503 is shown as an unknown outcome, never as executed (' + q('#message').textContent + ')');
+  await p.tick();
+  assert(ctl.fail503 === 0 && last().params.vx === top.SLOW && ctl.walking, 'answered again: the held stick continues');
   pointer('pointerup', 0, 0); await settle();
-  console.log(`JOYSTICK_MODE_DOM = PASS (full scale SLOW/STANDARD/FAST ${top.SLOW * 1e3}/${top.STANDARD * 1e3}/${top.FAST * 1e3} mm/s, half stick ${(fraction(.5) * 100).toFixed(1)} %, forward only off SLOW; held-stick change in order with refreshes at most ${changeGap} ms apart (deadline 1 s); timeout explicit; release and STOP first; repeated selections consistent; shipped page, real fixtures, no device)`);
+  assert.deepStrictEqual(last().params, { vx: 0, vy: 0, yaw_rate: 0, gait: 'JOYSTICK' }, 'release after the loss: neutral');
+  console.log(`JOYSTICK_MODE_DOM = PASS (full scale SLOW/STANDARD/FAST ${top.SLOW * 1e3}/${top.STANDARD * 1e3}/${top.FAST * 1e3} mm/s, half stick ${(fraction(.5) * 100).toFixed(1)} %, lateral on every mode's own limits, backward where the law has it; held-stick change in order with refreshes at most ${changeGap} ms apart (deadline 1 s); timeout explicit; release and STOP first; repeated selections consistent; shipped page, real fixtures, no device)`);
 })().catch(e => { console.error(e); process.exit(1); });

@@ -22,7 +22,7 @@ const fx = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 const CSRF = 'c'.repeat(64);
 const settle = async () => { for (let i = 0; i < 30; i++) await new Promise(r => setImmediate(r)); };
 
-async function boot(initialStatus = fx.status_ready) {
+async function boot(initialStatus = fx.status_ready, withGround = false) {
   let clock = 1000;
   const timers = [], intervals = [], calls = [], errors = [];
   // inflight: requests issued and not yet answered (each needs its own
@@ -53,9 +53,10 @@ async function boot(initialStatus = fx.status_ready) {
           init.signal?.addEventListener('abort', () => { device.holdUrl = null; const i = device.held.indexOf(entry); if (i >= 0) device.held.splice(i, 1); reject(new w.DOMException('aborted', 'AbortError')); }, { once: true });
         });
         if (url === '/wifi/session') return device.sessionOk ? reply(CSRF) : reply('AUTH_FAILED', 403);
-        if (url === '/status') return reply('mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n');
+        if (url === '/status') return reply(device.statusText || 'mode=MAINTENANCE\nauthority=NONE\npower_state=RUN\nsystem_health=READY\n', device.statusCode);
         if (url === '/wifi/status') return reply(JSON.stringify({ profiles: [], scan: [], active_profile: 0, sta_test: { seq: 0 }, policy: {}, network_phase: 'ADMIN_AP', admin_generation: 1 }));
         if (url === '/api/motion/status') return reply(device.status);
+        if (withGround && url === '/api/motion/capabilities') return reply(fx.capabilities);
         if (url === '/api/motion/command') {
           const next = device.replies.shift();
           assert(next, 'unexpected command ' + init.body);
@@ -75,6 +76,31 @@ async function boot(initialStatus = fx.status_ready) {
 }
 
 (async () => {
+  {
+    const g=await boot(fx.status_standing,true);
+    assert.deepStrictEqual(g.errors,[]);
+    g.q('[data-page="ground-page"]').click();
+    assert(!g.q('#ground-page').hidden&&g.q('header #simple-stop'),'Ground card with global STOP');
+    assert.deepStrictEqual([...g.q('#ground-leg').options].map(x=>x.value),['LF','RF','LH','RH']);
+    assert(!g.q('#ground-observe').disabled,'real cached telemetry acquisition available in HOLD');
+    g.q('#ground-leg').value='LH';g.q('#ground-leg').dispatchEvent(new g.dom.window.Event('change'));
+    g.device.replies.push({body:fx.ack_ground,status:200});g.q('#ground-observe').click();await settle();
+    const sent=JSON.parse(g.calls.filter(c=>c.url==='/api/motion/command').at(-1).body);
+    assert.strictEqual(sent.type,'GROUND_CONTACT.OBSERVE');assert.strictEqual(sent.params.leg,'LH');
+    assert.strictEqual(sent.owner,'dashboard');assert(sent.sequence>0&&sent.ttl_ms===5000);
+    assert(!g.q('#ground-contact').querySelector('#ground-probe'),'no fictitious probe button');
+    g.q('#ground-leg').value='LF';g.device.status=fx.status_ground;await g.poll();
+    assert(g.q('#ground-progress').textContent.includes('12/12 campioni (non cicli)'));
+    assert(g.q('#ground-values').textContent.includes('NON VALIDA'));
+    assert(g.q('#ground-signals').textContent.includes('UPPER: RAW'));
+    assert(g.q('#ground-contact').textContent.includes('non sono conferme indipendenti'));
+    const stale=JSON.parse(fx.status_ground);stale.stale=true;g.device.status=JSON.stringify(stale);await g.poll();
+    assert(g.q('#ground-observe').disabled,'stale feedback disables observation, not STOP');
+    g.device.replies.push({body:fx.ack_stop,status:200});g.q('#ground-stop').click();await settle();
+    assert.strictEqual(JSON.parse(g.calls.filter(c=>c.url==='/api/motion/command').at(-1).body).type,'MOTION.STOP');
+    assert.deepStrictEqual(g.errors,[]);g.dom.window.close();
+    console.log('GROUND_DASHBOARD: selection, real observation intent, timestamped result, stale refusal, shared STOP PASS');
+  }
   const p = await boot();
   const { q, device } = p;
   const envelopes = [];
@@ -107,7 +133,8 @@ async function boot(initialStatus = fx.status_ready) {
   // 2026-11-10: the guide says the joystick's full scale is the selected mode's top speed, steering SLOW only,
   // and the selector changes a forward walk in progress; the presets belong to the mode; no stale 6.5 s.
   assert(/fondo corsa in avanti è la velocità massima della modalità WALK scelta/.test(q('#simple-diagnostics').textContent) &&
-    /Sterzo, laterale e retromarcia solo in SLOW/.test(q('#simple-diagnostics').textContent) &&
+    /Sterzo, laterale e retromarcia in tutte le modalità, ciascuna sulla propria legge/.test(q('#simple-diagnostics').textContent) &&
+    /fino ad allora la leva resta sui limiti della legge in corso/.test(q('#simple-diagnostics').textContent) && !/retromarcia non ancora disponibile/.test(q('#simple-diagnostics').textContent) &&
     /un solo selettore di velocità\. SLOW 20 mm\/s/.test(q('#simple-diagnostics').textContent) &&
     /Durante un WALK in avanti il selettore cambia la modalità del passo in corso/.test(q('#simple-diagnostics').textContent) &&
     !/6,5 s/.test(q('#simple-diagnostics').textContent), 'guide texts kept in the diagnostics');
@@ -127,7 +154,7 @@ async function boot(initialStatus = fx.status_ready) {
     const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
     // Icon and name over the speed (modeLabels updates only the speed element).
     assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.querySelector('.mode-name').textContent + '|' + r.nextElementSibling.querySelector('.mode-speed').textContent),
-      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|32 mm/s']);
+      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|30 mm/s']);
     assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
     await settle();
     assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');
@@ -338,7 +365,14 @@ async function boot(initialStatus = fx.status_ready) {
     const recovering=JSON.parse(JSON.stringify(s));recovering.state='MOVING';recovering.phase='WALK_STANDARD';recovering.reason='STAND_FROM_STOPPED_WALK';recovering.stop.active=false;
     await refresh(JSON.stringify(recovering));assert(q('#simple-reason').textContent.includes('Ripresa dal WALK arrestato') && q('#simple-reason').textContent.includes('supporto non verificato') && q('#simple-stand').disabled && q('#simple-walk').disabled, 'explicit stopped-WALK recovery is displayed from Controller state while motion commands stay gated');
     s.stop.active=false;s.stop.stand_resume_allowed=false;s.stop.motion_verified=false;s.torque_active=false;s.safe_off_verified=true;s.safe_off_mask=8191;s.phase='IDLE';s.reason='SAFE_OFF_REQUESTED';
-    await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');assert(q('#simple-stand').disabled);
+    await refresh(JSON.stringify(s));assert.strictEqual(q('#simple-state').textContent,'SAFE_OFF VERIFICATO · COPPIA OFF');
+    assert(!q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-prone').disabled, '2026-11-14: after an operator STOP/SAFE_OFF with the OFF verified only an explicit STAND is offered (the Controller re-acquires the real pose); WALK and PRONE stay off');
+    {const n=JSON.parse(JSON.stringify(s));n.ready=false;n.readiness_reason='IMU_UNAVAILABLE';await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'Motion readiness still gates STAND after SAFE_OFF');
+     n.ready=true;n.safe_off_verified=false;n.safe_off_mask=8190;await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'an incomplete 13-servo SAFE_OFF never offers STAND');
+     n.safe_off_verified=true;n.safe_off_mask=8191;n.torque_active=true;await refresh(JSON.stringify(n));
+     assert(q('#simple-stand').disabled, 'torque reported ON is not a SAFE_OFF terminal');}
     {const e=JSON.parse(JSON.stringify(s));e.reason='INITIAL_POSE_OUTSIDE_SAFE_ENTRY';await refresh(JSON.stringify(e));
      assert.strictEqual(q('#simple-state').textContent,'POSA D’INGRESSO NON RICONOSCIUTA · COPPIA OFF');
      assert(q('#simple-state').dataset.tone==='warn'&&q('#simple-stand').disabled&&q('#simple-walk').disabled&&q('#simple-reason').textContent.includes('torna PRONTO da solo'), 'dev.5: a refused entry pose is a recoverable STOPPED state with STAND disabled until the Controller reports READY');
@@ -948,6 +982,52 @@ async function boot(initialStatus = fx.status_ready) {
     assert.deepStrictEqual(js.calls.filter(c => c.url === '/api/motion/command').map(c => JSON.parse(c.body).params.vx > 0 ? 'move' : 'neutral'), ['move', 'neutral']);
     assert.deepStrictEqual([hold, walking, js].flatMap(r => r.errors), []);
     for (const r of [hold, walking, js]) r.dom.window.close();
+  }
+  // Battery P1, instants of the 10/11 replay with the facts the firmware now
+  // publishes with torque ON (test_led_ring_manager replays the policy): measured
+  // voltages first, the DALY SOC an estimate, never green; the cockpit line
+  // carries the same facts and says NON VERIFICATA whenever /status is not current.
+  {
+    const e = await boot(fx.status_standing);  // HOLD, torque ON
+    const base = { mode: 'RUN', authority: 'MOTION', power_state: 'RUN', system_health: 'READY', bms_comm: 'OK', bms_valid: 'YES',
+      bms_fresh: 'YES', bms_sample_age_ms: '400', bms_state: 'STATIONARY', bms_current_a: '-0.3', bms_charge_mos: 'ON', bms_discharge_mos: 'ON',
+      bms_alarms: '0000 0000 0000 0000', led_charging: 'NO', led_charging_fault: 'NO', led_battery_warning: 'NO', led_battery_critical: 'NO',
+      led_render_deferred: 'YES' };
+    const show = async o => { e.device.statusText = Object.entries({ ...base, ...o }).map(([k, v]) => k + '=' + v).join('\n') + '\n'; e.device.statusCode = 200; await e.fire(4000); };
+    const line = () => e.q('#simple-energy'), card = () => e.q('#energyState').textContent;
+    assert(line() && !line().closest('details') && e.q('#simple-state').parentNode.nextElementSibling === line(), 'energy line right under the cockpit state, outside diagnostics');
+    await show({ bms_pack_v: '10.9', bms_cell_min_mv: '3643', bms_soc_percent: '44.9' });  // 19:20:15Z, torque ON
+    assert.strictEqual(line().textContent, 'Energia senza allarmi noti · pacco 10.9 V · cella min 3643 mV · SOC DALY 45 % (stima, non autonomia) · anello LED fermo fino a coppia OFF');
+    assert.strictEqual(line().dataset.tone, 'muted', 'no alarm: neutral, not green');
+    assert.strictEqual(e.q('#packV').textContent, '10.9 V'); assert.strictEqual(e.q('#cellMin').textContent, 'cella min 3643 mV');
+    assert.strictEqual(e.q('#soc').textContent, '45 %'); assert.strictEqual(e.q('#socBar').className, 'bar ', 'SOC estimate bar never green');
+    await show({ bms_pack_v: '10.5', bms_cell_min_mv: '3515', bms_soc_percent: '42.7', led_battery_warning: 'YES' });  // 19:46:55Z, torque ON
+    assert(line().textContent.startsWith('Energia BASSA · pacco 10.5 V · cella min 3515 mV · SOC DALY 43 % (stima, non autonomia)'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'warn');
+    assert(card().startsWith('BATTERY_WARNING') && e.q('#bmsBadge').textContent === 'BASSA' && e.q('#socBar').className === 'bar warn', card());
+    e.device.statusText = '{"version":1,"ok":false,"error":"MOTION_BUDGET_UNAVAILABLE","elapsed_ms":0}'; e.device.statusCode = 503; await e.fire(4000);
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · stato del Controller di 4 s fa · ultimo: BASSA · pacco 10.5 V'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'warn', 'paused diagnostic: the last values are not current');
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3350', bms_soc_percent: '41.2', led_battery_critical: 'YES' });  // trend continued, 3350 mV
+    assert(line().textContent.startsWith('Energia CRITICA · pacco 10.2 V · cella min 3350 mV · SOC DALY 41 % (stima, non autonomia)'), line().textContent);
+    assert.strictEqual(line().dataset.tone, 'bad');
+    assert(card().startsWith('BATTERY_CRITICAL') && e.q('#socBar').hidden && e.q('#soc').textContent === '41 %', 'critical: no SOC bar, the BMS estimate kept as reported');
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3350', bms_soc_percent: '41.2', bms_fresh: 'NO', bms_sample_age_ms: '9000', led_battery_critical: 'YES' });
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · dato BMS vecchio · ultimo: CRITICA') && line().dataset.tone === 'bad', line().textContent);
+    await show({ bms_pack_v: '10.2', bms_cell_min_mv: '3401', bms_soc_percent: '41.5', led_battery_warning: 'YES', led_render_deferred: 'NO' });  // 19:58:50Z, torque OFF
+    assert(!line().textContent.includes('anello LED'), 'ring live again at torque OFF');
+    await e.poll(13000); e.intervals.filter(i => i.ms === 1000).forEach(i => i.fn());
+    assert(line().textContent.startsWith('Energia NON VERIFICATA · stato del Controller di 13 s fa'), line().textContent);
+    // No false "full": an alarm at any reported SOC is never green, and charging at 100 % is never "piena".
+    for (const soc of ['100.0', '75.0', '50.0', '31.0'])
+      for (const alarm of [{ led_battery_warning: 'YES' }, { led_battery_critical: 'YES' }]) {
+        await show({ bms_pack_v: '10.4', bms_cell_min_mv: '3480', bms_soc_percent: soc, ...alarm });
+        assert(line().dataset.tone !== 'muted' && !e.q('#socBar').classList.contains('ok') && e.q('#bmsBadge').className !== 'chip ok', soc + JSON.stringify(alarm));
+      }
+    await show({ bms_pack_v: '12.6', bms_cell_min_mv: '4190', bms_soc_percent: '100.0', bms_state: 'CHARGING', led_charging: 'YES' });
+    assert(line().textContent.startsWith('Energia IN CARICA') && !/pien|full|complet/i.test(line().textContent + card()), line().textContent);
+    assert.deepStrictEqual(e.errors, []);
+    e.dom.window.close();
   }
   fs.writeFileSync(envelopesPath, envelopes.join('\n') + '\n');
   console.log('SIMPLE_DASHBOARD_DOM = PASS (' + envelopes.length + ' envelopes captured from the shipped page; real MotionService fixtures; ' + (sequence) + ' commands)');

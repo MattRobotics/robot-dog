@@ -36,6 +36,9 @@ struct ContactResult {
 // No assumption that the reference equals foot_link or lies on a ground plane.
 ContactResult contactForwardKinematics(LegId leg, const LegJointAngles& q,
                                       Vector3 groundNormalBase = {0.0, 0.0, 1.0});
+// Diagnostic projection along an up normal, relative to base_link origin.
+// Includes the finite tread's fillet; not a measured ground distance.
+bool lowestTreadHeightM(const ContactResult&, Vector3 up, double& heightM);
 struct ContactBranch { int8_t hip = 0; int8_t elbow = 0; };
 struct ContactIkOptions {
   IkOptions kinematics{};

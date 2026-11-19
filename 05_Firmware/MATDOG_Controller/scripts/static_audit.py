@@ -704,8 +704,11 @@ def check_acc_ceiling_runtime_path(files):
             "simple_inputs_.accCeiling=servo_bus_.configureAccCeiling(ids,12,simple::kAccCeilingTarget);",
             "simple_inputs_.authorityOk=true;"))
     motion_header = re.sub(r"\s+", "", strip_comments(by_name.get("SimpleMotion.h", (None, ""))[1]))
+    # The public stand() is the explicit operator STAND (command=true); walk() and the
+    # joystick rise through the private overload with command=false (2026-11-14).
     for required in ("constexpruint8_tkAccCeilingTarget=220;", "uint8_taccCeiling=0;",
-                     "constchar*stand(doubleheight,uint64_tnow,uint8_tacc=kStandDrive.acc);"):
+                     "constchar*stand(doubleheight,uint64_tnow,uint8_tacc=kStandDrive.acc){returnstand(height,now,acc,true);}",
+                     "constchar*stand(doubleheight,uint64_tnow,uint8_tacc,boolcommand);"):
         if motion_header.count(required) != 1:
             fail(f"SimpleMotion.h: {required!r} must appear exactly once")
     motion_path, motion = by_name.get("SimpleMotion.cpp", (None, ""))
@@ -716,7 +719,7 @@ def check_acc_ceiling_runtime_path(files):
                      '{"FAST",2.5,.825,.105,kWalkSwayXM,.35,.55,{1950,220},'):
         if compact.count(required) != 1:
             fail(f"{motion_path}: {required!r} must appear exactly once (every drive under register 85; STANDARD and FAST in the build)")
-    stand = function_body(motion, "const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc)") or ""
+    stand = function_body(motion, "const char* SimpleMotion::stand(double h,uint64_t now,uint8_t acc,bool command)") or ""
     if re.sub(r"\s+", "", strip_comments(stand)).count("acc>input_.accCeiling") != 1:
         fail(f"{motion_path}: stand() must compare the drive ACC with the ceiling exactly once, after its admission checks")
     ordered(motion_path, "stand()", stand, (
@@ -727,9 +730,9 @@ def check_acc_ceiling_runtime_path(files):
         'if(acc>input_.accCeiling)returninput_.accCeiling?"SERVO_ACC_CEILING_BELOW_DRIVE":"SERVO_ACC_CEILING_UNVERIFIED";',
         "if(stopActive_){"))
     ordered(motion_path, "walk()", function_body(motion, "const char* SimpleMotion::walk(unsigned stride,uint64_t now)") or "",
-            ("constchar*r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc);",))
+            ("constchar*r=stand(walkModeSpec(mode).heightM,now,walkModeSpec(mode).drive.acc,false);",))
     ordered(motion_path, "drive()", function_body(motion, "const char* SimpleMotion::drive(double vx,double vy,double yawRate,uint64_t now)") or "",
-            ("constchar*r=stand(law.heightM,now,law.drive.acc);",))
+            ("constchar*r=stand(law.heightM,now,law.drive.acc,false);",))
     ordered(motion_path, "selectWalkMode()", function_body(motion, "const char* SimpleMotion::selectWalkMode(WalkMode m)") or "",
             ('if(walkModeLive()&&walkModeSpec(m).drive.acc>input_.accCeiling)return"SERVO_ACC_CEILING_BELOW_DRIVE";', "selectedMode_=m;"))
     ordered(motion_path, "stepWalkMode()", function_body(motion, "void SimpleMotion::stepWalkMode(double eased)") or "",
@@ -3001,6 +3004,18 @@ def check_led_status_boundaries(files):
         fail(f"{ctl_path}: DALY must keep its one existing scheduler update")
     if len(re.findall(r"\bled_status_\.update\(", ctl)) != 1:
         fail(f"{ctl_path}: LED manager must have one periodic caller")
+    # Battery P1 (10/11: BATTERY_WARNING 12 min late behind a Motion guard):
+    # the policy runs every tick, unconditionally after its inputs; only the
+    # frame is deferred while Motion is engaged, before any transmission.
+    deferred = re.search(r"if\s*\(render_deferred_\)\s*return;", manager)
+    if not guard or not deferred or not (guard.end() <= deferred.start() < frame_pos):
+        fail(f"{manager_path}: a deferred render must return before the frame submission")
+    if sum(len(re.findall(r"\.deferRender\(", code)) for _, code in production) != 1 or \
+            re.sub(r"\s+", "", ctl).count(
+                "dalyAlarmBlocksChargingPresentation(battery.alarms);"
+                "led_status_.deferRender(simple_motion_.engaged());"
+                "led_status_.update(led_now_ms,led_inputs);") != 1:
+        fail(f"{ctl_path}: LED policy must run every tick; only its frame waits for torque OFF")
     for call in re.findall(r"\bdaly_\.(\w+)\s*\(", ctl):
         if call not in {"begin", "update", "availability", "health", "sample", "lastCommResult"}:
             fail(f"{ctl_path}: DALY {call}() is outside cached LED inputs/existing scheduler")
@@ -6944,13 +6959,18 @@ def check_simple_motion_boundaries(files):
                  "if(port_->verifyOff(offNext_))offMask_|=1u<<offNext_;",
                  "offNext_=(offNext_+1)%13;", "if(offMask_==0x1fff){energized_=false;offPending_=false;")
     require_path(motion, "void SimpleMotion::update(", "if(serviceStop())return;",
-                 "if(engaged()&&!input_.powerOk){fault(", "if(energized_&&gap>100000){fault(",
+                 "if(engaged()&&!input_.powerOk){fault(", "offVerified()&&!operatorStopped_&&",
+                 "if(energized_&&gap>100000){fault(",
                  "if(engaged()&&(!input_.ready||!input_.powerOk||!input_.authorityOk)){fault(",
                  "if(energized_&&!fresh(esp_timer_get_time())){fault(", "if(stopActive_){generateStop(now);return;}")
     require_path(motion, "bool SimpleMotion::send(", "if(stopActive_&&!stopFrame_)return false;",
                  "if(!holdReference&&!pointSafe(q)){fault(", "if(!port_->resolve(", "if(!frameTimed(")
+    # An operator STOP/SAFE_OFF re-arms only through an explicit STAND from the
+    # verified OFF, which then takes the full ACQUIRE (2026-11-14); a WALK or
+    # joystick rise passes command=false and stays refused (check_acc_ceiling_runtime_path pins both calls).
     require_path(motion, "const char* SimpleMotion::stand(", 'if(faultLatched_)return "FAULT_STOP_REQUIRED";',
-                 'if(operatorStopped_&&!energized_)return "SAFE_OFF_STAND_REFUSED";')
+                 'if(operatorStopped_&&(!command||energized_||!offVerified()))return "SAFE_OFF_STAND_REFUSED";',
+                 "proneRest_=false;operatorStopped_=false;state_=State::MOVING;phase_=Phase::ACQUIRE;")
     config=by_name.get("BuildConfig.h",(None,""))[1]
     if not re.search(r'constexpr bool kOperationalMotionAuthorized\s*=\s*false\s*;',config):
         fail("Operational image must retain MOTION_AUTHORIZED=0")

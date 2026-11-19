@@ -1,0 +1,13 @@
+USB: 411 righe
+HTTP: motion 19 campioni (1 senza risposta valida), status 3
+IDENTITÀ: 1.0.2-dev.7 build b5610620d0ce ota b5610620d0ce | health READY, BMS OK 12.1 V | uptime 31306 ms
+SEQUENZA (stato fase motivo | profilo selezionato attivo destinazione)
+  18:52:30 READY IDLE READY | SLOW SLOW SLOW
+CAMBI DI PROFILO DURANTE IL WALK (risoluzione 1 s; completato = vx al 98 % del massimo del profilo)
+PER PROFILO (WALKING a regime: attivo = destinazione)
+ANCHE E INSEGUIMENTO (coppia ON; margine delle anche dalla box kHeight ±25 mrad, in tick)
+STOP
+TEMPERATURE: max 25 °C (servo 11 alle 18:52:30); campioni ≥ 60 °C: nessuno; spike filtrati dal firmware 0
+TEMPI: missed 0→0, overrun 0→0, max lavoro per rilascio 4868 µs (max nella finestra)
+ULTIMO STATO: READY IDLE READY | SAFE_OFF verificato True, mask 8191, coppia OFF
+CRITERI DI INTERRUZIONE: nessuno

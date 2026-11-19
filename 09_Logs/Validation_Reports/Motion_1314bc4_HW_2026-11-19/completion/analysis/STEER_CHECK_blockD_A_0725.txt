@@ -1,0 +1,41 @@
+== blockD_A_0725: 518 status samples
+M0 memory gate (read only, both HTTP clients active, before an  58 smp
+D1 STAND 120 from PRONE_REST                                    29 smp | imu {'ATTENUATED': 26, 'SLEW': 2}
+Dm1 MODE STANDARD (as B1)                                        0 smp
+Dm2 MODE STANDARD published (read only)                          1 smp | imu {'WORKSPACE': 1}
+D2 joystick backward full scale 12 s                            41 smp | WALKING 36 vx -0.0167..-0.0167 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy True | end-of-step velocity {"vx_m_s":-0.01667,"vy_m_s":0.0,"yaw_rate_rad_s":0.0,"joystick":true} | imu {'SLEW': 2, 'ATTENUATED': 3, 'ENVELOPE': 36}
+D3 release (WALK STOP)                                          15 smp | WALKING 12 vx -0.0167..-0.0167 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 12, 'SLEW': 1, 'WORKSPACE': 2}
+D4 joystick lateral left 12 s                                   37 smp | WALKING 35 vx +0.0000..+0.0000 vy +0.0067..+0.0067 yaw +0.0000..+0.0000 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.00667,"yaw_rate_rad_s":0.0,"joystick":true} | imu {'SLEW': 4, 'ENVELOPE': 33}
+D5 release                                                      12 smp | WALKING 11 vx +0.0000..+0.0000 vy +0.0067..+0.0067 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 11, 'WORKSPACE': 1}
+D6 joystick lateral right 12 s                                  39 smp | WALKING 37 vx +0.0000..+0.0000 vy -0.0067..-0.0067 yaw +0.0000..+0.0000 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":-0.00667,"yaw_rate_rad_s":0.0,"joystick":true} | imu {'SLEW': 4, 'ENVELOPE': 35}
+D7 release                                                      15 smp | WALKING 11 vx +0.0000..+0.0000 vy -0.0067..-0.0067 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 11, 'SLEW': 3, 'WORKSPACE': 1}
+D8 joystick yaw counter-clockwise 12 s                          40 smp | WALKING 35 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw +0.0400..+0.0400 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.0,"yaw_rate_rad_s":0.04,"joystick":true} | imu {'SLEW': 5, 'OK': 1, 'ENVELOPE': 34}
+D9 release                                                      16 smp | WALKING 11 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw +0.0400..+0.0400 joy False | imu {'ENVELOPE': 11, 'SLEW': 3, 'WORKSPACE': 2}
+D10 joystick yaw clockwise 12 s                                 41 smp | WALKING 37 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw -0.0400..-0.0400 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.0,"yaw_rate_rad_s":-0.04,"joystick":true} | imu {'SLEW': 6, 'ENVELOPE': 35}
+D11 release                                                     14 smp | WALKING 11 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw -0.0400..-0.0400 joy False | imu {'ENVELOPE': 11, 'SLEW': 2, 'WORKSPACE': 1}
+D12 WALK STANDARD preset 1                                       6 smp | WALKING  1 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'SLEW': 3, 'OK': 1, 'ATTENUATED': 1, 'ENVELOPE': 1}
+D13 walk 4.0 s                                                  11 smp | WALKING 11 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | end-of-step velocity {"vx_m_s":0.025,"vy_m_s":0.0,"yaw_rate_rad_s":0.0,"joystick":false} | imu {'ENVELOPE': 11}
+D14 STOP (phase 1)                                               8 smp | imu {'ENVELOPE': 8}
+D15 STAND 120 resume                                            16 smp | imu {'ENVELOPE': 12, 'ATTENUATED': 3, 'SLEW': 1}
+D16 WALK STANDARD preset 1                                       5 smp | WALKING  1 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'SLEW': 1, 'ATTENUATED': 3, 'ENVELOPE': 1}
+D17 walk 5.3 s                                                  15 smp | WALKING 15 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | end-of-step velocity {"vx_m_s":0.025,"vy_m_s":0.0,"yaw_rate_rad_s":0.0,"joystick":false} | imu {'ENVELOPE': 15}
+D18 STOP (phase 2)                                               8 smp | WALKING  1 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 8}
+D19 WALK resume after the STOP (preset 1)                       14 smp | WALKING  1 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 14}
+D20 walk 6 s                                                    17 smp | WALKING 17 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | end-of-step velocity {"vx_m_s":0.025,"vy_m_s":0.0,"yaw_rate_rad_s":0.0,"joystick":false} | imu {'ENVELOPE': 17}
+D21 WALK STOP                                                   16 smp | WALKING 11 vx +0.0250..+0.0250 vy +0.0000..+0.0000 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 11, 'SLEW': 2, 'WORKSPACE': 3}
+Dm3 MODE SLOW (default restored, as F9)                          0 smp
+D22 PRONE to PRONE_REST                                         35 smp | imu {'SLEW': 1, 'ATTENUATED': 33}
+D23 TIMING dump (block D)                                        8 smp
+faults or fault-like reasons: none
+  LF_HIP    n  449 |raw-cmd| p50   5 p95  35 max 117 ticks (max in D1 STAND 120 from PRONE_REST) | commanded 1871..2047 raw 1877..2045
+  LF_UPPER  n  449 |raw-cmd| p50   7 p95  45 max 154 ticks (max in D2 joystick backward full scal) | commanded 2489..3077 raw 2472..3075
+  LF_LOWER  n  449 |raw-cmd| p50   4 p95  46 max  95 ticks (max in D1 STAND 120 from PRONE_REST) | commanded 2155..3112 raw 2156..3111
+  RF_HIP    n  449 |raw-cmd| p50   5 p95  46 max 117 ticks (max in D1 STAND 120 from PRONE_REST) | commanded 1969..2142 raw 1966..2136
+  RF_UPPER  n  449 |raw-cmd| p50   7 p95  37 max 149 ticks (max in D20 walk 6 s) | commanded 1113..1716 raw 1115..1713
+  RF_LOWER  n  449 |raw-cmd| p50   4 p95  53 max  94 ticks (max in D22 PRONE to PRONE_REST) | commanded 961..1858 raw 963..1856
+  RH_HIP    n  449 |raw-cmd| p50   5 p95  38 max 115 ticks (max in D1 STAND 120 from PRONE_REST) | commanded 1977..2166 raw 1983..2163
+  RH_UPPER  n  449 |raw-cmd| p50   9 p95  40 max 113 ticks (max in D13 walk 4.0 s) | commanded 724..1275 raw 730..1277
+  RH_LOWER  n  449 |raw-cmd| p50   7 p95  48 max 149 ticks (max in D17 walk 5.3 s) | commanded 1021..1790 raw 1025..1789
+  LH_HIP    n  449 |raw-cmd| p50   5 p95  26 max 112 ticks (max in D1 STAND 120 from PRONE_REST) | commanded 1954..2138 raw 1953..2130
+  LH_UPPER  n  449 |raw-cmd| p50   7 p95  53 max 121 ticks (max in D2 joystick backward full scal) | commanded 2847..3428 raw 2849..3418
+  LH_LOWER  n  449 |raw-cmd| p50   5 p95  46 max 146 ticks (max in D17 walk 5.3 s) | commanded 2324..3105 raw 2312..3103

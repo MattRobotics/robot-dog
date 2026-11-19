@@ -709,6 +709,8 @@ python3 "$SCRIPT_DIR/test_static_audit_startup.py"
 "$OUT/test_wifi_mode_policy"
 # Current owners for calibration RESTORE, bounded UART transactions and IMU snapshots.
 bash "$SCRIPT_DIR/run_calibration_restore_tests.sh"
+# The SimpleServoPort slot binding against the per-call lookup it replaced (2026-11-14).
+bash "$SCRIPT_DIR/run_servo_port_conversion_tests.sh"
 bash "$SCRIPT_DIR/run_servo_bus_deadline_tests.sh"
 bash "$SCRIPT_DIR/run_imu_feed_tests.sh"
 python3 -I "$SCRIPT_DIR/test_twin_assets.py"

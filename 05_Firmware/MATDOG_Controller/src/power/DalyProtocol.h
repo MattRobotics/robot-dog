@@ -492,6 +492,7 @@ class DalyBusScheduler {
   bool startNext(uint32_t now_ms, DalyRequest* started);
   // Deadline base, taken after the request bytes have left the UART.
   void markSent(uint32_t sent_ms) { sent_ms_ = sent_ms; }
+  uint32_t sentMs() const { return sent_ms_; }
 
   bool inFlight() const { return in_flight_; }
   DalyRequest inFlightRequest() const { return in_flight_request_; }

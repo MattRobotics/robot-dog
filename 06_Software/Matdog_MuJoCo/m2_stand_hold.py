@@ -25,7 +25,7 @@ import dynamics
 import servo
 import twin
 
-FW = pathlib.Path(__file__).resolve().parents[2] / "05_Firmware/MATDOG_Controller"
+FW = twin.FW_TREE
 BUS_IDS = (13, 12, 11, 23, 22, 21, 33, 32, 31, 43, 42, 41)  # slots LF RF RH LH x hip upper lower
 
 

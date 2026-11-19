@@ -1,0 +1,62 @@
+From b104f0026b218b735c90f319b70ad5279fbadf2c Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 14:21:48 +0100
+Subject: [PATCH 13/19] research(motion): P5, a refused STOP proof stops at the
+ first duration with a control outside the box
+
+StopPlan::build tried every 20 ms multiple up to 60 before refusing. With a = 0
+(every caller) the controls p1 = q + t*v/4 and end = q + t*v/2 only move away from
+q as t grows, also as computed in floating point, and q is inside the box: a control
+outside the box or the residual at one duration stays outside at every longer one.
+The velocity bound does not depend on t and the acceleration bound only eases, and
+neither sets the new flag. The search now returns the same refusal at that duration.
+Accepted plans, their duration and q/v/a are unchanged; end[] after a refusal is
+scratch and no caller reads it.
+
+On the fixture, WALK_SETTLE at the workspace edge repeated a refused proof every
+release: 0.9-2.0 M instructions in QEMU, the 24-27 ms WALK_SETTLE peaks on the chip.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+(cherry picked from commit 87338f8eef812e7ea338e062a8a230d99dc8bc7d)
+---
+ 05_Firmware/MATDOG_Controller/src/simple/StopPlan.h | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/StopPlan.h b/05_Firmware/MATDOG_Controller/src/simple/StopPlan.h
+index b938c3d..7b175c1 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/StopPlan.h
++++ b/05_Firmware/MATDOG_Controller/src/simple/StopPlan.h
+@@ -30,14 +30,14 @@ struct StopPlan {
+     for(unsigned i=0;i<12;++i){rest=rest&&acceleration[i]==0;vpeak=std::fmax(vpeak,std::abs(velocity[i]));}
+     if(rest&&std::isfinite(vpeak))first=std::max(2u,static_cast<unsigned>(std::fmin(61.,std::floor(1.5*vpeak/amax/.02))));
+     for(unsigned steps=first;steps<=60;++steps){
+-      const double t=steps*.02;bool valid=true;
++      const double t=steps*.02;bool valid=true,outside=false;
+       for(unsigned i=0;i<12&&valid;++i){
+         const double c1=a[i]*t,c2=-3*v[i]-2*c1,c3=2*v[i]+c1;
+         const double p1=q[i]+t*v[i]/4;
+         end[i]=q[i]+t*v[i]/2+t*t*a[i]/12;
+         // Quartic Bezier controls q,p1,end,end,end. A convex certified box
+         // encloses every continuous reference and asynchronous joint progress.
+-        for(double p:{q[i],p1,end[i]})if(!std::isfinite(p)||p<lo[i]||p>hi[i]||std::abs(p-q[i])>kMaxResidualRad)valid=false;
++        for(double p:{q[i],p1,end[i]})if(!std::isfinite(p)||p<lo[i]||p>hi[i]||std::abs(p-q[i])>kMaxResidualRad){valid=false;outside=true;}
+         auto velocityAt=[&](double u){return v[i]+u*(c1+u*(c2+u*c3));};
+         auto accelerationAt=[&](double u){return (c1+u*(2*c2+u*3*c3))/t;};
+         auto checkV=[&](double u){if(u>=0&&u<=1&&std::abs(velocityAt(u))>vmax+1e-12)valid=false;};
+@@ -49,6 +49,13 @@ struct StopPlan {
+         }else if(std::abs(c2)>1e-15)checkV(-c1/(2*c2));
+       }
+       if(valid){duration=t;return true;}
++      // P5 (P0 closure, 16/11): with a = 0 the controls p1 = q + t*v/4 and end = q + t*v/2 only
++      // move away from q (inside the box) as t grows, also as computed in floating point, so a
++      // control outside the box or the residual here stays outside at every longer multiple: the
++      // search ends with the same refusal it would reach at 60 steps. The acceleration bound,
++      // the only one that eases as t grows, never sets `outside`. Returned value and duration
++      // are unchanged; end[] after a refusal is scratch, read by no caller.
++      if(rest&&outside)return false;
+     }
+     return false;
+   }
+-- 
+2.43.0
+

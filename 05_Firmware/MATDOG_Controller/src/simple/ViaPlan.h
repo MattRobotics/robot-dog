@@ -35,11 +35,23 @@ struct ViaPlan {
     // Short or sharply turning segments slow down until neighbouring blends
     // fit without overlap. Blend length scales with speed and the segment
     // time inversely, so a square-root step converges in a few passes.
+    // b[k] depends only on v[k] and v[k+1]: a pass recomputes it only where
+    // one of them changed, each cruise row once, with the same arithmetic
+    // (P0 peaks 16/11: the soft-double divisions of the unchanged segments
+    // were most of the ~1.1 M instructions of a DEPLOY/LIFT plan).
+    bool changed[kMax+1];for(unsigned k=0;k<=n;++k)changed[k]=true;
     for(iterations=0;;++iterations){
-      for(unsigned k=0;k<n;++k){double m=0;for(unsigned i=0;i<kJoints;++i)m=std::fmax(m,std::abs(cruise(k+1,i)-cruise(k,i)));b[k]=1.875*m/amax;}
+      double prev[kJoints],cur[kJoints];bool prevRow=false;
+      for(unsigned k=0;k<n;++k){
+        if(!changed[k]&&!changed[k+1]){prevRow=false;continue;}
+        if(!prevRow)for(unsigned i=0;i<kJoints;++i)prev[i]=cruise(k,i);
+        double m=0;for(unsigned i=0;i<kJoints;++i){cur[i]=cruise(k+1,i);m=std::fmax(m,std::abs(cur[i]-prev[i]));prev[i]=cur[i];}
+        b[k]=1.875*m/amax;prevRow=true;
+      }
+      for(unsigned k=0;k<=n;++k)changed[k]=false;
       bool fits=true;
       for(unsigned k=1;k<n;++k){const double need=.5*(b[k-1]+b[k]),time=d[k]/v[k];
-        if(time<need-1e-12){v[k]*=std::fmax(.25,.98*std::sqrt(time/need));fits=false;}}
+        if(time<need-1e-12){v[k]*=std::fmax(.25,.98*std::sqrt(time/need));changed[k]=true;fits=false;}}
       if(fits)break;
       if(iterations==64)return false;
     }

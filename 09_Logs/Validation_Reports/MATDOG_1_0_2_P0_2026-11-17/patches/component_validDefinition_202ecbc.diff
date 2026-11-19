@@ -1,0 +1,42 @@
+diff --git a/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json b/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+index fbada93..aa9813e 100644
+--- a/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
++++ b/05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+@@ -9,6 +9,7 @@
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
++    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "32a493833c609a8c40c26849f80ed467bbcc1f8be2c065d068b30ea2e8b5c97e",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",
+diff --git a/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp b/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp
+index 0202b40..4db7257 100644
+--- a/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp
++++ b/05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp
+@@ -5,13 +5,24 @@
+ 
+ namespace matdog { namespace motion {
+ namespace {
++// The checks forwardKinematics() makes before it computes, and the only part of it a
++// definition used (its status): a model, three finite angles, each inside the
++// generated URDF limits inclusive. The FK trigonometry is no longer computed here.
++bool seedInsideModel(LegId leg, const LegJointAngles& q) {
++  const LegModel* model = legModel(leg);
++  if (!model || !std::isfinite(q.hip) || !std::isfinite(q.upper) || !std::isfinite(q.lower)) return false;
++  const double values[3] = {q.hip, q.upper, q.lower};
++  for (unsigned j=0; j<3; ++j)
++    if (values[j] < model->limits[j].lower || values[j] > model->limits[j].upper) return false;
++  return true;
++}
+ bool validDefinition(const StandDefinition& d) {
+   if (!std::isfinite(d.lowBodyHeightM) || !std::isfinite(d.standBodyHeightM) ||
+       d.lowBodyHeightM <= 0 || d.lowBodyHeightM >= d.standBodyHeightM || d.samples < 2) return false;
+   for (unsigned i=0; i<4; ++i) {
+     const auto p = d.contactsWorldM[i];
+     if (!std::isfinite(p.x) || !std::isfinite(p.y) || p.z != 0.0 ||
+-        forwardKinematics(static_cast<LegId>(i), d.standSeed[i]).status != KinematicsStatus::OK) return false;
++        !seedInsideModel(static_cast<LegId>(i), d.standSeed[i])) return false;
+   }
+   return true;
+ }

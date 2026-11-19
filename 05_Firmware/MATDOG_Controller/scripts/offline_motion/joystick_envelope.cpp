@@ -53,18 +53,27 @@ struct Port: simple::ServoPort {
   bool verifyOff(unsigned i) override{return i==12||o[i].torque==0;}
   void publish(){for(unsigned i=0;i<12;++i){o[i].raw=t[i];o[i].q=(int(t[i])-2048)*simple::kTickRad;}}
 };
-struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0,nominalTilt=0,liftErr=0,maxStep=0;unsigned frames=0,tiltFail=0;double lo[12],hi[12];std::string end;
+struct Result{double footLo=1e9,footHi=-1e9,box=1e9,gen1=1e9,tilt=1e9,footTilt=0,nominalTilt=0,liftErr=0,maxStep=0;unsigned frames=0,tiltFail=0,refused=0;double lo[12],hi[12];std::string end,refusals;
   Result(){for(unsigned i=0;i<12;++i){lo[i]=1e9;hi[i]=-1e9;}}
   void joint(unsigned i,double q){lo[i]=std::fmin(lo[i],q);hi[i]=std::fmax(hi[i],q);}};
 }
 int main(int argc,char** argv){
   // scenario: holds "seconds:vx[,vy,yaw_rate]" (SI); vx '-' = silent client;
   // "rand:SEED:SECONDS" = random commands inside the Controller ellipsoid.
+  // JOY_MODE 0|1|2 (vNext): the joystick walks that WALK mode's own law; limits per
+  // cycle of its period (JoystickSpec). "--limits" prints them (m/s, rad/s) for the script:
+  // steered fore/aft, lateral, yaw, published forward top, backward.
+  const auto mode=static_cast<simple::WalkMode>(std::getenv("JOY_MODE")?std::atoi(std::getenv("JOY_MODE")):0);
+  const auto& spec=simple::walkModeSpec(mode);const auto& js=simple::joystickSpec(mode);
+  const double T=spec.periodS,lim[3]={js.strideM/T,js.lateralM/T,js.yawRad/T};
+  if(argc==2&&!std::strcmp(argv[1],"--limits")){std::printf("%.17g %.17g %.17g %.17g %.17g\n",lim[0],lim[1],lim[2],spec.strideM[2]/T,js.backM/T);return 0;}
   if(argc<3){std::fprintf(stderr,"usage: joystick_envelope out.txt hold|rand ...\n");return 2;}
   FILE* out=std::fopen(argv[1],"w");if(!out)return 2;
-  const double T=simple::kJoystickPeriodS,lim[3]={simple::kJoystickStrideM/T,simple::kJoystickLateralM/T,simple::kJoystickYawRad/T};
-  V kSteerTilt[std::size(simple::kSteerTilt)];for(unsigned i=0;i<std::size(kSteerTilt);++i)kSteerTilt[i]={simple::kSteerTilt[i].roll,simple::kSteerTilt[i].pitch};
-  V walk100[std::size(simple::kWalkTilt100)];for(unsigned i=0;i<std::size(walk100);++i)walk100[i]={simple::kWalkTilt100[i].roll,simple::kWalkTilt100[i].pitch};
+  // The steered envelope of the mode (vNext steerTilt; SLOW: kSteerTilt).
+  const auto& steerTilt=simple::steerTilt(mode);
+  V kSteerTilt[std::extent<simple::SteerPolygon>::value];for(unsigned i=0;i<std::size(kSteerTilt);++i)kSteerTilt[i]={steerTilt[i].roll,steerTilt[i].pitch};
+  // The fore/aft regime's envelope: the mode's top-preset polygon (SLOW: kWalkTilt100).
+  V walk100[16];for(unsigned i=0;i<16;++i)walk100[i]={(*spec.tiltTop)[i].roll,(*spec.tiltTop)[i].pitch};
   struct Step{double seconds,v[3];bool silent;int walk=-1;};std::vector<Step> steps;  // walk: WALK STANDARD preset instead of a joystick command
   for(int a=2;a<argc;++a){unsigned seed=0;double total=0;
     if(std::sscanf(argv[a],"rand:%u:%lf",&seed,&total)==2){std::srand(seed);
@@ -77,17 +86,26 @@ int main(int argc,char** argv){
     else{Step s{0,{0,0,0},false};char v[64]{};if(std::sscanf(argv[a],"%lf:%63s",&s.seconds,v)!=2)return 2;
       if(!std::strcmp(v,"-"))s.silent=true;else std::sscanf(v,"%lf,%lf,%lf",&s.v[0],&s.v[1],&s.v[2]);steps.push_back(s);}}
   simple::SimpleMotion m;Port port;simple::Inputs in;m.begin(&port);
-  in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";std::copy(kLo,kLo+12,in.minRad);std::copy(kHi,kHi+12,in.maxRad);
+  // Register 85 verified at its target (dev.6): without it STAND is refused.
+  in.ready=in.powerOk=in.authorityOk=in.imuValid=true;in.refusal="READY";in.accCeiling=simple::kAccCeilingTarget;std::copy(kLo,kLo+12,in.minRad);std::copy(kHi,kHi+12,in.maxRad);
   auto tick=[&](){port.now+=simple::kPeriodUs;clock_us=port.now;in.imuStampUs=port.now;m.inputs(in);port.publish();m.update(port.now);};
   for(int i=0;i<15;++i)tick();
   if(m.stand(.120,port.now)){std::puts("STAND refused");return 1;}
   for(int i=0;i<3000&&m.state()!=simple::State::STANDING;++i)tick();
   if(m.state()!=simple::State::STANDING){std::puts("STAND not reached");return 1;}
+  if(const char* refused=m.selectWalkMode(mode)){std::printf("WALK mode refused: %s\n",refused);return 1;}
   Result r;motion::JointTargetFrame last{};
   for(const auto& st:steps){
     for(int n=0;n<std::lround(st.seconds*50);++n){
       if(st.walk>=0){if(n==0)m.walk(unsigned(st.walk),port.now);}
-      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();else m.drive(st.v[0],st.v[1],st.v[2],port.now);}  // dashboard refresh 240 ms
+      else if(!st.silent&&n%12==0){if(st.v[0]==0&&st.v[1]==0&&st.v[2]==0)m.walkStop();  // dashboard refresh 240 ms
+        // vNext audit: every refusal is reported and fails the scenario, except the
+        // refreshes while a WALK STOP runs (WALK_STOPPING) or its walk settles
+        // (MOTION_BUSY in WALK_SETTLE): the page holds the stick silent there and
+        // the next refresh after STANDING starts the walk.
+        else if(const char* why=m.drive(st.v[0],st.v[1],st.v[2],port.now)){
+          const bool settling=!std::strcmp(why,"MOTION_BUSY")&&m.state()==simple::State::MOVING&&!std::strcmp(m.phase(),"WALK_SETTLE");
+          if(std::strcmp(why,"WALK_STOPPING")&&!settling){++r.refused;if(r.refusals.find(why)==std::string::npos)r.refusals+=std::string(r.refusals.empty()?"":",")+why;}}}
       tick();
       if(m.state()==simple::State::FAULT){r.end=std::string("FAULT ")+m.reason();break;}
       if(std::strcmp(m.phase(),"WALK_STANDARD"))continue;
@@ -139,8 +157,14 @@ int main(int argc,char** argv){
   if(r.end.empty())r.end=std::string(simple::name(m.state()))+" "+m.reason();
   std::fclose(out);
   if(const char* env=std::getenv("JOY_ENVELOPE")){FILE* e=std::fopen(env,"a");if(e){for(unsigned i=0;i<12;++i)std::fprintf(e,"%s%.9f %.9f",i?" ":"",r.lo[i],r.hi[i]);std::fprintf(e,"\n");std::fclose(e);}}
-  if(!r.frames){std::printf("frames=0 walk=NOT_APPLICABLE end=%s\n",r.end.c_str());return r.end.rfind("FAULT",0)==0?1:0;}  // never reached WALK_STANDARD
-  std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad end=%s\n",
-    r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.end.c_str());
-  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0?1:0;
+  // A scenario must walk unless declared otherwise (JOY_EXPECT_NOWALK, release in
+  // the start ramp: it may end before WALK, as STANDARD/FAST rising from the
+  // 120 mm stand, or walk a few frames, as SLOW at its own height); a missing
+  // walk anywhere else fails (vNext audit).
+  const bool noWalk=std::getenv("JOY_EXPECT_NOWALK")!=nullptr;
+  if(!r.frames){std::printf("frames=0 walk=%s refused=%u%s%s end=%s\n",noWalk?"NOT_APPLICABLE":"MISSING",r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
+    return r.end.rfind("FAULT",0)==0||!noWalk||r.refused?1:0;}
+  std::printf("foot_x=[%.1f,%.1f] mm frames=%u box_margin=%.1f mrad gen1_margin=%.1f mrad tilt_margin=%.1f mrad tilt_fail=%u foot_tilt nominal/compensated=%.2f/%.2f deg lift_err=%.1f um max_target_step=%.5f rad refused=%u%s%s end=%s\n",
+    r.footLo*1e3,r.footHi*1e3,r.frames,r.box*1e3,r.gen1*1e3,r.tilt*1e3,r.tiltFail,r.nominalTilt*180/M_PI,r.footTilt*180/M_PI,r.liftErr*1e6,r.maxStep,r.refused,r.refused?" ":"",r.refusals.c_str(),r.end.c_str());
+  return r.end.rfind("FAULT",0)==0||r.tiltFail||r.box<0||r.refused?1:0;
 }

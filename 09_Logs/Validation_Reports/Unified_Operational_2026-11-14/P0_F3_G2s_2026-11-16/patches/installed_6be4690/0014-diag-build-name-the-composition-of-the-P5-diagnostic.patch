@@ -1,0 +1,34 @@
+From a86c6800b54399342a58f295c913e36bad989869 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 14:26:12 +0100
+Subject: [PATCH 14/19] diag(build): name the composition of the P5 diagnostic
+ in BuildConfig
+
+82c1af9 (validated on the fixture on 16/11, the best timing measured on the chip)
+plus P5 (87338f8 on research/p0-stopplan-20261116, cherry-picked unchanged). P4 is
+left out: on the chip the attenuated releases that overrun still took two solves.
+Still a diagnostic build.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/config/BuildConfig.h | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+index d2c05a8..35e7b84 100644
+--- a/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
++++ b/05_Firmware/MATDOG_Controller/src/config/BuildConfig.h
+@@ -163,6 +163,10 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
+ //   plus the accepted offset), P3a (bit-identical ViaPlan::plan), P3b (plan
+ //   release keeps the probe) and D3 (last release lost with Motion idle, the
+ //   @MOTION TIMING dump duration, the register-85 pass duration).
++// P5 diagnostic (composed 2026-11-16 on 82c1af9, the best timing measured on the
++//   chip; P4 left out, no gain on the overrun releases): plus P5, a refused STOP
++//   proof stops at the first duration with a control outside the box (same
++//   accept/refuse, same plans). Still diagnostic.
+ constexpr const char* kFirmwareVersion = "1.0.2-dev.8"; // P0 diagnostic build only; not an operational candidate
+ constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
+ constexpr const char* kBuildId         = MATDOG_BUILD_ID;
+-- 
+2.43.0
+

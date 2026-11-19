@@ -1,0 +1,14 @@
+540c540,542
+<   const collision::Box& walkBox() const { return steered_?*steerRegion(walkMode_).box:kWalkBox; }
+---
+>   // SCRATCH COLLECTION ONLY (not in the repo): STANDARD/FAST steered walks on the gen-1 limits.
+>   static constexpr collision::Box kCollect={{-.783864,-.914253,-1.598408,-.783864,-.914253,-1.58,-.783864,-.914253,-1.592272,-.783864,-.914253,-1.590738},{.783864,2.110758,.590583,.783864,2.10002,.581379,.771592,2.136835,.590583,.78233,2.129166,.585981}};
+>   const collision::Box& walkBox() const { return steered_?(walkMode_==WalkMode::SLOW?*steerRegion(walkMode_).box:kCollect):kWalkBox; }
+1054c1056
+<          contains(collision::kDeploy,q)||contains(collision::kLift,q)||contains(collision::kSteer,q);
+---
+>          contains(collision::kDeploy,q)||contains(collision::kLift,q)||contains(collision::kSteer,q)||(phase_==Phase::WALK&&steered_&&walkMode_!=WalkMode::SLOW&&contains(kCollect,q));  // SCRATCH COLLECTION ONLY
+1793c1795
+<   const auto& steer=steerRegion(walkMode_);const collision::Box& box=toSteered?*steer.box:kWalkBox;
+---
+>   const auto& steer=steerRegion(walkMode_);const collision::Box& box=toSteered?(walkMode_==WalkMode::SLOW?*steer.box:kCollect):kWalkBox;  // SCRATCH COLLECTION ONLY

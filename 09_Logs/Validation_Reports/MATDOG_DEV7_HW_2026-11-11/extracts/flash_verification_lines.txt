@@ -1,0 +1,5 @@
+41:Flash will be erased from 0x00010000 to 0x001bdfff...
+1762:Wrote 1757472 bytes at 0x00010000 in 38.9 seconds (361.2 kbit/s).
+1764:Hash of data verified.
+1785:Verification successful (digest matched).
+1788:APPLICATION_ONLY_FLASH = PASS

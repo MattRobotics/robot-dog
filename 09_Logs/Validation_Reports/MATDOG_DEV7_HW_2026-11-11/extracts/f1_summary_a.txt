@@ -1,0 +1,32 @@
+USB: 3966 righe
+  18:56:13 MOTION_ACC_CEILING verified=220 target=220
+  2026-11-11T18:57:21.455+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+  2026-11-11T18:57:32.450+00:00 MOTION_DIAG exit valid=0 fault=0 reason= phase=IDLE state=STOPPED at_us=0 now_us=0 energized=0 releases=0 missed=0 max_gap_us=0 drive=0/0 goal_sent_us=0 settle_us=0 deadline_us=0 last_polled
+  2026-11-11T18:57:32.450+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+HTTP: motion 304 campioni (1 senza risposta valida), status 60
+IDENTITÀ: 1.0.2-dev.7 build b5610620d0ce ota b5610620d0ce | health READY, BMS OK 12.1 V | uptime 316344 ms
+SEQUENZA (stato fase motivo | profilo selezionato attivo destinazione)
+  18:52:30 READY IDLE READY | SLOW SLOW SLOW
+  18:56:13 MOVING ACQUIRE ACQUIRING_REAL_POSE | SLOW SLOW SLOW
+  18:56:14 MOVING ALIGN ACQUIRING_REAL_POSE | SLOW SLOW SLOW
+  18:56:15 MOVING STAND_DEPLOY ACQUIRING_REAL_POSE | SLOW SLOW SLOW
+  18:56:18 MOVING STAND_LIFT ACQUIRING_REAL_POSE | SLOW SLOW SLOW
+  18:56:21 MOVING HEIGHT ACQUIRING_REAL_POSE | SLOW SLOW SLOW
+  18:56:23 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+  18:56:38 MOVING STOP STOP_IN_PROGRESS | SLOW SLOW SLOW
+  18:56:40 STOPPED STOP STOPPED_SUPPORT_UNVERIFIED | SLOW SLOW SLOW
+  18:56:46 MOVING HEIGHT HEIGHT_CHANGE | SLOW SLOW SLOW
+  18:56:47 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+CAMBI DI PROFILO DURANTE IL WALK (risoluzione 1 s; completato = vx al 98 % del massimo del profilo)
+PER PROFILO (WALKING a regime: attivo = destinazione)
+ANCHE E INSEGUIMENTO (coppia ON; margine delle anche dalla box kHeight ±25 mrad, in tick)
+  MOVING SLOW          n= 12 | margine anche min LF -45.7 RF -39.7 RH -21.7 LH -20.7 | max |err| H/U/L 73/82/82 tick | max carico H/U/L 120/104/112 ‰
+  STANDING SLOW        n= 61 | margine anche min LF 11.3 RF 12.3 RH 13.3 LH 10.3 | max |err| H/U/L 6/14/17 tick | max carico H/U/L 56/68/64 ‰
+  STOPPED SLOW         n=  6 | margine anche min LF 11.3 RF 12.3 RH 13.3 LH 10.3 | max |err| H/U/L 6/6/3 tick | max carico H/U/L 56/56/32 ‰
+STOP
+  18:56:38 STOP in corso (profilo SLOW→SLOW)
+  18:56:40 verificato dopo 2.0 s, coppia ON
+TEMPERATURE: max 27 °C (servo 21 alle 18:56:44); campioni ≥ 60 °C: nessuno; spike filtrati dal firmware 0
+TEMPI: missed 0→6, overrun 0→18, max lavoro per rilascio 33990 µs (max nella finestra)
+ULTIMO STATO: STANDING HOLD STAND_REACHED | SAFE_OFF verificato False, mask 0, coppia ON
+CRITERI DI INTERRUZIONE: nessuno

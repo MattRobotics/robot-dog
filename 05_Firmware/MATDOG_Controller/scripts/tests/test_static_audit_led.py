@@ -200,6 +200,18 @@ STATIC_MUTATIONS.extend([
     ("sample identity from paint clock", "Controller.cpp", "led_inputs.sampled_at_ms = battery.sampled_at_ms;", "led_inputs.sampled_at_ms = led_now_ms;"),
 ])
 
+# Battery P1: facts current with torque ON, no ring transmission while Motion is engaged.
+STATIC_MUTATIONS.extend([
+    ("Motion guard freezes battery facts again", "Controller.cpp", "led_status_.update(led_now_ms, led_inputs);",
+     "if(!simple_motion_.engaged())led_status_.update(led_now_ms, led_inputs);"),
+    ("ring rendered while Motion is engaged", "Controller.cpp", "led_status_.deferRender(simple_motion_.engaged());",
+     "led_status_.deferRender(false);"),
+    ("render deferral never set", "Controller.cpp", "led_status_.deferRender(simple_motion_.engaged());", ""),
+    ("manager transmits while deferred", "LedStatusManager.cpp", "if (render_deferred_) return;", ""),
+    ("manager defers after the frame", "LedStatusManager.cpp", "if (render_deferred_) return;\n  ring_->setFrame(frame);",
+     "ring_->setFrame(frame);\n  if (render_deferred_) return;"),
+])
+
 # Compile-valid semantic changes prove the suite checks behavior, rather
 # than merely grepping matching production expressions.
 POLICY_MUTATIONS = [

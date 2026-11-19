@@ -6,27 +6,26 @@
 namespace matdog {
 namespace motion {
 namespace {
-constexpr double kPi = 3.14159265358979323846;
-// Roundoff guards, not an extension of the physical workspace/URDF limits.
-constexpr double kDomainEpsilon = 1e-12;
-constexpr double kLimitEpsilonRad = 1e-12;
+using detail::Vec3f;
+constexpr float kPi = 3.14159265358979323846f;
 
-double clamp(double value, double low, double high) {
+float clamp(float value, float low, float high) {
   return value < low ? low : (value > high ? high : value);
 }
 
-double norm(const Vector3& p) { return std::hypot(std::hypot(p.x, p.y), p.z); }
+// Decimetre offsets from finite targets: a square overflows only for a target
+// beyond float range, and that infinity fails the reach test as it should.
+float norm(const Vec3f& p) { return std::sqrt(p.x * p.x + p.y * p.y + p.z * p.z); }
 
 // The generator requires every limit interval to be strictly inside (-pi, pi).
 // Hence each angle has at most one equivalent representative in that interval.
-bool boundedAngle(double raw, const JointLimit& limit, double& value) {
-  // |raw| <= pi: the nearest multiple of 2pi is 0 (at exactly pi the
-  // round-half-even quotient is 0 too), so remainder(raw, 2pi) == raw bit for
-  // bit. The soft-double remainder is only paid for angles outside (-pi, pi].
-  value = std::abs(raw) <= kPi ? raw : std::remainder(raw, 2.0 * kPi);
-  if (value < limit.lower - kLimitEpsilonRad ||
-      value > limit.upper + kLimitEpsilonRad) return false;
-  value = clamp(value, limit.lower, limit.upper);
+bool boundedAngle(float raw, float lower, float upper, float& value) {
+  // |raw| <= pi: the nearest multiple of 2pi is 0, so remainder(raw, 2pi) ==
+  // raw bit for bit; the remainder is only paid outside (-pi, pi].
+  value = std::abs(raw) <= kPi ? raw : std::remainder(raw, 2.0f * kPi);
+  if (value < lower - detail::kLimitEpsilonRad ||
+      value > upper + detail::kLimitEpsilonRad) return false;
+  value = clamp(value, lower, upper);
   return true;
 }
 // Constants of one virtual chain: b = planar foot offset, phi = its angle,
@@ -35,8 +34,8 @@ bool boundedAngle(double raw, const JointLimit& limit, double& value) {
 // (same inputs, same bits) so the analytic IK pays hypot/atan2 for them once
 // per chain instead of on every solve. Motion, STAND planning and the offline
 // tools call the IK from one task; no other context solves IK.
-struct ChainConstants { double fx, fz, lateral, a, hipFrameZ, b, phi, outer; bool valid; };
-const ChainConstants& chainConstants(const LegModel& m, double a, double lateral, double hipFrameZ) {
+struct ChainConstants { float fx, fz, lateral, a, hipFrameZ, b, phi, outer; bool valid; };
+const ChainConstants& chainConstants(const detail::ModelF& m, float a, float lateral, float hipFrameZ) {
   static ChainConstants cache[8]{};
   static unsigned next = 0;
   for (const auto& c : cache)
@@ -53,83 +52,82 @@ const ChainConstants& chainConstants(const LegModel& m, double a, double lateral
 
 IkResult inverseKinematics(LegId leg, const Vector3& target,
                            const IkOptions& options) {
-  const LegModel* model = legModel(leg);
-  return model ? detail::inverseWithModel(*model, target, options, 0.0) : IkResult{};
+  IkResult result;
+  if (!legModel(leg) || !std::isfinite(target.x) || !std::isfinite(target.y) ||
+      !std::isfinite(target.z) || !std::isfinite(options.toleranceM) ||
+      options.toleranceM < double(detail::kResidualM) || options.toleranceM > 1e-3) return result;
+  // The seed only has to be a valid FK input (finite, inside the URDF
+  // limits): the same status forwardKinematics would return, without its trig.
+  detail::JointsF seed;
+  result.status = detail::jointsF(leg, options.seed, seed);
+  if (result.status != KinematicsStatus::OK) return result;
+  const auto ik = detail::inverseWithModel(*detail::modelF(leg), detail::toF(target), seed,
+                                           static_cast<float>(options.toleranceM), 0.0f);
+  result.status = ik.status;
+  result.reachability = ik.reachability;
+  result.joints = detail::toD(ik.joints);
+  result.achievedFootOriginM = detail::toD(ik.achievedFootOriginM);
+  result.residualM = ik.residualM;
+  result.solutions = ik.solutions;
+  return result;
 }
 
-IkResult detail::inverseWithModel(const LegModel& geometry, const Vector3& target,
-                                   const IkOptions& options, double hipFrameZ,
-                                   AnalyticBranch* branch) {
-  IkResult result;
-  const LegModel* model = &geometry;
-  if (!std::isfinite(target.x) || !std::isfinite(target.y) ||
-      !std::isfinite(target.z) || !std::isfinite(options.toleranceM) ||
-      options.toleranceM < 1e-12 || options.toleranceM > 1e-3) return result;
-  // The seed only has to be a valid FK input (finite, inside the URDF
-  // limits): the same status forwardWithModel would return, without its trig.
-  const auto& seed = options.seed;
-  if (!std::isfinite(seed.hip) || !std::isfinite(seed.upper) || !std::isfinite(seed.lower)) {
-    result.status = FkResult{}.status;
-    return result;
-  }
-  const double seedValues[3] = {seed.hip, seed.upper, seed.lower};
-  for (unsigned i = 0; i < 3; ++i)
-    if (seedValues[i] < model->limits[i].lower || seedValues[i] > model->limits[i].upper) {
-      result.status = KinematicsStatus::JOINT_LIMIT;
-      return result;
-    }
-  const Vector3 p = {target.x - model->hipOrigin.x,
-                     target.y - model->hipOrigin.y,
-                     target.z - model->hipOrigin.z};
-  const double a = -model->lowerOrigin.z;
-  const double lateral = model->upperOrigin.y + model->footOrigin.y;
-  const auto& chain = chainConstants(geometry, a, lateral, hipFrameZ);
-  const double b = chain.b;
-  const double radius = std::hypot(p.y, p.z);
-  const double outer = chain.outer;
+detail::IkF detail::inverseWithModel(const ModelF& model, const Vec3f& target, const JointsF& seed,
+                                                       float toleranceM, float hipFrameZ, AnalyticBranch* branch) {
+  IkF result;
+  if (!(toleranceM >= kResidualM && toleranceM <= 1e-3f)) return result;
+  const Vec3f p = {target.x - model.hipOrigin.x,
+                   target.y - model.hipOrigin.y,
+                   target.z - model.hipOrigin.z};
+  const float a = -model.lowerOrigin.z;
+  const float lateral = model.upperOrigin.y + model.footOrigin.y;
+  const auto& chain = chainConstants(model, a, lateral, hipFrameZ);
+  const float b = chain.b;
+  const float radius = std::sqrt(p.y * p.y + p.z * p.z);
+  const float outer = chain.outer;
   result.status = KinematicsStatus::UNREACHABLE_GEOMETRY;
   result.reachability = Reachability::UNREACHABLE;
-  // Reject huge finite inputs before squaring; hypot is overflow-safe.
-  if (norm(p) > outer + kDomainEpsilon ||
+  // Also rejects a target beyond float range (infinite norm).
+  if (!(norm(p) <= outer + kDomainEpsilon) ||
       radius < std::abs(lateral) - kDomainEpsilon) return result;
 
-  const double alpha = std::atan2(p.z, p.y);
-  const double hipDelta = std::acos(clamp(lateral / radius, -1.0, 1.0));
-  const double phi = chain.phi;
+  const float alpha = std::atan2(p.z, p.y);
+  const float hipDelta = std::acos(clamp(lateral / radius, -1.0f, 1.0f));
+  const float phi = chain.phi;
   bool geometryExists = false;
   bool limitedCandidateExists = false;
-  struct Candidate { LegJointAngles q; double distance; AnalyticBranch branch; };
+  struct Candidate { JointsF q; float distance; AnalyticBranch branch; };
   Candidate candidates[4]{};
   unsigned count = 0;
 
   // Two hip branches, each with two planar elbow branches. Both are required
   // even for a target generated by FK; choosing a fixed knee sign is unsound.
   for (unsigned hipBranch = 0; hipBranch < 2; ++hipBranch) {
-    const double h = alpha + (hipBranch == 0 ? hipDelta : -hipDelta);
-    const double hipV = -std::sin(h) * p.y + std::cos(h) * p.z;
-    const double v = hipV - hipFrameZ;
-    const double cosine = (p.x * p.x + v * v - a * a - b * b) / (2.0 * a * b);
-    if (cosine < -1.0 - kDomainEpsilon || cosine > 1.0 + kDomainEpsilon) continue;
+    const float h = alpha + (hipBranch == 0 ? hipDelta : -hipDelta);
+    const float hipV = -std::sin(h) * p.y + std::cos(h) * p.z;
+    const float v = hipV - hipFrameZ;
+    const float cosine = (p.x * p.x + v * v - a * a - b * b) / (2.0f * a * b);
+    if (cosine < -1.0f - kDomainEpsilon || cosine > 1.0f + kDomainEpsilon) continue;
     geometryExists = true;
-    const double elbow = std::acos(clamp(cosine, -1.0, 1.0));
+    const float elbow = std::acos(clamp(cosine, -1.0f, 1.0f));
     // sin is odd, cos even: one evaluation serves both elbow branches, and
     // atan2 is odd in its first argument (the sign is applied after the
     // reduction in every libm), so one atan2 serves both too, bit for bit.
-    const double toTarget = std::atan2(-p.x, -v), se = std::sin(elbow), ce = std::cos(elbow);
-    const double elbowAngle = std::atan2(b * se, a + b * ce);
+    const float toTarget = std::atan2(-p.x, -v), se = std::sin(elbow), ce = std::cos(elbow);
+    const float elbowAngle = std::atan2(b * se, a + b * ce);
     for (unsigned elbowBranch = 0; elbowBranch < 2; ++elbowBranch) {
-      const double beta = elbowBranch == 0 ? elbow : -elbow;
-      const double u = toTarget - (elbowBranch == 0 ? elbowAngle : -elbowAngle);
-      LegJointAngles q{};
-      if (!boundedAngle(h, model->limits[0], q.hip) ||
-          !boundedAngle(u, model->limits[1], q.upper) ||
-          !boundedAngle(beta + phi, model->limits[2], q.lower)) continue;
+      const float beta = elbowBranch == 0 ? elbow : -elbow;
+      const float u = toTarget - (elbowBranch == 0 ? elbowAngle : -elbowAngle);
+      JointsF q{};
+      if (!boundedAngle(h, model.lower[0], model.upper[0], q.hip) ||
+          !boundedAngle(u, model.lower[1], model.upper[1], q.upper) ||
+          !boundedAngle(beta + phi, model.lower[2], model.upper[2], q.lower)) continue;
       limitedCandidateExists = true;
-      const double dh = q.hip - options.seed.hip;
-      const double du = q.upper - options.seed.upper;
-      const double dl = q.lower - options.seed.lower;
+      const float dh = q.hip - seed.hip;
+      const float du = q.upper - seed.upper;
+      const float dl = q.lower - seed.lower;
       candidates[count++] = {q, dh * dh + du * du + dl * dl,
-                             {static_cast<int8_t>(hipV >= 0.0 ? 1 : -1), static_cast<int8_t>(beta >= 0.0 ? 1 : -1)}};
+                             {static_cast<int8_t>(hipV >= 0.0f ? 1 : -1), static_cast<int8_t>(beta >= 0.0f ? 1 : -1)}};
     }
   }
   // The seed-nearest candidate that FK verifies inside the tolerance: the same
@@ -142,12 +140,12 @@ IkResult detail::inverseWithModel(const LegModel& geometry, const Vector3& targe
     }
   for (unsigned i = 0; i < count && result.solutions == 0; ++i) {
     const auto& c = candidates[i];
-    const FkResult fk = forwardWithModel(geometry, c.q, hipFrameZ);
-    const double residual = norm({target.x - fk.footOriginM.x,
-                                  target.y - fk.footOriginM.y,
-                                  target.z - fk.footOriginM.z});
+    const FkF fk = forwardWithModel(model, c.q, hipFrameZ);
+    const float residual = norm({target.x - fk.footOriginM.x,
+                                 target.y - fk.footOriginM.y,
+                                 target.z - fk.footOriginM.z});
     if (fk.status != KinematicsStatus::OK || !std::isfinite(residual) ||
-        residual > options.toleranceM) continue;
+        residual > toleranceM) continue;
     result.solutions = 1;
     result.joints = c.q;
     result.achievedFootOriginM = fk.footOriginM;

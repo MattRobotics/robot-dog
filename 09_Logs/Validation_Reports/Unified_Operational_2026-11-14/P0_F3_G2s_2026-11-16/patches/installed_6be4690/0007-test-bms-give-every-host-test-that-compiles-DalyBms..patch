@@ -1,0 +1,68 @@
+From 46b31757eb81c8370e816172503989e92ea9c151 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Sun, 15 Nov 2026 15:55:50 +0100
+Subject: [PATCH 07/19] test(bms): give every host test that compiles
+ DalyBms.cpp the UART2 stand-in
+
+D2 (8429bc0) includes soc/uart_struct.h in DalyBms.cpp. The host stand-in
+lived in daly_async_stub, so test_daly_async compiled but the pre-enable bus
+harness (run_preenable_bus_tests.sh, run twice by the night-recovery suite)
+stopped at the missing header: the night-recovery suite failed on D2 while it
+passes on 0c57b1b. static_audit does not run that suite (DEFERRED), so it did
+not see it.
+
+The stand-in moves to its own uart_status_stub directory (one header, same
+content) on the include path of both compiles. Firmware sources unchanged;
+night-recovery suite PASS again on this commit.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+(cherry picked from commit 4e3a740c07c1d4cb933474cdf29905844055568d)
+---
+ .../scripts/tests/run_night_recovery_tests.sh                  | 2 +-
+ .../MATDOG_Controller/scripts/tests/run_preenable_bus_tests.sh | 2 +-
+ .../{daly_async_stub => uart_status_stub}/soc/uart_struct.h    | 3 ++-
+ 3 files changed, 4 insertions(+), 3 deletions(-)
+ rename 05_Firmware/MATDOG_Controller/scripts/tests/{daly_async_stub => uart_status_stub}/soc/uart_struct.h (74%)
+
+diff --git a/05_Firmware/MATDOG_Controller/scripts/tests/run_night_recovery_tests.sh b/05_Firmware/MATDOG_Controller/scripts/tests/run_night_recovery_tests.sh
+index 47d3131..b8a97c8 100644
+--- a/05_Firmware/MATDOG_Controller/scripts/tests/run_night_recovery_tests.sh
++++ b/05_Firmware/MATDOG_Controller/scripts/tests/run_night_recovery_tests.sh
+@@ -5,7 +5,7 @@ sketch="$(cd "$here/../.." && pwd)"
+ out="$(mktemp -d /tmp/matdog-night.XXXXXX)"
+ trap 'rm -rf "$out"' EXIT
+ "${CXX:-g++}" -std=c++17 -Wall -Wextra -Werror -O1 -fsanitize=address,undefined -fno-omit-frame-pointer \
+- -I "$here/daly_async_stub" "$here/test_daly_async.cpp" "$sketch/src/power/DalyBms.cpp" \
++ -I "$here/daly_async_stub" -I "$here/uart_status_stub" "$here/test_daly_async.cpp" "$sketch/src/power/DalyBms.cpp" \
+  "$sketch/src/power/DalyProtocol.cpp" "$sketch/src/core/Availability.cpp" -o "$out/daly"
+ "$out/daly"
+ bash "$here/run_simple_motion_tests.sh"
+diff --git a/05_Firmware/MATDOG_Controller/scripts/tests/run_preenable_bus_tests.sh b/05_Firmware/MATDOG_Controller/scripts/tests/run_preenable_bus_tests.sh
+index d08e994..9c0e179 100644
+--- a/05_Firmware/MATDOG_Controller/scripts/tests/run_preenable_bus_tests.sh
++++ b/05_Firmware/MATDOG_Controller/scripts/tests/run_preenable_bus_tests.sh
+@@ -11,5 +11,5 @@ python3 -I - "$sketch/src/core/SimpleMotionIntegration.cpp" "$out/production_sim
+ import sys;src,dst=sys.argv[1:];t=open(src).read();s="bool Controller::SimpleServoPort::frame(";e="bool Controller::SimpleServoPort::enable("
+ assert t.count(s)==1 and t.count(e)==1;open(dst,"w").write(s+t.split(s,1)[1].split(e,1)[0])
+ PY
+-"${CXX:-g++}" -I "$out" -I "$here/servo_timed_stub" -I "$lib" -I "$sketch/src/simple" -std=c++17 -O1 -g -Wall -Wextra -Werror -Wno-misleading-indentation -Wno-unused-parameter -Wno-array-bounds -DARDUINO=100 -ffunction-sections -fdata-sections -Wl,--gc-sections -fsanitize=address,undefined -fno-omit-frame-pointer "${PREENABLE_TEST_SOURCE:-$here/test_preenable_bus.cpp}" "${sources[@]}" "$lib/SCS.cpp" "$lib/SCSerial.cpp" "$lib/SMS_STS.cpp" -o "$out/test"
++"${CXX:-g++}" -I "$out" -I "$here/servo_timed_stub" -I "$here/uart_status_stub" -I "$lib" -I "$sketch/src/simple" -std=c++17 -O1 -g -Wall -Wextra -Werror -Wno-misleading-indentation -Wno-unused-parameter -Wno-array-bounds -DARDUINO=100 -ffunction-sections -fdata-sections -Wl,--gc-sections -fsanitize=address,undefined -fno-omit-frame-pointer "${PREENABLE_TEST_SOURCE:-$here/test_preenable_bus.cpp}" "${sources[@]}" "$lib/SCS.cpp" "$lib/SCSerial.cpp" "$lib/SMS_STS.cpp" -o "$out/test"
+ "$out/test"
+diff --git a/05_Firmware/MATDOG_Controller/scripts/tests/daly_async_stub/soc/uart_struct.h b/05_Firmware/MATDOG_Controller/scripts/tests/uart_status_stub/soc/uart_struct.h
+similarity index 74%
+rename from 05_Firmware/MATDOG_Controller/scripts/tests/daly_async_stub/soc/uart_struct.h
+rename to 05_Firmware/MATDOG_Controller/scripts/tests/uart_status_stub/soc/uart_struct.h
+index 9a407fa..505d2a7 100644
+--- a/05_Firmware/MATDOG_Controller/scripts/tests/daly_async_stub/soc/uart_struct.h
++++ b/05_Firmware/MATDOG_Controller/scripts/tests/uart_status_stub/soc/uart_struct.h
+@@ -1,5 +1,6 @@
+ #pragma once
+-// Host stand-in for the ESP32-S3 UART status register (D2 test): the same
++// Host stand-in for the ESP32-S3 UART status register (D2, every host test that
++// compiles DalyBms.cpp: test_daly_async and the pre-enable bus harness): the same
+ // field layout as soc/esp32s3/register/soc/uart_struct.h, a writable UART2.
+ #include <cstdint>
+ typedef union {
+-- 
+2.43.0
+

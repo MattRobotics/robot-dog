@@ -5,7 +5,7 @@
 namespace matdog { namespace motion {
 constexpr uint16_t kMotionContractVersion = 1;
 constexpr size_t kMotionActionCount = 48;
-enum class Intent : uint8_t { STAND, LIE_DOWN, GAIT_SELECT, BASE_VELOCITY, BODY_POSE, ACTION_EXECUTE, STOP, STATUS, CAPABILITIES, UNKNOWN };
+enum class Intent : uint8_t { STAND, LIE_DOWN, GAIT_SELECT, BASE_VELOCITY, BODY_POSE, ACTION_EXECUTE, STOP, STATUS, CAPABILITIES, GROUND_OBSERVE, UNKNOWN };
 enum class ClientOwner : uint8_t { DASHBOARD, JETSON, LOCAL, UNKNOWN };
 // Timestamp uses Controller uptime, exposed by STATUS; no wall clock inference.
 // Clients estimate uptime from the most recent response and must stop on stale data.
@@ -17,7 +17,7 @@ struct MotionCommand {
   Intent intent = Intent::UNKNOWN;
   double target_height_m = .150, vx = 0, vy = 0, yaw_rate = 0;
   double x = 0, y = 0, z = 0, roll = 0, pitch = 0, yaw = 0;
-  char gait[17]{}, action_id[49]{};
+  char gait[17]{}, action_id[49]{}, leg[3]{};
 };
 enum class CommandOutcome : uint8_t { REJECTED, ACCEPTED, COMPLETED, ABORTED };
 struct MotionAck {

@@ -105,9 +105,10 @@ policy checks the selected solution. `CONTACT_MODE` means the selected solution
 is geometrically reachable but not accepted; its joints are not returned for
 use. Only `status==OK` makes the output usable.
 
-G1 numerical guards/tolerance bounds are retained. Default contact IK residual
-tolerance is `1e-9 m`. The contact-FK perpendicular-normal degeneracy threshold
-is `1e-9`, matching Python. No hardware velocity or acceleration limit exists.
+Numerical guards and tolerances are those of the FP32 core (18/11/2026), each
+derived in `LegKinematicsInternal.h`: default contact IK residual tolerance
+`1e-6 m`, contact-FK perpendicular-normal degeneracy threshold `1e-5`. No
+hardware velocity or acceleration limit exists.
 
 ## Stand definition, targets and trajectory
 

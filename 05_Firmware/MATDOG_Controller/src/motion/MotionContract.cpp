@@ -57,10 +57,10 @@ static const MotionAction catalog[kMotionActionCount] = {
 const MotionAction* actionCatalog() { return catalog; }
 const MotionAction* findAction(const char* id) { if(!id)return nullptr; for(const auto& a:catalog)if(!strcmp(id,a.id))return &a; return nullptr; }
 const char* toString(Intent i) {
- static const char* names[]={"POSTURE.STAND","POSTURE.LIE_DOWN","GAIT.SELECT","BASE_VELOCITY","BODY_POSE","ACTION.EXECUTE","MOTION.STOP","MOTION.STATUS","MOTION.CAPABILITIES","UNKNOWN"};
- return names[static_cast<unsigned>(i)<=static_cast<unsigned>(Intent::UNKNOWN)?static_cast<unsigned>(i):9];
+ static const char* names[]={"POSTURE.STAND","POSTURE.LIE_DOWN","GAIT.SELECT","BASE_VELOCITY","BODY_POSE","ACTION.EXECUTE","MOTION.STOP","MOTION.STATUS","MOTION.CAPABILITIES","GROUND_CONTACT.OBSERVE","UNKNOWN"};
+ return names[static_cast<unsigned>(i)<=static_cast<unsigned>(Intent::UNKNOWN)?static_cast<unsigned>(i):static_cast<unsigned>(Intent::UNKNOWN)];
 }
-Intent parseIntent(const char* s) { if(s)for(unsigned i=0;i<9;i++)if(!strcmp(s,toString(static_cast<Intent>(i))))return static_cast<Intent>(i); return Intent::UNKNOWN; }
+Intent parseIntent(const char* s) { if(s)for(unsigned i=0;i<static_cast<unsigned>(Intent::UNKNOWN);i++)if(!strcmp(s,toString(static_cast<Intent>(i))))return static_cast<Intent>(i); return Intent::UNKNOWN; }
 const char* toString(ClientOwner o) { switch(o){case ClientOwner::DASHBOARD:return "dashboard";case ClientOwner::JETSON:return "jetson";case ClientOwner::LOCAL:return "local";default:return "none";} }
 ClientOwner parseOwner(const char* s) { if(s)for(unsigned i=0;i<3;i++)if(!strcmp(s,toString(static_cast<ClientOwner>(i))))return static_cast<ClientOwner>(i); return ClientOwner::UNKNOWN; }
 const char* toString(CommandOutcome o) { switch(o){case CommandOutcome::ACCEPTED:return "ACCEPTED";case CommandOutcome::COMPLETED:return "COMPLETED";case CommandOutcome::ABORTED:return "ABORTED";default:return "REJECTED";} }
@@ -71,7 +71,7 @@ bool validCommand(const MotionCommand& c,uint32_t now,const char** reason) {
  for(size_t i=0;i<n;i++)if(!((c.id[i]>='a'&&c.id[i]<='z')||(c.id[i]>='A'&&c.id[i]<='Z')||(c.id[i]>='0'&&c.id[i]<='9')||c.id[i]=='_'||c.id[i]=='-'||c.id[i]=='.'))return reject("COMMAND_ID");
  if(!c.sequence)return reject("SEQUENCE");
  if(c.owner==ClientOwner::UNKNOWN||static_cast<unsigned>(c.owner)>3)return reject("OWNER");
- if(c.intent==Intent::UNKNOWN||static_cast<unsigned>(c.intent)>9)return reject("INTENT");
+ if(c.intent==Intent::UNKNOWN||static_cast<unsigned>(c.intent)>=static_cast<unsigned>(Intent::UNKNOWN))return reject("INTENT");
  // STOP de-escalates even with a stale dashboard clock or expired command TTL.
  if(c.intent==Intent::STOP){if(reason)*reason="OK";return true;}
  // signed age rejects future times and remains correct across uptime wrap.
@@ -81,7 +81,8 @@ bool validCommand(const MotionCommand& c,uint32_t now,const char** reason) {
  if(static_cast<uint32_t>(age)>=c.ttl_ms)return reject("EXPIRED");
  const double values[]={c.target_height_m,c.vx,c.vy,c.yaw_rate,c.x,c.y,c.z,c.roll,c.pitch,c.yaw};
  for(double v:values)if(!std::isfinite(v))return reject("NONFINITE_PARAMETER");
- if(strnlen(c.gait,sizeof(c.gait))==sizeof(c.gait)||strnlen(c.action_id,sizeof(c.action_id))==sizeof(c.action_id))return reject("PARAMETER_LENGTH");
+ if(strnlen(c.gait,sizeof(c.gait))==sizeof(c.gait)||strnlen(c.action_id,sizeof(c.action_id))==sizeof(c.action_id)||strnlen(c.leg,sizeof(c.leg))==sizeof(c.leg))return reject("PARAMETER_LENGTH");
+ if(c.intent==Intent::GROUND_OBSERVE&&std::strcmp(c.leg,"LF")&&std::strcmp(c.leg,"RF")&&std::strcmp(c.leg,"LH")&&std::strcmp(c.leg,"RH"))return reject("GROUND_LEG_REQUIRED");
  if(reason)*reason="OK";
  return true;
 }

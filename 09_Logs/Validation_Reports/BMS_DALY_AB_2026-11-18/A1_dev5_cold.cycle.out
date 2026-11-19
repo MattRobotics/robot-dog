@@ -1,0 +1,4 @@
+WAITING for KEY OFF
+KEY OFF at 2026-11-18T18:24:36.821Z; recorder armed, waiting for KEY ON
+OFF before this power-on: 77.5 min -> COLD START (>= 75 min)
+A1_dev5_cold: arm A firmware 1.0.1-dev.5 build df43feb94cdb boots seen 1 -> CLEAN  (356 samples from 6 to 718 s, 356 valid, longest hole 4 s)

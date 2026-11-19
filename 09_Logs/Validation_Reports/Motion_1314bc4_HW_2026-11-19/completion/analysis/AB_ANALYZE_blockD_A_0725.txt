@@ -1,0 +1,22 @@
+=== blockD_A_0725  profile A
+HTTP: 639 requests in 181 s (3.53/s), errors 0; torque-ON span 157 s: status 2.86/s, all 3.52/s; status_service_max_us 2851
+       {'poller /api/motion/status': 336, 'poller /status': 84, 'watcher /api/motion/status': 182, 'watcher /status': 37}
+steps PASS 27, FAIL [], aborts []
+windows 12; releases in windows 7979; hist [1851, 6100, 28, 0, 0, 0, 0, 0]; >=15 ms 0; >=20 ms 0; windows with max >=15 ms 0, >=16 ms 0; max 12729 us; overruns 0; missed 0
+since-boot over the run: releases +9061 missed +0 overruns +0
+  win 229475-230484 READY/IDLE               carried: PRONE_REST        max   None carried        comp   None solves None ovr 0 miss 0 hist [0, 0, 0, 0, 0, 0, 0, 0] sections None work None
+  win 230509-231021 MOVING/ACQUIRE           ACQUIRING_REAL_POSE        max   9423 STAND_DEPLOY   comp   2885 solves 1 ovr 0 miss 0 hist [375, 147, 0, 0, 0, 0, 0, 0] sections [2226, 5153, 1228, 549, 0, 267] work [1, 4, 6, 10]
+  win 231032-231996 MOVING/HEIGHT            HEIGHT_CHANGE              max  10041 WALK_STANDARD  comp   3348 solves 1 ovr 0 miss 0 hist [106, 867, 1, 0, 0, 0, 0, 0] sections [4043, 1051, 2917, 450, 1301, 279] work [1, 4, 4, 11]
+  win 232023-232864 MOVING/HEIGHT            HEIGHT_CHANGE              max  11033 WALK_STANDARD  comp   3713 solves 1 ovr 0 miss 0 hist [55, 801, 6, 0, 0, 0, 0, 0] sections [2079, 3266, 2440, 563, 2463, 222] work [1, 4, 4, 11]
+  win 232882-233808 MOVING/HEIGHT            HEIGHT_CHANGE              max  10935 WALK_STANDARD  comp   3481 solves 0 ovr 0 miss 0 hist [63, 875, 4, 0, 0, 0, 0, 0] sections [3823, 3383, 1842, 460, 1231, 196] work [0, 0, 0, 0]
+  win 233833-234783 MOVING/HEIGHT            HEIGHT_CHANGE              max  10579 WALK_STANDARD  comp   3566 solves 0 ovr 0 miss 0 hist [79, 883, 6, 0, 0, 0, 0, 0] sections [3866, 3154, 1600, 429, 1302, 228] work [0, 0, 0, 0]
+  win 234808-235751 MOVING/HEIGHT            HEIGHT_CHANGE              max  10322 WALK_STANDARD  comp   3501 solves 1 ovr 0 miss 0 hist [75, 884, 1, 0, 0, 0, 0, 0] sections [3956, 1248, 3126, 458, 1275, 259] work [1, 4, 4, 11]
+  win 235779-236184 MOVING/HEIGHT            HEIGHT_CHANGE              max   9720 WALK_STANDARD  comp   3193 solves 1 ovr 0 miss 0 hist [186, 239, 0, 0, 0, 0, 0, 0] sections [3961, 906, 2920, 415, 1286, 232] work [1, 4, 4, 11]
+  win 236211-236479 MOVING/WALK_STANDARD     STAND_FROM_STOPPED_WALK    max  12729 WALK_STANDARD  comp   2816 solves 1 ovr 0 miss 0 hist [61, 224, 3, 0, 0, 0, 0, 0] sections [3894, 3593, 1778, 710, 2548, 206] work [1, 4, 4, 8]
+  win 236483-236967 MOVING/HEIGHT            HEIGHT_CHANGE              max  10041 WALK_STANDARD  comp   3180 solves 1 ovr 0 miss 0 hist [197, 286, 1, 0, 0, 0, 0, 0] sections [3977, 827, 3180, 461, 1301, 295] work [1, 4, 4, 11]
+  win 236983-237784 MOVING/WALK_STANDARD     STAND_FROM_STOPPED_WALK    max  10615 WALK_STANDARD  comp   3300 solves 0 ovr 0 miss 0 hist [73, 729, 6, 0, 0, 0, 0, 0] sections [3993, 2894, 1723, 478, 1296, 231] work [0, 0, 0, 0]
+  win 237806-238536 MOVING/PRONE_HEIGHT      PRONE_DESCENT_NOT_VALIDATE max   8958 PRONE_HEIGHT   comp   2580 solves 2 ovr 0 miss 0 hist [581, 165, 0, 0, 0, 0, 0, 0] sections [3717, 775, 2357, 496, 1286, 327] work [2, 8, 10, 18]
+  heavy MAX_WORK          release 128833 PRONE_LIFT     work   8728 comp   1237 solves 2  since capture +None (capture gap None)
+  heavy MAX_WORK          release 237834 PRONE_HEIGHT   work   8958 comp   2357 solves 2  since capture +1 (capture gap 2)
+memory: heap_min_free 43368, loop stack min free 7712, httpd stack min free 9972; BMS /status samples 121, not OK 0, max fail_streak 0, pack ['11.1', '11.1'] V, SOC ['51.9', '51.7']
+

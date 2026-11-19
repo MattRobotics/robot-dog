@@ -1,0 +1,10 @@
+settle_A_0623: samples 341, heap_min_free min 44592 B (2026-11-19T06:23:14.043+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 72196 B, below 24 KB 0, allocation-failure lines 0
+settle_B_0623: samples 119, heap_min_free min 44592 B (2026-11-19T06:24:52.659+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 75460 B, below 24 KB 0, allocation-failure lines 0
+ab_B_0623: samples 162, heap_min_free min 44592 B (2026-11-19T06:26:32.530+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 75420 B, below 24 KB 0, allocation-failure lines 0
+ab_A_0623: samples 455, heap_min_free min 44592 B (2026-11-19T06:28:46.851+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 71284 B, below 24 KB 0, allocation-failure lines 0
+efg_A_0623: samples 432, heap_min_free min 44592 B (2026-11-19T06:30:58.458+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 73496 B, below 24 KB 0, allocation-failure lines 0
+efg_B_0623: samples 151, heap_min_free min 44592 B (2026-11-19T06:33:03.959+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 75960 B, below 24 KB 0, allocation-failure lines 0
+h_B_0623: samples 120, heap_min_free min 44592 B (2026-11-19T06:35:08.068+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 76484 B, below 24 KB 0, allocation-failure lines 0
+h_A_0623: samples 332, heap_min_free min 44592 B (2026-11-19T06:36:45.755+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 73264 B, below 24 KB 0, allocation-failure lines 0
+dash2: samples 147, heap_min_free min 43368 B (2026-11-19T06:49:55.987+00:00 /status), heap_largest min 31732 / max 31732 B, heap_free min 73004 B, below 24 KB 0, allocation-failure lines 0
+MEMORY_OK (heap_min_free >= 24 KB, no allocation failure)

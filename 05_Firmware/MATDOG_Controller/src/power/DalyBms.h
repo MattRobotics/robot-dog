@@ -58,6 +58,21 @@ class DalyBms {
   bool hasValidSample() const { return sample_.valid; }
   const DalySample& sample() const { return sample_; }
 
+  // D1 (2026-11-14): transport facts of the last completed telemetry poll,
+  // to tell a silent DALY from a partial, late or malformed reply. Counted
+  // from the bytes update() reads anyway: no bus traffic, and nothing here
+  // feeds availability, health, LED or Motion power. The poll's outcome is
+  // lastCommResult(); the last valid reply is sample().sampled_at_ms.
+  static constexpr uint32_t kNoByte = UINT32_MAX;
+  struct TelemetryDiag {
+    uint16_t rx_bytes = 0;             // read before the deadline (0 = silence)
+    uint32_t first_byte_ms = kNoByte;  // request sent -> first byte seen by update()
+    uint16_t stale_bytes = 0;          // discarded just before the request: they came
+                                       // after the previous poll closed (capped at 245)
+    uint32_t fail_streak = 0;          // consecutive polls not OK
+  };
+  const TelemetryDiag& telemetryDiag() const { return telemetry_diag_; }
+
   // BLOCKED per handoff 8A.8 / CLAUDE_CODE_PROMPT "DALY write is BLOCKED
   // until verified". The specific K-Series write protocol (opcode, framing,
   // ACK semantics, KEY-vs-MOS precedence) has not been identified or bench
@@ -105,6 +120,9 @@ class DalyBms {
 
   uint8_t rx_buf_[kDalyMaxResponseLen] = {0};
   size_t rx_len_ = 0;
+  uint32_t rx_first_ms_ = kNoByte;  // in-flight transaction
+  uint16_t stale_bytes_ = 0;        // drained before the in-flight request
+  TelemetryDiag telemetry_diag_;
 
   DalyCommResult last_result_ = DalyCommResult::NEVER_POLLED;
   uint32_t last_result_ms_ = 0;

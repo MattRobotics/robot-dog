@@ -42,12 +42,24 @@ bool Controller::SimpleServoPort::read(unsigned i,bool control,simple::Feedback&
   out.stampUs=esp_timer_get_time();out.valid=true;if(control)out.controlStampUs=out.stampUs;
   return true;
 }
-bool Controller::SimpleServoPort::decodeRaw(unsigned i,uint16_t raw,double& q){
-  if(!owner||i>=12||raw>=4096)return false;auto& c=*owner;
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
+// The lookups and the calibration-invariant checks of resolveRawObservation/
+// resolveRadiansToRaw (provenance, transform, joint, direction) are the same
+// for every call until the profile or a table changes: resolved here once per
+// revision (2026-11-14, ~6k instructions per conversion on the ESP32-S3).
+const Controller::SimpleServoPort::Slot* Controller::SimpleServoPort::slot(unsigned i){
+  if(!owner||i>=12)return nullptr;auto& c=*owner;auto& s=slots[i];
+  const uint32_t revision[3]={c.geometry_profile_.revision(),c.actuator_policy_.transforms().revision(),c.actuator_policy_.limits().revision()};
+  if(s.valid&&std::equal(revision,revision+3,s.revision))return &s;
+  s=Slot{};calibration::JointIdentity id;actuator::slotIdentity(i,&id);
   const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  actuator::MicroRad urad=0;
-  if(!tr||actuator::resolveRawObservation(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
+  if(!tr||actuator::resolveJointTransform(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,&s.transform)!=actuator::TargetResolveStatus::OK)return nullptr;
+  s.limit=c.actuator_policy_.limits().find(id,c.geometry_profile_.provenanceTag());  // decodeRaw needs none; resolve refuses without
+  std::copy(revision,revision+3,s.revision);s.valid=true;return &s;
+}
+bool Controller::SimpleServoPort::decodeRaw(unsigned i,uint16_t raw,double& q){
+  if(!owner||i>=12||raw>=4096)return false;
+  const Slot* s=slot(i);actuator::MicroRad urad=0;
+  if(!s||actuator::resolveRawObservation(s->transform,raw,&urad)!=actuator::TargetResolveStatus::OK)return false;
   q=actuator::microRadToRadians(urad);return true;
 }
 bool Controller::SimpleServoPort::readDeferred() const {
@@ -56,11 +68,9 @@ bool Controller::SimpleServoPort::readDeferred() const {
   return owner&&owner->servo_bus_.lastBusOutcome()==servo::BusOutcome::RX_PENDING;
 }
 bool Controller::SimpleServoPort::resolve(unsigned i,double q,uint16_t& raw){
-  if(!owner||i>=12)return false;auto& c=*owner;
-  calibration::JointIdentity id;actuator::slotIdentity(i,&id);
-  const auto* tr=c.actuator_policy_.transforms().find(id,c.geometry_profile_.provenanceTag());
-  const auto* lim=c.actuator_policy_.limits().find(id,c.geometry_profile_.provenanceTag());
-  return tr&&lim&&actuator::resolveRadiansToRaw(c.geometry_profile_,actuator::geometry_data::kProvenance,*tr,q,&raw)==actuator::TargetResolveStatus::OK&&lim->contains(raw);
+  if(!owner||i>=12)return false;
+  const Slot* s=slot(i);
+  return s&&s->limit&&actuator::resolveRadiansToRaw(s->transform,q,&raw)==actuator::TargetResolveStatus::OK&&s->limit->contains(raw);
 }
 bool Controller::SimpleServoPort::frame(const uint16_t raw[12],simple::Drive drive){
   // Only SimpleMotion's scoped, exact STOP frame may pass its operational
@@ -184,12 +194,22 @@ void Controller::updateSimpleMotion(uint64_t now){
     !profile?"SERVO_PREFLIGHT_REQUIRED":!mapping?"CALIBRATION_RESTORE_REQUIRED":!simple_limits_ready_?"GEN1_LIMITS_OR_FINGERPRINT":maintenance?"MAINTENANCE_BUSY":
     authority_.inhibited()||wifi_.configBusy()?"SYSTEM_CONFIGURATION_BUSY":!power?simple_inputs_.powerReason:!simple_inputs_.imuValid?"IMU_UNAVAILABLE":!feedback?"SERVO_FEEDBACK_STALE":"READY";
   simple_inputs_.refusal=reason;
+  const bool admissible=simple_inputs_.ready&&power&&simple_inputs_.imuValid&&feedback;
+  // Register 85 is volatile (trace 45): after a servo power-on the first activation wrote it on the 12 servos and
+  // waited kAccCeilingSettleMs inside the STAND, holding this loop and Motion for 126 ms (5-6 releases lost, HW 17-18/11).
+  // The same preparation runs once while admissible and idle in RUN: the 126 ms and the IDLE releases it skips move
+  // there (counted in missed_releases, outside any command window). acc_tried_ marks the attempt only: the verified
+  // value is simple_inputs_.accCeiling and every activation still reads register 85 back (12 ms on HW). Silent
+  // servos (rail off) re-arm it. This update releases the grant.
+  if(!feedback)acc_tried_=false;
+  else if(!acc_tried_&&admissible&&operating_mode_.mode()==OperatingMode::RUN&&!simple_motion_.engaged()&&
+          authority_.current()==ActuatorAuthority::NONE&&!prepareSimpleMotion())acc_tried_=true;
   simple_motion_.inputs(simple_inputs_);
   if(build::kServoPowerAvailable)simple_motion_.update(now);
   if(!simple_motion_.engaged()&&authority_.current()==ActuatorAuthority::MOTION){
     authority_.release(motion_authority_lease_);motion_authority_lease_={};servo_bus_.setValidationDrive(0,0);servo_bus_.setValidationTimeout(0);
   }
-  motion_service_.setReady(simple_inputs_.ready&&power&&simple_inputs_.imuValid&&feedback,reason);motion_service_.update();
+  motion_service_.setReady(admissible,reason);motion_service_.update();
   ControllerService::ReadinessView view;view.system_health=toString(system_state_.systemHealth());
   view.calibration=mapping?"RESTORED_GEN1":"NOT_RESTORED";view.joint_feedback=feedback?"AVAILABLE":"UNAVAILABLE";
   view.motion_authority=simple_motion_.energized()?"MOTION":"IDLE";view.phase=simple::name(simple_motion_.state());view.reason=reason;service_.setReadinessView(view);

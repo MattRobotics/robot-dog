@@ -1,6 +1,11 @@
 # MATDOG Firmware
 
-> **STATO CORRENTE — 10/11/2026:** è installata la build di sviluppo **MATDOG `1.0.2-dev.6` ACC 220**.
+> **STATO CORRENTE — 19/11/2026:** è installata la **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, `MATDOG Controller 1.0.2-dev.7`.
+> - **Identità:** commit `1314bc411c589c4216e95629f4665d9d01f05781` (tag `v1.0.2`), build `1314bc411c58`. APP 1 777 952 byte, SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`, `ROBOT_POWERED`. NVS gen-1 preservata.
+> - **Validazione:** fixture, 19/11. Catena 8/8, D1/D2, blocco D 27/27, S9 15/15; Motion Timing P0 CLOSED nel perimetro delle prove. Terra non qualificata. [Qualifica](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md).
+> - **Rollback:** `30c894a` (APP `03c863cc…`).
+>
+> **Storico 10/11/2026:** era installata la build di sviluppo `1.0.2-dev.6` ACC 220.
 > - **Identità:** sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP 1 751 040 byte, SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`; `ROBOT_POWERED`; NVS gen-1 preservata.
 > - **Validazione:** fixture Q1–Q8 qualificata (SLOW, STANDARD e FAST, cambi di profilo, STOP, joystick in avanti); 14/14 STOP verificati; a terra verifica positiva ma fuori protocollo. [Report hardware](../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md).
 > - **Stable storica:** [v1.0.1](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`, APP `14e055a0…`, [report](../09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md)).

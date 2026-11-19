@@ -1,0 +1,59 @@
+From 785bcec7f380ef852d53d0fe4778a84461afb85d Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 10:44:27 +0100
+Subject: [PATCH 1/2] research(motion): P4, every attenuated release keeps the
+ probe when its scale does not exceed the projection
+
+On the chip (82c1af9, 16/11) 18 of the 31 overruns were attenuated STAND,
+PRONE and HEIGHT releases that solved twice: the probe at the last accepted
+scale, then the projection when it had moved by more than 2 % (13.5-16 ms of
+compensation, 20-22 ms per release). The probe is now kept whenever its scale
+does not exceed the projection (a correction no larger than the attenuation
+allows), and the projection becomes the next release's probe scale, so a
+growing attenuation follows one release later. A projection below the probe's
+scale (joint room shrinking) still solves at once, as before. Box, workspace,
+pointSafe and limit checks are unchanged; no new state (correctionScale_
+exists). Generalizes P3b, which kept the probe only in the plan release.
+
+Host rig (64 scenarios) vs 719912a: same state/reason sequences and ends;
+OTHER releases with two solves 5376 -> 904; RAW differs by at most 1 tick in
+1680 releases; STOP length and held pose identical; IMU tracking statistics
+unchanged. Research candidate, not validated on hardware.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../src/simple/SimpleMotion.cpp                | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index de5da4c..653c2ea 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1492,13 +1492,17 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
+   // same Motion epoch, not a second timer or a servo acceleration controller.
+   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
+   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
+-  // P3b (P0 peaks, 16/11): the release that has just built a segment plan (beginPlan,
+-  // ~0.5-1.1 M instructions) keeps the probe at the last accepted scale when that scale
+-  // does not exceed the projection: a correction no larger than the attenuation allows,
+-  // for that one release; the next release takes the projection as before.
+-  const bool planRelease=planned_&&segmentStartUs_==now&&trialScale<=projection;
+-  if(projection>0&&(planRelease||std::abs(projection-trialScale)<=.02*projection)&&pointSafe(probe)&&contains(box,probe)){
+-    keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;if(imuLimited_)imuReason_="ATTENUATED";return;}
++  // P4 (82c1af9 on the chip, 16/11: 18 of 31 overruns were attenuated STAND/PRONE/
++  // HEIGHT releases solving twice, probe then projection, 13.5-16 ms of compensation):
++  // every attenuated release keeps the probe at the last accepted scale when that
++  // scale does not exceed the projection, a correction no larger than the attenuation
++  // allows, and the projection becomes the next release's probe scale: a growing
++  // attenuation follows one release later. A projection below the probe's scale (the
++  // joint room shrinking) still solves at once, as before. Generalizes P3b (the
++  // release that builds a segment plan only).
++  if(projection>0&&trialScale<=1.02*projection&&pointSafe(probe)&&contains(box,probe)){
++    if(trialScale<.98*projection)correctionScale_=projection;
++    keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=std::fmin(projection,trialScale)<.999;if(imuLimited_)imuReason_="ATTENUATED";return;}
+   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
+     const auto q=solve(scale,probe.valid?probe:f.target);
+     if(pointSafe(q)&&contains(box,q)){keep(q);rollCorrection_=roll;pitchCorrection_=pitch;correctionScale_=scale;imuLimited_=projection<.999||trial!=0;if(imuLimited_)imuReason_="ATTENUATED";return;}
+-- 
+2.43.0
+

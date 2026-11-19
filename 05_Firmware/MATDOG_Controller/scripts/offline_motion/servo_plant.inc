@@ -24,6 +24,10 @@ using P=simple::StopReferenceProbe;
 struct Param{double volt,load,accCap,latencyUs,deadband,sagScale;double unit[12];double brakeCap;};
 struct Servo{double pos=0,vel=0,goal=0;double vmax=1000,amax=5000,bmax=5000;uint64_t applyUs=0;double nextGoal=0;double nextV=1000,nextA=5000,nextB=5000;};
 struct Out{unsigned faults=0,stopsOk=0,stopsTried=0;const char* reason="";uint8_t refusedBy=0;double cycles=0,maxTrack=0,maxStopOvershoot=0,maxStopSettleS=0,maxStopBoxOut=0;unsigned walkReleases=0;uint64_t speedBound=0,moving=0;};
+// vNext audit (2026-11-11): the STOP box exit is the MEASURED encoder (with the
+// sag, what generateStop checks), over every attempt including a faulted one.
+static double measuredOut(const Rig& r,const simple::collision::Box& box){double out=0;
+  for(unsigned i=0;i<12;++i){const double q=r.p.observed[i].q;out=std::max(out,std::max(box.lo[i]-q,q-box.hi[i])/simple::kTickRad);}return out;}
 struct Model{
   Rig& r;Param prm;Servo s[12];std::array<uint16_t,12> lastTarget{};simple::Drive lastDrive{};size_t seen=0;
   static constexpr int sag[12]={-2,-1,-1,0,2,3,3,-4,-1,7,5,2};
@@ -92,25 +96,73 @@ static Out run(simple::WalkMode mode,int scenario,unsigned seed,double volt){
   for(unsigned n=0;n<4500&&!o.faults;++n){pl.tick();watch();if(r.m.state()==simple::State::WALKING){++o.walkReleases;o.maxTrack=std::max(o.maxTrack,pl.tracking());}
     if(scenario==3&&(n==300||n==1100||n==1900||n==2700))r.m.selectWalkMode(static_cast<simple::WalkMode>((unsigned(mode)+1+n/800)%3));
     if((scenario==1&&n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8)||(scenario==3&&(n==1150||n==2750))){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;
-      for(unsigned k=0;k<600&&!r.m.stopVerified()&&!o.faults;++k){pl.tick();watch();
-        for(unsigned i=0;i<12;++i){const double q=(pl.s[i].pos-2048)*simple::kTickRad;boxOut=std::max(boxOut,std::max(simple::kWalkBox.lo[i]-q,q-simple::kWalkBox.hi[i])/simple::kTickRad);}}
+      for(unsigned k=0;k<600&&!r.m.stopVerified()&&!o.faults;++k){pl.tick();watch();boxOut=std::max(boxOut,measuredOut(r,simple::kWalkBox));}
+      o.maxStopBoxOut=std::max(o.maxStopBoxOut,boxOut);
       if(o.faults||!r.m.stopVerified())break;
       const auto& plan=P::stopPlan(r.m);double over=0;for(unsigned i=0;i<12;++i)over=std::max(over,std::abs(pl.s[i].pos-std::lround(plan.end[i]/simple::kTickRad)-2048));
       o.maxStopOvershoot=std::max(o.maxStopOvershoot,over);o.maxStopSettleS=std::max(o.maxStopSettleS,(r.p.now-t0)/1e6);
-      o.maxStopBoxOut=std::max(o.maxStopBoxOut,boxOut);boxOut=0;
+      boxOut=0;
       if(r.m.walk(2,r.p.now)){o.faults=1;o.reason="RESUME_REFUSED";break;}
       for(unsigned k=0;k<4000&&r.m.state()!=simple::State::WALKING&&!o.faults;++k){pl.tick();watch();}
       if(r.m.state()==simple::State::WALKING)++o.stopsOk;}}
   o.speedBound=pl.speedBound;o.moving=pl.moving;return o;
 }
+// Motion vNext joystick scenarios (2026-11-11), on each mode's own law: 4: a steered
+// sequence (lateral, yaw, diagonal, backward-lateral; 2 cycles each) with 8 STOP at
+// spread instants, each verified, then STAND and the joystick again; 5: backward at
+// the mode's full backward speed, same STOPs; 6: the steered sequence with the IMU
+// at 0.9 of the steered envelope's pitch-down vertex; 7: backward with the selector
+// moved every 20 s (the backward walk keeps its law; a resumed walk takes the
+// selection), a STOP 1 s after the second and the fourth. A mode without backward
+// (JoystickSpec backM 0) reports 5 and 7 NOT_APPLICABLE.
+static Out runJoy(simple::WalkMode mode,int scenario,unsigned seed,double volt){
+  std::mt19937 g(seed);Rig r;Out o;
+  if(r.m.stand(.15,r.p.now)){o.faults=1;o.reason="STAND_REFUSED";return o;}
+  const Param prm=draw(g,volt);Model pl(r,prm);
+  auto watch=[&]{if(r.m.state()==simple::State::FAULT&&!o.faults){o.faults=1;o.reason=r.m.reason();o.refusedBy=r.m.exitSnapshot().refusedBy;o.cycles=r.m.exitSnapshot().cycles;}};
+  for(unsigned n=0;n<4000&&r.m.state()!=simple::State::STANDING&&!o.faults;++n){pl.tick();watch();}
+  if(r.m.state()!=simple::State::STANDING){if(!o.faults){o.faults=1;o.reason="NO_STANDING";}return o;}
+  r.m.selectWalkMode(mode);
+  auto lim=[](simple::WalkMode m,unsigned k){const auto& j=simple::joystickSpec(m);const double T=simple::walkModeSpec(m).periodS;
+    const double v[4]={j.strideM/T,j.lateralM/T,j.yawRad/T,j.backM/T};return v[k];};
+  if(scenario==6)tilt(r,0,.9*simple::steerTilt(mode)[4].pitch);else tilt(r,.004,.006);
+  const unsigned cycleReleases=unsigned(simple::walkModeSpec(mode).periodS/.02);
+  for(unsigned n=0;n<4500&&!o.faults;++n){
+    if(scenario==7&&(n==1000||n==2000||n==3000||n==4000))r.m.selectWalkMode(static_cast<simple::WalkMode>((unsigned(mode)+1+n/1000)%3));
+    // The page scales the stick to the limits the Controller applies (vNext audit:
+    // status walk_mode.joystick), not to a selection the walk has not taken.
+    const simple::WalkMode sel=r.m.joystickMode();double v[3]={-lim(sel,3),0,0};
+    if(scenario==4||scenario==6){const double s[6][3]={{0,1,0},{0,0,-1},{.7,-.7,0},{0,0,1},{-.6,.6,0},{0,-1,0}};const auto& d=s[(n/(2*cycleReleases))%6];
+      for(unsigned k=0;k<3;++k)v[k]=d[k]*lim(sel,k);}
+    if(n%12==0&&r.m.state()!=simple::State::FAULT&&!r.m.stopActive())r.m.drive(v[0],v[1],v[2],r.p.now);
+    pl.tick();watch();if(r.m.state()==simple::State::WALKING){++o.walkReleases;o.maxTrack=std::max(o.maxTrack,pl.tracking());}
+    const bool stopNow=scenario==7?(n==2050||n==4050):(n>300&&n%(cycleReleases+cycleReleases/8+7)==0&&o.stopsTried<8);
+    if(stopNow&&r.m.state()==simple::State::WALKING){++o.stopsTried;r.m.stop();const uint64_t t0=r.p.now;double boxOut=0;const auto& box=P::box(r.m);
+      for(unsigned k=0;k<600&&!r.m.stopVerified()&&!o.faults;++k){pl.tick();watch();boxOut=std::max(boxOut,measuredOut(r,box));}
+      o.maxStopBoxOut=std::max(o.maxStopBoxOut,boxOut);
+      if(o.faults||!r.m.stopVerified())break;
+      o.maxStopSettleS=std::max(o.maxStopSettleS,(r.p.now-t0)/1e6);
+      if(r.m.stand(simple::walkModeSpec(r.m.walkMode()).heightM,r.p.now)){o.faults=1;o.reason="RESUME_REFUSED";break;}
+      for(unsigned k=0;k<4000&&r.m.state()!=simple::State::STANDING&&!o.faults;++k){pl.tick();watch();}
+      if(r.m.state()==simple::State::STANDING)++o.stopsOk;}}
+  o.speedBound=pl.speedBound;o.moving=pl.moving;return o;
+}
 static void matrix(){
   const int onlyMode=getenv("MODE")?atoi(getenv("MODE")):-1,onlyScenario=getenv("SCENARIO")?atoi(getenv("SCENARIO")):-1;
-  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX","MODE_CHANGES"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
-  for(unsigned m=0;m<3;++m)for(int sc=0;sc<4;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario))continue;unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
-    for(unsigned seed=1;seed<=seeds;++seed){const auto o=run(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt);f+=o.faults;stopsOk+=o.stopsOk;stopsTried+=o.stopsTried;
+  const char* sn[]={"WALK_90s","STOP8_RESUME","IMU_PITCH_VERTEX","MODE_CHANGES","JOY_STEER_STOP8","JOY_BACK_STOP8","JOY_STEER_IMU","JOY_BACK_MODES"};const unsigned seeds=getenv("SEEDS")?atoi(getenv("SEEDS")):6;
+  for(unsigned m=0;m<3;++m)for(int sc=0;sc<8;++sc)for(double volt:{11.1,9.6}){if((onlyMode>=0&&int(m)!=onlyMode)||(onlyScenario>=0&&sc!=onlyScenario))continue;
+    if((sc==5||sc==7)&&simple::joystickSpec(static_cast<simple::WalkMode>(m)).backM<=0){
+      std::printf("PLANT %-8s %-16s %4.1fV NOT_APPLICABLE (no backward on this law)\n",simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt);continue;}unsigned f=0,stopsOk=0,stopsTried=0;double track=0,over=0,settle=0,boxOut=0;uint64_t sb=0,mv=0;std::string reasons;
+    // vNext audit: every planned STOP counts (8 in scenarios 1, 4, 5, 6; 2 in 3
+    // and 7); one never attempted (the walk was not walking then) is MISSED, and
+    // each failing seed is listed with its cause.
+    const unsigned planned=sc==1||sc==4||sc==5||sc==6?8:sc==3||sc==7?2:0;unsigned missed=0;
+    for(unsigned seed=1;seed<=seeds;++seed){const auto o=sc<4?run(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt):runJoy(static_cast<simple::WalkMode>(m),sc,seed*7919+sc*31+m,volt);f+=o.faults;stopsOk+=o.stopsOk;stopsTried+=o.stopsTried;
+      if(!o.faults&&o.stopsTried<planned)missed+=planned-o.stopsTried;
+      if(o.faults||o.stopsTried<planned)std::printf("  seed %u (%u) %.1fV: %s stops %u/%u of %u planned at c%.3f\n",seed,seed*7919+sc*31+m,volt,o.faults?o.reason:"STOP_NOT_ATTEMPTED",o.stopsOk,o.stopsTried,planned,o.cycles);
       track=std::max(track,o.maxTrack);over=std::max(over,o.maxStopOvershoot);settle=std::max(settle,o.maxStopSettleS);boxOut=std::max(boxOut,o.maxStopBoxOut);sb+=o.speedBound;mv+=o.moving;
       if(o.faults){char b[128];std::snprintf(b,sizeof b," %s[%s]@c%.2f",o.reason,o.refusedBy<10?simple::kSafeChecks[o.refusedBy]:"?",o.cycles);reasons+=b;}}
-    std::printf("PLANT %-8s %-16s %4.1fV seeds=%u faults=%u stops_ok=%u/%u max_tracking=%.1f ticks max_stop_end_offset=%.1f ticks max_stop_settle=%.2f s stop_box_out=%.1f ticks speed_bound=%.1f%%%s\n",
-      simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt,seeds,f,stopsOk,stopsTried,track,over,settle,boxOut,mv?100.*sb/mv:0.,reasons.c_str());std::fflush(stdout);}
+    std::printf("PLANT %-8s %-16s %4.1fV seeds=%u faults=%u stops_ok=%u/%u planned=%u missed=%u max_tracking=%.1f ticks max_stop_end_offset=%.1f ticks max_stop_settle=%.2f s stop_box_out_measured=%.1f ticks speed_bound=%.1f%%%s\n",
+      simple::walkModeSpec(static_cast<simple::WalkMode>(m)).name,sn[sc],volt,seeds,f,stopsOk,stopsTried,planned*seeds,missed,track,over,settle,boxOut,mv?100.*sb/mv:0.,reasons.c_str());std::fflush(stdout);}
 }
 }

@@ -1,7 +1,8 @@
 #pragma once
 #include "../simple/SimpleMotion.h"
+#include "../simple/GroundContactDiagnostic.h"
 namespace matdog { namespace core {
-constexpr size_t kMotionStatusJsonBytes=5376; // bounded status + unchanged 640 B HTTP reserve (long-age/reference-guard case); 5248 + 128 for the work histogram (motion-perf-next D11)
+constexpr size_t kMotionStatusJsonBytes=7168; // 5376 baseline + 1792 observation; retains 640 B HTTP reserve
 // Immutable per-request observation, transferred by the existing HTTP mailbox.
 // Contains no owner, port, command or writable Motion state. String pointers
 // refer only to firmware-lifetime reason/phase literals.
@@ -25,7 +26,7 @@ struct MotionStatusSnapshot {
   unsigned referenceFaultSlot=12;
   simple::State state=simple::State::STOPPED;
   uint8_t imuRefusedBy=0,entrySlot=12;  // dev.5 diagnostics, in the padding after state
-  uint8_t walkModes=0;  // simple::WalkMode: next walk (bits 0-1), the walk's target (bits 2-3), its law shape (high nibble); last padding byte
+  uint8_t walkModes=0;  // simple::WalkMode: next walk (bits 0-1), the walk's target (bits 2-3), its law shape (bits 4-5), the joystick's limits (bits 6-7); last padding byte
   float imuWanted[2]{},imuApplied[2]{};
   uint16_t commandedRaw[12]{};
   uint16_t offMask=0,referenceFaultRaw=0,hotPendingMask=0;
@@ -39,8 +40,9 @@ struct MotionStatusSnapshot {
   bool stopActive=false,stopInProgress=false,stopVerified=false,stopSupportVerified=false,standResumeAllowed=false;
   bool joystick=false;
   char activeId[49]{};
+  simple::GroundContactObservation ground{};
 };
-static_assert(sizeof(MotionStatusSnapshot)<=1552,"bounded per-request Motion observation");  // 1536 + the 16 B work histogram (motion-perf-next D11)
+static_assert(sizeof(MotionStatusSnapshot)<=1552+sizeof(simple::GroundContactObservation),"bounded per-request Motion observation");  // baseline plus bounded passive observation
 // Transport adapter only. SimpleMotion is the one operational state owner.
 class MotionService {
  public:
@@ -67,7 +69,8 @@ class MotionService {
  private:
   simple::SimpleMotion* motion_=nullptr;
   Prepare prepare_=nullptr;void* context_=nullptr;
-  bool ready_=false,active_=false,activeStop_=false,activeStopFromFault_=false;
+  bool ready_=false,active_=false,activeStop_=false,activeStopFromFault_=false,activeGround_=false;
+  simple::GroundContactDiagnostic ground_{};
   std::atomic<uint32_t> stopEpoch_{0};
   const char* reason_="BOOTING";
   motion::MotionAck last_{},activeAck_{};

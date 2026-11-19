@@ -11,9 +11,115 @@
 namespace matdog { namespace core {
 namespace {
 const char* boolean(bool b){return b?"true":"false";}
+// Status JSON without newlib printf (P0 HTTP, 17/11/2026). One answer is ~5 KB from ~70 snprintf calls and ~370
+// arguments: ~94 k CCOUNT (QEMU, ~290 k instructions) of _svfprintf_r/_dtoa_r, which run from flash on the HTTPD
+// core while Motion releases run on the other one (shared cache and flash: HTTP A/B on the fixture, 17/11).
+// writeText writes the same bytes as snprintf for what formatStatus uses: %s, %d/%i and %u with no, l or ll length,
+// %.Nf (N <= 9) correctly rounded from the exact binary value with ties to even. Flags, width, other conversions, a
+// null string, a non-finite or too large real go to snprintf for that one conversion. Same return value and
+// truncation as snprintf; -1 for a conversion without an argument or a '*' width (not used).
+struct Arg {
+  enum Kind:uint8_t{SIGNED,UNSIGNED,REAL,TEXT} kind;
+  union{long long i;unsigned long long u;double f;const char* s;};
+  Arg(int v):kind(SIGNED),i(v){} Arg(long v):kind(SIGNED),i(v){} Arg(long long v):kind(SIGNED),i(v){}
+  Arg(unsigned v):kind(UNSIGNED),u(v){} Arg(unsigned long v):kind(UNSIGNED),u(v){} Arg(unsigned long long v):kind(UNSIGNED),u(v){}
+  Arg(double v):kind(REAL),f(v){} Arg(const char* v):kind(TEXT),s(v){}
+};
+struct Text {
+  char* p;size_t cap,n=0;
+  void put(char c){if(n+1<cap)p[n]=c;++n;}
+  void put(const char* s,size_t k){const size_t room=n+1<cap?cap-1-n:0;if(room)std::memcpy(p+n,s,k<room?k:room);n+=k;}
+  void put(unsigned long long v){char d[20];char* const e=d+sizeof d;char* b=e;
+    while(v>0xFFFFFFFFull){const unsigned long long q=v/1000000000u;unsigned r=unsigned(v-q*1000000000u);for(unsigned j=0;j<9;++j){*--b=char('0'+r%10);r/=10;}v=q;}
+    unsigned w=unsigned(v);do{*--b=char('0'+w%10);w/=10;}while(w);
+    put(b,static_cast<size_t>(e-b));}
+};
+constexpr uint32_t kPow10[10]={1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000};
+// |x| x 10^p rounded to the nearest integer, ties to even, from the exact value m / 2^s of the double.
+// False when x is not finite or the result does not fit 64 bits (snprintf then formats it).
+bool scaled(double x,unsigned p,unsigned long long& r){
+  uint64_t b;std::memcpy(&b,&x,sizeof b);
+  const int e=int(b>>52&0x7FF);uint64_t m=b&((1ull<<52)-1);
+  if(e==0x7FF)return false;
+  if(e)m|=1ull<<52;
+  const int s=1075-(e?e:1);
+  const uint64_t a=(m&0xFFFFFFFFu)*kPow10[p],c=(m>>32)*kPow10[p];  // N = m x 10^p < 2^83 as hi:lo
+  const uint64_t lo=a+(c<<32),hi=(c>>32)+(lo<a);
+  if(s<=0){const int k=-s;if(hi||k>=64||(k&&lo>>(64-k)))return false;r=lo<<k;return true;}
+  if(s>=128){r=0;return true;}  // N < 2^83 <= half: rounds to 0
+  uint64_t q,rh,rl,hh,hl;  // quotient, remainder rh:rl, half hh:hl = 2^(s-1)
+  if(s<64){if(hi>>s)return false;q=lo>>s|hi<<(64-s);rh=0;rl=lo&((1ull<<s)-1);hh=0;hl=1ull<<(s-1);}
+  else if(s==64){q=hi;rh=0;rl=lo;hh=0;hl=1ull<<63;}
+  else{const int k=s-64;q=hi>>k;rh=hi&((1ull<<k)-1);rl=lo;hh=1ull<<(k-1);hl=0;}
+  const int cmp=rh!=hh?(rh<hh?-1:1):rl!=hl?(rl<hl?-1:1):0;
+  r=q+(cmp>0||(cmp==0&&(q&1)));
+  return r>=q;
+}
+int writeText(char* out,size_t cap,const char* fmt,const Arg* a,size_t count){
+  Text t{out,cap};size_t k=0;
+  for(const char* f=fmt;*f;++f){
+    if(*f!='%'){const char* q=f+1;while(*q&&*q!='%')++q;t.put(f,static_cast<size_t>(q-f));f=q-1;continue;}  // literal run
+    const char* spec=f++;
+    if(*f=='%'){t.put('%');continue;}
+    bool plain=true;int prec=-1,len=0;
+    while(*f=='-'||*f=='+'||*f==' '||*f=='#'||*f=='0'){plain=false;++f;}
+    while(*f>='0'&&*f<='9'){plain=false;++f;}
+    if(*f=='.'){prec=0;++f;while(*f>='0'&&*f<='9')prec=prec*10+(*f++-'0');}
+    if(*f=='l'){++len;if(*++f=='l'){++len;++f;}}
+    else while(*f=='h'||*f=='j'||*f=='z'||*f=='t'||*f=='L'){plain=false;++f;}
+    const char conv=*f;
+    if(!conv||*f=='*'||k>=count)return -1;
+    const Arg& v=a[k++];
+    const unsigned long long u=v.kind==Arg::SIGNED?static_cast<unsigned long long>(v.i):v.kind==Arg::UNSIGNED?v.u:0;
+    unsigned long long r=0;
+    if(plain&&prec<0&&conv=='s'&&v.kind==Arg::TEXT&&v.s){t.put(v.s,std::strlen(v.s));continue;}
+    if(plain&&prec<0&&(conv=='d'||conv=='i')&&v.kind!=Arg::REAL&&v.kind!=Arg::TEXT){
+      const long long x=len==2?static_cast<long long>(u):len?static_cast<long long>(static_cast<long>(u)):static_cast<long long>(static_cast<int>(u));
+      if(x<0){t.put('-');t.put(0ull-static_cast<unsigned long long>(x));}else t.put(static_cast<unsigned long long>(x));
+      continue;}
+    if(plain&&prec<0&&conv=='u'&&v.kind!=Arg::REAL&&v.kind!=Arg::TEXT){
+      t.put(len==2?u:len?static_cast<unsigned long long>(static_cast<unsigned long>(u)):static_cast<unsigned long long>(static_cast<unsigned>(u)));continue;}
+    if(plain&&!len&&conv=='f'&&prec>=0&&prec<=9&&v.kind==Arg::REAL&&scaled(v.f,unsigned(prec),r)){
+      uint64_t b;std::memcpy(&b,&v.f,sizeof b);if(b>>63)t.put('-');
+      const uint32_t t10=kPow10[prec];unsigned frac;
+      if(r<=0xFFFFFFFFull){const uint32_t w=uint32_t(r);t.put(static_cast<unsigned long long>(w/t10));frac=w%t10;}
+      else{t.put(r/t10);frac=unsigned(r%t10);}
+      if(prec){char d[9];for(int j=prec;j--;){d[j]=char('0'+frac%10);frac/=10;}t.put('.');t.put(d,unsigned(prec));}
+      continue;}
+    char one[24];const size_t n=static_cast<size_t>(f-spec)+1;  // this conversion alone, through snprintf
+    if(n>=sizeof one)return -1;
+    std::memcpy(one,spec,n);one[n]=0;
+    char* dst=t.n<cap?out+t.n:nullptr;const size_t room=t.n<cap?cap-t.n:0;
+    int w;
+    if(v.kind==Arg::REAL)w=std::snprintf(dst,room,one,v.f);
+    else if(v.kind==Arg::TEXT)w=std::snprintf(dst,room,one,v.s);
+    else if(conv=='d'||conv=='i'||conv=='c')w=len==2?std::snprintf(dst,room,one,static_cast<long long>(u)):len?std::snprintf(dst,room,one,static_cast<long>(u)):std::snprintf(dst,room,one,static_cast<int>(u));
+    else w=len==2?std::snprintf(dst,room,one,u):len?std::snprintf(dst,room,one,static_cast<unsigned long>(u)):std::snprintf(dst,room,one,static_cast<unsigned>(u));
+    if(w<0)return -1;
+    t.n+=static_cast<size_t>(w);
+  }
+  if(cap)out[t.n<cap?t.n:cap-1]=0;
+  return static_cast<int>(t.n);
+}
 }
 void MotionService::update(){
+ if(ground_.running()&&motion_){
+   const uint64_t now=esp_timer_get_time();
+   if(!ready_)ground_.abort(reason_,now);
+   else if(const char* why=simple::GroundContactDiagnostic::admission(*motion_,now))ground_.abort(why,now);
+   else if(now<ground_.snapshot().startedUs||now-ground_.snapshot().startedUs>=simple::kGroundObservationTimeoutUs)ground_.abort("GROUND_OBSERVATION_TIMEOUT",now);
+   // Four cached FK evaluations only in cooperative slack, only during an
+   // explicitly requested observation. No work on ordinary STAND/WALK.
+   else if(slack(now,5000))ground_.update(*motion_,now);
+ }
  if(!active_||!motion_)return;
+ if(activeGround_){
+   if(!ground_.running()){
+     activeAck_.outcome=ground_.snapshot().samples==simple::kGroundObservationSamples?motion::CommandOutcome::COMPLETED:motion::CommandOutcome::ABORTED;
+     activeAck_.reason=ground_.snapshot().reason;active_=activeGround_=false;finishedMs_=static_cast<uint32_t>(esp_timer_get_time()/1000);
+   }
+   activeAck_.executor_state=simple::name(motion_->state());return;
+ }
  if(activeStop_){
   // ACK revokes the old operation; only feedback-qualified arrest completes
   // the contextual STOP. SAFE_OFF is a distinct, register-verified terminal.
@@ -73,6 +179,7 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
    // an older HTTP motion request is waiting for its Controller turn.
    stopEpoch_.fetch_add(1,std::memory_order_release);
    const bool fromFault=motion_->state()==simple::State::FAULT;
+   ground_.abort("GROUND_STOPPED",esp_timer_get_time());activeGround_=false;
    motion_->stop();a.outcome=motion::CommandOutcome::ACCEPTED;a.reason=fromFault?"STOP_REQUESTED_FAULT_LATCHED":"STOP_REQUESTED";
    // Repeated STOPs acknowledge independently without restarting the first
    // operation's timing, progress or identity (including its held terminal).
@@ -103,17 +210,30 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  auto result=[&](const char* r,const char* accepted="COMMAND_ACCEPTED"){a.outcome=r?motion::CommandOutcome::REJECTED:motion::CommandOutcome::ACCEPTED;a.reason=r?r:accepted;
    a.executor_state=simple::name(motion_->state());
    replay.sequence=c.sequence;memcpy(replay.id,c.id,sizeof(replay.id));replay.ack=a;last_=a;
-   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&c.intent!=motion::Intent::GAIT_SELECT){activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
+   if(!r&&c.intent!=motion::Intent::STATUS&&c.intent!=motion::Intent::CAPABILITIES&&c.intent!=motion::Intent::GAIT_SELECT){
+     if(c.intent!=motion::Intent::GROUND_OBSERVE){ground_.abort("GROUND_SUPERSEDED",esp_timer_get_time());activeGround_=false;}
+     activeAck_=a;active_=true;activeStop_=false;acceptedMs_=now;finishedMs_=0;}return a;};
  const uint64_t us=esp_timer_get_time();
  if(c.intent==motion::Intent::STATUS||c.intent==motion::Intent::CAPABILITIES)return result(nullptr);
+ if(c.intent==motion::Intent::GROUND_OBSERVE){
+   if(ground_.running())return result("GROUND_OBSERVATION_BUSY");
+   if(!ready_)return result(reason_);
+   if(const char* r=simple::GroundContactDiagnostic::admission(*motion_,us))return result(r);
+   const int leg=simple::groundLeg(c.leg);if(leg<0)return result("GROUND_LEG_REQUIRED");
+   ground_.start(static_cast<unsigned>(leg),us);activeGround_=true;
+   return result(nullptr,"GROUND_OBSERVATION_STARTED");
+ }
  // WALK mode (2026-11-09): a volatile choice, no actuator and no active
  // command. A forward walk in progress moves its law to it progressively
- // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); otherwise the
- // next walk takes it (a WALK STOP, a STOP recovery, a steered or backward
- // joystick walk keep their law).
+ // (2026-11-10, SimpleMotion::stepWalkMode: WALK_MODE_CHANGING); a steered
+ // joystick walk takes it at its handover back to the forward regime, without
+ // stopping (vNext: WALK_MODE_AFTER_STEERING, a forward one only: a steered
+ // backward walk returns to a backward walk); otherwise the next walk takes it
+ // (a WALK STOP, a STOP recovery and a backward walk keep their law).
  if(c.intent==motion::Intent::GAIT_SELECT){simple::WalkMode m;if(!simple::parseWalkMode(c.gait,m))return result("WALK_MODE_UNKNOWN");
    if(const char* r=motion_->selectWalkMode(m))return result(r);const auto st=motion_->state();
-   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
+   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":motion_->walkModeAtHandover()?"WALK_MODE_AFTER_STEERING":
+                         st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
    // Nothing to stop at the PRONE rest: never take over the active command.
    if(motion_->proneRest())return result("NOT_WALKING");
@@ -145,15 +265,22 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
                  simple::kJoystickBackM/simple::kWalkPeriodS,simple::kJoystickFrontalBand,simple::kJoystickStrideM/simple::kJoystickPeriodS);
  if(n<=0||static_cast<size_t>(n)>=cap)return false;
  // WALK modes (2026-11-09), the Controller's single table (SimpleMotion.cpp):
- // a GAIT_SELECT chooses the next walk and moves a forward walk in progress;
- // the joystick walks forward at the selected mode's top speed (full scale).
+ // a GAIT_SELECT chooses the next walk and moves a fore/aft walk in progress;
+ // the joystick walks forward at the selected mode's top speed (full scale) and,
+ // vNext, backward, lateral and yaw at that mode's own limits (JoystickSpec;
+ // the top-level "joystick" object keeps the SLOW values for older pages).
  size_t used=static_cast<size_t>(n)-1;  // reopen the object
  for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
-   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s}",
+   const auto& j=simple::joystickSpec(static_cast<simple::WalkMode>(i));
+   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s,"
+     "\"joystick\":{\"vx_back_max_m_s\":%.17g,\"vy_max_m_s\":%.17g,\"yaw_rate_max_rad_s\":%.17g,\"vx_steered_max_m_s\":%.17g}}",  // round-trip exact: full stick = the Controller's range
      i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,w.strideM[0]*1e3,w.strideM[1]*1e3,w.strideM[2]*1e3,w.strideM[2]/w.periodS*1e3,w.heightM*1e3,w.liftM*1e3,w.duty,
-     unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified));
+     unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified),
+     j.backM/w.periodS,j.lateralM/w.periodS,j.yawRad/w.periodS,j.strideM/w.periodS);
    if(k<=0||static_cast<size_t>(k)>=cap-used)return false;used+=k;}
- return snprintf(out+used,cap-used,"]}")==2;
+ const int tail=snprintf(out+used,cap-used,
+   "],\"ground_contact\":{\"observe_command\":\"GROUND_CONTACT.OBSERVE\",\"samples\":%u,\"probing_available\":false,\"probing_reason\":\"THREE_SUPPORT_TRANSFER_UNAVAILABLE\",\"ground_height_available\":false}}",simple::kGroundObservationSamples);
+ return tail>0&&static_cast<size_t>(tail)<cap-used;
 }
 bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  if(!motion_)return false;
@@ -183,7 +310,8 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.tempChecks=motion_->tempChecks();for(unsigned i=0;i<2;++i)s.tempCheck[i]=motion_->tempCheck(i);
  s.imuReason=motion_->imuReason();for(unsigned i=0;i<2;++i){s.imuWanted[i]=motion_->imuWanted(i);s.imuApplied[i]=motion_->imuApplied(i);}
  s.imuRefusedBy=motion_->imuRefusedBy();
- s.walkModes=static_cast<uint8_t>(static_cast<unsigned>(motion_->selectedWalkMode())|static_cast<unsigned>(motion_->walkTarget())<<2|static_cast<unsigned>(motion_->walkMode())<<4);
+ s.walkModes=static_cast<uint8_t>(static_cast<unsigned>(motion_->selectedWalkMode())|static_cast<unsigned>(motion_->walkTarget())<<2|static_cast<unsigned>(motion_->walkMode())<<4|
+                                static_cast<unsigned>(motion_->joystickMode())<<6);
  {double d=0;s.entrySlot=static_cast<uint8_t>(motion_->entryViolation(esp_timer_get_time(),d));s.entryOutsideMrad=static_cast<int16_t>(std::lround(std::clamp(d*1e3,-32767.,32767.)));}
  s.imuValid=motion_->imuValid();
  s.imuStampUs=motion_->imuStampUs();
@@ -210,6 +338,7 @@ bool MotionService::captureStatus(MotionStatusSnapshot& s,uint32_t now) const {
  s.referenceFaultRaw=motion_->referenceFaultRaw();
  for(unsigned i=0;i<12;++i)s.feedback[i]=motion_->feedback()[i];
  for(unsigned i=0;i<4;++i)s.quaternion[i]=motion_->quaternion()[i];
+ s.ground=ground_.snapshot();
  s.referenceFaultFeedback=motion_->referenceFaultFeedback();return true;
 }
 bool MotionService::statusJson(char* out,size_t cap,uint32_t now) const {
@@ -226,7 +355,7 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  for(const auto& f:s.feedback)fresh=fresh&&f.valid&&
    !((us>=f.stampUs&&us-f.stampUs>250000)||(f.stampUs>us&&f.stampUs-us>15000));
  size_t used=0;bool ok=true;
- auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
+ auto add=[&](const char* fmt,auto... args){if(!ok)return;const Arg a[]={Arg(args)...};const int n=writeText(out+used,cap-used,fmt,a,sizeof...(args));if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
  add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"base_link_height_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\",\"id\":\"%s\",\"sequence\":%lu,\"accepted_ms\":%lu,\"finished_ms\":%lu},\"joints\":[",
  (unsigned long)now,simple::name(s.state),s.phase,fresh?s.poseRegion:"UNKNOWN",boolean(s.ready),s.reason,s.readinessReason,boolean(!fresh),boolean(s.state==simple::State::FAULT),boolean(s.offVerified),s.offMask,boolean(s.energized),boolean(s.heightValid),s.requestedHeightM*1000,s.heightM*1000,simple::baseLinkHeightFromNominalM(s.heightM)*1000,s.walkCycles,boolean(s.stabilizationLimited),boolean(s.imuValid),(unsigned long long)(us>=s.imuStampUs?(us-s.imuStampUs)/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)s.releases,(unsigned long)s.missed,(unsigned long long)s.maxGapUs,s.activeOutcome,s.activeReason,s.activeId,(unsigned long)s.activeSequence,(unsigned long)s.acceptedMs,(unsigned long)s.finishedMs);
  // Raw torque/goal fields retain their dated control observation. SAFE_OFF is
@@ -270,16 +399,21 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
  // WALK mode (2026-11-09): selected for the next walk, the law shape of the
  // current (or last) walk and the mode it moves to (2026-11-10: target, equal
  // to active once its law shape changed); the mode table is in the
- // capabilities. servo_read: goal
+ // capabilities. joystick (vNext audit, present only when it is not the
+ // selection): the mode whose joystick limits the Controller applies now (a
+ // steered or backward walk keeps its own law's until it can take the
+ // selection); the page scales the stick to it. servo_read: goal
  // speed min/max, ACC min/max the 12 servos hold (control read) and the age of
  // the oldest of those reads (ms); -1 until every servo has been read.
- {const unsigned selected=s.walkModes&3,target=(s.walkModes>>2)&3,current=s.walkModes>>4;int speedMin=-1,speedMax=-1,accMin=-1,accMax=-1;uint64_t oldest=0;
+ {const unsigned selected=s.walkModes&3,target=(s.walkModes>>2)&3,current=(s.walkModes>>4)&3,joystick=s.walkModes>>6;int speedMin=-1,speedMax=-1,accMin=-1,accMax=-1;uint64_t oldest=0;
   for(const auto& f:s.feedback){if(f.goalSpeed<0||f.acc<0){speedMin=speedMax=accMin=accMax=-1;break;}
     speedMin=speedMin<0?f.goalSpeed:std::min(speedMin,f.goalSpeed);speedMax=std::max(speedMax,f.goalSpeed);
     accMin=accMin<0?f.acc:std::min(accMin,f.acc);accMax=std::max(accMax,f.acc);oldest=oldest?std::min(oldest,f.controlStampUs):f.controlStampUs;}
-  add(",\"walk_mode\":{\"selected\":\"%s\",\"active\":\"%s\",\"target\":\"%s\",\"servo_read\":[%d,%d,%d,%d,%lld]}",
+  add(",\"walk_mode\":{\"selected\":\"%s\",\"active\":\"%s\",\"target\":\"%s\"",
     simple::walkModeSpec(static_cast<simple::WalkMode>(selected)).name,simple::walkModeSpec(static_cast<simple::WalkMode>(current)).name,
-    simple::walkModeSpec(static_cast<simple::WalkMode>(target)).name,
+    simple::walkModeSpec(static_cast<simple::WalkMode>(target)).name);
+  if(joystick!=selected)add(",\"joystick\":\"%s\"",simple::walkModeSpec(static_cast<simple::WalkMode>(joystick)).name);  // only when it differs: bounded budget
+  add(",\"servo_read\":[%d,%d,%d,%d,%lld]}",
     speedMin,speedMax,accMin,accMax,(long long)(speedMin<0||s.capturedUs<oldest?-1:(long long)((s.capturedUs-oldest)/1000)));}
  add(",\"walk_velocity\":{\"vx_m_s\":%.5f,\"vy_m_s\":%.5f,\"yaw_rate_rad_s\":%.5f,\"joystick\":%s}",s.walkVelocityX,s.walkVelocityY,s.walkYawRate,boolean(s.joystick));
  add(",\"power_reason\":\"%s\",\"bms_age_ms\":%lu,\"max_release_work_us\":%lu,\"overrun_releases\":%lu,\"joint_torque_source\":\"DATED_CONTROL_READ\",\"safe_off_source\":\"POST_STOP_TORQUE_READ_13\",\"safe_off_verified_us\":%llu",
@@ -288,6 +422,22 @@ bool MotionService::formatStatus(const MotionStatusSnapshot& s,char* out,size_t 
    add(",\"reference_guard\":{\"slot\":%u,\"raw\":%u,\"reference_raw\":%u,\"torque\":%d,\"goal\":%d,\"observed_us\":%llu}",
      s.referenceFaultSlot,f.raw,s.referenceFaultRaw,f.torque,f.goal,(unsigned long long)f.controlStampUs);}
 
+ // Diagnostic observation is historical, explicitly dated. No contact events
+ // or ground correction are synthesized from static STAND load variation.
+ const auto& g=s.ground;
+ if(g.leg<4){
+   add(",\"ground_contact\":{\"leg\":\"%s\",\"running\":%s,\"reason\":\"%s\",\"samples\":%u,\"required_samples\":%u,\"started_us\":%llu,\"finished_us\":%llu,\"ground_valid\":false,\"probing_available\":false,\"quality\":\"OBSERVATION_ONLY\",\"release_mm\":null,\"touchdown_mm\":null,\"correction_mm\":null,\"uncertainty_mm\":null",
+     simple::groundLegName(g.leg),boolean(g.running),g.reason,unsigned(g.samples),simple::kGroundObservationSamples,(unsigned long long)g.startedUs,(unsigned long long)g.finishedUs);
+   if(g.samples){
+     add(",\"lowest_mm\":%.2f,\"target_lowest_mm\":%.2f,\"range_mm\":[%.2f,%.2f],\"relative_mm\":%.2f,\"relative_range_mm\":[%.2f,%.2f],\"body_delta_mm\":%.2f,\"support_spread_mm\":%.2f,\"imu_stamp_us\":%llu,\"reference_sent_us\":%llu,\"span_us\":%lu,\"max_span_us\":%lu,\"joints\":[",
+       g.lowestMm,g.targetLowestMm,g.minMm,g.maxMm,g.relativeMm,g.relativeMinMm,g.relativeMaxMm,g.bodyDeltaMm,g.supportSpreadMm,
+       (unsigned long long)g.imuStampUs,(unsigned long long)g.referenceSentUs,(unsigned long)g.spanUs,(unsigned long)g.maxSpanUs);
+     for(unsigned j=0;j<3;++j)add("%s{\"stamp_us\":%llu,\"raw\":%u,\"commanded_raw\":%u,\"tracking_ticks\":%d,\"load\":%d,\"load_delta\":%d,\"load_range\":[%d,%d],\"current_raw\":%d,\"speed_raw\":%d,\"reference_jacobian_mm_rad\":%.2f}",j?",":"",
+       (unsigned long long)g.stampUs[j],g.raw[j],g.commandedRaw[j],int(g.tracking[j]),int(g.load[j]),int(g.loadDelta[j]),int(g.loadMin[j]),int(g.loadMax[j]),int(g.current[j]),int(g.speed[j]),g.referenceJacobianMm[j]);
+     add("%s","]");
+   }
+   add("%s","}");
+ }
  // Digital Twin contract already parsed by the existing viewer (telemetry v1):
  // the same 12 ACTUAL angles and BNO085 quaternion SimpleMotion holds, no new
  // read. sampled_at_ms dates the oldest joint sample; actual_rad when all 12

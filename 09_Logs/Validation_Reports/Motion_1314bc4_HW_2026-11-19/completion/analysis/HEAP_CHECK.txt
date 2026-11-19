@@ -1,0 +1,3 @@
+blockD_A_0725: samples 639, heap_min_free min 43368 B (2026-11-19T07:25:03.064+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 70736 B, below 24 KB 0, allocation-failure lines 0
+s9_A_0729: samples 470, heap_min_free min 43368 B (2026-11-19T07:29:01.972+00:00 /api/motion/status), heap_largest min 31732 / max 31732 B, heap_free min 68920 B, below 24 KB 0, allocation-failure lines 0
+MEMORY_OK (heap_min_free >= 24 KB, no allocation failure)

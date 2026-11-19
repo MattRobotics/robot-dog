@@ -1,0 +1,10 @@
+edges: 2026-11-19T06:46:04.530+00:00 READY/IDLE (rest True) -> 2026-11-19T06:49:25.628+00:00 READY/IDLE (rest True)
+releases 10054, missed 0, overruns 0
+max_release_work_us since boot 11012 -> 11012: block maximum <= 11012 us (not resolved: not above the earlier since-boot maximum)
+last armed window at the end (command_timing): {"missed": 0, "first_miss_phase": "", "first_miss_lateness_us": 0, "max_work_us": 9899, "max_work_phase": "PRONE_LIFT", "max_compensate_us": 2577, "max_work_solves": 2, "overruns": 0}
+dump 2026-11-19T06:49:27.713+00:00 MOTION_TIMING record=FIRST_MISS valid=0 phase=IDLE previous_phase=IDLE stamp_us=0 release=0 lateness_us=0 missed=0 skipped=0 work_us=0 visit_gap_us=0 outside_visit_us=0 fast_reads=0 control_reads=0 frames=0 read_us=0 previous_read_us=0 nominal_us=0 previous_no
+dump 2026-11-19T06:49:27.713+00:00 MOTION_TIMING record=MAX_WORK valid=1 phase=PRONE_LIFT previous_phase=PRONE_LIFT stamp_us=2434532894 release=121452 lateness_us=170 missed=0 skipped=0 work_us=9899 visit_gap_us=304 outside_visit_us=300 fast_reads=2 control_reads=1 frames=1 read_us=2831 previou
+dump 2026-11-19T06:49:27.713+00:00 MOTION_TIMING hist work=1413,145,0,0,0,0,0,0 read=1298,259,1,0 lateness=1518,40,0,0,0,0
+heap 2026-11-19T06:46:04.572+00:00 heap_free=74976 heap_min_free=44592
+heap 2026-11-19T06:49:25.666+00:00 heap_free=76232 heap_min_free=44592
+D1_P0_COUNTERS = PASS (criterion: both edges at rest, 0 missed, 0 overruns, since-boot maximum <= 16000 us; a since-boot maximum above 16000 us from an earlier run leaves the block maximum unresolved = not PASS)

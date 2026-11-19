@@ -268,7 +268,12 @@ class CalibrationGeometryProfile {
   bool withinDirectionVerifyEnvelope(const calibration::JointIdentity& identity,
                                      int32_t delta_ticks) const;
 
+  // Changes on every bind()/clear(): a ResolvedJointTransform of this profile
+  // is valid only while it is unchanged.
+  uint32_t revision() const { return revision_; }
+
  private:
+  uint32_t revision_ = 0;
   const GeometryProvenance* provenance_ = nullptr;
   GeometryProvenanceTag provenance_tag_ = kNoGeometryProvenance;
   const GeometryJointRecord* joints_ = nullptr;

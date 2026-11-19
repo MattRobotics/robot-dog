@@ -1,0 +1,6 @@
+ .../src/simple/SteerCollisionData.h                |    6 +-
+ .../Motion_SteerSlow_Recert_2026-11-18/README.md   |   57 +
+ .../steer_envelope_slow_steered.txt                |   79 +
+ .../steer_slow_certificate.json                    | 2349 ++++++++++++++++++++
+ .../steer_slow_certificate_input.txt               |    1 +
+ 5 files changed, 2489 insertions(+), 3 deletions(-)

@@ -1,6 +1,13 @@
 # MATDOG Controller — Changelog
 
-> **Current as of 2026-11-10:** the installed APP is the development build `1.0.2-dev.6` operational ACC 220.
+> **Current as of 2026-11-19: Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2).**
+> - **Installed APP:** `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781` (the tag points to that commit), SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
+> - **Fixture-qualified on 19/11.** Motion Timing P0 is CLOSED in the scope of those tests; ground locomotion is not qualified.
+> - **Rollback:** `30c894a`. See the entry below.
+>
+> **Historical, 2026-11-16 evening (branch `integ/matdog-unified-operational-20261114`):** the diagnostic `1.0.2-dev.8` build `6be46906d069` was installed (`a86c680` + F3 + IRAM G2s, APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`), validated on the fixture. The verification build `33134ae28260` was never installed.
+>
+> **Historical, 2026-11-10:** the installed APP was the development build `1.0.2-dev.6` operational ACC 220.
 > - **Identity:** source `450d2c7`, merged into `main` by PR #67; build `450d2c793dcb`; SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Hardware validation of 10/11:** fixture Q1–Q8 qualified; ground check positive but out of protocol ([report](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
 > - **Stable:** the first hardware-qualified Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`, build `17db0efe2324`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`) stays the immutable historical baseline.
@@ -8,6 +15,269 @@
 >
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
+
+## v1.0.2 — Stable GitHub Release: firmware 1.0.2-dev.7 `1314bc4` promoted unchanged, Motion fixture-qualified — 2026-11-19
+
+> **Promotion without recompilation** of the APP installed and qualified on the fixture on 19/11/2026.
+> - **Identity:** `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781`; APP 1 777 952 B, SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`, ROBOT_POWERED, CLEAN.
+> - **Tag:** `v1.0.2` on that commit. The internal version string stays `1.0.2-dev.7`.
+> - **Rollback:** `30c894a`, APP `03c863cc433622f672c11cae45f46694c4aa6f78ba0136cc1b7bc818a2e4b340`.
+
+- **What the release contains.** The `1.0.2` line since `main` of 10/11, i.e. the entries below from 11/11 to 16/11, plus five commits of 17–19/11:
+  - **`85bad0e`:**
+    - `StandTrajectory::validDefinition()` without the redundant rebuild (−95 % on the function);
+    - **PlanSplit V2:** a pending HEIGHT/PRONE_HEIGHT plan is prepared in the last unwind release; RAW frames, plans and STOP decisions are unchanged;
+    - `beginStop()` keeps HOLD's anchor when a STOP is serviced before the first frame of a pending start, so a STAND resume no longer jumps (up to 555 ticks);
+    - `formatStatus()` without newlib printf: byte-identical answers, −51 % instructions per answer.
+  - **`30c894a`, ACQUIRE v2:** register 85 (ACC ceiling) is prepared once while idle in RUN with torque OFF. The first STAND no longer holds the loop for ~126 ms: the register check takes 5.0 ms on 19/11, 131 ms before the patch.
+  - **`eb1ba28`, P1 minimal:** the steered edge-contact lift re-solve threshold goes from 10 to 50 µm (half a RAW tick). Offline, steered re-solves drop by 45–75 %.
+  - **`05e1214`, FP32 kinematic core:**
+    - the bounded per-release kinematics compute in binary32 inside `detail::`;
+    - the double public API, joint frames, boxes, `compensationSafe` and the StopPlan proof are unchanged;
+    - 51 of 38 153 frames differ by 1 RAW tick, none by more;
+    - QEMU P0 classes −74/−75 %;
+    - no FPU use in global constructors.
+  - **`1314bc4`, `kSteer` SLOW re-certified:** the RF UPPER maximum goes from 0.963456 to 1.004874 rad (FCL 120/120 + 12/12, lower bound 3.085 mm). This fixes the pre-existing steered SLOW `random_3` envelope failure.
+- **Hardware, 19/11, fixture (VERIFIED HARDWARE):**
+  - **Flash and identity:** flash APP-only with digest matched; NVS gen-1 and calibration 12/12 unchanged.
+  - **Tests run:** A/B chain 8/8 (140 steps), dashboard D1/D2 with HTTP STOP, block D 27/27 (joystick backward and lateral), S9 15/15 (steered SLOW).
+  - **Motion Timing P0 CLOSED in that scope:** max 12 729 µs against 16 000 µs, 0 overruns, 0 missed releases.
+  - **Against `30c894a`, same chain:** max 20 761 → 11 012 µs; releases ≥ 15 ms 217 → 0; overruns 2 → 0.
+  - **Memory and DALY:** `heap_min_free` ≥ 43 368 B; 0 DALY errors.
+- **Not integrated:**
+  - P4;
+  - full IRAM G2;
+  - kernel trigonometry reuse;
+  - full P1 (`TiltedContactIk`);
+  - W1, W2 and B;
+  - the 2 % rule variants and the Newton-tolerance change;
+  - HTTP tuning;
+  - the dev.8 diagnostic instrumentation.
+
+  See [ADR-008](../../09_Logs/Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md).
+- **Limits:**
+  - fixture only: no ground locomotion, and STANDARD/FAST keep `hardware_qualified=false`;
+  - not a WCET;
+  - the `random_3` IMU condition is certified offline only;
+  - the S7 cold cycle and the dashboard joystick were not run.
+- **Evidence:**
+  - [qualification](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md);
+  - [release manifest](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md);
+  - [integrated build](../../09_Logs/Validation_Reports/Motion_Integrated_1314bc4_2026-11-19/REPORT.md);
+  - [FP32 and P1](../../09_Logs/Validation_Reports/Motion_FP32_2026-11-18/REPORT.md);
+  - [`kSteer` certificate](../../09_Logs/Validation_Reports/Motion_SteerSlow_Recert_2026-11-18/README.md);
+  - [`30c894a`](../../09_Logs/Validation_Reports/Motion_30c894a_HW_2026-11-18/README.md).
+
+## Unreleased — Motion Timing P0: T2R1M, E1/E1b, P3a/P3b, P5, F3 (FAST 29.6 mm/s) and IRAM G2s integrated — 2026-11-16
+
+> Integrated on branch `integ/matdog-unified-operational-20261114` as 12 traced cherry-picks onto `f1f3914` (`4d02b80` … `33134ae`; each message names its source commit). The version string stays `1.0.2-dev.7`; identify builds by build ID and APP SHA256.
+>
+> - **Verification build:** CLEAN `33134ae28260`, ROBOT_POWERED, APP `0e07a4ac0b5764076670b8310b07f44eee15d957ec33703f18f9e30ea1b9b7b6`, 1 775 280 B. **Not installed.**
+> - **Hardware, 16/11 evening:** the same Motion law, with the dev.8 instrumentation, is the installed diagnostic `6be46906d069` ([report](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md)).
+>   - Fixture runs: targeted 12/12, A/B 18/18, FAST E–G 20/20, H 20/20; no fault.
+>   - Against `a86c680` in the same session: −6…−10 % per release; missed 5 → 0 and overruns 6 → 0 on the 29 common steps.
+>   - Internal-heap minimum 25 672 B, i.e. 1 096 B above the 24 KB threshold with two HTTP clients.
+>   - **Motion Timing P0 stays open:** 2 overruns at 20.8 ms, both two-solve STAND/HEIGHT/PRONE releases.
+
+- **What:**
+  - **T2R/T2R1/T2R1M** (`bb5520b`, `4757fa0`, `0fb22b0`): the STOP recovery runs on the T2 bracket and the T1 light release also applies while the correction slews, so no recovery or walk release carries both solves.
+  - **E1/E1b** (`ae9b6d1`, `447082c`): the compensation IK, and the STOP recovery's full solves, are seeded from this release's nominal plus the accepted offset.
+  - **P3a/P3b** (`db6d621`, `e6ee46b`): `ViaPlan` recomputes a blend only where its segment speeds changed (bit-identical plans); the plan release keeps the probe at the accepted scale.
+  - **P5** (`b104f00`): a refused STOP proof stops at the first duration with a control outside the box. Same accept/refuse results and same plans.
+  - **F3** (`a0451de`, originally `6146ef1`): the FAST preset 2 stride goes 80 → 74 mm, **32 → 29.6 mm/s**. This puts the peak reference secant at 29 RAW ticks against the STOP-proof frontier of 31.36 (margin +1.36); the old 31 caused the F3 FAULT of 16/11.
+    - New offline gate `scripts/offline_motion/run_stop_secant_gate.sh`.
+    - Dashboard labels changed to 30 mm/s.
+  - **IRAM G2 + G2s** (`e3fe5a0`, `cb9ed85`, `6be4690`): 17 more Motion hot-path functions carry `MATDOG_MOTION_HOT`. Cost: +6 148 B of IRAM and −6 144 B of internal heap (ELF).
+- **Left out:** the dev.8 diagnostic instrumentation (PMU, extended `@MOTION TIMING`, D2, D3) and the diagnostic composition notes in `BuildConfig.h`. They are kept as patches with the report; P4 is excluded (no measured gain).
+- **Unchanged:** STOP, limits, calibration, NVS, workspace and every other mode or preset. Outside FAST the frames are bit-identical (offline).
+- **Checks on `33134ae`:**
+  - `run_host_tests.sh` PASS;
+  - `static_audit` PASS, including the motion source gate with the re-pinned sources;
+  - `run_stop_secant_gate.sh` PASS;
+  - Motion suites `simple_motion`, `stop_support`, `prone` and `night_recovery` PASS (`results/motion_suites_33134ae.txt` of the report).
+
+## Unreleased — Motion: six hot-path kinematics functions fetched from IRAM (IRAM G1) — 2026-11-15
+
+> Integrated on branch `integ/matdog-unified-operational-20261114` by the merge `f3b0d48` of `cand/timing-iram-20261115` (`5eff171`, `e7b4266`, `f349af9`, on `cfc788a`); version string unchanged. Integrated build (CLEAN, **not flashed**): build `f3b0d48cd56d`, APP SHA256 `a6baacf5d5abc46fc0deb20a6be1664b89f3631c4b0e9c20fbdf74cd64619b99`, sections identical to the `f349af9` build.
+>
+> **Hardware, 15/11/2026:** the same patch, byte for byte, in the diagnostic `e321e8668139` (= `8530d3a` + IRAM G1), installed and validated on the fixture ([record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_e321e86_20261115.md)).
+> - Suite A–G 65/65 in one run; no functional regression.
+> - Against `8530d3a` (same blocks): WALK 11.8–13.5 → 10.8–12.3 ms and RECOVERY 17.0–18.5 → 15.1–16.4 ms per release; instruction memory stalls 0.47–0.50 → 0.37–0.45 of the cycles; missed releases 28 → 10, overruns 648 → 323, peak 39.67 → 36.11 ms.
+> - Internal heap −4.6 KB (static); suite minimum 45 216 B, largest block unchanged.
+> - **Timing P0 stays open** (0 missed, 0 overruns, ≤ 16 ms not met).
+
+- **What:** `src/motion/MotionHotPath.h` defines `MATDOG_MOTION_HOT`, a bare `section(".iram1.motion_hot")` attribute under `ESP_PLATFORM` (empty on host builds), on `legModel`, `edgeContactLiftM`, `pointToWorld`, `contactForwardKinematics`, `contactInverseKinematics` and `forwardWithModel`. The three sources are re-pinned in `scripts/tests/motion_final_release_sources.json`.
+- **Why:** PMU on the fixture (15/11) showed instruction-memory stalls at about half of the NOMINAL+COMPENSATE cycles; the set was chosen by simulated I-cache misses avoided per byte (offline report of 15/11).
+- **Unchanged:** machine code and results (QEMU fixture replay digest and `run_qemu_motion` 18/18 identical to the base), Motion semantics, STOP, limits, calibration, NVS.
+- **Checks:** `static_audit` PASS on `f3b0d48` (host tests PASS, motion source gate PASS).
+
+## Unreleased — Servo conversions: lookups and invariant checks resolved once per calibration revision — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **Hardware, 15/11/2026** (diagnostic `8530d3a11ac9` = this branch's `539b646` + Timing instrumentation, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - On the 14/11 yaw scenario, NOMINAL+COMPENSATE instructions per release (PMU) dropped 1 005 k → 863 k (WALK, −14 %) and 1 723 k → 1 285 k (RECOVERY, −25 %).
+> - Wall time per release: WALK 11.8–13.5 ms, RECOVERY 17.0–18.5 ms (14/11: 14.79 and 21.46).
+> - Timing P0 stays open: 30 missed releases and 677 overruns in the session, peak 39.67 ms; instruction memory stalls are 0.47–0.50 of the cycles.
+
+- **Why:** the hardware timing of 14/11 (dev.8u) measured WALK 14.79 ms and RECOVERY 21.46 ms per release (24 missed releases in RECOVERY), with up to 1.41× the instructions of the QEMU reference. QEMU with the real gen-1 tables:
+  - one `SimpleServoPort::resolve` costs 6 692 instructions and one `decodeRaw` 5 921 (stubs: 551 and 155);
+  - per call: `provenanceMatches` 2 896 (six SHA-256 hex strings compared), `transforms().find` and `limits().find` about 1 000 each, `findJoint` and `jointDirection` about 520 each, the arithmetic only about 100;
+  - a WALK release runs 24 resolves and 26 decodes, a RECOVERY release 36 and 38.
+- **What:**
+  - `CalibrationTargetResolver`: `resolveJointTransform()` is the invariant half of every conversion (profile bound, provenance, transform applicability, joint record, encoder direction: the same checks, order and status as before). Bound overloads of `resolveUrdfQToRaw`, `resolveRawObservation` and `resolveRadiansToRaw` do the per-call half (URDF limit, RAW domain, arithmetic). The full functions are now exactly these two halves in sequence.
+  - `JointTransformTable`, `ActuatorLimitTable` and `CalibrationGeometryProfile` expose `revision()`, changed by every clear/stored admit and every bind/clear.
+  - `SimpleServoPort::slot()` resolves a slot's table entries and invariant checks once per revision of the profile and of both tables, then every `resolve`/`decodeRaw` applies only the per-call half and `limit->contains()`. The binding names the table entries and the profile record; it copies no calibration value, so the calibration stays the single source of truth. Any change of the tables or the profile re-resolves. 12 slots × 32 bytes of RAM.
+- **Unchanged:** every check and status of the conversions, the tables and their admission gates, calibration, NVS, Motion, STOP, limits, frames.
+- **Equivalence (offline):**
+  - Two-tree differential proof (baseline vs this change, port bodies copied from each tree, golden gen-1 tables): 22.7 M resolve and 640 k decode results identical byte for byte, also after cleared tables, re-admission in reverse order, a new q0, a narrowed limit, a cleared, rebound or different geometry. Negative control: without the revision check it diverges at every change.
+  - New `test_servo_port_conversion` (in `run_host_tests.sh`): the production `slot()`, `decodeRaw()` and `resolve()` against the per-call lookup they replace, 13 slots, the whole RAW domain, a quarter-tick q grid, every rounding boundary, URDF limits, non-finite values, 12 table/profile states: 7 740 306 checks, 0 failures. It fails (1.9 M differences) without the revision check.
+- **Timing (QEMU Xtensa, real gen-1 conversions, 14/11 fixture replay, K = 3.088):** identical frames (host = QEMU, digest unchanged). Mean instructions per release: WALK 1 143 k → 864 k (−24 %), RECOVERY 1 768 k → 1 349 k (−24 %), WALK_SETTLE 967 k → 631 k (−35 %). Not a hardware measurement.
+
+## Unreleased — STOP/SAFE_OFF with torque OFF: an explicit STAND re-arms through ACQUIRE — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **VERIFIED HARDWARE, 15/11/2026** (diagnostic `8530d3a11ac9`, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - STOP at rest → STOPPED, SAFE_OFF 13/13, torque OFF in 0.2 s.
+> - Explicit STAND 120 through ACQUIRE/REFERENCE/ENABLE → `STAND_REACHED` 120.1 mm.
+> - That first STAND after boot had one 147 ms gap before its first release (6 missed releases, cause unknown).
+
+- **Why:** a STOP at rest (READY, torque OFF), a SAFE_OFF, or a STOP at the PRONE rest ended in STOPPED with `operatorStopped_`, and `stand()` refused every later STAND with `SAFE_OFF_STAND_REFUSED` until reboot. The latch prevented any implicit re-enable, but it also blocked the operator's own explicit command: only a reboot cleared it, and after a reboot the same STAND from the same pose is admitted.
+- **What:**
+  - An explicit STAND (the public `stand()`, the dashboard and USB `POSTURE.STAND`) is admitted after an operator STOP/SAFE_OFF once the 13-servo OFF is verified. It consumes the latch and takes the existing full ACQUIRE/REFERENCE/ENABLE from the measured pose, exactly as from boot.
+  - Nothing re-arms by itself: `update()` still keeps STOPPED (never READY) while `operatorStopped_` is set. WALK and the joystick rise through `stand(...,command=false)` and stay refused (`SAFE_OFF_STAND_REFUSED`), so a stale joystick refresh after a STOP cannot re-enable the robot. A STAND first, then WALK as usual.
+  - Still refused: a latched fault (`FAULT_STOP_REQUIRED`), a SAFE_OFF or STOP in progress (`SAFE_OFF_IN_PROGRESS`), a refused entry pose, unready inputs, BMS/power, IMU and the ACC ceiling (same reasons as before). ACQUIRE still faults on a servo alarm, torque ON or motion, and refuses a pose outside every certified region before any write. Authority loss after admission faults before any enable.
+  - Held STOP (torque ON) resume is unchanged.
+  - Dashboard: STAND is enabled in STOPPED when the Controller reports SAFE_OFF verified (13/13, torque OFF), no fault, Motion ready and no refused entry. WALK and PRONE stay disabled there.
+  - `static_audit`: the stand() rule now pins the new refusal (`operatorStopped_&&(!command||energized_||!offVerified())`), the latch consumption only in the torque-OFF ACQUIRE branch, READY only with `!operatorStopped_`, and `command=false` in walk() and drive().
+- **Unchanged:** STOP/StopPlan, SAFE_OFF, FAULT, ACQUIRE/REFERENCE/ENABLE checks, entry re-admission, boxes, limits, thresholds, deadlines, gait law, conversions, calibration, NVS.
+- **Tests (offline):**
+  - New `operatorStopRearm` (`test_simple_motion`):
+    - STOP at rest then STAND through `MotionService` (ACK `SAFE_OFF_VERIFIED`, 500 releases STOPPED with no frame or enable, WALK and joystick refused, REFERENCE with torque OFF, 12 enables, `STAND_REACHED`);
+    - STOP during WALK at three instants: the held resume is unchanged (no ACQUIRE, no new enable); after SAFE_OFF an explicit STAND re-acquires and stands;
+    - repeated STOPs at rest, in ACQUIRE, in REFERENCE/ENABLE, in HOLD (held, resumed) and SAFE_OFF from HOLD;
+    - no re-arm with a latched fault, an incomplete SAFE_OFF, unready inputs, power, IMU, ACC ceiling or height out of range; servo alarm in ACQUIRE faults; pose outside the certified regions refused before any write.
+  - Updated: PRONE rest + STOP (`test_simple_motion`, `test_stop_support`), entry re-admission + STOP, SAFE_OFF after a WALK STOP (`safeOffAndRecovery`): STAND now re-acquires, WALK stays refused; a fault keeps `FAULT_STOP_REQUIRED`.
+  - `run_simple_motion_tests`, `run_stop_support_tests`, `run_prone_tests`, `run_preenable_bus_tests`, `run_host_tests`, dashboard suite (contract 6112 checks, DOM, joystick DOM, twin feed) and `static_audit` PASS.
+
+## Unreleased — WALK_SETTLE: IMU correction expressed in the settle frame after a steered walk (Patch A) — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **VERIFIED HARDWARE, 15/11/2026** (diagnostic `8530d3a11ac9`, fixture, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)):
+> - The 14/11 scenario completed: STANDARD yaw clockwise full scale 22 s, STOP, 4 s held, STAND 120.
+> - −8.3/−33.2 mrad were carried into WALK_SETTLE and unwound without refusal; `STAND_REACHED` 119.8 mm in 6.2 s with 6 missed releases (14/11: FAULT, 24 missed).
+> - Three more resumes after a STOP completed.
+
+- **Why:** fixture session of 14/11 (build `0526cf6b9d79`): STANDARD joystick yaw, STOP, STAND 120. WALK_SETTLE faulted `NATIVE_TARGET_NOT_REACHED`:
+  - at the exit `refused_by=LOAD_BOX`, correction −10.4/−32.6 mrad never unwound, all 12 joints within 6 ticks;
+  - in WALK the accepted correction is gravity's tilt in the walk's support frame (`headed()`), while WALK_SETTLE solves in the final pose's body frame (identity heading);
+  - after a yaw (heading ≈ −0.84 rad) every unwind candidate jumped 15–26 ticks; LOAD_BOX or STOP_PLAN refused it, the correction never reached 0 and `releasingLevel` held the arrival until the deadline.
+  - RCA: `verification-artifacts/MATDOG_1_0_2_DEV8U_P0_DIAG_20261114/rca_walk_settle/REPORT_RCA_WALK_SETTLE.md`.
+- **What:** at the WALK → WALK_SETTLE handover the correction is rotated by R_z(heading)ᵀ, the transform `limitWalkTilt` uses, so the transmitted pose is unchanged at the handover. With identity heading (every unsteered walk) roll and pitch stay bit for bit.
+- **Unchanged:** kinematics, gait law, STOP/StopPlan, SAFE_OFF, FAULT, LOAD_BOX and every `compensationSafe` check, boxes, limits, thresholds, deadlines, joint↔servo conversions, calibration, NVS.
+- **Tests (offline):**
+  - Replay matrix (34 cases, production `SimpleMotion` on the `qemu_motion` rig; evidence `verification-artifacts/MATDOG_1_0_2_PATCHA_TIMINGBASE_20261114/`):
+    - cases: yaw both ways for 10/22 s, STOP, STAND 120/150; fixture quaternion, dev.8 tilt and level ground; STOP during WALK_SETTLE; joystick release; unsteered walks;
+    - `200a3bd`: 21 FAULT, and the passes carry an accepted 12–40-tick target jump at the handover;
+    - patched: 34/34 STAND_REACHED, 0 settle refusals after a yaw, ≤ 2 ticks per release at the handover (4 after a joystick release), correction exactly 0 before HEIGHT;
+    - unsteered digests identical.
+  - `test_simple_motion` and `test_ground_contact` (ASan/UBSan) PASS.
+  - Frame digest: unsteered scenarios identical. Steered scenarios differ only from the settle handover: the maximum per-release step drops from 14 to 2 and from 10 to 3 ticks.
+  - Servo plant (6 seeds): 0 faults, STOPs 1296/1296, as `200a3bd`. STOP window matrices (three modes): output identical to `200a3bd`.
+  - Joystick envelope with CAD, on top of the FAST stride fix (entry below): SLOW, STANDARD and FAST PASS; FAST minimum 0.77 mm.
+    - Without that fix this patch made FAST `random_6` fail (−0.14 mm). It only shifts the timing after steered settles; the same pose class already failed on `200a3bd` (seed 11, −0.39 mm), and the FAST fix removes the cause.
+  - FAST static support at every lift-off, full resolution, 64 seeds with both changes: minimum 0.53 mm.
+  - STOP window and FAST handover matrices: output identical to `200a3bd`.
+  - QEMU host/Xtensa 18/18 and `static_audit` PASS.
+
+## Unreleased — FAST joystick: stride changes over 4 cycles in both regimes — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+
+- **Why:** the FAST joystick envelope (CAD static support, `run_joystick_envelope.sh` mode 2) had negative static support margins in random command sequences, already on `200a3bd`.
+  - Values at full resolution: seed 11 −0.39 mm, seed 22 −0.05 mm, seed 39 −0.46 mm. Seed 22 is hidden by the gate's every-third-release sampling.
+  - Each minimum falls at a lift-off, for 40–120 ms. One planted foot sits 5–8 mm off its steady place because the stride per cycle changed while it stood. Steered: stride over 2 cycles, with full sway and the fillet contact. Fore/aft: forward decrease over 3 cycles, −0.20 mm in seed 10 when the timing shifts.
+  - Steady steering keeps ≥ 2.1 mm with the same commands. Slowing only lateral or yaw does not remove the minima; slowing the stride does.
+- **What:**
+  - FAST `decelCycles` 3 → 4: the forward decrease takes 4 cycles, like the fore/aft increases and the backward changes already do.
+  - The steered stride ramps over the longer of `kJoystickRampCycles` and the mode's `decelCycles`, i.e. 4 cycles for FAST.
+  - SLOW and STANDARD are unchanged bit for bit, since their `decelCycles` equals `kJoystickRampCycles`.
+- **Unchanged:** stride, lateral and yaw limits, speeds, sway amplitudes, lateral and yaw ramps, geometry, boxes and certificates, STOP/StopPlan, SAFE_OFF, FAULT, gates and thresholds, conversions, calibration, NVS.
+- **Tests (offline; evidence `verification-artifacts/MATDOG_1_0_2_FAST_SUPPORT_20261114/`):**
+  - Static support at every lift-off, full resolution, 64 random FAST seeds:
+    - before: minimum −0.46 mm (−1.01 mm with Patch A);
+    - after: minimum 0.53 mm (0.53 mm with Patch A).
+  - Joystick envelope with CAD: SLOW and STANDARD identical. FAST PASS, minimum 0.69 mm (`200a3bd`: 0.51 mm).
+  - STOP:
+    - window matrices (three modes, FAST backward, 6 seeds) and FAST handover matrices (dir 0–3): output identical to `200a3bd`;
+    - the SLOW forward window gives 160/168 at 9.6 V with flex 1.284, the same on `200a3bd`. This is the known model range above 1.13x; the hardware measured 0.3–0.6x.
+  - Servo plant, 6 seeds: 0 faults, STOPs 1296/1296.
+  - `test_simple_motion` and `test_ground_contact` PASS; frame digest identical.
+
+## Unreleased — DALY telemetry transport diagnostics (Battery P1, D1) — 2026-11-14
+
+> Offline, **IMPLEMENTED NOT HARDWARE VALIDATED**; version string unchanged, identify the build by build ID and APP SHA256. Branch `integ/matdog-unified-operational-20261114`.
+>
+> **Hardware, 14–15/11/2026** (diagnostic builds `0526cf6b9d79` and `8530d3a11ac9`, [record](../../09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HW_VALIDATION_8530d3a_20261115.md)): the D1 fields are live on the device.
+> - On 15/11 they recorded a 440 s DALY silence: `rx_bytes=0` and `stale_bytes=0` with a poll every 2 s, then recovery with 128/129 and 129/129 bytes, without reset.
+> - The cause is unknown and no driver defect was found.
+
+- **Why:** the BMS outages after boot (06/11–09/11, 2–5 min, `comm=TIMEOUT`) cannot tell a silent DALY from a partial, late or malformed reply (H0 sessions `MATDOG_1_0_2_DEV3_HW_H0_20261108`, `MATDOG_1_0_2_DEV6_T44FIX_H0_20261109`, `MATDOG_1_0_2_DEV6_ACCDIAG_HW_20261109`; physical cause UNKNOWN).
+- **What:** for the last completed 0xD2 poll, `DalyBms::telemetryDiag()` keeps the bytes read before the deadline, the delay from the request to the first byte `update()` saw, the bytes discarded just before the request (arrived after the previous poll closed) and the consecutive non-OK polls. `@BMS STATUS` prints them on one new last line, so the fixed line order `daly_calibration_guard.py` reads is unchanged; `/status` adds `bms_rx_bytes`, `bms_first_byte_ms`, `bms_stale_bytes`, `bms_fail_streak`, `bms_last_ok_uptime_ms` (`NONE` = no byte / no valid reply). Outcome stays `comm` / `bms_comm`; the last valid reply is the sample's own timestamp.
+- **Unchanged:** requests, 2 s cadence, 750 ms deadline, 5 s freshness, drain bound, KEY/MOS paths, availability, SystemHealth, LED policy, Motion power policy. No UART re-init, no new logging.
+- **Tests (offline):** `test_daly_async` (production `DalyBms`, virtual UART): silence, partial, late after the deadline, late inside it, CRC and header failures, streak reset, 8 TX bytes per poll; 4/4 diagnostic mutations detected. `test_daly_calibration_guard` with the trailing line; DALY audit mutations 52/52; review power chain and night-recovery runners PASS. `static_audit`: every host suite passes up to the Motion source gate, which fails exactly as on `2293a58` (Ground Contact `5472b65`: `FootContact`, `TiltedContactIk`, `GroundContactDiagnostic.h`); no new finding. ROBOT_POWERED build: APP 1 772 848 B (+720 B), layout gate OK.
+
+## Unreleased — MATDOG Controller 1.0.2-dev.7 integrated candidate: Motion vNext + Battery P1 — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. New version string `1.0.2-dev.7` (never assigned before; `v1.0.1-dev.7` is a different series). Branch `integ/motion-vnext-battery-p1-dev7-20261111` on the Motion candidate `a7f5c2c`; the two source branches stay unchanged (`feat/motion-multidirectional-vnext-20261111` at `a7f5c2c`, `fix/battery-p1-20261111` at `f5b9d32`). `450d2c7` (APP `82122e06…`) stays the installed reference and the rollback.
+
+- **Motion vNext** (entries below, `a7f5c2c`): multidirectional joystick on every WALK mode's own law, STANDARD backward, STOP inside its box under HIP flex, handover gate, joystick limits of the walking law. Added tests: a prolonged joystick refresh loss (five 503 in a row: fresh refreshes, outcome unknown, never neutral); a release while the handover waits (the deferral never holds back an exit from the walk).
+- **Battery P1** (cherry-picked `ffff2c1`, `3cfe6cf`, `1890190`, `f5b9d32`): battery warning/critical facts current with torque ON; the LED frame (RMT wait up to 20 ms) deferred to torque OFF; energy from pack and minimum cell voltages, the DALY SOC as an estimate. Conflicts: CHANGELOG only.
+- **Removed:** `bms_remaining_estimate_ah` and its portal row (SOC x 9 Ah restated the uncalibrated DALY SOC as a capacity). The DALY remaining-capacity register and the configured nominal stay, labelled.
+- **Integration check:** every source file equals its Motion or its Battery P1 version, except the three both touched (CHANGELOG, `MotionDashboard.h`, `test_simple_dashboard_dom.cjs`), whose difference from Motion is exactly the Battery P1 diff, and the two changes above.
+- **Unchanged:** geometry, URDF, calibration, NVS/EEPROM, joint limits, boxes and certificates, STOP, SAFE_OFF, watchdog, drive table, DALY algorithm.
+
+## Unreleased — MATDOG Controller 1.0.2-dev.6 Motion vNext audit fixes: STOP under HIP flex, handover, transitions — 2026-11-11
+
+> Offline candidate on `1160dce` (the entry below), **IMPLEMENTED NOT HARDWARE VALIDATED**; same version string `1.0.2-dev.6`, new source, build and APP. Answers the independent Codex audit of `1160dce` (NOT READY). Battery P1 not included. Evidence: `09_Logs/Validation_Reports/Motion_vNext_Multidirectional_2026-11-11/AUDIT_FIXES.md`.
+
+- **Cause (VERIFIED OFFLINE, servo_plant):** a STOP checks the MEASURED pose in its box at every release (`generateStop`), the walk never does; kHeight leaves the HIP +-16.3 ticks and the loaded HIP sits off its reference by its static flex (plant 0.5-1.5x the dev.15 pattern, up to 10.5 ticks; HW SLOW 5-6). Sway plus the arrest's braking distance plus the flex left the box: Codex's STANDARD backward seeds 3 and 6, FAST backward seed 25 at 9.6 V, SLOW backward seed 4 (identical on `450d2c7`), STANDARD forward seed 7 on 36 seeds, and the STOPs right after a steered -> fore/aft handover (STANDARD 6/72 in two directions, SLOW and FAST 1/72).
+- **Backward base sway** (`JoystickSpec::backSwayYM`, both regimes): SLOW 1.125, STANDARD 0.75, FAST 0.5 mm (was the forward 1.5 / - / 1.0). A STOP at every release of the sway-transfer windows (36 seeds x 2 V x 14 instants = 1008 per mode): 0 out of the box; static support 1.49 / 1.66 / 1.52 mm, capture 1.72 / 1.84 / 1.38 mm, tilt envelopes PASS.
+- **STANDARD backward enabled** (50 mm per cycle, 16.7 mm/s).
+- **STANDARD forward sway 1.5 -> 1.25 mm:** HIP margin 8.7 -> 10.0 ticks, static support 1.99 mm, capture 1.51 mm (the dev.6 selection rule kept); servo_plant STOP8 72 seeds 0/576 per voltage (was 1/281 on 36), sway-window STOPs 36 -> 2 of 1008.
+- **Handover gate** (`regimeHandover`, `loadedArrestInside`): never in a four-contact window, two releases before it or six after it; the arrest STOP would build must fit the destination box narrowed by each joint's measured residual and the reference's travel since that reading. The walk stays in its regime and retries. Replays 36 seeds x 2 V, every mode and direction: 0 failed STOP (`1160dce`: 14 of 864).
+- **FAST forward joystick decrease over 3 cycles** (`JoystickSpec::decelCycles`; SLOW, STANDARD keep 2): `frontal_changes` -0.44 -> positive static support.
+- **Joystick limits of the walking law** (`joystickMode`): a steered or backward walk keeps its own law's range until it can take the selection; status `walk_mode.joystick` (only when it is not `selected`); the page scales to it, and a deferred selection (ACK `WALK_MODE_AFTER_STEERING` / `WALK_MODE_NEXT_WALK`) keeps the held stick on the walk's limits (Codex: FAST backward + STANDARD selected went neutral, WALK STOP). `WALK_MODE_AFTER_STEERING` only for a forward steered walk; the ACC ceiling is checked at that selection too (`SERVO_ACC_CEILING_BELOW_DRIVE`).
+- **`JOYSTICK_BELOW_BAND`:** lateral/yaw under the 20 % band without fore/aft no longer starts a walk on the spot.
+- **Unchanged:** SLOW forward law and every frame digest of `run_motion_frame_digest.sh` (16 lines, identical to `1160dce`/`450d2c7`), FAST forward law, STOP, `StopPlan`, boxes, `pointSafe`, `compensationSafe`, tolerances, deadlines, NVS, geometry.
+- **Not closed (design decision):** a STOP at every release of the sway-transfer windows still leaves kHeight forward in SLOW 44, STANDARD 2, FAST 10 of 1008 (flex >= 1.28x, 1.16x, 1.13x the HW pattern; SLOW and FAST identical on `450d2c7`). 0 needs SLOW 1.0 mm (capture 1.04 mm), STANDARD 1.0 or FAST 0.875 mm (capture 1.32 mm): below the dev.6 rule (capture >= 1.41, support >= 1.7 mm). To be decided with HW flex data.
+- **Cost (static model):** the backward sway lowers the SLOW joystick gate minimum from 0.39 to 0.12 mm (`random_4`, a backward segment); STANDARD 0.38 mm, FAST 0.51 mm (`frontal_changes` +0.84, `random_8` +0.51 mm). No dynamic stability is claimed; MuJoCo V2 cannot resolve margins of this size.
+- **Verifications made strict:** `joystick_envelope` fails a scenario that never walks (`release_in_start` excepted: WALK optional) or has a refresh refused (`WALK_STOPPING`, and `MOTION_BUSY` in `WALK_SETTLE`, excepted); `servo_plant` counts every planned STOP (MISSED when not attempted), lists failing seeds, measures the box exit on the encoder reading including faulted attempts, and scales scenario 7 like the page; QEMU `JOY_HANDOVER_<mode>`; the steered-box README gives the certified lower bounds (3.035 / 3.022 / 3.003 mm), not cell-centre distances.
+
+## Unreleased — MATDOG Controller 1.0.2-dev.6 Motion vNext: multidirectional joystick on STANDARD and FAST — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. **Same version string `1.0.2-dev.6`, new source, build and APP** on `450d2c7`, which stays the installed reference (APP `82122e06…`) and the rollback with `1fbee7b`. Battery P1 (`fix/battery-p1-20261111`) is not included. Evidence: `09_Logs/Validation_Reports/Motion_vNext_Multidirectional_2026-11-11/`.
+
+- **Why:** handoff of 10/11: lateral, yaw and backward existed on SLOW only (`JOYSTICK_STEERING_SLOW_ONLY`, `JOYSTICK_BACKWARD_SLOW_ONLY`, `steerGait` on the SLOW law, `slowLaw` handover gate).
+- **Change:** a joystick spec per WALK mode (`JoystickSpec`: backward stride, steered ellipsoid, steered sway) and a steered box per mode (`steerBox`): each mode steers on its own law (period, duty, swing, height). Per second: SLOW unchanged (back 10, lateral 4.0 mm/s, yaw 1.83 deg/s); STANDARD lateral 6.7 mm/s, yaw 2.29 deg/s, sway 9 mm, **no backward yet** (`JOYSTICK_BACKWARD_UNAVAILABLE`); FAST back 20, lateral 4.8 mm/s, yaw 1.83 deg/s, sway 7.5 mm. Capabilities publish them per mode (`walk_modes[].joystick`), the dashboard scales the stick to them. A steered walk takes a new WALK mode at its return to the forward regime (`WALK_MODE_AFTER_STEERING`); a backward walk keeps its law.
+- **Certified boxes:** `kSteerStandard`, `kSteerFast` (`certify_steer_box.py`, 97 scenarios each, +/-40 mrad: 120/120 non-adjacent and 12/12 adjacent pairs, 11.08 / 10.99 mm), also admitted by `pointSafe`.
+- **Unchanged:** the SLOW laws (frame digests and SLOW joystick gate frames identical to `450d2c7`), STANDARD/FAST forward, STOP, SAFE_OFF, `kHeight`, `kSteer`, IMU envelopes, tolerances, drive table, NVS, geometry.
+- **Tests:** rig (151 joystick runs, 151 STOP verified), joystick gate per mode (SLOW/STANDARD PASS; FAST: only the pre-existing `frontal_changes`), `servo_plant` scenarios 4–7 per mode (steered STOP 48/48, steered IMU vertex 48/48, FAST backward 48/48), dashboard suite with Chrome, QEMU cost per release (steered STANDARD/FAST +3/+6 % peak against steered SLOW).
+- **Tools:** `joystick_envelope` and the QEMU bench set the verified register-85 ceiling (both refused every STAND since dev.6); the gate takes `JOY_MODE`; `certify_steer_box.py --name`.
+- **Pre-existing, unchanged, reported:** FAST forward joystick deceleration −0.44 mm static support (frames identical to `450d2c7`; 3 decel cycles give +0.84 mm); SLOW backward, a STOP in its first cycle met `STOP_MEASURED_OUTSIDE_BOX` in 1 of 6 `servo_plant` seeds (identical on `450d2c7`).
+
+## Unreleased — MATDOG Controller 1.0.2-dev.6 Battery P1: battery facts current with torque ON, LED ring deferred to torque OFF, energy on the dashboard — 2026-11-11
+
+> Offline candidate, **IMPLEMENTED NOT HARDWARE VALIDATED**. **Same version string `1.0.2-dev.6`, new source, build and APP** on `450d2c7`, which stays the installed reference (APP `82122e06…`) and, with `1fbee7b`, the rollback image. Source `1890190`, build `189019075144` CLEAN `ROBOT_POWERED`, APP 1 752 976 B, SHA256 `ac09c70c22e54ba43a9b05075b432aa2005c98109a8b07004af82bf355176e83`; not flashed.
+
+- **Why (hardware 10/11, `/status` replay):** since rc.11 r2 (`8e20c63`) `Controller.cpp` skipped `led_status_.update()` while Motion was engaged, freezing the policy together with the ring. BATTERY_WARNING (second fresh sample at pack ≤ 10.50 V) was due at 19:46:55Z and showed at 19:58:50Z, after torque OFF; the DALY samples stayed fresh throughout.
+- **Change:** the policy runs every tick. `LedStatusManager::deferRender(simple_motion_.engaged())` withholds only the frame (its RMT completion can wait up to 20 ms) until torque OFF, when the first update renders the current presentation. `/status` adds `led_render_deferred=YES|NO`.
+- **Dashboard:** the battery card headline is the pack voltage and the minimum cell; the DALY SOC is shown as an estimate ("stima del BMS, non autonomia") and its bar is never green. The Motion cockpit gets one fixed-height energy line from the same `/status` facts, `NON VERIFICATA` whenever `/status` is not current.
+- **Unchanged:** thresholds and hysteresis, SOC values (no correction), DALY parameters, NVS/EEPROM, Motion and its limits, STOP, SAFE_OFF, the `led_.update()` guard of the diagnostics, the ring transport. As with `450d2c7`, nothing is transmitted to the ring while Motion is engaged.
+- **Tests:** the 10/11 replay (511 samples) through the real ring, manager and policy: warning fact at 19:46:55Z with torque ON, no transmission in 463 engaged samples, warning frame at 19:58:50Z; critical at 3350 mV immediate. `static_audit.py` pins the unconditional policy call and the deferral (5 new mutations). DOM: replay instants on the shipped page.
+- **Not in this candidate (P2):** a non-blocking ring render with torque ON.
 
 ## Installed — MATDOG Controller 1.0.2-dev.6 operational ACC 220 (`450d2c7`, APP `82122e06…`, installed 10/11/2026 19:18Z; fixture Q1–Q8 qualified, ground check out of protocol): register 85 at runtime, WALK mode change during a walk, joystick on the selected mode — 2026-11-10
 

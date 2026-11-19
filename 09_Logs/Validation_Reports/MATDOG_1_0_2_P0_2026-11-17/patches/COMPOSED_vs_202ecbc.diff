@@ -1,0 +1,315 @@
+Only in 05_Firmware/MATDOG_Controller: build
+diff -ru 05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json 05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json
+--- 05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json	2026-11-16 21:18:22.000000000 +0100
++++ 05_Firmware/MATDOG_Controller/scripts/tests/motion_final_release_sources.json	2026-11-17 20:50:07.326433216 +0100
+@@ -9,6 +9,7 @@
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematics.cpp": "d838a719d7e372c31d9df6508b95f7cb3b6de472d5c4bd4d716233556cb1cb63",
+     "05_Firmware/MATDOG_Controller/src/motion/LegKinematicsInternal.h": "101b767d27504e2a8146aa13c649c8cb6ae58f4e155d255ab941496c0869a796",
+     "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.h": "bd97a032e9ec3d2a5598deb8fc52d9956ed1780bb9de5bf69f603ce77f7c30ea",
++    "05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp": "32a493833c609a8c40c26849f80ed467bbcc1f8be2c065d068b30ea2e8b5c97e",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.cpp": "fd74c81b8bb89a73324ce47a12a25b013f72a1fd6074105bd9354fda5b00b058",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltCompensation.h": "634d26ec1bb862486924d0a26475e90d15f9da7935a6f12f00a655b9d1709006",
+     "05_Firmware/MATDOG_Controller/src/motion/TiltedContactIk.cpp": "2c7c8fdc9ee3bfda5b600e2a53825d6d91f797dc0b45e4dd25b6602423a897b0",
+diff -ru 05_Firmware/MATDOG_Controller/src/core/MotionService.cpp 05_Firmware/MATDOG_Controller/src/core/MotionService.cpp
+--- 05_Firmware/MATDOG_Controller/src/core/MotionService.cpp	2026-11-16 21:18:22.000000000 +0100
++++ 05_Firmware/MATDOG_Controller/src/core/MotionService.cpp	2026-11-17 21:42:41.382907860 +0100
+@@ -11,6 +11,96 @@
+ namespace matdog { namespace core {
+ namespace {
+ const char* boolean(bool b){return b?"true":"false";}
++// Status JSON without newlib printf (P0 HTTP, 17/11/2026). One answer is ~5 KB from ~70 snprintf calls and ~370
++// arguments: ~94 k CCOUNT (QEMU, ~290 k instructions) of _svfprintf_r/_dtoa_r, which run from flash on the HTTPD
++// core while Motion releases run on the other one (shared cache and flash: HTTP A/B on the fixture, 17/11).
++// writeText writes the same bytes as snprintf for what formatStatus uses: %s, %d/%i and %u with no, l or ll length,
++// %.Nf (N <= 9) correctly rounded from the exact binary value with ties to even. Flags, width, other conversions, a
++// null string, a non-finite or too large real go to snprintf for that one conversion. Same return value and
++// truncation as snprintf; -1 for a conversion without an argument or a '*' width (not used).
++struct Arg {
++  enum Kind:uint8_t{SIGNED,UNSIGNED,REAL,TEXT} kind;
++  union{long long i;unsigned long long u;double f;const char* s;};
++  Arg(int v):kind(SIGNED),i(v){} Arg(long v):kind(SIGNED),i(v){} Arg(long long v):kind(SIGNED),i(v){}
++  Arg(unsigned v):kind(UNSIGNED),u(v){} Arg(unsigned long v):kind(UNSIGNED),u(v){} Arg(unsigned long long v):kind(UNSIGNED),u(v){}
++  Arg(double v):kind(REAL),f(v){} Arg(const char* v):kind(TEXT),s(v){}
++};
++struct Text {
++  char* p;size_t cap,n=0;
++  void put(char c){if(n+1<cap)p[n]=c;++n;}
++  void put(const char* s,size_t k){const size_t room=n+1<cap?cap-1-n:0;if(room)std::memcpy(p+n,s,k<room?k:room);n+=k;}
++  void put(unsigned long long v){char d[20];char* const e=d+sizeof d;char* b=e;
++    while(v>0xFFFFFFFFull){const unsigned long long q=v/1000000000u;unsigned r=unsigned(v-q*1000000000u);for(unsigned j=0;j<9;++j){*--b=char('0'+r%10);r/=10;}v=q;}
++    unsigned w=unsigned(v);do{*--b=char('0'+w%10);w/=10;}while(w);
++    put(b,static_cast<size_t>(e-b));}
++};
++constexpr uint32_t kPow10[10]={1,10,100,1000,10000,100000,1000000,10000000,100000000,1000000000};
++// |x| x 10^p rounded to the nearest integer, ties to even, from the exact value m / 2^s of the double.
++// False when x is not finite or the result does not fit 64 bits (snprintf then formats it).
++bool scaled(double x,unsigned p,unsigned long long& r){
++  uint64_t b;std::memcpy(&b,&x,sizeof b);
++  const int e=int(b>>52&0x7FF);uint64_t m=b&((1ull<<52)-1);
++  if(e==0x7FF)return false;
++  if(e)m|=1ull<<52;
++  const int s=1075-(e?e:1);
++  const uint64_t a=(m&0xFFFFFFFFu)*kPow10[p],c=(m>>32)*kPow10[p];  // N = m x 10^p < 2^83 as hi:lo
++  const uint64_t lo=a+(c<<32),hi=(c>>32)+(lo<a);
++  if(s<=0){const int k=-s;if(hi||k>=64||(k&&lo>>(64-k)))return false;r=lo<<k;return true;}
++  if(s>=128){r=0;return true;}  // N < 2^83 <= half: rounds to 0
++  uint64_t q,rh,rl,hh,hl;  // quotient, remainder rh:rl, half hh:hl = 2^(s-1)
++  if(s<64){if(hi>>s)return false;q=lo>>s|hi<<(64-s);rh=0;rl=lo&((1ull<<s)-1);hh=0;hl=1ull<<(s-1);}
++  else if(s==64){q=hi;rh=0;rl=lo;hh=0;hl=1ull<<63;}
++  else{const int k=s-64;q=hi>>k;rh=hi&((1ull<<k)-1);rl=lo;hh=1ull<<(k-1);hl=0;}
++  const int cmp=rh!=hh?(rh<hh?-1:1):rl!=hl?(rl<hl?-1:1):0;
++  r=q+(cmp>0||(cmp==0&&(q&1)));
++  return r>=q;
++}
++int writeText(char* out,size_t cap,const char* fmt,const Arg* a,size_t count){
++  Text t{out,cap};size_t k=0;
++  for(const char* f=fmt;*f;++f){
++    if(*f!='%'){const char* q=f+1;while(*q&&*q!='%')++q;t.put(f,static_cast<size_t>(q-f));f=q-1;continue;}  // literal run
++    const char* spec=f++;
++    if(*f=='%'){t.put('%');continue;}
++    bool plain=true;int prec=-1,len=0;
++    while(*f=='-'||*f=='+'||*f==' '||*f=='#'||*f=='0'){plain=false;++f;}
++    while(*f>='0'&&*f<='9'){plain=false;++f;}
++    if(*f=='.'){prec=0;++f;while(*f>='0'&&*f<='9')prec=prec*10+(*f++-'0');}
++    if(*f=='l'){++len;if(*++f=='l'){++len;++f;}}
++    else while(*f=='h'||*f=='j'||*f=='z'||*f=='t'||*f=='L'){plain=false;++f;}
++    const char conv=*f;
++    if(!conv||*f=='*'||k>=count)return -1;
++    const Arg& v=a[k++];
++    const unsigned long long u=v.kind==Arg::SIGNED?static_cast<unsigned long long>(v.i):v.kind==Arg::UNSIGNED?v.u:0;
++    unsigned long long r=0;
++    if(plain&&prec<0&&conv=='s'&&v.kind==Arg::TEXT&&v.s){t.put(v.s,std::strlen(v.s));continue;}
++    if(plain&&prec<0&&(conv=='d'||conv=='i')&&v.kind!=Arg::REAL&&v.kind!=Arg::TEXT){
++      const long long x=len==2?static_cast<long long>(u):len?static_cast<long long>(static_cast<long>(u)):static_cast<long long>(static_cast<int>(u));
++      if(x<0){t.put('-');t.put(0ull-static_cast<unsigned long long>(x));}else t.put(static_cast<unsigned long long>(x));
++      continue;}
++    if(plain&&prec<0&&conv=='u'&&v.kind!=Arg::REAL&&v.kind!=Arg::TEXT){
++      t.put(len==2?u:len?static_cast<unsigned long long>(static_cast<unsigned long>(u)):static_cast<unsigned long long>(static_cast<unsigned>(u)));continue;}
++    if(plain&&!len&&conv=='f'&&prec>=0&&prec<=9&&v.kind==Arg::REAL&&scaled(v.f,unsigned(prec),r)){
++      uint64_t b;std::memcpy(&b,&v.f,sizeof b);if(b>>63)t.put('-');
++      const uint32_t t10=kPow10[prec];unsigned frac;
++      if(r<=0xFFFFFFFFull){const uint32_t w=uint32_t(r);t.put(static_cast<unsigned long long>(w/t10));frac=w%t10;}
++      else{t.put(r/t10);frac=unsigned(r%t10);}
++      if(prec){char d[9];for(int j=prec;j--;){d[j]=char('0'+frac%10);frac/=10;}t.put('.');t.put(d,unsigned(prec));}
++      continue;}
++    char one[24];const size_t n=static_cast<size_t>(f-spec)+1;  // this conversion alone, through snprintf
++    if(n>=sizeof one)return -1;
++    std::memcpy(one,spec,n);one[n]=0;
++    char* dst=t.n<cap?out+t.n:nullptr;const size_t room=t.n<cap?cap-t.n:0;
++    int w;
++    if(v.kind==Arg::REAL)w=std::snprintf(dst,room,one,v.f);
++    else if(v.kind==Arg::TEXT)w=std::snprintf(dst,room,one,v.s);
++    else if(conv=='d'||conv=='i'||conv=='c')w=len==2?std::snprintf(dst,room,one,static_cast<long long>(u)):len?std::snprintf(dst,room,one,static_cast<long>(u)):std::snprintf(dst,room,one,static_cast<int>(u));
++    else w=len==2?std::snprintf(dst,room,one,u):len?std::snprintf(dst,room,one,static_cast<unsigned long>(u)):std::snprintf(dst,room,one,static_cast<unsigned>(u));
++    if(w<0)return -1;
++    t.n+=static_cast<size_t>(w);
++  }
++  if(cap)out[t.n<cap?t.n:cap-1]=0;
++  return static_cast<int>(t.n);
++}
+ }
+ void MotionService::update(){
+  if(ground_.running()&&motion_){
+@@ -265,7 +355,7 @@
+  for(const auto& f:s.feedback)fresh=fresh&&f.valid&&
+    !((us>=f.stampUs&&us-f.stampUs>250000)||(f.stampUs>us&&f.stampUs-us>15000));
+  size_t used=0;bool ok=true;
+- auto add=[&](const char* fmt,auto... args){if(!ok)return;const int n=snprintf(out+used,cap-used,fmt,args...);if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
++ auto add=[&](const char* fmt,auto... args){if(!ok)return;const Arg a[]={Arg(args)...};const int n=writeText(out+used,cap-used,fmt,a,sizeof...(args));if(n<0||static_cast<size_t>(n)>=cap-used){ok=false;return;}used+=n;};
+  add("{\"version\":1,\"now_ms\":%lu,\"state\":\"%s\",\"phase\":\"%s\",\"pose_region\":\"%s\",\"ready\":%s,\"reason\":\"%s\",\"readiness_reason\":\"%s\",\"stale\":%s,\"fault\":%s,\"safe_off_verified\":%s,\"safe_off_mask\":%u,\"torque_active\":%s,\"height_valid\":%s,\"height_source\":\"ENCODER_IMU_FLAT_GROUND_ESTIMATE\",\"requested_height_mm\":%.1f,\"height_estimate_mm\":%.1f,\"base_link_height_mm\":%.1f,\"walk_cycles\":%.6f,\"imu_correction_limited\":%s,\"imu_valid\":%s,\"imu_age_ms\":%llu,\"period_us\":%lu,\"releases\":%lu,\"missed_releases\":%lu,\"max_gap_us\":%llu,\"active_command\":{\"outcome\":\"%s\",\"reason\":\"%s\",\"id\":\"%s\",\"sequence\":%lu,\"accepted_ms\":%lu,\"finished_ms\":%lu},\"joints\":[",
+  (unsigned long)now,simple::name(s.state),s.phase,fresh?s.poseRegion:"UNKNOWN",boolean(s.ready),s.reason,s.readinessReason,boolean(!fresh),boolean(s.state==simple::State::FAULT),boolean(s.offVerified),s.offMask,boolean(s.energized),boolean(s.heightValid),s.requestedHeightM*1000,s.heightM*1000,simple::baseLinkHeightFromNominalM(s.heightM)*1000,s.walkCycles,boolean(s.stabilizationLimited),boolean(s.imuValid),(unsigned long long)(us>=s.imuStampUs?(us-s.imuStampUs)/1000:0),(unsigned long)simple::kPeriodUs,(unsigned long)s.releases,(unsigned long)s.missed,(unsigned long long)s.maxGapUs,s.activeOutcome,s.activeReason,s.activeId,(unsigned long)s.activeSequence,(unsigned long)s.acceptedMs,(unsigned long)s.finishedMs);
+  // Raw torque/goal fields retain their dated control observation. SAFE_OFF is
+diff -ru 05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp 05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp
+--- 05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp	2026-11-16 21:18:22.000000000 +0100
++++ 05_Firmware/MATDOG_Controller/src/motion/StandTrajectory.cpp	2026-11-17 20:50:07.326639014 +0100
+@@ -5,13 +5,24 @@
+ 
+ namespace matdog { namespace motion {
+ namespace {
++// The checks forwardKinematics() makes before it computes, and the only part of it a
++// definition used (its status): a model, three finite angles, each inside the
++// generated URDF limits inclusive. The FK trigonometry is no longer computed here.
++bool seedInsideModel(LegId leg, const LegJointAngles& q) {
++  const LegModel* model = legModel(leg);
++  if (!model || !std::isfinite(q.hip) || !std::isfinite(q.upper) || !std::isfinite(q.lower)) return false;
++  const double values[3] = {q.hip, q.upper, q.lower};
++  for (unsigned j=0; j<3; ++j)
++    if (values[j] < model->limits[j].lower || values[j] > model->limits[j].upper) return false;
++  return true;
++}
+ bool validDefinition(const StandDefinition& d) {
+   if (!std::isfinite(d.lowBodyHeightM) || !std::isfinite(d.standBodyHeightM) ||
+       d.lowBodyHeightM <= 0 || d.lowBodyHeightM >= d.standBodyHeightM || d.samples < 2) return false;
+   for (unsigned i=0; i<4; ++i) {
+     const auto p = d.contactsWorldM[i];
+     if (!std::isfinite(p.x) || !std::isfinite(p.y) || p.z != 0.0 ||
+-        forwardKinematics(static_cast<LegId>(i), d.standSeed[i]).status != KinematicsStatus::OK) return false;
++        !seedInsideModel(static_cast<LegId>(i), d.standSeed[i])) return false;
+   }
+   return true;
+ }
+diff -ru 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+--- 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp	2026-11-16 21:18:22.000000000 +0100
++++ 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp	2026-11-17 20:50:07.327153543 +0100
+@@ -308,6 +308,12 @@
+   // q starts exactly at the decoded accepted RAW. All times use the ESP
+   // clock; no unwritten nominal point or asynchronous encoder pose is used.
+   stopOrigin_=source;walkStopping_=walkRecover_=false;
++  // A pending start whose plan is active but whose first frame was never accepted (send() serviced this STOP before or
++  // instead of its TX): the held reference is still HOLD's. The resume keeps HOLD's nominal stand (the plan's first
++  // via) and its zero correction (a pending start begins only at zero), not the never-commanded endpoint and correction
++  // step that beginHeight/beginProne, activatePlan and compensate wrote for that frame.
++  if(source==Phase::HOLD&&planned_){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[0][i];
++    segmentTo_=q;plannedHeight_=plan_.p[0][14];rollCorrection_=pitchCorrection_=0;}
+   stopActive_=true;stopVerified_=false;stopStartUs_=now;stopTerminalUs_=stopDwellUs_=0;
+   // One existing control-read population takes 1.44 s, plus the 0.5 s dwell.
+   stopDeadlineUs_=now+static_cast<uint64_t>(std::ceil(stopPlan_.duration*1e6))+3000000;
+@@ -858,15 +864,27 @@
+     if(k>=160&&std::fmin(from,to)+1e-6<z&&z<std::fmax(from,to)-1e-6&&!knotVia(k))return false;}
+   JointTargetFrame q;return heightTarget(to,q)&&via(q,0,0,to);
+ }
++bool SimpleMotion::heightPlan(const JointTargetFrame& from,double fromHeight,double to){
++  plan_.clear();return via(from,0,0,fromHeight)&&heightVias(fromHeight,to);
++}
+ void SimpleMotion::beginPlan(Phase next,const collision::Box& box,uint64_t now,double speed,double acc){
++  if(const char* r=preparePlan(box,speed,acc)){fault(r);return;}
++  activatePlan(next,box,now);
++}
++const char* SimpleMotion::preparePlan(const collision::Box& box,double speed,double acc){
+   // The whole time-continuous group lies in one certified box: each joint
+   // stays within the range of its via points, which are all checked here.
+-  if(plan_.n<1||!plan_.plan(speed,acc)){fault("STAND_PLAN_UNAVAILABLE");return;}
+-  double distance=0;
++  if(plan_.n<1||!plan_.plan(speed,acc))return "STAND_PLAN_UNAVAILABLE";
+   for(unsigned k=0;k<plan_.n;++k){JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[k][i];
+-    if(!contains(box,q)||!pointSafe(q)){fault("STAND_CLEARANCE_UNAVAILABLE");return;}
+-    for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(plan_.p[k][i]-plan_.p[0][i]));
+-    segmentTo_=q;}
++    if(!contains(box,q)||!pointSafe(q))return "STAND_CLEARANCE_UNAVAILABLE";}
++  return nullptr;
++}
++void SimpleMotion::activatePlan(Phase next,const collision::Box& box,uint64_t now){
++  // preparePlan proved at least one via: the segment ends at the last one.
++  double distance=0;
++  for(unsigned k=0;k<plan_.n;++k)for(unsigned i=0;i<12;++i)distance=std::fmax(distance,std::abs(plan_.p[k][i]-plan_.p[0][i]));
++  JointTargetFrame q;q.valid=true;for(unsigned i=0;i<12;++i)jointSlot(q,i)=plan_.p[plan_.n-1][i];
++  segmentTo_=q;
+   phase_=next;planned_=true;segmentBox_=&box;segmentStartUs_=now;loadedSinceUs_=0;
+   segmentDurationUs_=static_cast<uint64_t>(std::ceil(plan_.duration*1e6));settleUs_=now+segmentDurationUs_;
+   segmentDeadlineUs_=settleUs_+static_cast<uint64_t>((12+2*(distance/(kStandDrive.speed*kTickRad)+2.*kStandDrive.speed/(kStandDrive.acc*100.)))*1e6);
+@@ -904,12 +922,22 @@
+   JointTargetFrame q;if(!heightTarget(h,q)||!via(q,0,0,h)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+   plannedHeight_=h;beginPlan(Phase::LIFT,collision::kLift,now);
+ }
+-void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,const collision::Box& box,uint64_t now){
+-  plan_.clear();
+-  if(!via(from,0,0,fromHeight)||!heightVias(fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+-  plannedHeight_=requestedHeight_;beginPlan(Phase::HEIGHT,box,now);
++void SimpleMotion::beginHeight(const JointTargetFrame& from,double fromHeight,const collision::Box& box,uint64_t now,bool prepared){
++  if(!prepared&&!heightPlan(from,fromHeight,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
++  plannedHeight_=requestedHeight_;
++  if(prepared)activatePlan(Phase::HEIGHT,box,now);else beginPlan(Phase::HEIGHT,box,now);
++}
++// P0 split (F6/H18 peaks, 16/11): the release that ends the IMU unwind of a pending HEIGHT/PRONE_HEIGHT knows the
++// next release starts the move. That plan reads only the nominal stand (segmentTo_, plannedHeight_), the requested
++// height, frozen knots and the qualified limits (constant while energized): no feedback, IMU or clock. Build and
++// verify it here, after this release's frame. The next release still checks the measured pose, takes its own now
++// as the epoch and sends the first frame (activatePlan); any later release ignores it.
++void SimpleMotion::preparePending(){
++  const bool prone=phase_==Phase::PRONE_HEIGHT;
++  if(prone&&plannedHeight_<=kProneHandoverM)return;  // a PRONE_LIFT start plans in its own release
++  if(heightPlan(segmentTo_,plannedHeight_,prone?kProneHandoverM:requestedHeight_)&&!preparePlan(collision::kHeight))preparedRelease_=releases_;
+ }
+-void SimpleMotion::beginProne(Phase next,uint64_t now){
++void SimpleMotion::beginProne(Phase next,uint64_t now,bool prepared){
+   // Same ViaPlan/FK/IK, native RAM profile and independent-joint box proof as
+   // STAND. No target is based on the loaded encoder sag as a new nominal pose.
+   // PRONE-only front LOWER floor: +20 mrad from the stand route's folded
+@@ -921,10 +949,11 @@
+     return q;};
+   auto proneVia=[&](unsigned k){const auto* p=paired_data::kKnots[k].p;
+     return via(pronePoint(k),p[4],p[5],p[6]);};
+-  plan_.clear();const collision::Box* box=nullptr;
++  if(!prepared)plan_.clear();
++  const collision::Box* box=nullptr;
+   if(next==Phase::PRONE_HEIGHT){
+     box=&collision::kHeight;
+-    if(!via(segmentTo_,0,0,plannedHeight_)||!heightVias(plannedHeight_,kProneHandoverM)){fault("PRONE_PATH_NOT_CLEAR");return;}
++    if(!prepared&&!heightPlan(segmentTo_,plannedHeight_,kProneHandoverM)){fault("PRONE_PATH_NOT_CLEAR");return;}
+     plannedHeight_=kProneHandoverM;
+   }else if(next==Phase::PRONE_LIFT){
+     box=&collision::kLift;
+@@ -943,6 +972,7 @@
+   // Check the measured handover too, even when ordinary arrival (12 ticks)
+   // rather than loaded-settle completed the preceding segment. No box bypass.
+   if(!pointSafe(measured())||!contains(*box,measured())){fault("PRONE_PATH_NOT_CLEAR");return;}
++  if(prepared){activatePlan(next,*box,now);return;}
+   beginPlan(next,*box,now,next==Phase::PRONE_LAND?.10:kStandSpeedRadS,
+                          next==Phase::PRONE_LAND?.20:kStandAccelerationRadS2);
+ }
+@@ -1832,17 +1862,22 @@
+     if((phase_==Phase::HEIGHT||phase_==Phase::PRONE_HEIGHT)&&holdNominal_.target.valid&&
+        (rollCorrection_!=0||pitchCorrection_!=0)){
+       if(now>segmentDeadlineUs_){if(returningProne())proneNotCompleted(now,"PRONE_NOT_COMPLETED_SUPPORT_HELD");else fault("NATIVE_TARGET_NOT_REACHED");return;}
+-      timing::Section section(timing::COMPENSATE);
+-      auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);return;
++      {timing::Section section(timing::COMPENSATE);
++       auto f=holdNominal_;compensateLevel(f,{},now,true);send(f.target,kStandDrive,now);}
++      // This frame ended the unwind: the next release starts the move. Prepare its plan now, unless revoked.
++      if(rollCorrection_==0&&pitchCorrection_==0&&pendingGoalValid_&&!offPending_&&!stop_.load()&&!safeOffRequest_.load())preparePending();
++      return;
+     }
+     pendingGoalValid_=false;
+-    if(phase_==Phase::PRONE_HEIGHT){beginProne(plannedHeight_>kProneHandoverM?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT,now);return;}
++    const bool prepared=preparedRelease_&&preparedRelease_+1==releases_;preparedRelease_=0;
++    if(phase_==Phase::PRONE_HEIGHT){const Phase next=plannedHeight_>kProneHandoverM?Phase::PRONE_HEIGHT:Phase::PRONE_LIFT;
++      beginProne(next,now,prepared&&next==Phase::PRONE_HEIGHT);return;}
+     JointTargetFrame actual;actual.valid=true;
+     for(unsigned i=0;i<12;++i)jointSlot(actual,i)=fb_[i].q;
+     if(!heightStartClear(actual,pendingGoal_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+     // Start from the preceding NOMINAL stand: an already compensated encoder
+     // pose fed back as nominal would apply the IMU correction twice.
+-    if(transitionSafe(actual,pendingGoal_,collision::kHeight)||entersHeight(actual,pendingGoal_)){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now);return;}
++    if(transitionSafe(actual,pendingGoal_,collision::kHeight)||entersHeight(actual,pendingGoal_)){beginHeight(segmentTo_,plannedHeight_,collision::kHeight,now,prepared);return;}
+     plan_.clear();if(!via(segmentTo_,0,0,plannedHeight_)||!via(pendingGoal_,0,0,requestedHeight_)){fault("HEIGHT_PATH_NOT_CLEAR");return;}
+     plannedHeight_=requestedHeight_;beginPlan(Phase::LIFT,collision::kLift,now);return;
+   }
+diff -ru 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h
+--- 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-16 21:18:22.000000000 +0100
++++ 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-17 20:50:07.327968887 +0100
+@@ -558,8 +558,15 @@
+   bool via(const motion::JointTargetFrame&,double pitch,double x,double z);
+   bool knotVia(unsigned knot);
+   bool heightVias(double from,double to);
++  // Via points of a level height move into plan_, from the nominal stand `from` (HEIGHT and PRONE_HEIGHT).
++  bool heightPlan(const motion::JointTargetFrame& from,double fromHeight,double to);
+   void beginPlan(Phase,const collision::Box&,uint64_t,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
+-  void beginProne(Phase,uint64_t);
++  // beginPlan in two parts: preparePlan times plan_ and proves its via points (changes plan_ only; the fault reason or
++  // nullptr), activatePlan takes `now` as the segment epoch and generates the first frame.
++  const char* preparePlan(const collision::Box&,double speed=kStandSpeedRadS,double acc=kStandAccelerationRadS2);
++  void activatePlan(Phase,const collision::Box&,uint64_t);
++  void preparePending();
++  void beginProne(Phase,uint64_t,bool prepared=false);
+   bool returningProne() const { return phase_>=Phase::PRONE_HEIGHT&&phase_<=Phase::PRONE_LAND; }
+   void proneNotCompleted(uint64_t now,const char* held);
+   // A STOP in a planned route segment (the PRONE descent or the STAND_DEPLOY/
+@@ -570,7 +577,7 @@
+   const char* proneRecovery(motion::JointTargetFrame& held,InitialRoute& route) const;
+   void beginDeploy(const motion::JointTargetFrame* measured,uint64_t);
+   void beginLift(const motion::JointTargetFrame* measured,uint64_t);
+-  void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t);
++  void beginHeight(const motion::JointTargetFrame& from,double fromHeight,const collision::Box&,uint64_t,bool prepared=false);
+   motion::JointTargetFrame measured() const;
+   void generateStand(uint64_t);
+   void generateWalk(uint64_t);
+@@ -659,6 +666,9 @@
+   motion::JointTargetFrame segmentTo_{};
+   const collision::Box* segmentBox_=nullptr;
+   ViaPlan plan_{};
++  // P0 split: the release that left in plan_ the verified plan of the pending HEIGHT/PRONE_HEIGHT start (0: none).
++  // Only the next release may activate it (preparePending).
++  uint32_t preparedRelease_=0;
+   bool planned_=false;
+   double nativePitch_=0,nativeX_=0,nativeZ_=0,plannedHeight_=0;
+   uint64_t segmentStartUs_=0,segmentDurationUs_=0,settleUs_=0,segmentDeadlineUs_=0;

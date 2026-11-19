@@ -133,3 +133,15 @@ permalinks should now be treated as unavailable**, and the report can be recover
 archive (section 6). See [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md).
 `b3fd945…` is the commit the **installed** firmware was built from. A build of `main` has another
 source commit and build ID, and is not shown to be byte-identical to the installed image.
+
+## 8. Update 2026-11-19 — local evidence of the `1.0.2` line (added; the sections above are unchanged)
+
+The hardware and offline evidence of 14–19/11/2026 was produced on the operator's workstation (Asus) and is kept there in full: serial logs, status recordings, QEMU runs, certificates, qualification scripts, firmware images and Git bundles. **It is not recoverable from this public repository**, except for the reports, text analyses and seals that the per-session manifests publish.
+
+| Session | Manifest (paths and SHA256 of the local originals and second copies) |
+|---|---|
+| 17/11 | [P0 campaign evidence manifest](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/EVIDENCE_MANIFEST.md) |
+| 18/11 | [`LOCAL_ARCHIVES.sha256.txt`](Validation_Reports/Motion_FP32_2026-11-18/LOCAL_ARCHIVES.sha256.txt) |
+| 19/11 (Stable `v1.0.2`) | [Evidence manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md), with the seal check of all 29 sealed folders of 17–19/11 |
+
+Originals and second copies share one physical disk. No independent physical copy is declared for them.

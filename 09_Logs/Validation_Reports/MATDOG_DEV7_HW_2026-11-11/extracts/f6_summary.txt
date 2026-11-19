@@ -1,0 +1,45 @@
+USB: 7314 righe
+  2026-11-11T19:28:54.796+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+  2026-11-11T19:29:05.729+00:00 MOTION_DIAG exit valid=0 fault=0 reason= phase=IDLE state=STOPPED at_us=0 now_us=0 energized=0 releases=0 missed=0 max_gap_us=0 drive=0/0 goal_sent_us=0 settle_us=0 deadline_us=0 last_polled
+  2026-11-11T19:29:05.729+00:00 MOTION_DIAG exit_cause refused_by=0 check= imu_reason= cycles=0.000 nominal_solved=0 steered=0 correction_mrad=0.0,0.0 wanted_mrad=0.0,0.0 advance=0.0000,0.0000,0.0000 walk_mode=SLOW period_
+HTTP: motion 593 campioni (0 senza risposta valida), status 118
+IDENTITÀ: 1.0.2-dev.7 build b5610620d0ce ota b5610620d0ce | health READY, BMS OK 11.9 V | uptime 2216615 ms
+SEQUENZA (stato fase motivo | profilo selezionato attivo destinazione)
+  19:19:20 STANDING HOLD STAND_REACHED | SLOW FAST SLOW
+  19:25:55 MOVING HEIGHT HEIGHT_CHANGE | SLOW FAST SLOW
+  19:25:56 WALKING WALK_STANDARD WALK_JOYSTICK | SLOW SLOW SLOW
+  19:26:13 WALKING WALK_STANDARD WALK_STOPPING | SLOW SLOW SLOW
+  19:26:19 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+  19:26:32 MOVING HEIGHT HEIGHT_CHANGE | SLOW SLOW SLOW
+  19:26:34 WALKING WALK_STANDARD WALK_JOYSTICK | SLOW SLOW SLOW
+  19:27:02 WALKING WALK_STANDARD WALK_STOPPING | SLOW SLOW SLOW
+  19:27:08 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+  19:27:21 MOVING HEIGHT HEIGHT_CHANGE | SLOW SLOW SLOW
+  19:27:22 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+  19:27:23 MOVING HEIGHT HEIGHT_CHANGE | SLOW SLOW SLOW
+  19:27:24 WALKING WALK_STANDARD WALK_JOYSTICK | SLOW SLOW SLOW
+  19:27:47 WALKING WALK_STANDARD WALK_STOPPING | SLOW SLOW SLOW
+  19:27:54 STANDING HOLD STAND_REACHED | SLOW SLOW SLOW
+  19:28:00 STANDING HOLD STAND_REACHED | STANDARD SLOW SLOW
+  19:28:03 STANDING HOLD STAND_REACHED | FAST SLOW SLOW
+  19:28:04 MOVING HEIGHT HEIGHT_CHANGE | FAST SLOW SLOW
+  19:28:06 WALKING WALK_STANDARD WALK_STANDARD | FAST FAST FAST
+  19:28:29 WALKING WALK_STANDARD WALK_STOPPING | FAST FAST FAST
+  19:28:32 STANDING HOLD STAND_REACHED | FAST FAST FAST
+  19:28:39 STANDING HOLD STAND_REACHED | SLOW FAST FAST
+CAMBI DI PROFILO DURANTE IL WALK (risoluzione 1 s; completato = vx al 98 % del massimo del profilo)
+PER PROFILO (WALKING a regime: attivo = destinazione)
+  SLOW: 87 campioni, vx max 5.7 mm/s, joystick max 6.7 mm/s, servo_read speed/ACC 1000-1000/50-50 (atteso 1000/50, max 20 mm/s)
+  FAST: 26 campioni, vx max 32.0 mm/s, joystick max 0.0 mm/s, servo_read speed/ACC 1950-1950/220-220 (atteso 1950/220, max 32 mm/s)
+ANCHE E INSEGUIMENTO (coppia ON; margine delle anche dalla box kHeight ±25 mrad, in tick)
+  STANDING FAST        n=436 | margine anche min LF 16.3 RF 13.3 RH 12.3 LH 14.3 | max |err| H/U/L 3/6/4 tick | max carico H/U/L 32/56/40 ‰
+  MOVING FAST          n=  1 | margine anche min LF 16.3 RF 13.3 RH 13.3 LH 14.3 | max |err| H/U/L 3/12/16 tick | max carico H/U/L 32/52/40 ‰
+  WALKING SLOW sterzo  n= 87 | margine anche min n/d (box kSteer) | max |err| H/U/L 83/64/71 tick | max carico H/U/L 196/180/160 ‰
+  STANDING SLOW        n= 37 | margine anche min LF 11.3 RF 10.3 RH 10.3 LH 10.3 | max |err| H/U/L 7/10/14 tick | max carico H/U/L 64/72/64 ‰
+  MOVING SLOW          n=  6 | margine anche min LF 11.3 RF 10.3 RH 10.3 LH 10.3 | max |err| H/U/L 7/25/52 tick | max carico H/U/L 64/88/84 ‰
+  WALKING FAST         n= 26 | margine anche min LF 13.3 RF 10.3 RH 11.3 LH 12.3 | max |err| H/U/L 9/148/103 tick | max carico H/U/L 84/380/396 ‰
+STOP
+TEMPERATURE: max 68 °C (servo 31 alle 19:27:49); campioni ≥ 60 °C: 68 °C servo 31 alle 19:27:49, 66 °C servo 23 alle 19:27:51; spike filtrati dal firmware 1
+TEMPI: missed 141→146, overrun 3264→3645, max lavoro per rilascio 46691 µs (max nella finestra)
+ULTIMO STATO: STANDING HOLD STAND_REACHED | SAFE_OFF verificato False, mask 0, coppia ON
+CRITERI DI INTERRUZIONE: nessuno

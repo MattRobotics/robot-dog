@@ -3,6 +3,7 @@
 #include <limits>
 
 #include "../../src/status/LedStatusManager.h"
+#include "led_replay_20261110_fixture.h"
 
 using namespace matdog;
 using namespace matdog::status;
@@ -322,6 +323,89 @@ static void testTransitionHistory() {
   CHECK(manager.transition(0).at_ms == 119 && manager.transition(7).at_ms == 112);  // ring keeps the newest 8
 }
 
+// Battery P1, the 10/11 hardware session replayed as Controller now drives the
+// manager: deferRender(torque) then update() on every sample. The installed
+// 450d2c7 skipped update() with torque ON and warned only at 19:58:50Z. At the
+// 5 s /status cadence; the device sees every 2 s DALY sample, so on hardware the
+// fact can only come earlier.
+static void testMotionDeferredRender() {
+  led_test::reset();
+  LedRing ring;
+  LedStatusManager manager;
+  manager.begin(&ring);
+  CHECK(ring.begin());
+  LedStatusInputs in;
+  in.system_health = core::SystemHealth::READY;
+  in.sample_valid = true;
+  in.daly_comm_ok = true;
+  uint32_t first_fact = 0, first_recorded = 0, first_frame_after = 0, warning_at_ms = 0;
+  unsigned engaged = 0, engaged_frames = 0, later_than_installed = 0;
+  bool was_engaged = false, fact_engaged = false;
+  for (const LedReplaySample& r : kLedReplay20261110) {
+    led_test::now_ms = r.uptime_ms;
+    in.telemetry_age_ms = r.age_ms;
+    in.sampled_at_ms = r.uptime_ms - r.age_ms;
+    in.soc_percent = r.soc_x10 * 0.1f;  // DalyProtocol decodes reg16 * 0.1f
+    in.cell_min_mv = r.cell_mv;
+    in.pack_voltage_v = r.pack_dv * 0.1f;
+    const size_t before = led_test::frames.size();
+    manager.deferRender(r.torque);
+    manager.update(r.uptime_ms, in);
+    CHECK(manager.renderDeferred() == r.torque);
+    if (r.torque) { ++engaged; engaged_frames += led_test::frames.size() - before; was_engaged = true; }
+    if (!first_fact && manager.snapshot().battery_warning) {
+      first_fact = r.utc_hhmmss; fact_engaged = r.torque; warning_at_ms = r.uptime_ms;
+    }
+    if (!first_recorded && r.warned) first_recorded = r.utc_hhmmss;
+    if (r.warned && !manager.snapshot().battery_warning) ++later_than_installed;
+    if (!r.torque && was_engaged && !first_frame_after && led_test::frames.size() > before) {
+      first_frame_after = r.utc_hhmmss;
+      // The catch-up frame is the current warning, never the pre-Motion green bar.
+      CHECK(manager.state() == LedPresentationState::BATTERY_WARNING);
+      for (uint32_t pixel : lastFrame().pixels) {
+        CHECK(pixel == lastFrame().pixels[0] && (pixel & 0xFF) == 0 && (pixel >> 16) > ((pixel >> 8) & 0xFF));
+      }
+    }
+    CHECK(!manager.snapshot().battery_critical);  // 3375 mV / 10.2 V at the end: never critical
+  }
+  std::printf("replay 10/11: %zu samples, %u engaged, warning fact %06lu%s (installed 450d2c7: %06lu), "
+              "frames while engaged %u, first frame after torque OFF %06lu\n",
+              sizeof(kLedReplay20261110) / sizeof(kLedReplay20261110[0]), engaged,
+              static_cast<unsigned long>(first_fact), fact_engaged ? " torque ON" : "",
+              static_cast<unsigned long>(first_recorded), engaged_frames,
+              static_cast<unsigned long>(first_frame_after));
+  CHECK(engaged == 463);  // 19:20:15Z-19:58:45Z
+  CHECK(first_fact == 194655 && fact_engaged);  // second fresh sample at pack <= 10.50 V
+  CHECK(first_recorded == 195850);
+  CHECK(later_than_installed == 0);
+  CHECK(engaged_frames == 0);  // no WS2812/RMT transmission while Motion is engaged
+  CHECK(first_frame_after == 195850);
+  CHECK(manager.state() == LedPresentationState::BATTERY_WARNING);
+  CHECK(manager.transition(0).to == LedPresentationState::BATTERY_WARNING &&
+        manager.transition(0).at_ms == warning_at_ms);
+
+  // Same trend continued with torque ON again: critical is immediate at
+  // 3350 mV, still without a transmission; torque OFF renders it at once.
+  uint32_t now = kLedReplay20261110[sizeof(kLedReplay20261110) / sizeof(kLedReplay20261110[0]) - 1].uptime_ms;
+  const size_t frames = led_test::frames.size();
+  for (uint16_t cell : {3360, 3351, 3350}) {
+    now += 2000;
+    led_test::now_ms = now;
+    in.telemetry_age_ms = 300; in.sampled_at_ms = now - 300; in.cell_min_mv = cell;
+    manager.deferRender(true);
+    manager.update(now, in);
+    CHECK(manager.snapshot().battery_critical == (cell == 3350));
+  }
+  CHECK(led_test::frames.size() == frames);
+  CHECK(manager.state() == LedPresentationState::BATTERY_CRITICAL);
+  now += 2000 - now % 500;  // first half of the 2 Hz blink: red at full ceiling
+  led_test::now_ms = now;
+  manager.deferRender(false);
+  manager.update(now, in);
+  CHECK(led_test::frames.size() == frames + 1);
+  checkSolid(0x3C0000);
+}
+
 int main() {
   CHECK(std::strcmp(toString(LedDiagnostic::NONE), "NONE") == 0);
   CHECK(std::strcmp(toString(LedDiagnostic::CHASE), "CHASE") == 0);
@@ -332,6 +416,7 @@ int main() {
     testSocDiagnostic();
     testManagerOwnership();
     testTransitionHistory();
+    testMotionDeferredRender();
   } else {
     testUsbOnly();
   }

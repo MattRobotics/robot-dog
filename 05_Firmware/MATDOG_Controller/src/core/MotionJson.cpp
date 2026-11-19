@@ -17,13 +17,14 @@ bool params(Parser& p,motion::MotionCommand& c,uint32_t& seen){
  p.ws();if(p.p<p.end&&*p.p=='}'){p.p++;return true;}
  for(unsigned count=0;count<16;count++){
   char key[32]{};if(!p.string(key,sizeof(key))||!p.token(':'))return false;
-  const char* keys[]={"target_height_m","vx","vy","yaw_rate","x","y","z","roll","pitch","yaw","gait","action_id","reason"};unsigned index=13;for(unsigned i=0;i<13;i++)if(!strcmp(key,keys[i]))index=i;
-  if(index==13||(seen&(1u<<index)))return false;
+  const char* keys[]={"target_height_m","vx","vy","yaw_rate","x","y","z","roll","pitch","yaw","gait","action_id","reason","leg"};unsigned index=14;for(unsigned i=0;i<14;i++)if(!strcmp(key,keys[i]))index=i;
+  if(index==14||(seen&(1u<<index)))return false;
   seen|=1u<<index;
   double* values[]={&c.target_height_m,&c.vx,&c.vy,&c.yaw_rate,&c.x,&c.y,&c.z,&c.roll,&c.pitch,&c.yaw};
   if(index<10){if(!p.number(*values[index]))return false;}
   else if(index==10){if(!p.string(c.gait,sizeof(c.gait)))return false;}
   else if(index==11){if(!p.string(c.action_id,sizeof(c.action_id)))return false;}
+  else if(index==13){if(!p.string(c.leg,sizeof(c.leg)))return false;}
   else {char unused[96];if(!p.string(unused,sizeof(unused)))return false;}
   if(p.token('}'))return true;
   if(!p.token(','))return false;
@@ -48,7 +49,7 @@ bool parseMotionJson(const char* input,size_t len,motion::MotionCommand* out,con
  }
  p.ws();if(!closed||p.p!=p.end||seen!=255)return false;
  uint32_t allowed=0,required=0;
- switch(c.intent){case motion::Intent::STAND:allowed=required=1;break;case motion::Intent::LIE_DOWN:allowed=1;break;case motion::Intent::GAIT_SELECT:allowed=required=1u<<10;break;case motion::Intent::BASE_VELOCITY:allowed=14|(1u<<10);required=14;break;case motion::Intent::BODY_POSE:allowed=1008;break;case motion::Intent::ACTION_EXECUTE:allowed=(1u<<11)|1;required=1u<<11;break;case motion::Intent::STOP:allowed=1u<<12;break;case motion::Intent::STATUS:case motion::Intent::CAPABILITIES:break;default:return false;}
+ switch(c.intent){case motion::Intent::GROUND_OBSERVE:allowed=required=1u<<13;break;case motion::Intent::STAND:allowed=required=1;break;case motion::Intent::LIE_DOWN:allowed=1;break;case motion::Intent::GAIT_SELECT:allowed=required=1u<<10;break;case motion::Intent::BASE_VELOCITY:allowed=14|(1u<<10);required=14;break;case motion::Intent::BODY_POSE:allowed=1008;break;case motion::Intent::ACTION_EXECUTE:allowed=(1u<<11)|1;required=1u<<11;break;case motion::Intent::STOP:allowed=1u<<12;break;case motion::Intent::STATUS:case motion::Intent::CAPABILITIES:break;default:return false;}
  if((ps&~allowed)||(ps&required)!=required)return false;
  *out=c;if(reason)*reason="OK";return true;
 }

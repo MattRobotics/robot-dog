@@ -30,14 +30,14 @@ struct StopPlan {
     for(unsigned i=0;i<12;++i){rest=rest&&acceleration[i]==0;vpeak=std::fmax(vpeak,std::abs(velocity[i]));}
     if(rest&&std::isfinite(vpeak))first=std::max(2u,static_cast<unsigned>(std::fmin(61.,std::floor(1.5*vpeak/amax/.02))));
     for(unsigned steps=first;steps<=60;++steps){
-      const double t=steps*.02;bool valid=true;
+      const double t=steps*.02;bool valid=true,outside=false;
       for(unsigned i=0;i<12&&valid;++i){
         const double c1=a[i]*t,c2=-3*v[i]-2*c1,c3=2*v[i]+c1;
         const double p1=q[i]+t*v[i]/4;
         end[i]=q[i]+t*v[i]/2+t*t*a[i]/12;
         // Quartic Bezier controls q,p1,end,end,end. A convex certified box
         // encloses every continuous reference and asynchronous joint progress.
-        for(double p:{q[i],p1,end[i]})if(!std::isfinite(p)||p<lo[i]||p>hi[i]||std::abs(p-q[i])>kMaxResidualRad)valid=false;
+        for(double p:{q[i],p1,end[i]})if(!std::isfinite(p)||p<lo[i]||p>hi[i]||std::abs(p-q[i])>kMaxResidualRad){valid=false;outside=true;}
         auto velocityAt=[&](double u){return v[i]+u*(c1+u*(c2+u*c3));};
         auto accelerationAt=[&](double u){return (c1+u*(2*c2+u*3*c3))/t;};
         auto checkV=[&](double u){if(u>=0&&u<=1&&std::abs(velocityAt(u))>vmax+1e-12)valid=false;};
@@ -49,6 +49,13 @@ struct StopPlan {
         }else if(std::abs(c2)>1e-15)checkV(-c1/(2*c2));
       }
       if(valid){duration=t;return true;}
+      // P5 (P0 closure, 16/11): with a = 0 the controls p1 = q + t*v/4 and end = q + t*v/2 only
+      // move away from q (inside the box) as t grows, also as computed in floating point, so a
+      // control outside the box or the residual here stays outside at every longer multiple: the
+      // search ends with the same refusal it would reach at 60 steps. The acceleration bound,
+      // the only one that eases as t grows, never sets `outside`. Returned value and duration
+      // are unchanged; end[] after a refusal is scratch, read by no caller.
+      if(rest&&outside)return false;
     }
     return false;
   }

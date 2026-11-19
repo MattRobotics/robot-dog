@@ -76,6 +76,8 @@ def check_sources():
                          "core/MotionService.h", "core/MotionService.cpp", "core/MotionJson.h", "core/MotionJson.cpp",
                          "core/CommandRouter.cpp", "core/SimpleMotionIntegration.cpp",
                          "simple/SimpleMotion.h", "simple/SimpleMotion.cpp",
+                         # Ground Contact Phase 1 (5472b65): read-only FK/Jacobian over a const SimpleMotion.
+                         "simple/GroundContactDiagnostic.h",
                          "network/HttpTransport.h", "network/HttpTransport.cpp"}
     for path in sorted((FW / "src").rglob("*")):
         if not path.is_file() or path.suffix not in (".h", ".cpp") or path.is_relative_to(motion):

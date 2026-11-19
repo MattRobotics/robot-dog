@@ -1,0 +1,32 @@
+BASE K1 1203/1405 K2 1334/1630 K3 1200/1963 K4 762/1304 K5 1079/1786
+G2c bytes=9966 symbols=19 weak=0 K1 795/1015 (-34%/-28%) K2 877/1124 (-34%/-31%) K3 765/1240 (-36%/-37%) K4 223/813 (-71%/-38%) K5 656/1424 (-39%/-20%)
+G2s bytes=5844 symbols=17 weak=0 K1 895/1061 (-26%/-24%) K2 971/1169 (-27%/-28%) K3 869/1405 (-28%/-28%) K4 418/886 (-45%/-32%) K5 778/1473 (-28%/-18%)
+   member     41 t matdog::motion::
+   member    175 T matdog::motion::worldContactInverseKinematicsTilted
+   member    734 T matdog::motion::validBodyPose
+   member    407 T matdog::simple::SimpleMotion::compensationTarget
+   member    676 T matdog::motion::pointToBase
+   member    578 T matdog::motion::detail::invert3
+   member     80 T matdog::motion::gaitOffset
+   member    190 T matdog::simple::SimpleMotion::readTimed
+   member    463 T matdog::motion::legPhase
+   member    700 T matdog::motion::tiltFromQuaternion
+   member    249 T matdog::simple::SimpleMotion::pointSafe
+   member    709 T matdog::simple::SimpleMotion::send
+   member    111 T matdog::simple::SimpleMotion::frameTimed
+   member    130 T matdog::simple::SimpleMotion::rememberReference
+   member    331 T matdog::simple::SimpleMotion::rateFromHistory
+   member     56 T matdog::simple::SimpleMotion::measured
+   member    214 T matdog::motion::bodyPoseFromRollPitch
+   member   3231 T matdog::motion::contactInverseKinematicsGroundNormal
+   member    891 T matdog::motion::validGaitParameters
+GREEDY_NOWEAK budget=4096 bytes=4075 symbols=11 weak=0 K1 959/1124 (-20%/-20%) K2 1043/1238 (-22%/-24%) K3 935/1481 (-22%/-25%) K4 486/947 (-36%/-27%) K5 839/1494 (-22%/-16%)
+   functions: matdog::motion::; matdog::motion::worldContactInverseKinematicsTilted; matdog::motion::validBodyPose; matdog::simple::SimpleMotion::compensationTarget; matdog::motion::pointToBase; matdog::motion::detail::invert3; matdog::motion::gaitOffset; matdog::simple::SimpleMotion::stop; matdog::simple::SimpleMotion::readTimed; matdog::motion::legPhase; matdog::motion::tiltFromQuaternion
+GREEDY_NOWEAK budget=5120 bytes=5089 symbols=14 weak=0 K1 924/1090 (-23%/-22%) K2 1001/1199 (-25%/-26%) K3 898/1435 (-25%/-27%) K4 440/916 (-42%/-30%) K5 803/1480 (-26%/-17%)
+   functions: matdog::motion::; matdog::motion::worldContactInverseKinematicsTilted; matdog::motion::validBodyPose; matdog::simple::SimpleMotion::compensationTarget; matdog::motion::pointToBase; matdog::motion::detail::invert3; matdog::motion::gaitOffset; matdog::simple::SimpleMotion::stop; matdog::simple::SimpleMotion::readTimed; matdog::motion::legPhase; matdog::motion::tiltFromQuaternion; matdog::simple::SimpleMotion::pointSafe; matdog::simple::SimpleMotion::send; matdog::simple::SimpleMotion::measured
+GREEDY_NOWEAK budget=6144 bytes=6130 symbols=21 weak=0 K1 888/1054 (-26%/-25%) K2 964/1161 (-28%/-29%) K3 860/1395 (-28%/-29%) K4 404/877 (-47%/-33%) K5 771/1468 (-29%/-18%)
+   functions: matdog::motion::; matdog::motion::worldContactInverseKinematicsTilted; matdog::motion::validBodyPose; matdog::simple::SimpleMotion::compensationTarget; matdog::motion::pointToBase; matdog::motion::detail::invert3; matdog::motion::gaitOffset; matdog::simple::SimpleMotion::stop; matdog::simple::SimpleMotion::readTimed; matdog::motion::legPhase; matdog::motion::tiltFromQuaternion; matdog::simple::SimpleMotion::pointSafe; matdog::simple::SimpleMotion::send; matdog::simple::SimpleMotion::frameTimed; matdog::simple::SimpleMotion::rememberReference; matdog::simple::SimpleMotion::rateFromHistory; matdog::simple::SimpleMotion::measured; matdog::motion::bodyPoseFromRollPitch; matdog::simple::SimpleMotion::updateTelemetry; matdog::simple::SimpleMotion::fresh; matdog::simple::SimpleMotion::slewStep
+GREEDY_NOWEAK budget=7168 bytes=7139 symbols=23 weak=0 K1 855/1011 (-29%/-28%) K2 930/1117 (-30%/-31%) K3 831/1343 (-31%/-32%) K4 404/869 (-47%/-33%) K5 745/1439 (-31%/-19%)
+   functions: matdog::motion::; matdog::motion::worldContactInverseKinematicsTilted; matdog::motion::validBodyPose; matdog::simple::SimpleMotion::compensationTarget; matdog::motion::pointToBase; matdog::motion::detail::invert3; matdog::motion::gaitOffset; matdog::simple::SimpleMotion::stop; matdog::simple::SimpleMotion::readTimed; matdog::motion::legPhase; matdog::motion::tiltFromQuaternion; matdog::simple::SimpleMotion::pointSafe; matdog::simple::SimpleMotion::send; matdog::simple::SimpleMotion::frameTimed; matdog::simple::SimpleMotion::rememberReference; matdog::simple::SimpleMotion::rateFromHistory; matdog::simple::SimpleMotion::measured; matdog::motion::bodyPoseFromRollPitch; matdog::motion::validGaitParameters; matdog::simple::SimpleMotion::updateTelemetry; matdog::simple::SimpleMotion::fresh; matdog::simple::SimpleMotion::slewStep; matdog::simple::SimpleMotion::rememberCorrection
+GREEDY_NOWEAK budget=8192 bytes=8188 symbols=25 weak=0 K1 822/972 (-32%/-31%) K2 893/1083 (-33%/-34%) K3 805/1313 (-33%/-33%) K4 403/868 (-47%/-33%) K5 719/1439 (-33%/-19%)
+   functions: matdog::motion::; matdog::motion::worldContactInverseKinematicsTilted; matdog::motion::validBodyPose; matdog::simple::SimpleMotion::compensationTarget; matdog::motion::pointToBase; matdog::motion::detail::invert3; matdog::motion::gaitOffset; matdog::simple::SimpleMotion::stop; matdog::simple::SimpleMotion::readTimed; matdog::motion::legPhase; matdog::motion::tiltFromQuaternion; matdog::simple::SimpleMotion::pointSafe; matdog::simple::SimpleMotion::send; matdog::simple::SimpleMotion::frameTimed; matdog::simple::SimpleMotion::rememberReference; matdog::simple::SimpleMotion::rateFromHistory; matdog::simple::SimpleMotion::measured; matdog::motion::bodyPoseFromRollPitch; matdog::motion::validGaitParameters; matdog::simple::SimpleMotion::updateTelemetry; matdog::simple::SimpleMotion::fresh; matdog::simple::SimpleMotion::slewStep; matdog::simple::SimpleMotion::lerpFrame; matdog::simple::SimpleMotion::rememberCorrection; matdog::motion::gaitTrackCartesian

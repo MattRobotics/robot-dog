@@ -7,6 +7,7 @@
 
 #include "../actuator/ActuatorRuntime.h"
 #include "../actuator/ActuatorWritePolicy.h"
+#include "../actuator/CalibrationTargetResolver.h"
 #include "../actuator/CalibrationGeometryProfileData.h"
 #include "../actuator/CalibrationSequencePlanData.h"
 #include "../calibration/CalibrationExecutionEngine.h"
@@ -197,7 +198,7 @@ class Controller {
   MotionService motion_service_;
   AuthorityLease motion_authority_lease_{};
   calibration::RecordInspection simple_record_{};
-  bool simple_limits_ready_=false,preflight_started_=false;
+  bool simple_limits_ready_=false,preflight_started_=false,acc_tried_=false;  // register 85 prepared while idle (attempt, not proof)
   struct SimpleServoPort : simple::ServoPort {
     Controller* owner=nullptr;
     bool read(unsigned,bool,simple::Feedback&) override;
@@ -213,6 +214,12 @@ class Controller {
     void referenceFault(unsigned,const simple::Feedback&,double,uint16_t) override;
     bool tempCheck(simple::TempCheck& t) const override { if(temp_checked)t=temp_check;return temp_checked; }
     simple::TempCheck temp_check{};bool temp_checked=false;
+    // A slot's table entries and calibration-invariant checks, resolved once
+    // per revision of the profile and of both tables; each conversion still
+    // checks its own value (URDF, RAW domain, limit) as before.
+    struct Slot{actuator::ResolvedJointTransform transform{};const actuator::JointLimit* limit=nullptr;uint32_t revision[3]{};bool valid=false;};
+    Slot slots[12]{};
+    const Slot* slot(unsigned);
   } simple_port_{};
   // CR3-M5: the session-scoped, RAM-only physical-motion permit — distinct
   // from the final hardware_motion_authorized flag, which stays false

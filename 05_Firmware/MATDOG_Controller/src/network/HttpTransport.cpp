@@ -968,6 +968,21 @@ void HttpTransport::statusExtension(
           ? "YES"
           : "NO",
       (unsigned long)power::kDalyTelemetryFreshnessMs);
+  // D1: transport facts of the last poll (outcome = bms_comm); NONE = no byte
+  // / no valid reply since boot.
+  {
+    const power::DalyBms::TelemetryDiag &d = service_->bmsTelemetryDiag();
+    char first[12] = "NONE", last_ok[12] = "NONE";
+    if (d.first_byte_ms != power::DalyBms::kNoByte)
+      snprintf(first, sizeof(first), "%lu", (unsigned long)d.first_byte_ms);
+    if (valid)
+      snprintf(last_ok, sizeof(last_ok), "%lu",
+               (unsigned long)service_->uptimeMillis(bms.sampled_at_ms));
+    add("bms_rx_bytes=%u\nbms_first_byte_ms=%s\nbms_stale_bytes=%u\n"
+        "bms_fail_streak=%lu\nbms_last_ok_uptime_ms=%s\n",
+        (unsigned)d.rx_bytes, first, (unsigned)d.stale_bytes,
+        (unsigned long)d.fail_streak, last_ok);
+  }
   if (valid) {
     add("bms_current_a=%.1f\nbms_state=%s\nbms_charge_mos=%s\n"
         "bms_discharge_mos=%s\nbms_alarms=%04X %04X %04X %04X\n",
@@ -975,15 +990,12 @@ void HttpTransport::statusExtension(
         bms.discharge_mos_on ? "ON" : "OFF", bms.alarms[0], bms.alarms[1],
         bms.alarms[2], bms.alarms[3]);
     // Capacity (Dashboard 2026-10-17): the DALY 0xD2 remaining-capacity
-    // register as reported (a BMS coulomb count, not validated on MATDOG), the
-    // configured nominal pack, and SOC x nominal labelled as an ESTIMATE.
-    // Display only: nothing here feeds a protection, permit or LED threshold.
-    add("bms_remaining_ah=%.1f\nbms_capacity_config_ah=%.1f\n"
-        "bms_remaining_estimate_ah=%.2f\n",
-        bms.remaining_ah, power::kPackNominalCapacityAh,
-        bms.soc_percent >= 0 && bms.soc_percent <= 100
-            ? bms.soc_percent * power::kPackNominalCapacityAh / 100.0f
-            : 0.0f);
+    // register as reported (a BMS coulomb count, not validated on MATDOG) and
+    // the configured nominal pack. Display only: nothing here feeds a
+    // protection, permit or LED threshold. (1.0.2-dev.7: the former SOC x
+    // nominal "estimate" restated the uncalibrated DALY SOC in Ah; removed.)
+    add("bms_remaining_ah=%.1f\nbms_capacity_config_ah=%.1f\n",
+        bms.remaining_ah, power::kPackNominalCapacityAh);
     add("bms_cells=%u\nbms_cell_min_mv=%u\nbms_cell_max_mv=%u\n"
         "bms_cell_delta_mv=%u\n",
         (unsigned)bms.cell_count, (unsigned)bms.cell_min_mv,
@@ -1024,6 +1036,9 @@ void HttpTransport::statusExtension(
       status::toString(service_->ledDiagnostic()));
   if (led.soc_valid)
     add("led_soc_percent=%.1f\n", led.soc_percent);
+  // YES while Motion is engaged: the facts above are current, the physical
+  // ring keeps its last frame until torque OFF.
+  add("led_render_deferred=%s\n", service_->ledManager().renderDeferred() ? "YES" : "NO");
   add("network_phase=%s\nwifi_enabled=%s\nap_active=%s\nap_clients=%u\n"
       "heap_free=%lu\nheap_min_free=%lu\nloop_stack_min_free=%lu\n",
       toString(service_->networkAdminAccess().phase.load()),

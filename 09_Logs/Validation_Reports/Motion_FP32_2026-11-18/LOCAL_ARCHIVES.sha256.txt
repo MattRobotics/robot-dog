@@ -1,0 +1,25 @@
+# Local-only archives and binaries of the 18/11/2026 session (Asus, not in Git). sha256  path
+## Second copy (tar.gz, verified with gzip -t, tar -t, sha256sum -c)
+5fc628291d051c033c100673d96f36373db010213514d2126e7e7f2e7e73eec2  ~/MATDOG/backups/verification-artifacts/session-20261118/MATDOG_1_0_2_MOTION_FP32_20261118.tar.gz
+93b2004b38f795a29ec0a20b1013f45b42cb5e90307c2163572e4c57d9e8aa81  ~/MATDOG/backups/verification-artifacts/session-20261118/MATDOG_1_0_2_P0_TOLERANCE_20261118.tar.gz
+e47d1e38d2633a91dcc534f437c090a165a12696597fdc203cd29c8ed2685247  ~/MATDOG/backups/verification-artifacts/session-20261118/MATDOG_20261118_30c894a_and_P0_reports.tar.gz
+542546c0c650005a4eee89b4d867938f183edb8214db71bde0942b0f1e22dffe  ~/MATDOG/backups/verification-artifacts/session-20261118/MATDOG_BMS_DALY_AB_FABLE_20261118.tar.gz
+5d39d12528cbeb12824d9ef5c912f076fa0487dc1447cb16e874add81fa2bf38  ~/MATDOG/backups/verification-artifacts/session-20261118/MATDOG_firmware_05e1214_30c894a_artifacts.tar.gz
+b625718c13fd917b8f32f503c12b6ebcf7c7184708c1800f66b0bac818ba2303  ~/MATDOG/backups/verification-artifacts/session-20261118/SHA256SUMS.txt
+## Git bundles (git bundle verify: okay)
+50dba7816de575e487330d094530a5fba3e34f559d4ff08a86ed5b42d8058869  ~/MATDOG/backups/git/robot-dog-motion-candidates-20261118-full.bundle
+4621e9eabb4c73539af7e16f47f535c685740d90cbff70d63cdea78b905664b4  ~/MATDOG/backups/git/robot-dog-motion-candidates-20261118.bundle
+## Firmware images (APP)
+75ac737d7ee65bcb9bc1c2cb43722b742b64fb8a4af78492a54eb2b2057257c5  ~/MATDOG/backups/esp32/app_images/05e1214/MATDOG_Controller.ino.bin  (05e1214, P1+FP32, CLEAN, not flashed)
+03c863cc433622f672c11cae45f46694c4aa6f78ba0136cc1b7bc818a2e4b340  ~/MATDOG/backups/esp32/app_images/30c894a/MATDOG_Controller.ino.bin  (30c894a, installed, rollback image)
+727620fba8303a23ea3e6b9a36d5572ae6fb3eabd5e7fbd10706fafa114583e7  ~/MATDOG/build-output/motion-fp32-20261118/05e1214/artifacts/ROBOT_POWERED-ota0/MATDOG_Controller.ino.elf
+a85b92d9e06b3bc52d6f74118a9aa96a8b3305f57f1a4e8d6b91e234d2c017dc  ~/MATDOG/build-output/motion-fp32-20261118/05e1214/artifacts/ROBOT_POWERED-ota0/MATDOG_Controller.ino.map
+## Evidence folders (sha256 of each folder's SHA256SUMS.txt seal)
+31d79d737d29862778fad13b836e3fd95bc03cf71fc0c1aeca81b9181f406f72  ~/MATDOG/verification-artifacts/MATDOG_1_0_2_MOTION_FP32_20261118/SHA256SUMS.txt
+8f3780e0a868ce02968e99b12a2fa0c5ccc341049e6b3a084185ec9fe9f3e9e4  ~/MATDOG/verification-artifacts/MATDOG_1_0_2_P0_TOLERANCE_20261118/SHA256SUMS.txt
+eb95181bba2bb398e85b2437da174fbd92b510eca7cf325fbb78c15742f06c12  ~/MATDOG/verification-artifacts/MATDOG_1_0_2_ACQV2_CLEAN_20261118/SHA256SUMS.txt
+2ca75b3ed8442e35d9d8d505b1339172f0e77343fce5bfb5b966ba37ac37fa18  ~/MATDOG/verification-artifacts/MATDOG_1_0_2_ACQV2_30C894A_HW_20261118/SHA256SUMS.txt
+3ab9f106c33128714f55168f5583eaf7ec7ff469520637c472f97798ad64abc8  ~/MATDOG/verification-artifacts/MATDOG_BMS_DALY_AB_FABLE_20261118/SHA256SUMS.txt
+## Flash package (prepared, not executed) and rollback script
+3d35a1a8061dfe971a0f245d8c1268a6f1e7969e809e3bf27deb4a92e31c0271  /home/matteo-manicardi/MATDOG/verification-artifacts/MATDOG_1_0_2_MOTION_FP32_20261118/preflash/flash-qualified-app0-1.0.2-dev.7-05e1214.sh
+812a2e830225c4513016f959e1e035df7e5f440e53e8142c68db9e800e4c643b  /home/matteo-manicardi/MATDOG/verification-artifacts/MATDOG_1_0_2_ACQV2_CLEAN_20261118/preflash/flash-qualified-app0-1.0.2-dev.7-30c894a.sh

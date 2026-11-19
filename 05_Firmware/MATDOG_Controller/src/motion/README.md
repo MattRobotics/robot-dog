@@ -113,14 +113,16 @@ lateral radius and equal planar lengths (the fully folded indeterminate case).
 | `UNREACHABLE_LIMITS` | UNREACHABLE | Geometric branches exist; none meet limits |
 | `NUMERICAL_FAILURE` | UNKNOWN | In-limit candidates fail numerical FK verification |
 
-For FK, `JOINT_LIMIT` describes the supplied angles. Geometry and domain checks
-use `1e-12` metre or dimensionless roundoff guards as appropriate; angle endpoint
-normalization/deduplication uses `1e-12` rad. These guards only absorb floating
-point roundoff. Every returned angle is clamped inside the exact URDF interval,
-and every successful solution must meet the requested residual tolerance.
-The default is `1e-9 m`; accepted option range is `[1e-12, 1e-3] m`.
-Nonfinite inputs are rejected before trigonometry. Large finite targets are
-rejected with overflow-safe norms before squaring.
+For FK, `JOINT_LIMIT` describes the supplied angles. The solvers compute in
+binary32 (FP32 core, 18/11/2026, `LegKinematicsInternal.h`); the public API and
+the joint frames stay double. Geometry and domain checks use `1e-6` metre or
+dimensionless roundoff guards; angle endpoint clamping uses `1e-6` rad. These
+guards only absorb floating point roundoff. Every returned angle is clamped
+inside the URDF interval (float limits rounded inward), and every successful
+solution must meet the requested residual tolerance. The default is `1e-6 m`;
+accepted option range is `[1e-6, 1e-3] m`. Nonfinite inputs are rejected before
+trigonometry; a finite target beyond float range becomes infinite and fails the
+reach test.
 
 Determinism means fixed candidate order, no state and identical results for
 repeated inputs in the same binary/math environment. Bitwise equivalence

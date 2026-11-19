@@ -1,0 +1,56 @@
+diff -ru a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp w/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-11 19:04:50.000000000 +0100
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-12 09:20:00.509745298 +0100
+@@ -101,6 +101,20 @@
+   if(pv(u)>=1-r){const T w=T(1)-u;return T(1)-T(k)*w*w;}
+   return T(1/(1-r))*(u-T(.5*r));
+ }
++// Vertical swing profile (gait study, MuJoCo dev.7 correlation 2026-11-12): the foot
++// rises with a smootherstep over the first kSwingLiftRise of the swing and lands with
++// one over the last kSwingLiftFall, at liftM between (C2: zero speed and acceleration
++// at lift-off and touchdown). The legacy bell 64 u^3 (1-u)^3 reaches 5 % of liftM at
++// u = 0.1 and 26 % at u = 0.2, while the foot already moves; a short rise lifts it
++// before it travels, a long fall keeps the touchdown as low as the legacy bell
++// (front UPPER at its kHeight bound). Rise/fall <= 0 keeps the legacy bell.
++constexpr double kSwingLiftRise=0.30,kSwingLiftFall=0.60;
++template<class T> T liftProfile(T u){
++  if(kSwingLiftRise<=0||kSwingLiftFall<=0)return T(64)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++  const T up=pv(u)<kSwingLiftRise?smooth(u*T(1/kSwingLiftRise)):T(1);
++  const T down=pv(u)>1-kSwingLiftFall?smooth((T(1)-u)*T(1/kSwingLiftFall)):T(1);
++  return up*down;
++}
+ // Geometric stride law: body progress, in cycles of advance. Identity without
+ // ramps. The start raises the progress rate 0->1 over startCycles; after the
+ // decel cycle S=terminal-stopCycles the rate falls 1->0 at the terminal
+@@ -182,7 +196,7 @@
+     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
+     out.feet[i]=a;
+     if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp,p.swingRampEnd);
+-      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(p.liftM)*liftProfile(u);
+       out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
+ }
+ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double accel,double terminal,GaitTrack* track){
+diff -ru a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h w/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-11 19:04:50.000000000 +0100
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.h	2026-11-12 09:20:00.513287581 +0100
+@@ -111,9 +111,18 @@
+ // --reverse PASS (HIP margin 10.3 / 12.3 / 13.3 ticks). decelCycles: the forward joystick decrease
+ // (kJoystickFrontalDecelCycles below; FAST 3: frontal_changes -0.44 mm with 2).
+ struct JoystickSpec { double backM,strideM,lateralM,yawRad,swayBaseYM,swayLowM,swayYM,backSwayYM,decelCycles; };
++// Gait study (MuJoCo dev.7 correlation, 2026-11-12): above the on-demand threshold
++// the steered sway grows with the demand, from kJoystickSwayLowM at the threshold
++// to swayYM at the full lateral/yaw ellipsoid, instead of taking swayYM at once
++// (a 40 % diagonal took the full 9 mm). Below it, unchanged. Hysteresis unchanged:
++// once above the low sway the amplitude never falls under swayLowM until the demand
++// falls under kJoystickSwayOffDemand.
+ inline double joystickSwayYM(double advanceYM,double yawRad,double currentSwayYM,const JoystickSpec& j){
+   const double y=advanceYM/j.lateralM,w=yawRad/j.yawRad,s=std::sqrt(y*y+w*w);
+-  if(s>=(currentSwayYM>j.swayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand))return j.swayYM;
++  if(s>=(currentSwayYM>j.swayLowM?kJoystickSwayOffDemand:kJoystickSwayOnDemand)){
++    const double u=std::fmin(1.,std::fmax(0.,(s-kJoystickSwayOnDemand)/(1-kJoystickSwayOnDemand)));
++    return std::fmax(j.swayLowM,j.swayLowM+(j.swayYM-j.swayLowM)*u);
++  }
+   return j.swayBaseYM+(j.swayLowM-j.swayBaseYM)*std::fmin(1.,s/kJoystickSwayOnDemand);
+ }
+ constexpr uint64_t kJoystickTimeoutUs=1000000;

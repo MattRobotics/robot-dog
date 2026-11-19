@@ -72,6 +72,7 @@ void CalibrationGeometryProfile::bind(const GeometryProvenance* provenance,
     clear();
     return;
   }
+  ++revision_;
   provenance_ = provenance;
   provenance_tag_ = geometryProvenanceTag(*provenance);
   joints_ = joints;
@@ -81,6 +82,7 @@ void CalibrationGeometryProfile::bind(const GeometryProvenance* provenance,
 }
 
 void CalibrationGeometryProfile::clear() {
+  ++revision_;
   provenance_ = nullptr;
   provenance_tag_ = kNoGeometryProvenance;
   joints_ = nullptr;

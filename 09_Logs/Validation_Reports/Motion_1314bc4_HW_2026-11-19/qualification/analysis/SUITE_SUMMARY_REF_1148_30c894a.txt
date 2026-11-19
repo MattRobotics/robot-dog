@@ -1,0 +1,196 @@
+====================================================================================================
+RUN settle_A_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 0 us () comp 0 | {} 
+PASS S0 TIMING dump (since boot, Motion inactive)                    12.1 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 0 us () comp 0 | {} 
+PASS S1 STAND 120 from PRONE_REST                                     9.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18141 us (STAND_DEPLOY) comp 12702 | {"complete_s": 9.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS S2 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18141 us (STAND_DEPLOY) comp 12702 | {"reason": "WALK_MODE_SELECTED"} 
+PASS S2b MODE STANDARD published (read only)                          0.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18141 us (STAND_DEPLOY) comp 12702 | {} 
+PASS S3 joystick yaw counter-clockwise full scale 12 s (as D8)       14.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18873 us (WALK_STANDARD) comp 9927 | {"walking_after_s": 2.3} 
+PASS S4 release (as D9)                                               4.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18873 us (WALK_STANDARD) comp 9927 | {"standing_after_s": 4.6, "reason": "STAND_REACHED"} 
+PASS S5 joystick yaw clockwise full scale 12 s (as D10)              13.7 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18308 us (WALK_STANDARD) comp 12369 | {"walking_after_s": 1.6} 
+PASS S6 release (as D11)                                              5.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18308 us (WALK_STANDARD) comp 12369 | {"standing_after_s": 5.4, "reason": "STAND_REACHED"} 
+PASS S7 MODE SLOW (default restored, as F9)                           0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18308 us (WALK_STANDARD) comp 12369 | {"reason": "WALK_MODE_SELECTED"} 
+PASS S8 PRONE to PRONE_REST                                          13.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18364 us (PRONE_HEIGHT) comp 12610 | {"complete_s": 13.0, "safe_off_mask": 8191} 
+PASS S9 TIMING dump (since boot: PMU sums and heaviest release per    1.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18364 us (PRONE_HEIGHT) comp 12610 | {} 
+steps: 12 PASS, 0 FAIL
+DALY D1: 20 /status samples 11:48:10..11:49:45; comm {'OK': 20}
+  rx_bytes {'129': 20} | first_byte_ms {'13': 1, '14': 3, '15': 2, '16': 2, '17': 4, '18': 2, '19': 3, '20': 1, '21': 1, '40': 1} | stale {'0': 20} | fail_streak max 0 | fresh {'YES': 20} | alarms {'0000 0000 0000 0000': 20}
+  pack 11.3..11.3 V, SoC 73.8..73.9 %, current -0.5..-0.2 A, cell min 3780 mV; health {'READY': 20}; uptime 450151..545128 ms
+Motion: 97 status samples; (state, fault) {('READY', False): 36, ('MOVING', False): 27, ('WALKING', False): 34}
+  joint temperature max (C): LF_HIP=25 LF_UPPER=25 LF_LOWER=36 RF_HIP=46 RF_UPPER=25 RF_LOWER=27 RH_HIP=24 RH_UPPER=24 RH_LOWER=26 LH_HIP=25 LH_UPPER=40 LH_LOWER=26
+  joint voltage min (dV): LF_HIP=114 LF_UPPER=113 LF_LOWER=114 RF_HIP=114 RF_UPPER=114 RF_LOWER=114 RH_HIP=114 RH_UPPER=114 RH_LOWER=114 LH_HIP=113 LH_UPPER=114 LH_LOWER=113
+  IMU correction applied -54.7..47.5 mrad, wanted -63.3..53.7 mrad; reasons {'IMU_STALE': 33, 'ATTENUATED': 25, 'SLEW': 7, 'ENVELOPE': 32}; imu_valid {True: 97}
+  last 11:49:46.659: state READY phase IDLE reason PRONE_REST fault False safe_off True mask 8191 torque False missed 5 overruns 0 max_work 18873 us
+====================================================================================================
+RUN settle_B_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18364 us (PRONE_HEIGHT) comp 12610 | {} 
+PASS S0 TIMING dump (since boot, Motion inactive)                    12.1 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18364 us (PRONE_HEIGHT) comp 12610 | {} 
+PASS S1 STAND 120 from PRONE_REST                                    10.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13350 us (STAND_DEPLOY) comp 9111 | {"complete_s": 10.6, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS S2 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13350 us (STAND_DEPLOY) comp 9111 | {"reason": "WALK_MODE_SELECTED"} 
+PASS S2b MODE STANDARD published (read only)                          1.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13350 us (STAND_DEPLOY) comp 9111 | {} 
+PASS S3 joystick yaw counter-clockwise full scale 12 s (as D8)       14.1 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 19482 us (WALK_STANDARD) comp 10547 | {"walking_after_s": 2.0} 
+PASS S4 release (as D9)                                               5.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 19482 us (WALK_STANDARD) comp 10547 | {"standing_after_s": 5.8, "reason": "STAND_REACHED"} 
+PASS S5 joystick yaw clockwise full scale 12 s (as D10)              14.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15148 us (WALK_STANDARD) comp 9086 | {"walking_after_s": 2.3} 
+PASS S6 release (as D11)                                              5.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15148 us (WALK_STANDARD) comp 9096 | {"standing_after_s": 5.6, "reason": "STAND_REACHED"} 
+PASS S7 MODE SLOW (default restored, as F9)                           0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15148 us (WALK_STANDARD) comp 9096 | {"reason": "WALK_MODE_SELECTED"} 
+PASS S8 PRONE to PRONE_REST                                          13.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14408 us (PRONE_LIFT) comp 7224 | {"complete_s": 13.2, "safe_off_mask": 8191} 
+PASS S9 TIMING dump (since boot: PMU sums and heaviest release per    1.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14408 us (PRONE_LIFT) comp 7224 | {} 
+steps: 12 PASS, 0 FAIL
+====================================================================================================
+RUN ab_B_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14408 us (PRONE_LIFT) comp 7224 | {} 
+PASS A0 TIMING dump (baseline, Motion inactive)                      12.1 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14408 us (PRONE_LIFT) comp 7224 | {} 
+PASS A1 STOP at rest (READY, torque OFF)                              0.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14408 us (PRONE_LIFT) comp 7224 | {"complete_s": 0.6, "reason": "STOP_REQUESTED"} 
+PASS A2 STAND 120 after the STOP (ACQUIRE/REFERENCE/ENABLE)           9.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17370 us (STAND_LIFT) comp 12322 | {"complete_s": 9.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS A3 STAND 150                                                     3.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16190 us (HEIGHT) comp 11965 | {"complete_s": 3.4, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 150.2} 
+PASS A4 STAND 80                                                      3.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14014 us (HEIGHT) comp 9085 | {"complete_s": 3.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 80.6} 
+PASS A5 STAND 120                                                     3.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16423 us (HEIGHT) comp 11085 | {"complete_s": 3.4, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS A6 PRONE to PRONE_REST                                          13.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17640 us (PRONE_LIFT) comp 12804 | {"complete_s": 13.4, "safe_off_mask": 8191} 
+PASS A7 TIMING dump (block A)                                         1.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17640 us (PRONE_LIFT) comp 12804 | {} 
+PASS A8 STAND 120 from PRONE_REST                                    10.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17492 us (STAND_LIFT) comp 12415 | {"complete_s": 10.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS B1 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17492 us (STAND_LIFT) comp 12415 | {"reason": "WALK_MODE_SELECTED"} 
+PASS B2 STAND 110                                                     2.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12655 us (HEIGHT) comp 7416 | {"complete_s": 2.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 110.3} 
+PASS B3 joystick yaw clockwise full scale 22 s                       23.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15834 us (WALK_STANDARD) comp 9052 | {"walking_after_s": 1.3} 
+PASS B4 STOP during the yaw walk                                      3.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15834 us (WALK_STANDARD) comp 9052 | {"stop_verified_s": 3.2, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS B5 wait 4 s held                                                 4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15834 us (WALK_STANDARD) comp 9052 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS B6 STAND 120 resume (WALK recovery, WALK_SETTLE, HEIGHT)         7.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16440 us (WALK_SETTLE) comp 8218 | {"complete_s": 7.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.0} 
+PASS B7 PRONE to PRONE_REST                                          13.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17052 us (PRONE_DEPLOY) comp 12694 | {"complete_s": 13.4, "safe_off_mask": 8191} 
+PASS B8 TIMING dump (block B)                                         1.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17052 us (PRONE_DEPLOY) comp 12694 | {} 
+steps: 18 PASS, 0 FAIL
+====================================================================================================
+RUN ab_A_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17052 us (PRONE_DEPLOY) comp 12694 | {} 
+PASS A0 TIMING dump (baseline, Motion inactive)                      12.1 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17052 us (PRONE_DEPLOY) comp 12694 | {} 
+PASS A1 STOP at rest (READY, torque OFF)                              0.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17052 us (PRONE_DEPLOY) comp 12694 | {"complete_s": 0.4, "reason": "STOP_REQUESTED"} 
+PASS A2 STAND 120 after the STOP (ACQUIRE/REFERENCE/ENABLE)          10.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18257 us (STAND_LIFT) comp 13018 | {"complete_s": 10.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.5} 
+PASS A3 STAND 150                                                     3.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18143 us (HEIGHT) comp 12986 | {"complete_s": 3.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 150.1} 
+PASS A4 STAND 80                                                      3.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18093 us (HEIGHT) comp 13081 | {"complete_s": 3.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 80.6} 
+PASS A5 STAND 120                                                     2.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17629 us (HEIGHT) comp 12733 | {"complete_s": 2.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS A6 PRONE to PRONE_REST                                          12.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17741 us (PRONE_LIFT) comp 12612 | {"complete_s": 12.4, "safe_off_mask": 8191} 
+PASS A7 TIMING dump (block A)                                         1.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17741 us (PRONE_LIFT) comp 12612 | {} 
+PASS A8 STAND 120 from PRONE_REST                                    10.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18579 us (ALIGN) comp 12329 | {"complete_s": 10.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS B1 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18579 us (ALIGN) comp 12329 | {"reason": "WALK_MODE_SELECTED"} 
+PASS B2 STAND 110                                                     2.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13665 us (HEIGHT) comp 7341 | {"complete_s": 2.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 110.6} 
+PASS B3 joystick yaw clockwise full scale 22 s                       23.2 s  missed +0 overruns +2 | cmd missed 0 first -/0 us, max work 20761 us (WALK_STANDARD) comp 9541 | {"walking_after_s": 1.0} 
+PASS B4 STOP during the yaw walk                                      2.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 20761 us (WALK_STANDARD) comp 9541 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS B5 wait 4 s held                                                 4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 20761 us (WALK_STANDARD) comp 9541 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS B6 STAND 120 resume (WALK recovery, WALK_SETTLE, HEIGHT)         6.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18005 us (WALK_STANDARD) comp 9667 | {"complete_s": 6.4, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 119.9} 
+PASS B7 PRONE to PRONE_REST                                          12.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 19003 us (PRONE_DEPLOY) comp 13439 | {"complete_s": 12.4, "safe_off_mask": 8191} 
+PASS B8 TIMING dump (block B)                                         1.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 19003 us (PRONE_DEPLOY) comp 13439 | {} 
+steps: 18 PASS, 0 FAIL
+DALY D1: 26 /status samples 11:53:45..11:55:50; comm {'OK': 26}
+  rx_bytes {'129': 26} | first_byte_ms {'12': 1, '13': 1, '14': 5, '15': 3, '16': 6, '18': 2, '19': 5, '20': 3} | stale {'0': 26} | fail_streak max 0 | fresh {'YES': 26} | alarms {'0000 0000 0000 0000': 26}
+  pack 11.3..11.3 V, SoC 73.3..73.5 %, current -0.5..-0.2 A, cell min 3777 mV; health {'READY': 26}; uptime 784988..909895 ms
+Motion: 130 status samples; (state, fault) {('READY', False): 38, ('STOPPED', False): 6, ('MOVING', False): 61, ('STANDING', False): 2, ('WALKING', False): 23}
+  joint temperature max (C): LF_HIP=27 LF_UPPER=48 LF_LOWER=36 RF_HIP=47 RF_UPPER=27 RF_LOWER=36 RH_HIP=29 RH_UPPER=38 RH_LOWER=69 LH_HIP=27 LH_UPPER=38 LH_LOWER=30
+  joint voltage min (dV): LF_HIP=114 LF_UPPER=113 LF_LOWER=114 RF_HIP=114 RF_UPPER=114 RF_LOWER=114 RH_HIP=114 RH_UPPER=114 RH_LOWER=113 LH_HIP=114 LH_UPPER=114 LH_LOWER=113
+  IMU correction applied -34.2..21.5 mrad, wanted -34.3..26.3 mrad; reasons {'ATTENUATED': 91, 'SLEW': 6, 'ENVELOPE': 33}; imu_valid {True: 130}
+  last 11:55:54.428: state READY phase IDLE reason PRONE_REST fault False safe_off True mask 8191 torque False missed 5 overruns 2 max_work 20761 us
+====================================================================================================
+RUN efg_A_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 19003 us (PRONE_DEPLOY) comp 13439 | {} 
+PASS E1 STAND 120 from PRONE_REST                                    10.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17490 us (ALIGN) comp 12325 | {"complete_s": 10.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.5} 
+PASS E2 WALK STANDARD preset 1                                        2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16151 us (HEIGHT) comp 11327 | {"walking_after_s": 2.2} 
+PASS E3 walk 6 s                                                      6.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16151 us (HEIGHT) comp 11327 | {} 
+PASS E4 MODE SLOW during the walk                                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16151 us (HEIGHT) comp 11327 | {"reason": "WALK_MODE_CHANGING"} 
+PASS E5 walk 12 s                                                    12.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16330 us (WALK_STANDARD) comp 11327 | {} 
+PASS E6 MODE STANDARD during the walk                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16330 us (WALK_STANDARD) comp 11327 | {"reason": "WALK_MODE_CHANGING"} 
+PASS E7 walk 12 s                                                    12.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16521 us (WALK_STANDARD) comp 11327 | {} 
+PASS E8 WALK STOP                                                     7.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17687 us (HEIGHT) comp 12669 | {"standing_after_s": 7.6, "reason": "STAND_REACHED"} 
+PASS F1 MODE FAST                                                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17687 us (HEIGHT) comp 12669 | {"reason": "WALK_MODE_SELECTED"} 
+PASS F2 WALK FAST preset 2 (32 mm/s)                                  1.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15292 us (HEIGHT) comp 8287 | {"walking_after_s": 1.6} 
+PASS F3 walk 15 s                                                    15.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16252 us (WALK_STANDARD) comp 9485 | {} 
+PASS F4 STOP during the FAST walk                                     2.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16252 us (WALK_STANDARD) comp 9485 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS F5 STAND 120 resume                                              5.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18511 us (HEIGHT) comp 11574 | {"complete_s": 5.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS F6 WALK FAST preset 2                                            2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18502 us (HEIGHT) comp 11598 | {"walking_after_s": 2.2} 
+PASS F7 walk 10 s                                                    10.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18502 us (HEIGHT) comp 11598 | {} 
+PASS F8 WALK STOP                                                     4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18502 us (HEIGHT) comp 11598 | {"standing_after_s": 4.0, "reason": "STAND_REACHED"} 
+PASS F9 MODE SLOW (default for the next session)                      0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18502 us (HEIGHT) comp 11598 | {"reason": "WALK_MODE_SELECTED"} 
+PASS G1 PRONE to PRONE_REST                                          12.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18902 us (PRONE_LIFT) comp 13641 | {"complete_s": 12.0, "safe_off_mask": 8191} 
+PASS G2 TIMING dump (blocks E-F, final)                               1.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18902 us (PRONE_LIFT) comp 13641 | {} 
+steps: 20 PASS, 0 FAIL
+DALY D1: 26 /status samples 11:55:57..11:58:02; comm {'OK': 26}
+  rx_bytes {'129': 26} | first_byte_ms {'13': 1, '14': 3, '15': 2, '16': 1, '17': 2, '18': 5, '19': 6, '20': 3, '21': 2, '22': 1} | stale {'0': 26} | fail_streak max 0 | fresh {'YES': 26} | alarms {'0000 0000 0000 0000': 26}
+  pack 11.3..11.3 V, SoC 73.1..73.3 %, current -0.5..-0.2 A, cell min 3779 mV; health {'READY': 26}; uptime 916681..1041692 ms
+Motion: 127 status samples; (state, fault) {('READY', False): 24, ('MOVING', False): 36, ('STANDING', False): 2, ('WALKING', False): 64, ('STOPPED', False): 1}
+  joint temperature max (C): LF_HIP=26 LF_UPPER=41 LF_LOWER=34 RF_HIP=26 RF_UPPER=27 RF_LOWER=49 RH_HIP=25 RH_UPPER=29 RH_LOWER=33 LH_HIP=27 LH_UPPER=40 LH_LOWER=27
+  joint voltage min (dV): LF_HIP=114 LF_UPPER=113 LF_LOWER=114 RF_HIP=114 RF_UPPER=113 RF_LOWER=113 RH_HIP=114 RH_UPPER=114 RH_LOWER=113 LH_HIP=113 LH_UPPER=114 LH_LOWER=113
+  IMU correction applied -33.4..32.4 mrad, wanted -48.3..47.1 mrad; reasons {'ATTENUATED': 51, 'SLEW': 3, 'ENVELOPE': 71, 'OK': 1, 'WORKSPACE': 1}; imu_valid {True: 127}
+  last 11:58:03.204: state READY phase IDLE reason PRONE_REST fault False safe_off True mask 8191 torque False missed 5 overruns 2 max_work 20761 us
+====================================================================================================
+RUN efg_B_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18902 us (PRONE_LIFT) comp 13641 | {} 
+PASS E1 STAND 120 from PRONE_REST                                    10.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13745 us (ALIGN) comp 10052 | {"complete_s": 10.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS E2 WALK STANDARD preset 1                                        2.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13733 us (HEIGHT) comp 9747 | {"walking_after_s": 2.0} 
+PASS E3 walk 6 s                                                      6.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14383 us (WALK_STANDARD) comp 9747 | {} 
+PASS E4 MODE SLOW during the walk                                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14383 us (WALK_STANDARD) comp 9747 | {"reason": "WALK_MODE_CHANGING"} 
+PASS E5 walk 12 s                                                    12.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14709 us (WALK_STANDARD) comp 9747 | {} 
+PASS E6 MODE STANDARD during the walk                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14709 us (WALK_STANDARD) comp 9747 | {"reason": "WALK_MODE_CHANGING"} 
+PASS E7 walk 12 s                                                    12.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15713 us (WALK_STANDARD) comp 9747 | {} 
+PASS E8 WALK STOP                                                     4.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15713 us (WALK_STANDARD) comp 9747 | {"standing_after_s": 4.4, "reason": "STAND_REACHED"} 
+PASS F1 MODE FAST                                                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15713 us (WALK_STANDARD) comp 9747 | {"reason": "WALK_MODE_SELECTED"} 
+PASS F2 WALK FAST preset 2 (32 mm/s)                                  2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 11978 us (HEIGHT) comp 6970 | {"walking_after_s": 2.2} 
+PASS F3 walk 15 s                                                    15.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15854 us (WALK_STANDARD) comp 9027 | {} 
+PASS F4 STOP during the FAST walk                                     2.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15854 us (WALK_STANDARD) comp 9027 | {"stop_verified_s": 2.8, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS F5 STAND 120 resume                                              6.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16036 us (HEIGHT) comp 11855 | {"complete_s": 6.6, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 119.9} 
+PASS F6 WALK FAST preset 2                                            3.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17042 us (HEIGHT) comp 12036 | {"walking_after_s": 3.4} 
+PASS F7 walk 10 s                                                    10.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17042 us (HEIGHT) comp 12036 | {} 
+PASS F8 WALK STOP                                                     4.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17042 us (HEIGHT) comp 12036 | {"standing_after_s": 4.4, "reason": "STAND_REACHED"} 
+PASS F9 MODE SLOW (default for the next session)                      0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17042 us (HEIGHT) comp 12036 | {"reason": "WALK_MODE_SELECTED"} 
+PASS G1 PRONE to PRONE_REST                                          12.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18851 us (PRONE_HEIGHT) comp 12306 | {"complete_s": 12.2, "safe_off_mask": 8191} 
+PASS G2 TIMING dump (blocks E-F, final)                               1.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18851 us (PRONE_HEIGHT) comp 12306 | {} 
+steps: 20 PASS, 0 FAIL
+====================================================================================================
+RUN h_B_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18851 us (PRONE_HEIGHT) comp 12306 | {} 
+PASS H1 STAND 120 from PRONE_REST                                    10.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13593 us (HEIGHT) comp 7063 | {"complete_s": 10.4, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS H2 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13593 us (HEIGHT) comp 7063 | {"reason": "WALK_MODE_SELECTED"} 
+PASS H3 WALK STANDARD preset 1                                        2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 11637 us (WALK_STANDARD) comp 7278 | {"walking_after_s": 2.2} 
+PASS H4 walk 4.0 s                                                    4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12295 us (WALK_STANDARD) comp 7882 | {} 
+PASS H5 STOP during the walk                                          2.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12295 us (WALK_STANDARD) comp 7882 | {"stop_verified_s": 2.8, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H6 wait 3 s held                                                 3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12295 us (WALK_STANDARD) comp 7882 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H7 STAND 120 resume, STOP 1.0 s into the RECOVERY (~50 release   3.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13638 us (WALK_STANDARD) comp 7471 | {"stop_verified_s": 2.6, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H8 wait 3 s held                                                 3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13638 us (WALK_STANDARD) comp 7471 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H9 STAND 120 resume to STAND_REACHED                             6.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14052 us (WALK_STANDARD) comp 9119 | {"complete_s": 6.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.0} 
+PASS H10 WALK STANDARD preset 1                                       2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12308 us (HEIGHT) comp 7285 | {"walking_after_s": 2.2} 
+PASS H11 walk 5.3 s                                                   5.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12745 us (WALK_STANDARD) comp 8057 | {} 
+PASS H12 STOP during the walk                                         2.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13203 us (WALK_STANDARD) comp 8057 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H13 wait 3 s held                                                3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13203 us (WALK_STANDARD) comp 8057 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H14 STAND 120 resume, STOP 0.3 s into the RECOVERY (~15 releas   2.7 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12684 us (WALK_STANDARD) comp 6069 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H15 wait 3 s held                                                3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12684 us (WALK_STANDARD) comp 6069 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H16 STAND 120 resume to STAND_REACHED                            7.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13928 us (WALK_STANDARD) comp 7755 | {"complete_s": 7.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 119.9} 
+PASS H17 MODE SLOW (default for the next session)                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 13928 us (WALK_STANDARD) comp 7755 | {"reason": "WALK_MODE_SELECTED"} 
+PASS H18 PRONE to PRONE_REST                                         12.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15447 us (PRONE_LIFT) comp 11173 | {"complete_s": 12.4, "safe_off_mask": 8191} 
+PASS H19 TIMING dump (block H)                                        1.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15447 us (PRONE_LIFT) comp 11173 | {} 
+steps: 20 PASS, 0 FAIL
+====================================================================================================
+RUN h_A_1148
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15447 us (PRONE_LIFT) comp 11173 | {} 
+PASS H1 STAND 120 from PRONE_REST                                    10.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18919 us (STAND_LIFT) comp 13039 | {"complete_s": 10.0, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.2} 
+PASS H2 MODE STANDARD                                                 0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 18919 us (STAND_LIFT) comp 13039 | {"reason": "WALK_MODE_SELECTED"} 
+PASS H3 WALK STANDARD preset 1                                        1.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17556 us (HEIGHT) comp 12552 | {"walking_after_s": 1.8} 
+PASS H4 walk 4.0 s                                                    4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17556 us (HEIGHT) comp 12552 | {} 
+PASS H5 STOP during the walk                                          2.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17556 us (HEIGHT) comp 12552 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H6 wait 3 s held                                                 3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17556 us (HEIGHT) comp 12552 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H7 STAND 120 resume, STOP 1.0 s into the RECOVERY (~50 release   3.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14004 us (WALK_STANDARD) comp 7260 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H8 wait 3 s held                                                 3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14004 us (WALK_STANDARD) comp 7260 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H9 STAND 120 resume to STAND_REACHED                             5.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 14685 us (WALK_STANDARD) comp 7916 | {"complete_s": 5.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 119.9} 
+PASS H10 WALK STANDARD preset 1                                       2.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16811 us (HEIGHT) comp 11903 | {"walking_after_s": 2.2} 
+PASS H11 walk 5.3 s                                                   5.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16811 us (HEIGHT) comp 11903 | {} 
+PASS H12 STOP during the walk                                         2.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16811 us (HEIGHT) comp 11903 | {"stop_verified_s": 2.0, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H13 wait 3 s held                                                3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 16811 us (HEIGHT) comp 11903 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H14 STAND 120 resume, STOP 0.3 s into the RECOVERY (~15 releas   2.5 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12954 us (WALK_STANDARD) comp 7206 | {"stop_verified_s": 2.2, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS H15 wait 3 s held                                                3.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 12954 us (WALK_STANDARD) comp 7206 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS H16 STAND 120 resume to STAND_REACHED                            6.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15186 us (WALK_STANDARD) comp 8335 | {"complete_s": 6.2, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS H17 MODE SLOW (default for the next session)                     0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 15186 us (WALK_STANDARD) comp 8335 | {"reason": "WALK_MODE_SELECTED"} 
+PASS H18 PRONE to PRONE_REST                                         12.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17898 us (PRONE_LIFT) comp 12696 | {"complete_s": 12.4, "safe_off_mask": 8191} 
+PASS H19 TIMING dump (block H)                                        1.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 17898 us (PRONE_LIFT) comp 12696 | {} 
+steps: 20 PASS, 0 FAIL
+DALY D1: 19 /status samples 12:01:52..12:03:22; comm {'OK': 19}
+  rx_bytes {'129': 19} | first_byte_ms {'11': 5, '12': 1, '13': 2, '14': 1, '16': 1, '17': 4, '18': 2, '19': 1, '20': 2} | stale {'0': 19} | fail_streak max 0 | fresh {'YES': 19} | alarms {'0000 0000 0000 0000': 19}
+  pack 11.3..11.3 V, SoC 72.6..72.8 %, current -0.5..-0.2 A, cell min 3777 mV; health {'READY': 19}; uptime 1272115..1362038 ms
+Motion: 94 status samples; (state, fault) {('READY', False): 24, ('MOVING', False): 45, ('WALKING', False): 10, ('STOPPED', False): 14, ('STANDING', False): 1}
+  joint temperature max (C): LF_HIP=27 LF_UPPER=27 LF_LOWER=32 RF_HIP=27 RF_UPPER=27 RF_LOWER=28 RH_HIP=25 RH_UPPER=26 RH_LOWER=28 LH_HIP=36 LH_UPPER=42 LH_LOWER=29
+  joint voltage min (dV): LF_HIP=114 LF_UPPER=113 LF_LOWER=114 RF_HIP=114 RF_UPPER=114 RF_LOWER=113 RH_HIP=114 RH_UPPER=114 RH_LOWER=114 LH_HIP=113 LH_UPPER=114 LH_LOWER=113
+  IMU correction applied -16.9..16.2 mrad, wanted -21.9..20.0 mrad; reasons {'ATTENUATED': 50, 'ENVELOPE': 41, 'SLEW': 3}; imu_valid {True: 94}
+  last 12:03:25.574: state READY phase IDLE reason PRONE_REST fault False safe_off True mask 8191 torque False missed 5 overruns 2 max_work 20761 us

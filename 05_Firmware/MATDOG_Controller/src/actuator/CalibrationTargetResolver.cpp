@@ -41,20 +41,29 @@ TargetResolveStatus commonChecks(const CalibrationGeometryProfile& profile,
 
 }  // namespace
 
-TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
-                                      const GeometryProvenance& expected_provenance,
-                                      const JointTransform& transform,
-                                      MicroRad q_urad,
-                                      uint16_t* raw_tick_out) {
-  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
-
+TargetResolveStatus resolveJointTransform(const CalibrationGeometryProfile& profile,
+                                          const GeometryProvenance& expected_provenance,
+                                          const JointTransform& transform,
+                                          ResolvedJointTransform* out) {
+  if (out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
   const GeometryJointRecord* joint = nullptr;
   int8_t direction = 0;
   const TargetResolveStatus common =
       commonChecks(profile, expected_provenance, transform, &joint, &direction);
   if (common != TargetResolveStatus::OK) return common;
+  out->transform = &transform;
+  out->joint = joint;
+  out->direction = direction;
+  return TargetResolveStatus::OK;
+}
 
-  if (q_urad < joint->urdf_lower || q_urad > joint->urdf_upper) {
+TargetResolveStatus resolveUrdfQToRaw(const ResolvedJointTransform& resolved,
+                                      MicroRad q_urad, uint16_t* raw_tick_out) {
+  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  if (resolved.transform == nullptr || resolved.joint == nullptr) return TargetResolveStatus::REJECT_TRANSFORM;
+  if (resolved.direction != 1 && resolved.direction != -1) return TargetResolveStatus::REJECT_DIRECTION;
+
+  if (q_urad < resolved.joint->urdf_lower || q_urad > resolved.joint->urdf_upper) {
     return TargetResolveStatus::REJECT_URDF_LIMIT;
   }
 
@@ -62,14 +71,47 @@ TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
       roundDivSigned(static_cast<int64_t>(q_urad) * kTicksPerRevolution,
                      kMicroRadPerRevolution);
   const int64_t raw =
-      static_cast<int64_t>(transform.q0_tick) +
-      static_cast<int64_t>(direction) * signed_ticks;
+      static_cast<int64_t>(resolved.transform->q0_tick) +
+      static_cast<int64_t>(resolved.direction) * signed_ticks;
 
   if (raw < 0 || raw >= kTicksPerRevolution) {
     return TargetResolveStatus::REJECT_RAW_DOMAIN;
   }
 
   *raw_tick_out = static_cast<uint16_t>(raw);
+  return TargetResolveStatus::OK;
+}
+
+TargetResolveStatus resolveUrdfQToRaw(const CalibrationGeometryProfile& profile,
+                                      const GeometryProvenance& expected_provenance,
+                                      const JointTransform& transform,
+                                      MicroRad q_urad,
+                                      uint16_t* raw_tick_out) {
+  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  ResolvedJointTransform resolved;
+  const TargetResolveStatus common =
+      resolveJointTransform(profile, expected_provenance, transform, &resolved);
+  if (common != TargetResolveStatus::OK) return common;
+  return resolveUrdfQToRaw(resolved, q_urad, raw_tick_out);
+}
+
+TargetResolveStatus resolveRawObservation(const ResolvedJointTransform& resolved,
+                                          uint16_t raw_tick, MicroRad* q_urad_out) {
+  if (q_urad_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  if (raw_tick >= static_cast<uint16_t>(kTicksPerRevolution)) {
+    return TargetResolveStatus::REJECT_RAW_DOMAIN;
+  }
+  if (resolved.transform == nullptr || resolved.joint == nullptr) return TargetResolveStatus::REJECT_TRANSFORM;
+  if (resolved.direction != 1 && resolved.direction != -1) return TargetResolveStatus::REJECT_DIRECTION;
+
+  const int64_t raw_delta =
+      static_cast<int64_t>(raw_tick) - static_cast<int64_t>(resolved.transform->q0_tick);
+  const int64_t q =
+      roundDivSigned(raw_delta * static_cast<int64_t>(resolved.direction) *
+                         kMicroRadPerRevolution,
+                     kTicksPerRevolution);
+
+  *q_urad_out = static_cast<MicroRad>(q);
   return TargetResolveStatus::OK;
 }
 
@@ -82,22 +124,11 @@ TargetResolveStatus resolveRawObservation(const CalibrationGeometryProfile& prof
   if (raw_tick >= static_cast<uint16_t>(kTicksPerRevolution)) {
     return TargetResolveStatus::REJECT_RAW_DOMAIN;
   }
-
-  const GeometryJointRecord* joint = nullptr;
-  int8_t direction = 0;
+  ResolvedJointTransform resolved;
   const TargetResolveStatus common =
-      commonChecks(profile, expected_provenance, transform, &joint, &direction);
+      resolveJointTransform(profile, expected_provenance, transform, &resolved);
   if (common != TargetResolveStatus::OK) return common;
-
-  const int64_t raw_delta =
-      static_cast<int64_t>(raw_tick) - static_cast<int64_t>(transform.q0_tick);
-  const int64_t q =
-      roundDivSigned(raw_delta * static_cast<int64_t>(direction) *
-                         kMicroRadPerRevolution,
-                     kTicksPerRevolution);
-
-  *q_urad_out = static_cast<MicroRad>(q);
-  return TargetResolveStatus::OK;
+  return resolveRawObservation(resolved, raw_tick, q_urad_out);
 }
 
 TargetResolveStatus resolveRawToUrdfQ(const CalibrationGeometryProfile& profile,
@@ -143,6 +174,14 @@ TargetResolveStatus resolveRadiansToRaw(const CalibrationGeometryProfile& profil
   const TargetResolveStatus s = resolveUrdfQToRaw(profile, expected_provenance, transform, q, raw_tick_out);
   if (s == TargetResolveStatus::OK && q_urad_out != nullptr) *q_urad_out = q;
   return s;
+}
+
+TargetResolveStatus resolveRadiansToRaw(const ResolvedJointTransform& resolved,
+                                        double q_rad, uint16_t* raw_tick_out) {
+  if (raw_tick_out == nullptr) return TargetResolveStatus::REJECT_NULL_OUTPUT;
+  MicroRad q = 0;
+  if (!radiansToMicroRad(q_rad, &q)) return TargetResolveStatus::REJECT_URDF_LIMIT;
+  return resolveUrdfQToRaw(resolved, q, raw_tick_out);
 }
 
 TargetResolveStatus resolveDeltaFromQ0(const CalibrationGeometryProfile& profile,

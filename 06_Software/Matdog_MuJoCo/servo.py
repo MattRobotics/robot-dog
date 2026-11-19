@@ -16,6 +16,15 @@ Per servo, in joint space (1 tick = 2*pi/4096 rad), two layers:
    is the joint damping (implicit), the rotor inertia the joint armature
    (tau_m = J omega0 / tau_full) and the gear friction a Coulomb frictionloss
    (fraction of tau_full). Torque OFF: no drive, no back-EMF (H-bridge open).
+3. Gear train under load (dev.7 correlation, 2026-11-12): the Coulomb friction
+   grows with the torque the gears transmit, F = friction + (1 - eta) |tau_m|,
+   with the motor torque tau_m = duty tau_full / eta, so a driven joint still
+   delivers duty * tau_full (the vendor stall torque is an output figure) while
+   a back-driven one holds up to (2 - eta) / eta times more per duty. eta = 1
+   is the unloaded model above, bit for bit. With gear_friction_v0_rad_s > 0 the
+   load-dependent part is a smooth friction, -(1 - eta) |tau_m| tanh(qdot / v0),
+   with no static band (a joint dithered by its own loop: at rest the output
+   torque is tau_m, no history); the constant part stays a Coulomb frictionloss.
 
 PARAMS lists every number with its status: MEASURED, FIRMWARE, VENDOR,
 IDENTIFIED (fitted on measured bench data, unloaded) or HYPOTHESIS.
@@ -40,6 +49,8 @@ PARAMS = {
     "latency_s": (0.0015, "HYPOTHESIS", "servo_plant draws 0-3 ms"),
     "brake_cap_step_s2": (math.inf, "HYPOTHESIS", "inf = the frame's ACC; bench unloaded arrival braking at ACC 50: p10 8 397, median 9 231 (MEASURED); loaded: NOT MEASURED"),
     "acc_ceiling": (220, "FIRMWARE", "register 85 written by the candidate (kAccCeilingTarget)"),
+    "gear_efficiency": (1.0, "HYPOTHESIS (1 = no load-dependent friction)", "forward efficiency of the gear train under load; holding vs driving per duty (2 - eta) / eta; not measured on the bench (unloaded)"),
+    "gear_friction_v0_rad_s": (0.0, "HYPOTHESIS", "0: the load-dependent friction is Coulomb (static band, history); > 0: smooth, tanh(qdot / v0)"),
     "volt": (11.1, "MEASURED", "bus voltage of the bench and of the HW sessions (11.1-11.4 V); 9.6 V is the low-battery case of servo_plant"),
 }
 
@@ -57,6 +68,8 @@ class Params:
     latency_s: float = PARAMS["latency_s"][0]
     brake_cap_step_s2: float = PARAMS["brake_cap_step_s2"][0]
     acc_ceiling: int = PARAMS["acc_ceiling"][0]
+    gear_efficiency: float = PARAMS["gear_efficiency"][0]
+    gear_friction_v0_rad_s: float = PARAMS["gear_friction_v0_rad_s"][0]
     volt: float = PARAMS["volt"][0]
 
     @property
@@ -142,8 +155,13 @@ class Servos:
         return np.where(self.torque_on, d, 0.0)
 
     def torque(self, q):
-        """Drive torque (N*m) without the back-EMF term (MuJoCo joint damping)."""
-        return self.duty(q) * self.p.tau_full * self.unit
+        """Motor torque at the output (N*m) without the back-EMF term (MuJoCo joint damping):
+        duty * tau_full / eta, of which the load-dependent gear friction takes (1 - eta)."""
+        return self.duty(q) * self.p.tau_full * self.unit / self.p.gear_efficiency
+
+    def gear_friction(self, torque):
+        """Coulomb friction of each joint (N*m) while the motor applies `torque` (servo.torque)."""
+        return self.p.friction + (1.0 - self.p.gear_efficiency) * np.abs(torque)
 
 
 def apply_to_model(model, params, dofs, unit=None, torque_on=None):

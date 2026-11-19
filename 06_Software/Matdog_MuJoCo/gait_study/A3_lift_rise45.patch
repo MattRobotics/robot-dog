@@ -1,0 +1,33 @@
+diff -ru a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp w/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp
+--- a/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-11 19:04:50.000000000 +0100
++++ b/05_Firmware/MATDOG_Controller/src/motion/Gait.cpp	2026-11-12 09:20:00.431082392 +0100
+@@ -101,6 +101,20 @@
+   if(pv(u)>=1-r){const T w=T(1)-u;return T(1)-T(k)*w*w;}
+   return T(1/(1-r))*(u-T(.5*r));
+ }
++// Vertical swing profile (gait study, MuJoCo dev.7 correlation 2026-11-12): the foot
++// rises with a smootherstep over the first kSwingLiftRise of the swing and lands with
++// one over the last kSwingLiftFall, at liftM between (C2: zero speed and acceleration
++// at lift-off and touchdown). The legacy bell 64 u^3 (1-u)^3 reaches 5 % of liftM at
++// u = 0.1 and 26 % at u = 0.2, while the foot already moves; a short rise lifts it
++// before it travels, a long fall keeps the touchdown as low as the legacy bell
++// (front UPPER at its kHeight bound). Rise/fall <= 0 keeps the legacy bell.
++constexpr double kSwingLiftRise=0.45,kSwingLiftFall=0.45;
++template<class T> T liftProfile(T u){
++  if(kSwingLiftRise<=0||kSwingLiftFall<=0)return T(64)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++  const T up=pv(u)<kSwingLiftRise?smooth(u*T(1/kSwingLiftRise)):T(1);
++  const T down=pv(u)>1-kSwingLiftFall?smooth((T(1)-u)*T(1/kSwingLiftFall)):T(1);
++  return up*down;
++}
+ // Geometric stride law: body progress, in cycles of advance. Identity without
+ // ramps. The start raises the progress rate 0->1 over startCycles; after the
+ // decel cycle S=terminal-stopCycles the rate falls 1->0 at the terminal
+@@ -182,7 +196,7 @@
+     }else{a=anchor(p,i,td,terminal);if(!phase.stance)b=anchor(p,i,td+1,terminal);}
+     out.feet[i]=a;
+     if(!phase.stance){T u=(s-T(td+p.duty))*T(1/(1-p.duty));if(phase.boundary)setP(u,0);T f=swingProfile(u,p.swingRamp,p.swingRampEnd);
+-      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(64*p.liftM)*u*u*u*(T(1)-u)*(T(1)-u)*(T(1)-u);
++      T x=T(a.x)+T(b.x-a.x)*f,y=T(a.y)+T(b.y-a.y)*f,z=T(p.liftM)*liftProfile(u);
+       out.feet[i]={pv(x),pv(y),pv(z)};footRates(out,i,x,y,z);}}
+ }
+ CartesianSample sample(const GaitParameters& p,double cycles,double rate,double accel,double terminal,GaitTrack* track){

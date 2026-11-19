@@ -1,0 +1,13 @@
+simple_motion exit=0 138 s
+stop_support exit=0 46 s
+prone exit=0 135 s
+night_recovery exit=0 264 s
+
+simple_motion: PASS software sequencing, reachable heights, gait continuity, native-target timeout, STOP, alarms, communication/deadline loss; NO HARDWARE MOTION VALIDATION
+stop_support: PASS contextual STOP software tests; PHYSICAL BRAKING AND SUPPORT NOT QUALIFIED
+prone: PASS — PRONE_DEV15_REPLAY 4/4 PRONE_REST; blocked handover held, recoverable, SAFE_OFF on request and on power loss; NO PHYSICAL VALIDATION (the dev.15 trace names FAIL_52_2/FAIL_52_4 are the replayed historical failures, both reaching PRONE_REST)
+night_recovery: IMU_FEED PASS checks=57 failures=0 hardware=false
+
+run_host_tests.sh: USB_FRAMING_MUTATIONS = PASS (both historical defects detected) HOST_TESTS = PASS (current owners and motion source gate; motion execution suites DEFERRED) 
+static_audit: STATIC_AUDIT = PASS ; MOTION_CONVERGENCE_SOURCE = PASS x2; FAIL lines 0
+build: exit=0, APP 0e07a4ac0b5764076670b8310b07f44eee15d957ec33703f18f9e30ea1b9b7b6, 1 775 280 B, CLEAN, ROBOT_POWERED, not installed

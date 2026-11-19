@@ -1,0 +1,45 @@
+From e6ee46b492833054c0b3d09258eb33de75ec05c1 Mon Sep 17 00:00:00 2001
+From: ManicardiMatteo87 <manicardi.matteo87@gmail.com>
+Date: Mon, 16 Nov 2026 08:34:42 +0100
+Subject: [PATCH 11/19] research(motion): P3b, the release that builds a
+ segment plan keeps the probe at the accepted scale
+
+A STAND from PRONE builds the DEPLOY and LIFT plans in the release that ends
+the preceding segment, and the attenuated compensation of that release then
+solved twice (probe at the last accepted scale, then the projection). In the
+plan release (planned_ and segmentStartUs_ == now, existing state) the probe
+is kept when its scale does not exceed the projection: a correction no larger
+than the attenuation allows, for that one release; the next release takes
+the projection as before. A shrinking projection still solves at once.
+
+Host rig (64 scenarios): no RAW frame differs, applied correction within
+0.04 mrad. QEMU (fixture scenario): ALIGN->DEPLOY release 1 606 k -> below
+1 208 k instructions with E1+P3a. Research candidate, not validated on
+hardware.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ 05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+index 935c2c9..8eff24f 100644
+--- a/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
++++ b/05_Firmware/MATDOG_Controller/src/simple/SimpleMotion.cpp
+@@ -1492,7 +1492,12 @@ void SimpleMotion::compensate(LocomotionFrame& f,uint64_t now){
+   // same Motion epoch, not a second timer or a servo acceleration controller.
+   const double envelope=quinticTimeLaw(std::fmin(1.,double(now-imuStartUs_)/1e6),1).progress;
+   const double projection=probe.valid?envelope/std::sqrt(1+4*sum):0;
+-  if(projection>0&&std::abs(projection-trialScale)<=.02*projection&&pointSafe(probe)&&contains(box,probe)){
++  // P3b (P0 peaks, 16/11): the release that has just built a segment plan (beginPlan,
++  // ~0.5-1.1 M instructions) keeps the probe at the last accepted scale when that scale
++  // does not exceed the projection: a correction no larger than the attenuation allows,
++  // for that one release; the next release takes the projection as before.
++  const bool planRelease=planned_&&segmentStartUs_==now&&trialScale<=projection;
++  if(projection>0&&(planRelease||std::abs(projection-trialScale)<=.02*projection)&&pointSafe(probe)&&contains(box,probe)){
+     keep(probe);rollCorrection_=roll;pitchCorrection_=pitch;imuLimited_=projection<.999;if(imuLimited_)imuReason_="ATTENUATED";return;}
+   for(unsigned trial=0;trial<5&&projection>0;++trial){const double scale=projection*std::ldexp(1.,-static_cast<int>(trial));
+     const auto q=solve(scale,probe.valid?probe:f.target);
+-- 
+2.43.0
+

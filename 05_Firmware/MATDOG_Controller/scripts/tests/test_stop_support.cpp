@@ -184,12 +184,14 @@ void stopPlanBounds(){
 void holdAndProne(){
   for(double h:{.05,.10,.15}){Rig r;r.stand(h);r.ticks(100);checkHeldStop(r);}
   // PRONE ends at rest (dev.15): STOP there is the ordinary OFF latch, no held
-  // reference and no frame; STAND then needs the usual SAFE_OFF recovery.
+  // reference and no frame. A WALK stays refused; an explicit STAND re-arms
+  // from the verified OFF through ACQUIRE (2026-11-14), never the STOP resume.
   for(unsigned wait:{0u,100u}){Rig prone;prone.stand(.05);assert(!prone.m.prone(prone.p.now));
     for(unsigned n=0;n<8000&&!prone.m.proneRest();++n)prone.tick();assert(prone.m.proneRest());prone.ticks(wait);
     const auto frames=prone.p.frames;prone.m.stop();prone.ticks(40);
     assert(!prone.m.stopActive()&&!prone.m.proneRest()&&prone.m.offVerified()&&!prone.m.energized()&&prone.p.frames==frames);
-    assert(!strcmp(prone.m.stand(.10,prone.p.now),"SAFE_OFF_STAND_REFUSED"));}
+    assert(!strcmp(prone.m.walk(1,prone.p.now),"SAFE_OFF_STAND_REFUSED")&&prone.p.frames==frames);
+    assert(!prone.m.stand(.10,prone.p.now)&&!strcmp(prone.m.phase(),"ACQUIRE")&&!prone.m.stopActive());}
   // Loaded low HOLD outside kHeight, already admitted by dev.7 inside kLift.
   Rig loaded;loaded.stand(.05);loaded.ticks(100);
   loaded.p.observed[2].raw+=7;loaded.p.observed[2].q+=7*simple::kTickRad;
@@ -274,7 +276,10 @@ void supportPlaneLevelTarget(){
         upSupport.x*current.rotation[0][2]+upSupport.y*current.rotation[1][2]+upSupport.z*current.rotation[2][2]};
       for(unsigned omitted=0;omitted<=4;++omitted){bool stance[4];for(unsigned i=0;i<4;++i)stance[i]=i!=omitted;
         double roll=9,pitch=9;assert(motion::supportLevelTarget(stand.contactsWorldM,solved.target,stance,upBody,current,roll,pitch));
-        assert(std::abs(roll-expectedRoll)<1e-7&&std::abs(pitch-expectedPitch)<1e-7);++cases;
+        // FP32 core: each contact verifies within 1e-6 m (Newton tolerance), which tilts a
+        // support triangle with >= 0.1 m sides by <= 2e-5 rad (0.013 tick, 1/50 of the
+        // 1 mrad leveling dead band); measured 1.6e-6 rad (18/11/2026).
+        assert(std::abs(roll-expectedRoll)<2e-5&&std::abs(pitch-expectedPitch)<2e-5);++cases;
       }
     }
   }
@@ -431,8 +436,12 @@ void safeOffAndRecovery(){
     motion::MotionCommand c;c.intent=motion::Intent::STOP;c.owner=motion::ClientOwner::DASHBOARD;strcpy(c.id,"http-after-safe-off");c.sequence=1;
     assert(service.command(c,r.p.now/1000).outcome==motion::CommandOutcome::ACCEPTED);
     r.finishOff();r.ticks(20);assert(r.m.offMask()==8191&&!r.m.energized()&&!r.m.stopActive());
-    assert(r.p.enables==enables&&r.p.frames==frames&&r.m.stand(.15,r.p.now));
-    if(scenario==5||scenario==6)assert(r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"CONCURRENT_PHYSICAL_FAULT"));
+    assert(r.p.enables==enables&&r.p.frames==frames);
+    if(scenario==5||scenario==6){assert(!strcmp(r.m.stand(.15,r.p.now),"FAULT_STOP_REQUIRED")&&r.m.state()==simple::State::FAULT&&!strcmp(r.m.reason(),"CONCURRENT_PHYSICAL_FAULT"));continue;}
+    // 2026-11-14: no torque-ON resume and no WALK after the SAFE_OFF; an
+    // explicit STAND re-acquires the real pose from torque OFF (ACQUIRE).
+    assert(r.m.state()==simple::State::STOPPED&&!strcmp(r.m.walk(1,r.p.now),"SAFE_OFF_STAND_REFUSED"));
+    assert(!r.m.stand(.15,r.p.now)&&!strcmp(r.m.phase(),"ACQUIRE")&&!r.m.stopActive()&&r.p.enables==enables&&r.p.frames==frames);
   }
   {Rig r;r.walk();r.ticks(380);r.p.failStopFrame=r.p.failWithSafeOff=true;r.m.stop();
     for(unsigned n=0;n<20&&r.m.state()!=simple::State::FAULT;++n)r.tick();
@@ -457,7 +466,7 @@ void safeOffAndRecovery(){
   motion::MotionCommand parsed;const char* why=nullptr;
   const char bad[]={"{\"version\":1,\"id\":\"off\",\"sequence\":1,\"issued_at_ms\":0,\"ttl_ms\":1000,\"owner\":\"dashboard\",\"type\":\"SERVO.SAFE_OFF\",\"params\":{}}"};
   assert(!core::parseMotionJson(bad,strlen(bad),&parsed,&why));
-  puts("SAFE_OFF global 13/13 overrides Motion/STOP/TX and concurrent fault; HTTP STOP never undoes OFF. Explicit STAND uses existing torque only from admitted held poses");
+  puts("SAFE_OFF global 13/13 overrides Motion/STOP/TX and concurrent fault; HTTP STOP never undoes OFF. Explicit STAND uses existing torque only from admitted held poses; after SAFE_OFF it re-acquires from torque OFF");
 }
 void writerHandoffWithImu(){
   // Constant and varying ordinary IMU correction in HOLD, HEIGHT50->100,

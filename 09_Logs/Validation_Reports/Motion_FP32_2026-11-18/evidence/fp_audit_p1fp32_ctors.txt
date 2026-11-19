@@ -1,0 +1,7 @@
+     8 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I__ZN11qemu_motion6gClockE  []
+    27 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I_hardware_serial_end  []
+    11 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I__ZN6StringC2EPKc  []
+     8 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I__Zli4_kHzy  []
+   105 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I__ZN9__gnu_cxx9__freeresEv  []
+    12 insn  fpu=   0 soft=   0 dlibm=  0 flibm=  0 sfloat=  0  _GLOBAL__sub_I__ZN17__eh_globals_init7_S_initE  []
+TOTAL insn=171 fpu=0 soft=0 dlibm=0 flibm=0 sfloat=0
