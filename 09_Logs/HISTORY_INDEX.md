@@ -187,6 +187,7 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | Date | Commit | Document | Status |
 |---|---|---|---|
 | 2026-11-11 | `b561062` | [`1.0.2-dev.7` hardware report](Validation_Reports/MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md) (Motion vNext + Battery P1) | VALIDATED HARDWARE in the tested scope, NOT STABLE |
+| 2026-11-13 | `5472b65` | [Ground Contact sensorless Phase 1](Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md) | VERIFIED OFFLINE passive diagnostics; motorized calibration PARTIAL, not qualified; never run on the robot |
 | 2026-11-14 | `integ/matdog-unified-operational-20261114` | [Unified operational branch handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md) | Git consolidation, no flash |
 | 2026-11-14/16 | diagnostic `1.0.2-dev.8` builds `8530d3a`, `e321e86`, `46b3175`, `82c1af9`, `2638204`, `a86c680`, `6be4690` | Hardware validations and offline P0 work, indexed in [Validation_Reports](Validation_Reports/README.md) | Fixture-validated diagnostics; Motion Timing P0 open |
 | 2026-11-17 | `06b6db0` | [P0 campaign, HTTP A/B](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/REPORT.md) | HTTP status load the dominant amplifier; P0 open |
@@ -196,3 +197,4 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | 2026-11-19 | `1314bc4`, docs `e6825f1` | [Integrated build](Validation_Reports/Motion_Integrated_1314bc4_2026-11-19/REPORT.md) | CLEAN build, offline checks PASS |
 | 2026-11-19 | `1314bc4` | [**Hardware qualification and completion**](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md), [release manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md), [ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md) | VERIFIED HARDWARE on the fixture; Motion Timing P0 CLOSED in that scope; KEEP |
 | 2026-11-19 | consolidation merge into `main`, tag `v1.0.2` on `1314bc4` | [Release `v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) | Stable, Motion fixture-qualified; `v1.0.1` unchanged |
+| 2026-11-19 | seven candidate, documentation and release branches | Deleted from GitHub after verification: 0 commits outside `main` ([EXTERNAL_ARCHIVES §9](EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19)) | Only `main` remains; tags kept |

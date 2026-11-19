@@ -38,6 +38,10 @@
     - QEMU P0 classes −74/−75 %;
     - no FPU use in global constructors.
   - **`1314bc4`, `kSteer` SLOW re-certified:** the RF UPPER maximum goes from 0.963456 to 1.004874 rad (FCL 120/120 + 12/12, lower bound 3.085 mm). This fixes the pre-existing steered SLOW `random_3` envelope failure.
+- **Also in the line, without an entry of its own:** `5472b65`, Ground Contact sensorless Phase 1 (13/11).
+  - Passive `GROUND_CONTACT.OBSERVE` diagnostics in the dashboard Calibration & Maintenance tab.
+  - VERIFIED OFFLINE; never run on the robot.
+  - No probing or weight transfer (`THREE_SUPPORT_TRANSFER_UNAVAILABLE`) and no absolute ground height ([report](../../09_Logs/Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md)).
 - **Hardware, 19/11, fixture (VERIFIED HARDWARE):**
   - **Flash and identity:** flash APP-only with digest matched; NVS gen-1 and calibration 12/12 unchanged.
   - **Tests run:** A/B chain 8/8 (140 steps), dashboard D1/D2 with HTTP STOP, block D 27/27 (joystick backward and lateral), S9 15/15 (steered SLOW).

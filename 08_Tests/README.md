@@ -18,6 +18,7 @@ Percorsi relativi alla radice del repository. `FW` = `05_Firmware/MATDOG_Control
 |---|---|---|
 | Test host del firmware (unità e integrazione) | `FW/scripts/tests/run_host_tests.sh`, più le singole suite `FW/scripts/tests/run_*` | `bash scripts/tests/run_host_tests.sh` dalla cartella `FW`. Dura ≈ 2,5 min; il file non è eseguibile |
 | Suite Motion mirate | `FW/scripts/tests/run_simple_motion_tests.sh`, `run_stop_support_tests.sh`, `run_prone_tests.sh`, `run_calibration_restore_tests.sh` | `bash …` |
+| Ground Contact sensorless (diagnostica passiva) | `FW/scripts/tests/run_simple_motion_tests.sh --ground-contact` (`test_ground_contact.cpp`) | VERIFIED OFFLINE, mai provata sul robot ([rapporto](../09_Logs/Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md)) |
 | Audit statico (pin di sorgente, confini, regole) | `FW/scripts/static_audit.py` | `python3 scripts/static_audit.py "$(pwd)"` con il percorso **assoluto** dello sketch. Dura ≈ 6 min |
 | Gate offline della legge Motion | `FW/scripts/offline_motion/`: `run_stop_secant_gate.sh`, `run_joystick_envelope.sh`, `run_perturbation_matrix.sh`, `run_stop_matrix.sh`, `run_walk_support_check.sh`, `run_walk_tilt_envelope_check.sh`, `run_motion_frame_digest.sh` | Banchi host deterministici |
 | Banco QEMU ESP32-S3 | `FW/scripts/offline_motion/run_qemu_motion.sh`, `FW/scripts/offline_motion/qemu_motion/` | Conteggi CCOUNT, **non** tempi hardware |

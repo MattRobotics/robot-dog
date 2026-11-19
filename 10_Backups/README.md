@@ -17,7 +17,9 @@ Questa cartella distingue ciò che è **recuperabile da GitHub** da ciò che esi
 | Immagini APP con ELF, map, manifest e sdkconfig | `~/MATDOG/backups/esp32/app_images/<commit>/`. Stable `v1.0.2`: `1314bc4`, sigillo `312fe371…`. Rollback: `30c894a`, sigillo `8a1aa6d3…` | [Manifest delle evidenze v1.0.2](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md#c-immagini-firmware-asus) |
 | Evidenze integrali delle sessioni (log seriali, registrazioni di stato, QEMU, certificati, script) | `~/MATDOG/verification-artifacts/<cartella sigillata>/` | Manifest di ogni sessione; per la linea `1.0.2`, la sezione 8 di [`EXTERNAL_ARCHIVES.md`](../09_Logs/EXTERNAL_ARCHIVES.md) |
 | Seconde copie delle evidenze | `~/MATDOG/backups/verification-artifacts/session-<data>/` (tar.gz con `SHA256SUMS.txt`) | Idem |
-| Bundle Git | `~/MATDOG/backups/git/*.bundle`, con `.sha256` | Bundle della `v1.0.2`: hash nel `MATDOG_v1.0.2_RELEASE_MANIFEST.txt` della Release |
+| Bundle Git | `~/MATDOG/backups/git/*.bundle`, con `.sha256` | Bundle della `v1.0.2`: hash nel `MATDOG_v1.0.2_RELEASE_MANIFEST.txt` della Release e nel [manifest delle evidenze](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md#d-seconda-copia-asus) |
+| Kit della release `v1.0.2` (asset, note, testo della PR e dei commenti alle issue) | `~/MATDOG/backups/releases/v1.0.2/`, con `LOCAL_SHA256SUMS.txt` | Idem |
+| Inventario dei branch remoti eliminati il 19/11 | `~/MATDOG/backups/git/deleted-remote-branches-20261119.txt`, con `.sha256` | [EXTERNAL_ARCHIVES §9](../09_Logs/EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19) |
 
 ## Regole
 

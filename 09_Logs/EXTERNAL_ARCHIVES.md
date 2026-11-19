@@ -145,3 +145,23 @@ The hardware and offline evidence of 14–19/11/2026 was produced on the operato
 | 19/11 (Stable `v1.0.2`) | [Evidence manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md), with the seal check of all 29 sealed folders of 17–19/11 |
 
 Originals and second copies share one physical disk. No independent physical copy is declared for them.
+
+## 9. Remote branches deleted on 2026-11-19
+
+*(Added; the sections above are unchanged.)*
+
+After the Stable `v1.0.2` merge (`main` = `052d52ed309c8aa4d53ee8ee0bbbc10706e0d898`), seven remote branches were deleted on 2026-11-19 (09:12Z) with a normal `git push --delete`, without force push or history rewrite.
+- Before deletion each held **0 commits outside `main`** and was an ancestor of it; no pull request was open.
+- GitHub now keeps only `main`. Release and historical tags are unchanged; `v1.0.2` still points to the firmware commit `1314bc4`.
+
+| Deleted branch | Last tip |
+|---|---|
+| `cand/ksteer-slow-recert-20261118` | `e6825f1a222bc505adbb6d5decf77b1cc40ec6be` |
+| `cand/motion-fp32-20261118` | `05e1214b4010f65794d8e038366d5a3e36251bb8` |
+| `cand/p1-edge-lift-halftick-20261118` | `eb1ba28d9ad32a794ec6afc1e2adff80c01c02fe` |
+| `docs/bms-daly-ab-evidence-20261118` | `d396a457190ba6f6bba2f26911816e152bdb251b` |
+| `docs/motion-fp32-session-close-20261118` | `251a1743ffc45849e516ead419084482ba093b48` |
+| `integ/matdog-unified-operational-20261114` | `06b6db0368d360fd3976886ba65775f1ebaf816b` |
+| `release/v1.0.2-stable-20261119` | `919dfa907e10e33257c925a9c6cc032f90b3ae8c` |
+
+Every tip is reachable from `main`. A verified local copy of all of them, together with `main` and the release tags, is the Git bundle listed in the [v1.0.2 evidence manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md#d-seconda-copia-asus).

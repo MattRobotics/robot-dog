@@ -10,7 +10,7 @@
 | # | Elemento | Valore |
 |---|---|---|
 | 1 | Firmware realmente installato | `SOURCE_SIGNATURE build_id=1314bc411c58 version=1.0.2-dev.7 profile=ROBOT_POWERED`, `GIT_DIRTY=NO`, `ota_running_build_id=1314bc411c58`. Letto via USB dopo il boot del 19/11 (06:08Z) e di nuovo alle 07:24Z e 07:33Z |
-| 2 | Commit sorgente dell'APP | **`1314bc411c589c4216e95629f4665d9d01f05781`**, branch `cand/ksteer-slow-recert-20261118`. Discende da `main` `6838e4d` senza divergenze; la linea è nel §5 |
+| 2 | Commit sorgente dell'APP | **`1314bc411c589c4216e95629f4665d9d01f05781`**. Pubblicato prima sul branch `cand/ksteer-slow-recert-20261118`, eliminato dal remoto il 19/11 dopo l'inclusione in `main` ([inventario](../../EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19)). Discende da `main` `6838e4d` senza divergenze; la linea è nel §5 |
 | 3 | Build ID | `1314bc411c58` |
 | 4 | APP SHA256 | **`dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`** |
 | 5 | Dimensione e profilo | 1 777 952 B. Manifest di build originale: `ROBOT_POWERED`, `SOURCE_STATE=CLEAN`, `GIT_DIRTY=0`, `OTA_INGEST_ENABLED=0`, `MOTION_STACK=MATDOG_SIMPLE_V1`, `MOTION_AUTHORITY=RUNTIME_GOVERNED`, `BOOT_MOTION_AUTHORIZED=0`, `PRIVATE_TLS_CONFIGURATION_SHA256=ABSENT`, `BUILD_UTC=2026-11-19T05:27:14Z`; FQBN `esp32:esp32:esp32s3:…PartitionScheme=custom…PSRAM=opi` |

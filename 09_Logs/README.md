@@ -17,7 +17,7 @@ Stato corrente 19/11/2026: **Stable [`v1.0.2`](https://github.com/MattRobotics/r
   - [campagna P0 del 17/11](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/REPORT.md);
   - [handoff del 18/11](Development_Log/2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md).
 
-Storico 14–16/11/2026: branch operativo unificato e build diagnostiche `1.0.2-dev.8` ([handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md)). Storico 11/11: `1.0.2-dev.7` `b5610620d0ce` ([rapporto](Validation_Reports/MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md)).
+Storico 14–16/11/2026: branch operativo unificato e build diagnostiche `1.0.2-dev.8` ([handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md)). Ground Contact sensorless Fase 1 (13/11, [rapporto](Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md)): diagnostica passiva inclusa nel firmware attuale, VERIFIED OFFLINE, mai provata sul robot. Storico 11/11: `1.0.2-dev.7` `b5610620d0ce` ([rapporto](Validation_Reports/MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md)).
 
 Storico 10/11/2026: era installata la build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`).
 - **Hardware:** fixture Q1–Q8 qualificata; terra fuori protocollo. [Report HW](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) · [evidenze e SHA256](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
