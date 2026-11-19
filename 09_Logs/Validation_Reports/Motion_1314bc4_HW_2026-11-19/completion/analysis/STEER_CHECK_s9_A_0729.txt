@@ -1,0 +1,29 @@
+== s9_A_0729: 381 status samples
+M0 memory gate (read only, both HTTP clients active, before an  57 smp
+K0 MODE SLOW selected (read only, at rest)                       0 smp
+K1 STAND 120 from PRONE_REST                                    29 smp | imu {'ATTENUATED': 26, 'WORKSPACE': 1, 'SLEW': 1}
+K2 joystick lateral left SLOW full scale 12 s (as D4)           37 smp | WALKING 36 vx +0.0000..+0.0000 vy +0.0040..+0.0040 yaw +0.0000..+0.0000 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.004,"yaw_rate_rad_s":0.0,"joystick":true} | imu {'ATTENUATED': 1, 'SLEW': 2, 'ENVELOPE': 34}
+K3 release (as D5)                                              18 smp | WALKING 17 vx +0.0000..+0.0000 vy +0.0040..+0.0040 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 17, 'WORKSPACE': 1}
+K4 joystick lateral right SLOW full scale 12 s (as D6)          40 smp | WALKING 37 vx +0.0000..+0.0000 vy -0.0040..-0.0040 yaw +0.0000..+0.0000 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":-0.004,"yaw_rate_rad_s":0.0,"joystick":true} | imu {'SLEW': 4, 'ATTENUATED': 1, 'ENVELOPE': 35}
+K5 release (as D7)                                              17 smp | WALKING 16 vx +0.0000..+0.0000 vy -0.0040..-0.0040 yaw +0.0000..+0.0000 joy False | imu {'ENVELOPE': 16, 'WORKSPACE': 1}
+K6 joystick yaw counter-clockwise SLOW full scale 12 s (as D8)  39 smp | WALKING 37 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw +0.0320..+0.0320 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.0,"yaw_rate_rad_s":0.032,"joystick":true} | imu {'SLEW': 4, 'ENVELOPE': 35}
+K7 release (as D9)                                              21 smp | WALKING 17 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw +0.0320..+0.0320 joy False | imu {'ENVELOPE': 17, 'SLEW': 3, 'WORKSPACE': 1}
+K8 joystick yaw clockwise SLOW full scale 12 s (as D10)         41 smp | WALKING 36 vx +0.0000..+0.0000 vy +0.0000..+0.0000 yaw -0.0320..-0.0320 joy True | end-of-step velocity {"vx_m_s":0.0,"vy_m_s":0.0,"yaw_rate_rad_s":-0.032,"joystick":true} | imu {'SLEW': 7, 'ENVELOPE': 34}
+K9 STOP during the yaw walk (as B4)                              7 smp | imu {'ENVELOPE': 7}
+K10 wait 4 s held (as B5)                                       11 smp | imu {'ENVELOPE': 11}
+K11 STAND 120 resume (as B6)                                    20 smp | imu {'ENVELOPE': 19, 'SLEW': 1}
+K12 PRONE to PRONE_REST                                         35 smp | imu {'SLEW': 2, 'ATTENUATED': 32}
+K13 TIMING dump (S9)                                             7 smp
+faults or fault-like reasons: none
+  LF_HIP    n  313 |raw-cmd| p50   5 p95  33 max  94 ticks (max in K1 STAND 120 from PRONE_REST) | commanded 1872..2048 raw 1877..2047
+  LF_UPPER  n  313 |raw-cmd| p50   4 p95  27 max  54 ticks (max in K8 joystick yaw clockwise SLOW) | commanded 2466..3081 raw 2468..3075
+  LF_LOWER  n  313 |raw-cmd| p50   4 p95  44 max  99 ticks (max in K12 PRONE to PRONE_REST) | commanded 2070..3112 raw 2072..3111
+  RF_HIP    n  313 |raw-cmd| p50   5 p95  35 max  86 ticks (max in K1 STAND 120 from PRONE_REST) | commanded 1965..2142 raw 1964..2136
+  RF_UPPER  n  313 |raw-cmd| p50   5 p95  32 max  53 ticks (max in K8 joystick yaw clockwise SLOW) | commanded 1109..1654 raw 1114..1650
+  RF_LOWER  n  313 |raw-cmd| p50   4 p95  45 max  98 ticks (max in K1 STAND 120 from PRONE_REST) | commanded 961..1899 raw 963..1897
+  RH_HIP    n  313 |raw-cmd| p50   6 p95  41 max  83 ticks (max in K6 joystick yaw counter-clockw) | commanded 1977..2170 raw 1983..2166
+  RH_UPPER  n  313 |raw-cmd| p50   6 p95  48 max  97 ticks (max in K12 PRONE to PRONE_REST) | commanded 724..1273 raw 731..1273
+  RH_LOWER  n  313 |raw-cmd| p50   5 p95  39 max  84 ticks (max in K12 PRONE to PRONE_REST) | commanded 1021..1782 raw 1025..1778
+  LH_HIP    n  313 |raw-cmd| p50   5 p95  48 max  90 ticks (max in K7 release (as D9)) | commanded 1950..2137 raw 1949..2129
+  LH_UPPER  n  313 |raw-cmd| p50   5 p95  33 max  94 ticks (max in K1 STAND 120 from PRONE_REST) | commanded 2848..3428 raw 2849..3423
+  LH_LOWER  n  313 |raw-cmd| p50   4 p95  43 max  90 ticks (max in K1 STAND 120 from PRONE_REST) | commanded 2297..3105 raw 2302..3103

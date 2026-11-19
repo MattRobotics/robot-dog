@@ -1,0 +1,26 @@
+====================================================================================================
+RUN s9_A_0729
+PASS M0 memory gate (read only, both HTTP clients active, before an  20.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 8958 us (PRONE_HEIGHT) comp 2580 | {} 
+PASS K0 MODE SLOW selected (read only, at rest)                       0.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 8958 us (PRONE_HEIGHT) comp 2580 | {} 
+PASS K1 STAND 120 from PRONE_REST                                     9.8 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 8210 us (HEIGHT) comp 2899 | {"complete_s": 9.8, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 120.1} 
+PASS K2 joystick lateral left SLOW full scale 12 s (as D4)           13.3 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10507 us (WALK_STANDARD) comp 3569 | {"walking_after_s": 1.0} 
+PASS K3 release (as D5)                                               6.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10753 us (WALK_STANDARD) comp 3569 | {"standing_after_s": 6.2, "reason": "STAND_REACHED"} 
+PASS K4 joystick lateral right SLOW full scale 12 s (as D6)          13.9 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10045 us (WALK_STANDARD) comp 3283 | {"walking_after_s": 1.6} 
+PASS K5 release (as D7)                                               6.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10045 us (WALK_STANDARD) comp 3524 | {"standing_after_s": 6.0, "reason": "STAND_REACHED"} 
+PASS K6 joystick yaw counter-clockwise SLOW full scale 12 s (as D8)  13.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10278 us (WALK_STANDARD) comp 3544 | {"walking_after_s": 1.3} 
+PASS K7 release (as D9)                                               7.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10278 us (WALK_STANDARD) comp 3705 | {"standing_after_s": 7.4, "reason": "STAND_REACHED"} 
+PASS K8 joystick yaw clockwise SLOW full scale 12 s (as D10)         14.5 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 9956 us (WALK_STANDARD) comp 3790 | {"walking_after_s": 2.2} 
+PASS K9 STOP during the yaw walk (as B4)                              2.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10293 us (WALK_STANDARD) comp 3790 | {"stop_verified_s": 2.4, "resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE", "state": "STOPPED", "torque_active": true} 
+PASS K10 wait 4 s held (as B5)                                        4.0 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10293 us (WALK_STANDARD) comp 3790 | {"resume_allowed": true, "resume_reason": "STAND_RECOVERY_AVAILABLE"} 
+PASS K11 STAND 120 resume (as B6)                                     6.6 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 10533 us (WALK_STANDARD) comp 2203 | {"complete_s": 6.6, "ack_reason": "COMMAND_ACCEPTED", "height_estimate_mm": 119.8} 
+PASS K12 PRONE to PRONE_REST                                         12.4 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 8455 us (PRONE_DEPLOY) comp 2579 | {"complete_s": 12.4, "safe_off_mask": 8191} 
+PASS K13 TIMING dump (S9)                                             1.2 s  missed +0 overruns +0 | cmd missed 0 first -/0 us, max work 8455 us (PRONE_DEPLOY) comp 2579 | {} 
+steps: 15 PASS, 0 FAIL
+DALY D1: 27 /status samples 07:29:02..07:31:12; comm {'OK': 27}
+  rx_bytes {'129': 27} | first_byte_ms {'11': 3, '12': 1, '13': 1, '14': 2, '15': 3, '16': 2, '17': 2, '18': 5, '19': 2, '20': 5, '22': 1} | stale {'0': 27} | fail_streak max 0 | fresh {'YES': 27} | alarms {'0000 0000 0000 0000': 27}
+  pack 11.0..11.1 V, SoC 51.5..51.6 %, current -0.5..-0.2 A, cell min 3687 mV; health {'READY': 27}; uptime 4832632..4962551 ms
+Motion: 134 status samples; (state, fault) {('READY', False): 24, ('MOVING', False): 36, ('WALKING', False): 70, ('STOPPED', False): 4}
+  joint temperature max (C): LF_HIP=26 LF_UPPER=23 LF_LOWER=24 RF_HIP=36 RF_UPPER=42 RF_LOWER=24 RH_HIP=24 RH_UPPER=22 RH_LOWER=25 LH_HIP=36 LH_UPPER=42 LH_LOWER=24
+  joint voltage min (dV): LF_HIP=111 LF_UPPER=111 LF_LOWER=111 RF_HIP=111 RF_UPPER=111 RF_LOWER=111 RH_HIP=111 RH_UPPER=111 RH_LOWER=110 LH_HIP=111 LH_UPPER=111 LH_LOWER=110
+  IMU correction applied -64.0..62.4 mrad, wanted -58.1..62.3 mrad; reasons {'ATTENUATED': 45, 'SLEW': 10, 'ENVELOPE': 79}; imu_valid {True: 134}
+  last 07:31:15.023: state READY phase IDLE reason PRONE_REST fault False safe_off True mask 8191 torque False missed 0 overruns 0 max_work 12729 us

@@ -1,0 +1,9 @@
+     4.0 s  comm -> OK age_ms=23
+last sample (718.01, 'OK', '1749')
+uptime first/last (10.0, 'READY', 9210) (700.0, 'READY', 699195)
+health values ['READY']
+1 L:calibration      : STALE_PENDING_FULL_RECALIBRATION hardware
+382 L:DALY   init=OK detected=ONLINE expected=REQUIRED result=PASS
+358 OK
+358 L:  rx_bytes=N first_byte_ms=N stale_bytes=N fail_streak=N las
+1 L:{"version":N,"now_ms":N,"state":"READY","phase":"IDLE","pose

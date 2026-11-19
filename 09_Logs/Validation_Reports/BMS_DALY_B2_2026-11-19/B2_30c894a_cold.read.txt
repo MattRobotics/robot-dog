@@ -1,0 +1,1 @@
+B2_30c894a_cold: arm B firmware 1.0.2-dev.7 build 30c894a0d430 boots seen 1 -> CLEAN  (358 samples from 4 to 718 s, 358 valid, longest hole 2 s)
