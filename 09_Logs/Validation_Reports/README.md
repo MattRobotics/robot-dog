@@ -7,6 +7,7 @@
 >   - `kSteer`: [Motion_SteerSlow_Recert_2026-11-18](Motion_SteerSlow_Recert_2026-11-18/README.md);
 >   - campagna P0 del 17/11: [rapporto](MATDOG_1_0_2_P0_2026-11-17/REPORT.md).
 > - **Rollback:** [`30c894a`, qualifica del 18/11](Motion_30c894a_HW_2026-11-18/README.md).
+> - **Nel firmware anche:** [Ground Contact Fase 1](Ground_Contact_Phase1_2026-11-13/REPORT.md) (13/11), diagnostica passiva VERIFIED OFFLINE, mai provata sul robot; nessuna misura assoluta del terreno.
 > - **DALY:** [A/B del 18/11](BMS_DALY_AB_2026-11-18/REPORT_AB.md) INCONCLUSIVE, [B2 del 19/11](BMS_DALY_B2_2026-11-19/README.md) CLEAN; RCA congelata, causa UNKNOWN.
 
 > **Storico — branch operativo unico (14/11/2026) — `integ/matdog-unified-operational-20261114`:** [handoff](Unified_Operational_2026-11-14/HANDOFF.md) — Battery P1 + Motion dev.7, Ground Contact Fase 1 e ricerca MuJoCo vNext in un solo branch; consolidamento solo Git, nessun flash.

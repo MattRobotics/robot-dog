@@ -31,6 +31,7 @@
 | Locomozione a terra G0–G5 | Mai qualificata. STANDARD e FAST hanno `hardware_qualified=false`; la v1.0.2 è qualificata solo sulla fixture | #52 |
 | STOP a terra a fine swing anteriore; camminate lunghe a terra; frenata sotto carico | Non provati | #52 |
 | Condizione `random_3` di `kSteer` (beccheggio ≈ +55 mrad, passo 40 mm) | Certificata solo offline; S9 è rimasto entro ±31 mrad | #52 |
+| Ground Contact sensorless, Fase 1 | Diagnostica passiva `GROUND_CONTACT.OBSERVE` (scheda Calibration & Maintenance) presente nel firmware `v1.0.2`: VERIFIED OFFLINE, mai provata sul robot. Probing e trasferimento del carico non disponibili (`THREE_SUPPORT_TRANSFER_UNAVAILABLE`); **nessuna misura assoluta del terreno** (`ground_height_available=false`). [Rapporto](Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md) | #52 |
 | Ciclo a freddo S7 su `1314bc4` (ACQUIRE B dopo freddo) | Non eseguito il 19/11; ACQUIRE è invariato rispetto a `30c894a` | — |
 | Temperature spurie | Picchi isolati di un campione (fino a 65–69 °C) su giunti diversi, in `1314bc4` come in `30c894a`; nessuna protezione scattata | #52 |
 | Joystick dalla dashboard (pressione tenuta) | Non provato il 19/11; via USB è coperto | #62 |
@@ -53,14 +54,15 @@
 - Joystick in avanti, indietro, laterale e in rotazione.
 - Margine P0 di 3,3 ms, con READ e FRAME come costi principali.
 
-**Limiti da misurare a terra, con criteri da fissare prima delle prove:**
-- velocità reale rispetto a quella comandata, per modo;
-- fluidità: oscillazioni del corpo, continuità dei frame;
-- ampiezza dell'alzata e distacco reale del piede (nel gemello il piede in swing tocca);
-- tracking dei giunti sotto carico e cedimento delle anche;
-- stabilità e margine di supporto;
-- STOP a terra;
-- prova G0–G5 con batteria ≥ 11,0 V e anticaduta.
+**Da sviluppare o qualificare, con criteri da fissare prima delle prove:**
+- **locomozione reale a terra:** prova G0–G5 con batteria ≥ 11,0 V e anticaduta, STOP a terra, stabilità e margine di supporto;
+- **velocità e fluidità del gait:** velocità reale rispetto a quella comandata, per modo; oscillazioni del corpo e continuità dei frame;
+- **FAST fino a 40 mm/s:** valutazione mantenendo STOP, stabilità e limiti. Offline, il 16/11, risultava non certificabile con i box e la frenata attuali ([valutazione](Validation_Reports/Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/LOCO_EVAL.md));
+- **WALK TROT:** non supportato dalle evidenze attuali (stessa valutazione);
+- **alzata effettiva delle zampe e distanza dal terreno:** nel gemello il piede in swing tocca;
+- **tracking e frenata sotto carico,** cedimento delle anche;
+- **sway e traiettorie;**
+- **ripresa della diagnostica Ground Contact sensorless,** senza dichiarare disponibile una misura assoluta del terreno.
 
 **Riferimento:** issue [#52](https://github.com/MattRobotics/robot-dog/issues/52).
 

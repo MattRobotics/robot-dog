@@ -74,7 +74,11 @@ Cartella `~/MATDOG/backups/verification-artifacts/session-20261119/`, verificata
 
 **Sessione del 18/11:** archivi e bundle sono in [`../Motion_FP32_2026-11-18/LOCAL_ARCHIVES.sha256.txt`](../Motion_FP32_2026-11-18/LOCAL_ARCHIVES.sha256.txt). Il bundle completo `robot-dog-motion-candidates-20261118-full.bundle` (`50dba781…`) è stato riverificato il 19/11.
 
-**Bundle Git della Stable:** creato dopo il merge e il tag. Il suo SHA256 è in `MATDOG_v1.0.2_RELEASE_MANIFEST.txt`, allegato alla Release.
+**Bundle Git della Stable:** `~/MATDOG/backups/git/robot-dog-stable-v1.0.2-20261119.bundle`, 43 031 153 B, SHA256 `3f800b97b70b7967ca2713895700fd84e6f3d51a5e5c407e13b33e51525a15bd`, `git bundle verify` okay.
+- Contiene `main` al merge (`052d52e`), i tag `v1.0.1` e `v1.0.2` e le punte dei sette branch eliminati dal remoto il 19/11.
+- Inventario dei branch: `~/MATDOG/backups/git/deleted-remote-branches-20261119.txt`, SHA256 `074d821cd79ccf6c14869b64ccbc80109cccfd5e30b8b3eb84b46660f573ebfc`.
+
+**Kit della release:** `~/MATDOG/backups/releases/v1.0.2/` (asset, note, testo della PR e dei commenti alle issue). Sigillo `LOCAL_SHA256SUMS.txt` `33870b443326c51b16346f6f616d768429543ced20e51b6c0b88b123139ef051`.
 
 **Limite:** originali e seconda copia stanno sullo **stesso disco** dell'Asus. Non è dichiarata una copia fisica indipendente; i sottoinsiemi pubblicati sono anche su GitHub.
 
