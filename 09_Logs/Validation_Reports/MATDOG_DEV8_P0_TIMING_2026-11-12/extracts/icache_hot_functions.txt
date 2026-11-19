@@ -1,0 +1,182 @@
+42018adc-4201a0a6 5578 62649 matdog::motion::solveGaitInto(matdog::motion::LocomotionFram
+42010e5c-420116ce 2162 56223 matdog::motion::contactForwardKinematics(matdog::motion::Leg
+4200f5b8-4201024f 3223 49266 matdog::motion::contactInverseKinematicsGroundNormal(matdog:
+4201ad98-4201b82b 2707 44016 matdog::motion::detail::inverseWithModel(matdog::motion::Leg
+4201a6cc-4201aa5e 914 34503 matdog::motion::detail::forwardWithModel(matdog::motion::Leg
+4201072c-420109c1 661 33169 matdog::motion::pointToWorld(matdog::motion::BodyPose const&
+4200ec3c-4200f5b5 2425 18226 matdog::motion::(anonymous namespace)::contactJacobian(matdo
+4200e0ec-4200eb0c 2592 17446 matdog::motion::supportLevelTarget(matdog::motion::Vector3 c
+4200c854-4200dbf8 5028 15028 matdog::simple::SimpleMotion::update(unsigned long long)
+42002f40-420036c6 1926 14705 matdog::simple::StopPlan::build(double const*, double const*
+420306a0-4203092e 654 14680 __ieee754_hypot
+420173ac-4201859b 4591 14233 matdog::motion::(anonymous namespace)::sample(matdog::motion
+420116d0-420118c7 503 13933 matdog::motion::contactInverseKinematics(matdog::motion::Leg
+4202feb0-420302db 1067 13665 __ieee754_asin
+42008f50-42009a05 2741 11258 matdog::simple::SimpleMotion::compensateLevel(matdog::motion
+4201044c-4201072a 734 10599 matdog::motion::validBodyPose(matdog::motion::BodyPose const
+4201aa9c-4201acde 578 9302 matdog::motion::detail::invert3(double const (*) [3], double
+4203109c-420313be 802 7987 atan
+420109c4-42010c68 676 7957 matdog::motion::pointToBase(matdog::motion::BodyPose const&,
+4201a3f8-4201a6b4 700 7503 matdog::motion::tiltFromQuaternion(double, double, double, d
+42014604-4201497f 891 7276 matdog::motion::validGaitParameters(matdog::motion::GaitPara
+4200c2a8-4200c854 1452 7112 matdog::simple::SimpleMotion::generateWalk(unsigned long lon
+42021910-420219aa 154 5825 esp_task_wdt_reset
+42007150-420075a7 1111 5200 matdog::simple::SimpleMotion::compensationSafe(matdog::motio
+42007b10-42007dd5 709 5176 matdog::simple::SimpleMotion::send(matdog::motion::JointTarg
+42030eb0-4203109a 490 4769 __ieee754_sqrt
+42014c3c-42014e0b 463 4501 matdog::motion::legPhase(matdog::motion::GaitParameters cons
+42030930-42030d3a 1034 4484 __ieee754_rem_pio2
+420088e4-42008edc 1528 3969 matdog::simple::SimpleMotion::steerWalk(unsigned long long)
+4203045c-4203069e 578 3844 __ieee754_fmod
+420042b8-420043b1 249 3724 matdog::simple::SimpleMotion::pointSafe(matdog::motion::Join
+4202f9f8-4202feb0 1208 3699 __ieee754_acos
+4201a104-4201a3f8 756 3608 matdog::motion::quinticTimeLaw(double, double)
+4200677c-42006b59 989 3578 matdog::simple::SimpleMotion::lerpFrame(matdog::motion::Loco
+420302dc-42030459 381 3509 __ieee754_atan2
+42009a08-42009e5c 1108 3466 matdog::simple::SimpleMotion::nominalRelease(matdog::motion:
+42006494-4200662b 407 3224 matdog::simple::SimpleMotion::compensationTarget(matdog::mot
+42030d3c-42030eb0 372 3086 __ieee754_remainder
+4203d638-4203d6a5 109 2772 esp_cpu_set_watchpoint
+42003a1c-42003ba8 396 2745 matdog::simple::timing::Release::~Release()
+4202eec0-4202ef1c 92 2620 acos
+42006b98-42006ce3 331 2601 matdog::simple::SimpleMotion::rateFromHistory(double const*,
+420143b4-42014603 591 2596 double matdog::motion::(anonymous namespace)::progress<doubl
+42009ec4-4200a634 1904 2563 matdog::simple::SimpleMotion::compensate(matdog::motion::Loc
+4202ef1c-4202ef78 92 2397 asin
+42006148-42006491 841 2376 matdog::simple::SimpleMotion::limitWalkTilt(double&, double&
+4202f2a0-4202f3d2 306 2375 floor
+4202f88c-4202f9f6 362 2343 __kernel_sin
+4201bb24-4201bc6f 331 2340 qemu_motion::Sim::tick(bool)
+42014258-420143b3 347 2233 double matdog::motion::(anonymous namespace)::swayRegular<do
+4202f090-4202f0ea 90 2100 sqrt
+420102fc-4201044c 336 2046 matdog::motion::worldEdgeContactInverseKinematicsTilted(matd
+420026e4-4200282e 330 1947 _ZN6matdog6simple12_GLOBAL__N_115projectWalkTiltILj6EEEbRAT_
+4200eb0c-4200ebe2 214 1876 matdog::motion::bodyPoseFromRollPitch(matdog::motion::Vector
+4202efe8-4202f036 78 1838 hypot
+4203c884-4203c8e3 95 1818 matdog::simple::SimpleMotion::fresh(unsigned long long) cons
+42021830-42021910 224 1781 esp_task_wdt_init
+4200dff8-4200e0e9 241 1728 matdog::motion::(anonymous namespace)::unit(matdog::motion::
+420121c8-42012350 392 1679 double matdog::motion::(anonymous namespace)::lateralRegular
+42010d80-42010ddc 92 1631 _ZZN6matdog6motion16edgeContactLiftMEdENKUldE_clEd$constprop
+42013c44-42013e18 468 1624 matdog::motion::(anonymous namespace)::PlanarT<double> matdo
+4202f038-4202f090 88 1600 remainder
+42021568-420215a1 57 1584 find_entry_from_task_handle_and_check_all_reset
+42003d5c-42003e1a 190 1561 matdog::simple::SimpleMotion::readTimed(unsigned int, bool, 
+4200264c-420026e4 152 1516 _ZZN6matdog6simple8StopPlan5buildEPKdS3_S3_S3_S3_ddENKUldE2_
+42012c00-42012cc2 194 1421 matdog::motion::(anonymous namespace)::PlanarT<double> matdo
+4202f714-4202f88c 376 1416 __kernel_cos
+420028ac-42002905 89 1403 _ZN6matdog6simple12_GLOBAL__N_18containsERKNS0_9collision3Bo
+420215a4-420215c8 36 1381 task_wdt_timer_feed
+4202ef78-4202ef8f 23 1362 atan2
+420025c0-4200264c 140 1300 _ZZN6matdog6simple8StopPlan5buildEPKdS3_S3_S3_S3_ddENKUldE1_
+42004200-42004282 130 1300 matdog::simple::SimpleMotion::rememberReference(unsigned lon
+420024ec-420025bf 211 1296 matdog::simple::(anonymous namespace)::headed(matdog::motion
+4202f5a8-4202f5e6 62 1278 fmax
+4201ace0-4201ad98 184 1222 matdog::motion::(anonymous namespace)::boundedAngle(double, 
+42008318-420084f5 477 1123 matdog::simple::SimpleMotion::joystickGoal(bool, double*) co
+4202ef90-4202efe8 88 1122 fmod
+420049c0-42004bd6 534 1092 matdog::simple::SimpleMotion::measureHeight()
+420038f0-42003928 56 1079 matdog::simple::timing::arm()
+42010de4-42010e59 117 1061 matdog::motion::edgeContactLiftM(double)
+4203d610-4203d636 38 1045 esp_cpu_set_breakpoint
+42003948-420039d0 136 1040 matdog::simple::timing::Visit::Visit()
+42007a4c-42007b10 196 1040 matdog::simple::SimpleMotion::serviceStop()
+42014980-420149f7 119 1040 matdog::motion::gaitSettleCycles(matdog::motion::GaitParamet
+42003e1c-42003e8b 111 1028 matdog::simple::SimpleMotion::frameTimed(unsigned short cons
+4201b900-4201b965 101 1028 qemu_motion::Port::frame(unsigned short const*, matdog::simp
+42010250-420102fb 171 1022 matdog::motion::worldContactInverseKinematicsTilted(matdog::
+4200287c-420028ac 48 940 matdog::motion::jointSlot(matdog::motion::JointTargetFrame c
+4203c8e4-4203c90d 41 922 matdog::motion::(anonymous namespace)::convert(matdog::motio
+42014bb4-42014c04 80 910 matdog::motion::gaitOffset(matdog::motion::GaitType, matdog:
+42006690-42006701 113 864 matdog::simple::SimpleMotion::slewStep(unsigned long long, u
+4202f43c-4202f4bc 128 839 sin
+420036c8-42003767 159 825 matdog::simple::walkClockS(double)
+42010ce8-42010d7e 150 816 matdog::motion::worldContactInverseKinematics(matdog::motion
+42010c68-42010ce5 125 812 matdog::motion::supportsFlatContactIk(matdog::motion::BodyPo
+4201aa60-4201aa9b 59 796 matdog::motion::forwardKinematics(matdog::motion::LegId, mat
+42006704-4200677a 118 751 matdog::simple::SimpleMotion::rememberCorrection(matdog::mot
+42004bd8-42004c07 47 696 matdog::simple::SimpleMotion::updateTelemetry(unsigned long 
+4202f59c-4202f5a6 10 691 nan
+4202f224-4202f29f 123 689 cos
+42006b5c-42006b97 59 686 double const& std::clamp<double>(double const&, double const
+4203ecc0-4203ecf2 50 677 esp_vApplicationIdleHook
+4202f628-4202f673 75 673 __fpclassifyd
+4201c17c-4201c300 388 607 qemu_motion::p0Footprint(qemu_motion::Sim&)
+42021c00-42021cd6 214 595 esp_task_wdt_impl_timer_allocate
+4200be98-4200c2a7 1039 560 matdog::simple::SimpleMotion::drive(double, double, double, 
+42003928-42003946 30 559 matdog::simple::timing::count(matdog::simple::timing::Work, 
+42021cd8-42021cfe 38 553 esp_task_wdt_impl_timer_feed
+4201b8a4-4201b8fe 90 520 qemu_motion::Port::read(unsigned int, bool, matdog::simple::
+4202f674-4202f712 158 520 lround
+4203c994-4203c9ca 54 517 qemu_motion::Digest::add(unsigned long, unsigned int)
+42032c88-42032caa 34 514 std::basic_string<char, std::char_traits<char>, std::allocat
+42002860-4200287c 28 503 _ZNK6matdog6simple12SimpleMotion7walkBoxEv$isra$0
+42002908-42002935 45 495 matdog::motion::jointSlot(matdog::motion::JointTargetFrame&,
+42004284-420042b5 49 468 matdog::simple::SimpleMotion::stopTimedOut(unsigned long lon
+4202152c-42021565 57 449 find_entry_and_check_all_reset
+4200ebe4-4200ec3a 86 432 matdog::motion::(anonymous namespace)::inLimits(matdog::moti
+420039d0-420039e6 22 419 matdog::simple::timing::Visit::~Visit()
+420039e8-42003a1c 52 419 matdog::simple::timing::switchPart(unsigned int)
+4201c300-4201c36a 106 419 runner(void*)
+4201c36c-4201c391 37 419 matdog::simple::timing::qemuTimingNow()
+4201859c-420185cb 47 406 matdog::motion::gaitTrackCartesian(matdog::motion::GaitTrack
+420149f8-42014bb4 444 387 matdog::motion::(anonymous namespace)::anchor(matdog::motion
+42010ddc-42010de4 8 333 matdog::motion::footContactModel()
+42014c04-42014c3a 54 318 _ZN6matdog6motion12_GLOBAL__N_16offsetERKNS0_14GaitParameter
+4201b860-4201b891 49 305 qemu_motion::Port::resolve(unsigned int, double, unsigned sh
+4202f5e8-4202f626 62 286 fmin
+4203d2e4-4203d302 30 265 esp_dport_access_read_buffer
+42007a18-42007a4c 52 261 matdog::simple::SimpleMotion::proneNotCompleted(unsigned lon
+4203c7d8-4203c7eb 19 261 _ZNK6matdog6simple12SimpleMotion7engagedEv$isra$0
+4203c864-4203c883 31 261 matdog::simple::SimpleMotion::stop(char const*)
+42003ce8-42003d59 113 260 matdog::simple::steerGait(double const*, matdog::simple::Wal
+42006f60-42007150 496 260 matdog::simple::SimpleMotion::regimeHandover(bool) const
+420084f8-420088e4 1004 260 matdog::simple::SimpleMotion::startWalk(unsigned long long)
+42008edc-42008f50 116 260 matdog::simple::SimpleMotion::compensateLevel(matdog::motion
+4201b82c-4201b85d 49 260 qemu_motion::Port::decodeRaw(unsigned int, unsigned short, d
+4201b894-4201b8a1 13 260 qemu_motion::Port::~Port()
+4201b968-4201bb23 443 260 qemu_motion::Port::reset()
+4203bb40-4203c7d7 3223 260 _dtoa_r
+4203c920-4203c925 5 260 matdog::simple::ServoPort::referenceFault(unsigned int, matd
+42002b74-42002f06 914 257 matdog::simple::ViaPlan::sample(double, double*, double*, do
+42002f08-42002f3e 54 257 matdog::simple::StopPlan::build(double const*, double const*
+4203c96c-4203c98a 30 257 qemu_motion::Port::verifyOff(unsigned int)
+42005724-42006100 2524 230 matdog::simple::SimpleMotion::stepWalkMode(double)
+42009e5c-42009ec4 104 228 _ZZN6matdog6simple12SimpleMotion10compensateERNS_6motion15Lo
+42002424-420024ea 198 216 matdog::simple::(anonymous namespace)::routePoint(unsigned i
+42004c08-42004c40 56 216 matdog::simple::SimpleMotion::measured() const
+42006100-42006145 69 216 matdog::simple::SimpleMotion::pendingWalkTilt() const
+4200662c-4200668f 99 216 matdog::simple::SimpleMotion::compensate(matdog::motion::Loc
+4200dfc4-4200dff8 52 216 matdog::motion::generateStandTarget(matdog::motion::StandDef
+42011e88-420121c6 830 203 matdog::motion::(anonymous namespace)::D matdog::motion::(an
+42013754-42013c41 1261 203 void matdog::motion::(anonymous namespace)::body<matdog::mot
+42013e18-42014258 1088 203 matdog::motion::(anonymous namespace)::D matdog::motion::(an
+42014e0c-420173ab 9631 203 void matdog::motion::(anonymous namespace)::sampleLaw<matdog
+420188d4-42018adb 519 203 matdog::motion::gaitHold(matdog::motion::GaitParameters cons
+42003768-420037c7 95 191 _ZZN6matdog6simple12SimpleMotion14nominalReleaseERNS_6motion
+420037c8-420038b5 237 185 matdog::simple::joystickSwayYM(double, double, double, matdo
+42011aa8-42011b10 104 156 double matdog::motion::(anonymous namespace)::smooth<double>
+4201a0a8-4201a102 90 145 matdog::motion::solveGait(matdog::motion::GaitParameters con
+4202f3d4-4202f43a 102 120 ldexp
+4203c7ec-4203c805 25 116 std::atomic<bool>::load(std::memory_order) const
+4203c808-4203c847 63 116 matdog::simple::SimpleMotion::walkModeLive() const
+4200569c-42005723 135 115 matdog::simple::SimpleMotion::selectWalkMode(matdog::simple:
+42007dd8-42008316 1342 115 matdog::simple::SimpleMotion::generateStop(unsigned long lon
+42003bd8-42003c08 48 104 matdog::simple::nominalHeightFromBaseLinkM(double)
+4201a6b4-4201a6cc 24 95 matdog::motion::legModel(matdog::motion::LegId)
+4202f0ec-4202f222 310 65 ceil
+42003ba8-42003bd8 48 52 matdog::simple::baseLinkHeightFromNominalM(double)
+420118c8-42011aa8 480 52 matdog::motion::(anonymous namespace)::solve3(double const (
+42012b4c-42012bfe 178 30 matdog::motion::(anonymous namespace)::place(double const*, 
+420038b8-420038ed 53 20 matdog::simple::SimpleMotion::stopping() const
+4200be70-4200be98 40 10 matdog::simple::SimpleMotion::stand(double, unsigned long lo
+4200dd40-4200dfbb 635 6 matdog::motion::(anonymous namespace)::solve(matdog::motion:
+4200dfbc-4200dfc4 8 6 matdog::motion::canonicalStandDefinition()
+42012350-42012b49 2041 6 matdog::motion::(anonymous namespace)::D matdog::motion::(an
+4201c530-4201c578 72 6 serialEventRun()
+4201e90c-4201e953 71 6 loopTask(void*)
+4201c394-4201c3d6 66 3 setup()
+4201c3d8-4201c3e3 11 3 loop()
+4201c520-4201c530 16 3 HardwareSerial::write(unsigned char const*, unsigned int)
+4201ce78-4201ce90 24 3 millis
+4203d310-4203d325 21 2 finite

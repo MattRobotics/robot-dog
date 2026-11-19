@@ -1,0 +1,22 @@
+commit f3bbca1 ImuFeed.h sha256 9c6608d850f410a2 test sha256 fa7a09e7d1385f00 host 8 CPUs g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+== seqlock_classify, TSan, 20 runs
+DETERMINISTIC read1=4(consistent) read2=3(consistent) read3=4(consistent) -> BACK1 reproduced, no torn data
+CONCURRENT runs=20 runs_with_old_torn=0 reads=8176836 DATA=0 BACK1=0 BACKN=0
+tsan_warnings=0
+== seqlock_classify, -O2, 200 runs
+DETERMINISTIC read1=4(consistent) read2=3(consistent) read3=4(consistent) -> BACK1 reproduced, no torn data
+CONCURRENT runs=200 runs_with_old_torn=11 reads=514673654 DATA=0 BACK1=12 BACKN=0
+== test_imu_feed section E, 20 sequential runs
+runs=20 FAIL=0 tsan_warnings=0
+torn per run:  20 torn=0
+classes: 
+== test_imu_feed section E, 24 concurrent runs
+runs=24 FAIL=9 tsan_warnings=0
+torn per run:  15 torn=0, 7 torn=1, 1 torn=2, 1 torn=3
+classes:  12 BACK1
+
+== next-candidate options (offline only, not in the firmware): proposed reader = read() + cur_ re-check (mono_check.cpp)
+== vs production read() under the same stress (prod_fail.cpp); a failed read while energized is IMU_STALE (SimpleMotion.cpp:1627)
+DETERMINISTIC_MONO read1=3 read2=3 read3=4 -> monotonic
+CONCURRENT_MONO runs=200 reads=288564728 DATA=0 BACK=0 read_failures_after_first_publish=24
+CONCURRENT_PROD runs=200 reads=829446175 read_failures_after_first_publish=7

@@ -20,6 +20,8 @@ Questa cartella distingue ciò che è **recuperabile da GitHub** da ciò che esi
 | Bundle Git | `~/MATDOG/backups/git/*.bundle`, con `.sha256` | Bundle della `v1.0.2`: hash nel `MATDOG_v1.0.2_RELEASE_MANIFEST.txt` della Release e nel [manifest delle evidenze](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md#d-seconda-copia-asus) |
 | Kit della release `v1.0.2` (asset, note, testo della PR e dei commenti alle issue) | `~/MATDOG/backups/releases/v1.0.2/`, con `LOCAL_SHA256SUMS.txt` | Idem |
 | Inventario dei branch remoti eliminati il 19/11 | `~/MATDOG/backups/git/deleted-remote-branches-20261119.txt`, con `.sha256` | [EXTERNAL_ARCHIVES §9](../09_Logs/EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19) |
+| Archivio di tutti i riferimenti Git locali al 19/11 (125: branch, `refs/preserve`, tag), prima della pulizia dei worktree | `~/MATDOG/backups/git/robot-dog-local-refs-archive-20261119.bundle` (storia completa), con `.sha256` e `.inventory.txt` | [EXTERNAL_ARCHIVES §10](../09_Logs/EXTERNAL_ARCHIVES.md#10-local-worktrees-and-branches-consolidated-on-2026-11-19) |
+| Contenuto non committato dei 60 worktree rimossi e del checkout `github/robot-dog` (61 cartelle: patch, file, ignorati significativi) | `~/MATDOG/backups/worktrees-archive-20261119/`, con `MANIFEST.json` e `SHA256SUMS.txt` | Idem |
 
 ## Regole
 

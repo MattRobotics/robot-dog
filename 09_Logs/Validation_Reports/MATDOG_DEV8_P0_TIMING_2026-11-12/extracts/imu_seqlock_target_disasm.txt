@@ -1,0 +1,125 @@
+# be9198d ROBOT_POWERED ELF sha256 cd99554c8d1cf6b968ff2117c4a2a40ac9a742f24f1652c738ccf16cbfc524d7
+# GNU objdump (crosstool-NG esp-14.2.0_20260121) 2.43.1
+# SeqSlot<RotationSample>::read (ImuFeed.h:68-80), called once, from Controller::updateSimpleMotion (orientationSnapshot).
+# Every atomic load (cur_ @+88, seq, words) is bracketed by memw. Reader window cur_ load -> seq load: 4201e87b..4201e896 (8 instructions).
+4201e868 <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_>:
+4201e868:	entry	a1, 80
+4201e86b:	mov.n	a10, a3
+4201e86d:	movi.n	a12, 8
+4201e86f:	movi	a15, 2
+4201e872:	addi	a11, a1, 8
+4201e875:	memw
+4201e878:	memw
+4201e87b:	l32i	a9, a2, 88
+4201e87e:	memw
+4201e881:	bnone	a9, a15, 4201e8a5 <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0x3d>
+4201e884:	extui	a9, a9, 0, 1
+4201e887:	addx4	a8, a9, a9
+4201e88a:	addx2	a8, a8, a9
+4201e88d:	memw
+4201e890:	addx4	a8, a8, a2
+4201e893:	memw
+4201e896:	l32i.n	a14, a8, 0
+4201e898:	memw
+4201e89b:	extui	a9, a14, 0, 1
+4201e89e:	beqz.n	a9, 4201e8ac <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0x44>
+4201e8a0:	addi.n	a12, a12, -1
+4201e8a2:	bnez	a12, 4201e875 <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0xd>
+4201e8a5:	movi.n	a2, 0
+4201e8a7:	j	4201e8dc <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0x74>
+4201e8aa:	.byte	00
+4201e8ab:	.byte	00
+4201e8ac:	movi.n	a13, 10
+4201e8ae:	loop	a13, 4201e8c4 <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0x5c>
+4201e8b1:	add.n	a7, a8, a9
+4201e8b3:	memw
+4201e8b6:	memw
+4201e8b9:	l32i.n	a6, a7, 4
+4201e8bb:	add.n	a7, a11, a9
+4201e8bd:	memw
+4201e8c0:	s32i.n	a6, a7, 0
+4201e8c2:	addi.n	a9, a9, 4
+4201e8c4:	memw
+4201e8c7:	memw
+4201e8ca:	l32i.n	a8, a8, 0
+4201e8cc:	memw
+4201e8cf:	bne	a14, a8, 4201e8a0 <_ZNK6matdog3imu7SeqSlotINS0_14RotationSampleEE4readEPS2_+0x38>
+4201e8d2:	movi.n	a12, 40
+4201e8d4:	l32r	a8, 42000020 <_stext> (400011f4 <memcpy>)
+4201e8d7:	callx8	a8
+4201e8da:	movi.n	a2, 1
+4201e8dc:	retw.n
+	...
+
+# Writer tail inlined in Bno085Imu::consume: publishEnd (ImuFeed.h:65-66) = slot seq store (4201fa1e) then cur_ store (4201fa31, @+0x12c),
+# memw around each. Writer window seq-even -> cur_: 7 instructions.
+4201fa04 <_ZN6matdog3imu9Bno085Imu7consumeERK15sh2_SensorValuelm+0x108>:
+4201fa04:	mov.n	a10, a3
+4201fa06:	call8	4201f884 <_ZN6matdog3imu7SeqSlotINS0_14RotationSampleEE12publishBeginERKS2_>
+4201fa09:	l32i	a9, a3, 92
+4201fa0c:	memw
+4201fa0f:	addx4	a8, a9, a9
+4201fa12:	addx2	a8, a8, a9
+4201fa15:	l32i	a9, a3, 96
+4201fa18:	addx4	a8, a8, a3
+4201fa1b:	memw
+4201fa1e:	s32i.n	a9, a8, 0
+4201fa20:	memw
+4201fa23:	l32i	a9, a3, 92
+4201fa26:	movi.n	a8, 2
+4201fa28:	memw
+4201fa2b:	or	a8, a8, a9
+4201fa2e:	memw
+4201fa31:	s32i	a8, a2, 0x12c
+4201fa34:	memw
+4201fa37:	j	4201f914 <_ZN6matdog3imu9Bno085Imu7consumeERK15sh2_SensorValuelm+0x18>
+
+# publishBegin (ImuFeed.h:54-63): seq odd store and word stores, memw around each.
+4201f884 <_ZN6matdog3imu7SeqSlotINS0_14RotationSampleEE12publishBeginERKS2_>:
+4201f884:	entry	a1, 80
+4201f887:	addi.n	a7, a1, 8
+4201f889:	movi.n	a12, 40
+4201f88b:	movi.n	a11, 0
+4201f88d:	mov.n	a10, a7
+4201f88f:	l32r	a8, 42000028 <_stext+0x8> (400011e8 <memset>)
+4201f892:	callx8	a8
+4201f895:	mov.n	a11, a3
+4201f897:	movi.n	a12, 40
+4201f899:	mov.n	a10, a7
+4201f89b:	l32r	a8, 42000020 <_stext> (400011f4 <memcpy>)
+4201f89e:	callx8	a8
+4201f8a1:	memw
+4201f8a4:	memw
+4201f8a7:	l32i	a8, a2, 88
+4201f8aa:	movi.n	a9, -1
+4201f8ac:	xor	a8, a8, a9
+4201f8af:	extui	a8, a8, 0, 1
+4201f8b2:	memw
+4201f8b5:	addx4	a9, a8, a8
+4201f8b8:	s32i	a8, a2, 92
+4201f8bb:	addx2	a8, a9, a8
+4201f8be:	memw
+4201f8c1:	addx4	a8, a8, a2
+4201f8c4:	memw
+4201f8c7:	l32i.n	a9, a8, 0
+4201f8c9:	memw
+4201f8cc:	addi.n	a10, a9, 1
+4201f8ce:	memw
+4201f8d1:	memw
+4201f8d4:	s32i.n	a10, a8, 0
+4201f8d6:	memw
+4201f8d9:	movi.n	a10, 0
+4201f8db:	movi.n	a11, 10
+4201f8dd:	loop	a11, 4201f8f3 <_ZN6matdog3imu7SeqSlotINS0_14RotationSampleEE12publishBeginERKS2_+0x6f>
+4201f8e0:	memw
+4201f8e3:	add.n	a13, a7, a10
+4201f8e5:	l32i.n	a13, a13, 0
+4201f8e7:	add.n	a12, a8, a10
+4201f8e9:	memw
+4201f8ec:	s32i.n	a13, a12, 4
+4201f8ee:	memw
+4201f8f1:	addi.n	a10, a10, 4
+4201f8f3:	addi.n	a9, a9, 2
+4201f8f5:	s32i	a9, a2, 96
+4201f8f8:	retw.n
+	...

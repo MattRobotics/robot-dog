@@ -36,6 +36,8 @@
 
 > **Picchi residui dopo T2R1M (16/11/2026, offline):** [rapporto](Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/REPORT.md) — branch locale `research/p0-peaks-20261116`: E1 (seme dell'IK di compensazione), E1b (anche nella ripresa), P3a (`ViaPlan::plan`, identico bit per bit), P3b (release del piano). QEMU WALK max 1 430 → 1 172 k, RECOVERY 2 156 → 1 562 k, OTHER 2 045 → 1 376 k; non flashati. Prossimo candidato diagnostico `82c1af9` (+ D3), costruito e auditato, [piano della sessione](Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/NEXT_SESSION_PLAN_82c1af9.md). Le 2 perse «da PRONE_REST» sono probabilmente un artefatto della dump diagnostica (da confermare con D3). Cattura a freddo B8 con D2: 601/601 poll OK, causa DALY UNKNOWN. [Valutazione della locomozione](Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/LOCO_EVAL.md) e [piano delle misure a terra](Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/GROUND_MEASUREMENT_PLAN.md): FAST 40 non certificabile con i box e la frenata attuali, TROT non supportato dalle evidenze; dato mancante principale = C per giunto.
 
+> **Storico — analisi offline P0 timing dev.8 (12/11/2026), recuperata il 19/11:** [rapporto ed estratti](MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md). Fattore per istruzione, I-cache, build diagnostica `be9198d` mai installata. Superata dalla chiusura P0 del 19/11 ([ADR-008](../Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md)).
+
 > **Storico — robot installato l’11/11/2026, `1.0.2-dev.7` / `b5610620d0ce` (APP SHA256 `28744982…6053d4`), Motion vNext + Battery P1:** [VALIDATED HARDWARE nel perimetro provato, NOT STABLE](MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md) — fixture e terra senza Jetson, 14/14 STOP verificati (4 in avanti a terra nei tre modi), cedimento statico HIP ≤ 4 tick; aperti: timing a terra (fino a 43 release perse in 30 s), cambio da FAST verso il basso, STANDARD 25 mm/s, sway laterale, letture di temperatura · [evidenze e SHA256](MATDOG_DEV7_HW_2026-11-11/EVIDENCE_INDEX.md) · [punti aperti](MATDOG_DEV7_HW_2026-11-11/OPEN_ITEMS.md) · [ripresa](MATDOG_DEV7_HW_2026-11-11/NEXT_SESSION_HANDOFF.md). Rollback `450d2c7`. La Stable resta `v1.0.1`.
 
 > **Storico — robot installato il 10/11/2026, `1.0.2-dev.6` ACC 220 / `450d2c793dcb` (APP SHA256 `82122e06…6256`):** [validazione hardware](Dev6_ACC220_HW_2026-11-10/REPORT.md) · [manifest delle evidenze](Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md) · [rapporto originale](Dev6_ACC220_HW_2026-11-10/REPORT_HW_SESSION.md).
@@ -57,6 +59,7 @@
 
 > **Storico pre-flash:** [candidata dev.16](Dev16_Candidate_2026-11-07/REPORT.md) e [procedura originale](Dev16_Candidate_2026-11-07/FLASH_AND_TEST.md). In seguito è stata installata, collaudata e conservata come rollback della dev.17.
 > **Storico dev.15:** [validazione parziale del 06/11](Dev15_HW_2026-11-06/REPORT.md), [manifest](Dev15_HW_2026-11-06/EVIDENCE_MANIFEST.md), [analisi video](Dev15_HW_2026-11-06/VIDEO_AUDIT.md) e [RCA timing](Dev15_HW_2026-11-06/TIMING_RCA_2026-11-07.md); difetti PRONE di quella build non rappresentano la stable corrente.
+> **Storico dev.15 — HostLink (06/11/2026), recuperato il 19/11:** [USB CDC e bridge Linux](HostLink_2026-11-06/REPORT.md). Il codice è integrato nella Stable `v1.0.2`; il collegamento operativo con la Jetson NON è qualificato.
 
 # Validation reports — index
 

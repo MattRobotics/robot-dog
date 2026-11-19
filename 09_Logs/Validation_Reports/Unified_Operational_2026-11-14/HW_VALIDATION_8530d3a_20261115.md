@@ -66,7 +66,7 @@ Durante la sessione ci sono state **due interruzioni dello strumento**, non del 
 
 ## Prossimo sviluppo
 
-Candidato IRAM secondo la tabella del §6 del rapporto dev.8 (`MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md`, branch `diag/dev8-p0-timing-20261112`):
+Candidato IRAM secondo la tabella del §6 del rapporto dev.8 ([`MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md`](../MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md), in `main` dal 19/11; ramo locale `diag/dev8-p0-timing-20261112` archiviato, [EXTERNAL_ARCHIVES §10](../../EXTERNAL_ARCHIVES.md#10-local-worktrees-and-branches-consolidated-on-2026-11-19)):
 - funzioni: `solveGaitInto`, `contactForwardKinematics`, `contactInverseKinematicsGroundNormal`, `inverseWithModel`, `forwardWithModel`, `pointToWorld`, 14,9 KB;
 - prima la verifica di spazio: heap minimo libero osservato 38 136 B;
 - poi equivalenza offline dei frame e un solo passaggio hardware con la stessa suite (`timing_tools/fixture_suite.py`).

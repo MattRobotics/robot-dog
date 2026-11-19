@@ -1,0 +1,52 @@
+== 1. HW: first records of the two critical windows (us; work = solves/ik/newton/fk; meta = lateness/since-release/external)
+  19:44:37 HEIGHT_CHANGE            max_work   read  2143 nom     0 cmp 13480 conv 1670 frame 1279 | prev nom     0 cmp  7098 | work [1, 4, 4, 8] | meta [55, 7579, 3553]
+  19:44:38 WALK_JOYSTICK            max_work   read  1861 nom  8776 cmp 12288 conv 1031 frame 1177 | prev nom  5308 cmp  7450 | work [1, 4, 4, 11] | meta [550, 2629, 1370]
+  19:44:39 WALK_JOYSTICK            max_work   read  2223 nom 11732 cmp 16018 conv 1377 frame 1199 | prev nom  1021 cmp  8051 | work [1, 4, 5, 12] | meta [336, 1382, 1632]
+  19:44:39 WALK_JOYSTICK            first_miss read  1583 nom  9743 cmp 13043 conv  983 frame 1176 | prev nom 10248 cmp 13075 | work [1, 8, 12, 23] | meta [21691, 1513, 2197]
+  19:44:40 WALK_JOYSTICK            max_work   read  1810 nom 14840 cmp 16488 conv 1051 frame 1199 | prev nom   538 cmp 12958 | work [1, 4, 8, 15] | meta [549, 2816, 1785]
+  19:44:40 WALK_JOYSTICK            first_miss read  1583 nom  9743 cmp 13043 conv  983 frame 1176 | prev nom 10248 cmp 13075 | work [1, 8, 12, 23] | meta [21691, 1513, 2197]
+  19:44:41 WALK_JOYSTICK            max_work   read  1901 nom 14420 cmp 24351 conv 1404 frame 1280 | prev nom   561 cmp 18102 | work [1, 7, 11, 21] | meta [20239, 1281, 1406]
+  19:44:41 WALK_JOYSTICK            first_miss read  1583 nom  9743 cmp 13043 conv  983 frame 1176 | prev nom 10248 cmp 13075 | work [1, 8, 12, 23] | meta [21691, 1513, 2197]
+  19:44:56 STAND_FROM_STOPPED_WALK  max_work   read  2216 nom 15646 cmp  9318 conv 1239 frame    0 | prev nom     0 cmp     0 | work [1, 6, 10, 19] | meta [1185, 0, 25764]
+  19:44:56 STAND_FROM_STOPPED_WALK  first_miss read  1620 nom  8358 cmp  9228 conv  954 frame    0 | prev nom  7552 cmp  9592 | work [1, 6, 10, 19] | meta [20507, 1709, 0]
+  19:44:57 STAND_FROM_STOPPED_WALK  max_work   read  1870 nom 13150 cmp 15601 conv 1443 frame 1200 | prev nom  7603 cmp  7185 | work [1, 4, 6, 13] | meta [19160, 1373, 1514]
+  19:44:57 STAND_FROM_STOPPED_WALK  first_miss read  1620 nom  8358 cmp  9228 conv  954 frame    0 | prev nom  7552 cmp  9592 | work [1, 6, 10, 19] | meta [20507, 1709, 0]
+  19:45:00 STAND_FROM_STOPPED_WALK  max_work   read  1888 nom 18324 cmp 22872 conv 1021 frame 1174 | prev nom 11431 cmp 12134 | work [1, 8, 12, 23] | meta [13585, 1337, 1525]
+  19:45:00 STAND_FROM_STOPPED_WALK  first_miss read  1620 nom  8358 cmp  9228 conv  954 frame    0 | prev nom  7552 cmp  9592 | work [1, 6, 10, 19] | meta [20507, 1709, 0]
+  19:47:49 WALK_JOYSTICK            max_work   read  1923 nom  8280 cmp 10265 conv  940 frame 1188 | prev nom 12549 cmp     0 | work [1, 4, 4, 11] | meta [180, 5734, 3202]
+  19:47:50 WALK_JOYSTICK            max_work   read  2287 nom 10564 cmp  9932 conv 1114 frame 1214 | prev nom   830 cmp  7244 | work [1, 4, 5, 12] | meta [506, 6437, 3507]
+  19:47:53 WALK_JOYSTICK            max_work   read  1905 nom  9983 cmp 14916 conv 1485 frame 1293 | prev nom  1607 cmp 13785 | work [1, 4, 5, 12] | meta [2828, 1236, 1359]
+  19:47:54 WALK_JOYSTICK            max_work   read  3974 nom 10762 cmp 15237 conv 1879 frame 1251 | prev nom   870 cmp  7564 | work [1, 4, 5, 12] | meta [539, 8057, 4213]
+  19:48:00 WALK_JOYSTICK            max_work   read  3783 nom 12987 cmp 14757 conv 1329 frame 1212 | prev nom   984 cmp  8427 | work [1, 4, 5, 12] | meta [1560, 5980, 2669]
+  19:48:01 WALK_JOYSTICK            max_work   read  1862 nom 16328 cmp 18026 conv  931 frame 1173 | prev nom   590 cmp 10377 | work [1, 7, 11, 21] | meta [15901, 1299, 1457]
+  19:48:01 WALK_JOYSTICK            first_miss read  1923 nom  6985 cmp  9025 conv  869 frame 1182 | prev nom 17372 cmp 10363 | work [1, 4, 8, 15] | meta [28573, 1808, 0]
+  19:48:03 WALK_JOYSTICK            max_work   read  1894 nom 14326 cmp 24566 conv 1570 frame 1293 | prev nom   610 cmp 13217 | work [1, 7, 11, 21] | meta [9029, 1310, 1481]
+  19:48:03 WALK_JOYSTICK            first_miss read  1923 nom  6985 cmp  9025 conv  869 frame 1182 | prev nom 17372 cmp 10363 | work [1, 4, 8, 15] | meta [28573, 1808, 0]
+== 2. HW: COMPENSATE wall by work class (distinct max/first-miss records) vs QEMU instructions of the same class
+  work (1, 4, 4, 11)   HW n= 48 min   6.0 med  13.6 max  15.5 ms | QEMU n= 779 p50  319 k [ 268.. 356] | 18.8-42.7 ns/instr (min-med)
+  work (1, 4, 5, 12)   HW n= 45 min   6.5 med  13.2 max  17.0 ms | QEMU n=1172 p50  355 k [ 292.. 397] | 18.4-37.2 ns/instr (min-med)
+  work (1, 4, 6, 13)   HW n=  6 min   6.8 med  14.4 max  17.6 ms | QEMU n=  51 p50  372 k [ 314.. 384] | 18.3-38.7 ns/instr (min-med)
+  work (1, 4, 7, 14)   HW n=  8 min   7.3 med  15.4 max  16.1 ms | QEMU n=  39 p50  392 k [ 338.. 404] | 18.6-39.1 ns/instr (min-med)
+  work (1, 4, 8, 15)   HW n= 52 min   7.1 med  15.8 max  19.6 ms | QEMU n= 347 p50  413 k [ 353.. 448] | 17.2-38.3 ns/instr (min-med)
+  work (1, 6, 10, 19)  HW n=  9 min   9.2 med  19.9 max  22.0 ms | QEMU n=  98 p50  547 k [ 471.. 570] | 16.9-36.4 ns/instr (min-med)
+  work (1, 7, 11, 21)  HW n= 10 min  11.8 med  20.1 max  24.6 ms | QEMU n=  52 p50  603 k [ 581.. 631] | 19.5-33.3 ns/instr (min-med)
+  work (1, 8, 12, 23)  HW n= 19 min  13.0 med  23.5 max  26.9 ms | QEMU n=  57 p50  654 k [ 588.. 685] | 20.0-35.9 ns/instr (min-med)
+== 3. HW sections other than NOMINAL/COMPENSATE (all distinct records and their previous release)
+  READ     n= 430 min  1537 p50  2102 p90  3789 max  4199 us
+  CONVERT  n= 435 min   193 p50  1210 p90  1654 max  1961 us
+  FRAME    n= 138 min  1165 p50  1242 p90  1305 max  1343 us
+  REST     n= 205 min    91 p50   208 p90   331 max  6746 us
+== 4. HW work histogram vs QEMU NOMINAL+COMPENSATE scaled by one constant (ns per instruction)
+  yaw STANDARD 19:44:38-48           HW n= 576 [0.0, 0.021, 0.431, 0.255, 0.203, 0.047, 0.042, 0.002]
+                                     QEMU n= 496 [0.0, 0.0, 0.423, 0.413, 0.133, 0.016, 0.014, 0.0] fit 27.4 ns/instr (6.6 cycles @240 MHz) L1=0.316; instr p50 391 k max 1099 k
+  recovery 19:44:56-19:45:00         HW n= 191 [0.0, 0.0, 0.0, 0.476, 0.387, 0.079, 0.052, 0.005]
+                                     QEMU n= 205 [0.0, 0.0, 0.0, 0.478, 0.434, 0.044, 0.044, 0.0] fit 24.7 ns/instr (5.9 cycles @240 MHz) L1=0.097; instr p50 631 k max 1106 k
+  steered sweep 19:47:49-19:48:10    HW n=1182 [0.0, 0.025, 0.506, 0.255, 0.156, 0.034, 0.022, 0.003]
+                                     QEMU n=3198 [0.0, 0.0, 0.512, 0.371, 0.097, 0.009, 0.011, 0.0] fit 27.9 ns/instr (6.7 cycles @240 MHz) L1=0.246; instr p50 373 k max 1123 k
+== 5. QEMU release structure (nominal solve > 100 k instr, full compensation > 150 k instr)
+  A_YAW_STOP_RECOVER   WALK_JOYSTICK            n= 496 nominal solve  250, full compensation  319, both   73 (consecutive    2); both: p50 660 k max 1099 k instr
+  A_YAW_STOP_RECOVER   STAND_FROM_STOPPED_WALK  n= 205 nominal solve  205, full compensation  205, both  205 (consecutive  204); both: p50 631 k max 1106 k instr
+  B_SWEEP              WALK_JOYSTICK            n=3198 nominal solve 1605, full compensation 1934, both  341 (consecutive    7); both: p50 627 k max 1123 k instr
+== 6. I-cache simulation (Motion-only instruction stream, 32 B lines, 8-way LRU)
+  WALK     n=117 flash code per release KB p5/p50/max 38/39/52 | misses 16 KB 1494/2092/3732, 32 KB 735/915/1496, 64 KB 55/91/186
+  RECOVER  n=147 flash code per release KB p5/p50/max 48/49/50 | misses 16 KB 2699/2781/3635, 32 KB 1212/1306/1411, 64 KB 113/138/165
