@@ -1,0 +1,2 @@
+TOTAL insn=8714 fpu=587 soft=320 dlibm=1 flibm=64 sfloat=14
+global constructors: TOTAL insn=284 fpu=0 soft=0 dlibm=0 flibm=0 sfloat=0

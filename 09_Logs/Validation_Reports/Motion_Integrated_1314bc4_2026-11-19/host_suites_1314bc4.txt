@@ -1,0 +1,3 @@
+run_simple_motion_tests exit=0 (PASS line present)
+run_stop_support_tests exit=0 seconds=47
+run_prone_tests exit=0 seconds=131

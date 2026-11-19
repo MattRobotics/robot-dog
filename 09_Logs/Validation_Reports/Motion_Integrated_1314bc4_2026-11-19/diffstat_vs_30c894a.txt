@@ -1,0 +1,20 @@
+ .../tests/motion_final_release_sources.json        |   23 +-
+ .../scripts/tests/test_stop_support.cpp            |    5 +-
+ .../MATDOG_Controller/src/motion/BodyPose.cpp      |   60 +-
+ .../MATDOG_Controller/src/motion/CONTACT_STAND.md  |    7 +-
+ .../MATDOG_Controller/src/motion/FootContact.cpp   |  130 +-
+ 05_Firmware/MATDOG_Controller/src/motion/Gait.cpp  |   91 +-
+ .../src/motion/LegInverseKinematics.cpp            |  150 +-
+ .../MATDOG_Controller/src/motion/LegKinematics.cpp |  131 +-
+ .../MATDOG_Controller/src/motion/LegKinematics.h   |    4 +-
+ .../src/motion/LegKinematicsInternal.h             |  127 +-
+ 05_Firmware/MATDOG_Controller/src/motion/README.md |   18 +-
+ .../src/motion/TiltCompensation.cpp                |   54 +-
+ .../src/motion/TiltedContactIk.cpp                 |  244 +-
+ .../MATDOG_Controller/src/motion/TiltedContactIk.h |    2 +-
+ .../src/simple/SteerCollisionData.h                |    6 +-
+ .../Motion_SteerSlow_Recert_2026-11-18/README.md   |   57 +
+ .../steer_envelope_slow_steered.txt                |   79 +
+ .../steer_slow_certificate.json                    | 2349 ++++++++++++++++++++
+ .../steer_slow_certificate_input.txt               |    1 +
+ 19 files changed, 3160 insertions(+), 378 deletions(-)

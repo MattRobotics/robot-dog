@@ -1,0 +1,9 @@
+rst:0x1 (POWERON),boot:0x4 (SPI_FLASH_BOOT)
+entry 0x403c88b8
+E (530) octal_psram: PSRAM chip is not connected, or wrong PSRAM line mode
+E (532) esp_psram: PSRAM enabled but initialization failed. Bailing out.
+E cpu_start: Failed to init external RAM; continuing without it.
+E (534) octal_psram: PSRAM chip is not connected, or wrong PSRAM line mode
+E (534) esp_psram: PSRAM enabled but initialization failed. Bailing out.
+E (554) esp_core_dump_flash: Incorrect size of core dump image: -65536
+E (1951) rmt: rmt_tx_wait_all_done(593): flush timeout

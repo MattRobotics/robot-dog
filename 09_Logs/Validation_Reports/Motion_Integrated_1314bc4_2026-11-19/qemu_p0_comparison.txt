@@ -1,0 +1,21 @@
+QEMU ESP32-S3 (-icount shift=3), CCOUNT: deterministic work, NOT hardware time.
+scenario variant   heaviest  NOMINAL mean/max   >280k >320k  digest
+B3  30c894a    403600   106066/ 285533    163    25  69a1ceb90248496b
+D8  30c894a    439865   105196/ 287714    230    44  716e97b0001d9110
+H   30c894a    403657    97238/ 253775    140     6  f83135abd2ca0c75
+E   30c894a    403625    84446/ 253754    116     9  a4194517dd1ed815
+S   30c894a    528877        0/      0    224   190  8e8b2789d3b16e08
+B3  05e1214    248085    22140/  40197      0     0  18f9a46bb3bc0687
+D8  05e1214    248085    21598/  40190      0     0  870320739d4fc877
+H   05e1214    248098    32084/  75538      0     0  e376f01fcb104c00
+E   05e1214    248085    17970/  39060      0     0  ae3995e44b0552f4
+S   05e1214    268853        0/      0      0     0  3fabad93921de00f
+B3  1314bc4    248105    22139/  40183      0     0  18f9a46bb3bc0687
+D8  1314bc4    248113    21594/  40169      0     0  870320739d4fc877
+H   1314bc4    248120    32027/  76240      0     0  e376f01fcb104c00
+E   1314bc4    248085    17970/  39045      0     0  ae3995e44b0552f4
+S   1314bc4    269548        0/      0      0     0  3fabad93921de00f
+P0 class maxima (C1P double compensation w/o plan, C2 nominal+compensation, C3 walk >4 IK):
+  30c894a C1=528877 C1P=354231 C2=- C3=-
+  05e1214 C1=268853 C1P=91067 C2=110857 C3=110857
+  1314bc4 C1=269548 C1P=91060 C2=110822 C3=110822
