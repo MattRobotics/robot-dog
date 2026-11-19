@@ -165,3 +165,59 @@ After the Stable `v1.0.2` merge (`main` = `052d52ed309c8aa4d53ee8ee0bbbc10706e0d
 | `release/v1.0.2-stable-20261119` | `919dfa907e10e33257c925a9c6cc032f90b3ae8c` |
 
 Every tip is reachable from `main`. A verified local copy of all of them, together with `main` and the release tags, is the Git bundle listed in the [v1.0.2 evidence manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md#d-seconda-copia-asus).
+
+## 10. Local worktrees and branches consolidated on 2026-11-19
+
+*(Added; the sections above are unchanged.)*
+
+On 2026-11-19 the operator's workstation (Asus) went from **63 local checkouts of this repository to 3**. Nothing was published by this step, and no history was rewritten. GitHub still holds only `main`.
+
+**Checkouts that remain:**
+
+| Checkout | State | Why it stays |
+|---|---|---|
+| `~/MATDOG/github/robot-dog` | Detached on `main`, clean | Holds the shared `.git` directory, so it cannot be removed. Local `*.local.h` credential headers stay ignored in place |
+| `~/MATDOG/github/robot-dog-led-ap-combined-20261010` | Branch `main` | The operational checkout |
+| `~/MATDOG/worktrees/matdog-dev7-b561062-src` | Detached on `b561062` (dev.7), clean | `06_Software/Matdog_MuJoCo/gait_study/fast40/run_twin.sh` and `offline_variant.sh` read it by absolute path |
+
+**Removed:**
+- **60 worktrees.** 49 were clean and were removed without force. The other 11 had uncommitted content; it was archived and the archive verified file by file before removal.
+- **81 local branches.** 42 were already merged into `main` (`git branch -d`). The other 39 are not in `main`; each was deleted only after its exact tip was confirmed in the bundle below.
+- Seven `e` files holding the text of the `less` help screen, which had no value.
+
+No `git gc` or object pruning was run. The `refs/preserve/*` references, the local tags and `refs/codex/*` were kept.
+
+**Local archives** (Asus only, same disk):
+
+| Archive | Content | Hash |
+|---|---|---|
+| `~/MATDOG/backups/git/robot-dog-local-refs-archive-20261119.bundle` | Complete-history bundle of all 125 local references as of 19/11, before deletion: 82 branches, 20 `refs/preserve`, 5 `refs/codex`, 18 tags. `git bundle verify` passes; a recovery into a separate empty repository restored all 125 references with identical SHAs, and `fsck` passes | `0ee65008535b6ef5306c4280c938abfcc375a36f6398ada5f448e0e7dd65cec7` |
+| `…/robot-dog-local-refs-archive-20261119.inventory.txt` | Every reference with its SHA, plus the key commits below | `ec8c12f6bfd9eb8e714784d76943f745606c426849ddd2d147ed1daa337c6ad5` |
+| `~/MATDOG/backups/worktrees-archive-20261119/` | One folder per removed worktree, plus one for the former uncommitted state of `~/MATDOG/github/robot-dog`: `STATUS.txt` (path, HEAD, branch), `TRACKED.patch` (binary diff against HEAD), copies of the modified and untracked files, and the significant ignored files. `MANIFEST.json` lists them all. Each patch was checked to rebuild the worktree's tracked files exactly | `SHA256SUMS.txt` (614 lines) = `388cea4810d5fa87acc41b564412d55dbc0e347a606098db21e88b32fc826e31` |
+| Private credential archive | The ignored `*.local.h` credential and TLS headers of the removed checkouts | Permissions 700/600, outside the repository, never published |
+
+To recover the references: `git init r && git -C r fetch <bundle> 'refs/*:refs/*'`.
+
+To recreate a removed worktree: take its HEAD from `STATUS.txt`, run `git worktree add <path> <HEAD>`, then `git apply --binary TRACKED.patch` and copy `files/` over it.
+
+**Commits that existed only in local branches before 19/11.** All are in the bundle; none goes back into the firmware.
+
+| Commit | Meaning | Status |
+|---|---|---|
+| `bc1679ff7cfcc1c66e815e283e5e102a6ae37239` | HostLink USB CDC and Linux bridge report (dev.15) | Report recovered into `main`: [HostLink_2026-11-06](Validation_Reports/HostLink_2026-11-06/REPORT.md). The code has been integrated since `7997ad4`. Jetson is not qualified |
+| `76c5f8f104a9a27cd26247d26554cc20e253c2a9` | dev.8 P0 timing analysis, diagnostic build `be9198d` | Report and `extracts/` recovered into `main` as historical evidence: [MATDOG_DEV8_P0_TIMING_2026-11-12](Validation_Reports/MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md). The diagnostics and `tools/` stay in the bundle only. Superseded by ADR-008 |
+| `7118f7ba5377a5d08d75ae36c11f898b3bcf2d22`, `6c5cffcb1c1bb4948d4364284536aaf1769f39a7` | rc.10 installed sources snapshot, and the 14-commit experimental PRONE line of 29/10 | Historical. PRONE was re-integrated on rc.11 (`65b6564`, in `main`). The 29/10 reports are also in `~/MATDOG/verification-artifacts/MATDOG_MOTION_OPERATIONAL_20261029/` and `MATDOG_PRONE_COMPLETION_20261029/` |
+| `a289e73165e0ae19fef371347d092fddce6d616b` | Post-dev.7 dashboard/Twin consolidation | Superseded: 80 % of its added lines are in `main`, and its STOP/SAFE_OFF semantics are in `v1.0.2` |
+| `d5471b2601700985f452343b44991f9b10f717aa` | Prototype, not adopted: height as true `base_link` above the contact plane | Discarded |
+| `9cfd86bc5c4ab56215e3f792492831ca60afb94a` | REV01-FIX geometry probe on dev.5 sources | Discarded; REV01-FIX reached `main` through the dev.6/dev.7 line |
+| `43fa92a0d17f9a0bfcd274420517224aad043f68` | WIP M0.4 P2 (see §2), also the uncommitted state of `~/MATDOG/github/robot-dog` | Not integrated, as before |
+
+**Historical evidence scripts that name a removed worktree path.** They are kept unchanged as evidence. To run one again, recreate the worktree at its HEAD as described above:
+
+| Script | Worktree it names | HEAD |
+|---|---|---|
+| `Validation_Reports/Night_2026-11-09/evidence/steered_limits/run.sh` | `matdog-gait-redesign-20261108` | `1fbee7b0382941c1d75656d5dcdae4939dc5ce13` |
+| `Validation_Reports/Motion_vNext_Multidirectional_2026-11-11/collect_steer_envelope.sh` | `matdog-motion-multidir-vnext-20261111` | `a7f5c2cb4c838aaaff13eb7d53c47c60d2b3695d` |
+| `Validation_Reports/Runtime_Commissioning_2026-10-14/entry_geometry_bundle_20261014.json` (provenance field) | `robot-dog-runtime-commissioning-20261014` | `83c3410c90c151abfcd1747d3251dc75cd453d44` |
+
+**Not removed.** `~/MATDOG/worktrees/robot-dog-g5b-imu-offline` is a separate clean clone, not a worktree, and was outside the audited 63. All its references exist in this repository; its tip `0529e44` is tag `archive/g5b-imu-offline-20261027`, which is also on GitHub. It holds no untracked or ignored files.

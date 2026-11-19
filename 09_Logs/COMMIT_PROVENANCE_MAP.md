@@ -116,3 +116,7 @@ listed here.
 | Documentation on top of `1314bc4` | `e6825f1`, then the 18/11 documentation branches (`833ca9d`, `251a174`, `d396a45`), merged into the consolidation branch | No executable file changes: under `05_Firmware/` only `README.md`, `MATDOG_Controller/README.md` and `MATDOG_Controller/CHANGELOG.md` change, and the `src/` tree, the sketch and the scripts equal those of `1314bc4` |
 
 All these commits are reachable from `main` after the consolidation merge, and no history was rewritten. The seven candidate, documentation and release branches were deleted from GitHub on 19/11, after verifying that none held a commit outside `main`; their last tips are in [EXTERNAL_ARCHIVES §9](EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19).
+
+## Local-only commits archived on 2026-11-19 (added)
+
+The local branches of the operator's workstation were deleted on 19/11, after all 125 local references were bundled and test-recovered. The commits below existed in no published branch. Their meaning and status are in [EXTERNAL_ARCHIVES §10](EXTERNAL_ARCHIVES.md#10-local-worktrees-and-branches-consolidated-on-2026-11-19): `bc1679f` (HostLink report, recovered into `main`), `76c5f8f` (dev.8 P0 timing report, recovered into `main`), `7118f7b` and `6c5cffc` (rc.10 snapshot and PRONE line), `a289e73`, `d5471b2`, `9cfd86b`, `43fa92a`.

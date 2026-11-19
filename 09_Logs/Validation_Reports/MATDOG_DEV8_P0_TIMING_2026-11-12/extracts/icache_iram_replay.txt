@@ -1,0 +1,6 @@
+top0 0.0KB_in_IRAM SUMMARY walk_mean_miss=2065 recover_mean_miss=2852 releases=115/145
+top6 14.9KB_in_IRAM SUMMARY walk_mean_miss=949 recover_mean_miss=1130 releases=115/145
+top10 26.6KB_in_IRAM SUMMARY walk_mean_miss=652 recover_mean_miss=790 releases=115/145
+top15 35.9KB_in_IRAM SUMMARY walk_mean_miss=484 recover_mean_miss=497 releases=115/145
+top25 43.5KB_in_IRAM SUMMARY walk_mean_miss=193 recover_mean_miss=194 releases=115/145
+top40 53.4KB_in_IRAM SUMMARY walk_mean_miss=5 recover_mean_miss=5 releases=115/145
