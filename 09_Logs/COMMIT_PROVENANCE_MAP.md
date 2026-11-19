@@ -105,3 +105,14 @@ source commit and build ID, and is not shown to be byte-identical to the install
 Many other hexadecimal strings in older documents are SHA-256 prefixes of files or commits from the
 operator's machine or from other repositories; they are not commits of this repository and are not
 listed here.
+
+## Stable `v1.0.2` (added 2026-11-19)
+
+| Item | SHA | Note |
+|---|---|---|
+| Tag `v1.0.2` (annotated) | points to `1314bc411c589c4216e95629f4665d9d01f05781` | The **firmware commit** the released APP was built from (build ID `1314bc411c58`), unlike `v1.0.1`, whose tag points to a merge commit |
+| `main` before the consolidation | `6838e4d` | Ancestor of `1314bc4`: no divergence, 69 commits between them |
+| Firmware commits after the unified branch head `06b6db0` | `85bad0e` → `30c894a` → `eb1ba28` → `05e1214` → `1314bc4` | Content and hardware status: [release manifest §5](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md#5-linea-dei-commit-firmware-da-main-6838e4d-1011-a-1314bc4) |
+| Documentation on top of `1314bc4` | `e6825f1`, then the 18/11 documentation branches (`833ca9d`, `251a174`, `d396a45`), merged into the consolidation branch | No executable file changes: under `05_Firmware/` only `README.md`, `MATDOG_Controller/README.md` and `MATDOG_Controller/CHANGELOG.md` change, and the `src/` tree, the sketch and the scripts equal those of `1314bc4` |
+
+All these commits are reachable from `main` after the consolidation merge. No history was rewritten, and the candidate and documentation branches are kept.

@@ -1,24 +1,21 @@
 # AGENTS.md — MATDOG
 
-> **Branch operativo unico (14/11/2026):** `integ/matdog-unified-operational-20261114`. La baseline qui sotto è quella di `main` al 10/11; leggi prima l'[handoff](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md).
-
-> **Stato del branch al 16/11/2026 sera.**
-> - **Installato:** diagnostica `6be46906d069` (F3 + IRAM G2s), APP `be678d83…3b68`, VERIFIED HARDWARE su fixture.
-> - **Sorgente:** la sua legge Motion è integrata nel branch senza strumentazione; build `33134ae28260`, mai installata.
+> **Baseline attuale (19/11/2026): Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) su `main`.**
+> - **Installato:** `1.0.2-dev.7`, build `1314bc411c58`, commit `1314bc4`, APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`. Il tag `v1.0.2` punta a quel commit.
+> - **Qualifica:** solo sulla fixture ([dossier](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
+>   - Motion Timing P0 CLOSED e congelato ([ADR-008](09_Logs/Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md)).
+>   - Locomozione a terra **non** qualificata.
+> - **Rollback:** `30c894a`. **Stable storica:** `v1.0.1`, immutabile.
+> - **Silenzi DALY:** causa UNKNOWN, RCA congelata.
+> - **Prossima milestone:** Ground Locomotion & Gait Performance ([OPEN_ITEMS](09_Logs/OPEN_ITEMS.md)).
 > - **Sessioni hardware** ([ADR-007](09_Logs/Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md)):
 >   - al massimo 2 client HTTP;
 >   - controllo di memoria M0 prima di Motion;
->   - processi solo tramite `timing_tools/session_proc.py`.
-> - **Aperti:** Motion Timing P0, margine di heap 1 096 B con 2 client, silenzi DALY (manca la misura RS485).
-> - **Rapporto:** [P0 F3 G2s](09_Logs/Validation_Reports/Unified_Operational_2026-11-14/P0_F3_G2s_2026-11-16/REPORT.md).
-
-> **Baseline attuale (10/11/2026).**
-> - **Firmware installato:** build di sviluppo `1.0.2-dev.6` ACC 220. Sorgente `450d2c7`, in `main` dalla PR #67; build `450d2c793dcb`; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
-> - **Validazione:** fixture Q1–Q8 qualificata; a terra verifica positiva ma fuori protocollo ([dossier HW](09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
-> - **Stable storica:** [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`), immutabile.
-> - **Gemello MuJoCo V1:** offline, in `06_Software/Matdog_MuJoCo` (tag `matdog-mujoco-v1-20261110`). Non è una qualifica hardware.
+>   - processi solo dal registro (`session_proc.py`), mai uccisi per pattern;
+>   - criteri fissati prima della prova e mai rilassati dopo.
 > - **Regole:** `main`, tag, binario verificato e firmware installato sono identità distinte. Nessun flash, merge o riscrittura di calibrazione senza mandato.
-> - **Problemi residui:** [OPEN_ITEMS](09_Logs/OPEN_ITEMS.md).
+> - **Storico:** gli stati del 10, 16, 17 e 18/11 sono nella [cronologia](09_Logs/HISTORY_INDEX.md) e in [OPEN_ITEMS](09_Logs/OPEN_ITEMS.md).
+> - **Gemello MuJoCo V1:** offline, in `06_Software/Matdog_MuJoCo`. Non è una qualifica hardware.
 
 
 Punto d'ingresso: [`README.md`](README.md). Storia fino al 26/10/2026: diario V2 in [`09_Logs/Firmware_History/`](09_Logs/Firmware_History/README.md). Architettura: [`ARCHITECTURE.md`](01_Docs/02_Architecture/ARCHITECTURE.md). Sicurezza flash: [`FLASH_LAYOUT_SAFETY_NOTICE.md`](05_Firmware/MATDOG_Controller/FLASH_LAYOUT_SAFETY_NOTICE.md).

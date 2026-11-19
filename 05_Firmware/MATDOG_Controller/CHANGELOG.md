@@ -1,11 +1,13 @@
 # MATDOG Controller — Changelog
 
-> **Branch `integ/matdog-unified-operational-20261114`, current as of 2026-11-16 evening:**
-> - **Installed on the robot:** the diagnostic `1.0.2-dev.8` build `6be46906d069` (`a86c680` + F3 + IRAM G2s), APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`, validated on the fixture.
-> - **This branch's source** carries its Motion law without the diagnostic instrumentation (entry below). The verification build `33134ae28260` was **never installed**.
-> - The block that follows describes `main` on 10/11 and is historical for this branch.
+> **Current as of 2026-11-19: Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2).**
+> - **Installed APP:** `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781` (the tag points to that commit), SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
+> - **Fixture-qualified on 19/11.** Motion Timing P0 is CLOSED in the scope of those tests; ground locomotion is not qualified.
+> - **Rollback:** `30c894a`. See the entry below.
 >
-> **Current as of 2026-11-10:** the installed APP is the development build `1.0.2-dev.6` operational ACC 220.
+> **Historical, 2026-11-16 evening (branch `integ/matdog-unified-operational-20261114`):** the diagnostic `1.0.2-dev.8` build `6be46906d069` was installed (`a86c680` + F3 + IRAM G2s, APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`), validated on the fixture. The verification build `33134ae28260` was never installed.
+>
+> **Historical, 2026-11-10:** the installed APP was the development build `1.0.2-dev.6` operational ACC 220.
 > - **Identity:** source `450d2c7`, merged into `main` by PR #67; build `450d2c793dcb`; SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Hardware validation of 10/11:** fixture Q1–Q8 qualified; ground check positive but out of protocol ([report](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)).
 > - **Stable:** the first hardware-qualified Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) (`1.0.1-dev.17`, build `17db0efe2324`, SHA256 `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`) stays the immutable historical baseline.
@@ -13,6 +15,58 @@
 >
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
+
+## v1.0.2 — Stable GitHub Release: firmware 1.0.2-dev.7 `1314bc4` promoted unchanged, Motion fixture-qualified — 2026-11-19
+
+> **Promotion without recompilation** of the APP installed and qualified on the fixture on 19/11/2026.
+> - **Identity:** `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781`; APP 1 777 952 B, SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`, ROBOT_POWERED, CLEAN.
+> - **Tag:** `v1.0.2` on that commit. The internal version string stays `1.0.2-dev.7`.
+> - **Rollback:** `30c894a`, APP `03c863cc433622f672c11cae45f46694c4aa6f78ba0136cc1b7bc818a2e4b340`.
+
+- **What the release contains.** The `1.0.2` line since `main` of 10/11, i.e. the entries below from 11/11 to 16/11, plus five commits of 17–19/11:
+  - **`85bad0e`:**
+    - `StandTrajectory::validDefinition()` without the redundant rebuild (−95 % on the function);
+    - **PlanSplit V2:** a pending HEIGHT/PRONE_HEIGHT plan is prepared in the last unwind release; RAW frames, plans and STOP decisions are unchanged;
+    - `beginStop()` keeps HOLD's anchor when a STOP is serviced before the first frame of a pending start, so a STAND resume no longer jumps (up to 555 ticks);
+    - `formatStatus()` without newlib printf: byte-identical answers, −51 % instructions per answer.
+  - **`30c894a`, ACQUIRE v2:** register 85 (ACC ceiling) is prepared once while idle in RUN with torque OFF. The first STAND no longer holds the loop for ~126 ms: the register check takes 5.0 ms on 19/11, 131 ms before the patch.
+  - **`eb1ba28`, P1 minimal:** the steered edge-contact lift re-solve threshold goes from 10 to 50 µm (half a RAW tick). Offline, steered re-solves drop by 45–75 %.
+  - **`05e1214`, FP32 kinematic core:**
+    - the bounded per-release kinematics compute in binary32 inside `detail::`;
+    - the double public API, joint frames, boxes, `compensationSafe` and the StopPlan proof are unchanged;
+    - 51 of 38 153 frames differ by 1 RAW tick, none by more;
+    - QEMU P0 classes −74/−75 %;
+    - no FPU use in global constructors.
+  - **`1314bc4`, `kSteer` SLOW re-certified:** the RF UPPER maximum goes from 0.963456 to 1.004874 rad (FCL 120/120 + 12/12, lower bound 3.085 mm). This fixes the pre-existing steered SLOW `random_3` envelope failure.
+- **Hardware, 19/11, fixture (VERIFIED HARDWARE):**
+  - **Flash and identity:** flash APP-only with digest matched; NVS gen-1 and calibration 12/12 unchanged.
+  - **Tests run:** A/B chain 8/8 (140 steps), dashboard D1/D2 with HTTP STOP, block D 27/27 (joystick backward and lateral), S9 15/15 (steered SLOW).
+  - **Motion Timing P0 CLOSED in that scope:** max 12 729 µs against 16 000 µs, 0 overruns, 0 missed releases.
+  - **Against `30c894a`, same chain:** max 20 761 → 11 012 µs; releases ≥ 15 ms 217 → 0; overruns 2 → 0.
+  - **Memory and DALY:** `heap_min_free` ≥ 43 368 B; 0 DALY errors.
+- **Not integrated:**
+  - P4;
+  - full IRAM G2;
+  - kernel trigonometry reuse;
+  - full P1 (`TiltedContactIk`);
+  - W1, W2 and B;
+  - the 2 % rule variants and the Newton-tolerance change;
+  - HTTP tuning;
+  - the dev.8 diagnostic instrumentation.
+
+  See [ADR-008](../../09_Logs/Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md).
+- **Limits:**
+  - fixture only: no ground locomotion, and STANDARD/FAST keep `hardware_qualified=false`;
+  - not a WCET;
+  - the `random_3` IMU condition is certified offline only;
+  - the S7 cold cycle and the dashboard joystick were not run.
+- **Evidence:**
+  - [qualification](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md);
+  - [release manifest](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md);
+  - [integrated build](../../09_Logs/Validation_Reports/Motion_Integrated_1314bc4_2026-11-19/REPORT.md);
+  - [FP32 and P1](../../09_Logs/Validation_Reports/Motion_FP32_2026-11-18/REPORT.md);
+  - [`kSteer` certificate](../../09_Logs/Validation_Reports/Motion_SteerSlow_Recert_2026-11-18/README.md);
+  - [`30c894a`](../../09_Logs/Validation_Reports/Motion_30c894a_HW_2026-11-18/README.md).
 
 ## Unreleased — Motion Timing P0: T2R1M, E1/E1b, P3a/P3b, P5, F3 (FAST 29.6 mm/s) and IRAM G2s integrated — 2026-11-16
 

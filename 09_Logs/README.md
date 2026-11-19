@@ -1,6 +1,25 @@
 # MATDOG logs and evidence
 
-Stato corrente 10/11/2026: installata la build di sviluppo **`1.0.2-dev.6` ACC 220** (`450d2c7`, APP `82122e06…`).
+Stato corrente 19/11/2026: **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, installata e qualificata sulla fixture. Firmware `1.0.2-dev.7` `1314bc411c58`, commit `1314bc4`, APP `dd16bd62…`.
+- **Evidenze correnti:**
+  - [qualifica HW del 19/11](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md): catena 8/8, D1/D2, blocco D, S9;
+  - [manifest della release](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md);
+  - [evidenze, archivi locali e SHA256](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md).
+- **Decisioni:**
+  - [ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md): Motion Timing P0 CLOSED e congelato;
+  - [DALY B2](Validation_Reports/BMS_DALY_B2_2026-11-19/README.md): RCA congelata, causa UNKNOWN.
+- **Prima della Stable** (17–19/11):
+  - [build integrata](Validation_Reports/Motion_Integrated_1314bc4_2026-11-19/REPORT.md);
+  - [FP32 e P1](Validation_Reports/Motion_FP32_2026-11-18/REPORT.md);
+  - [certificato `kSteer`](Validation_Reports/Motion_SteerSlow_Recert_2026-11-18/README.md);
+  - [rollback `30c894a`](Validation_Reports/Motion_30c894a_HW_2026-11-18/README.md);
+  - [A/B DALY](Validation_Reports/BMS_DALY_AB_2026-11-18/REPORT_AB.md);
+  - [campagna P0 del 17/11](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/REPORT.md);
+  - [handoff del 18/11](Development_Log/2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md).
+
+Storico 14–16/11/2026: branch operativo unificato e build diagnostiche `1.0.2-dev.8` ([handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md)). Storico 11/11: `1.0.2-dev.7` `b5610620d0ce` ([rapporto](Validation_Reports/MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md)).
+
+Storico 10/11/2026: era installata la build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`).
 - **Hardware:** fixture Q1–Q8 qualificata; terra fuori protocollo. [Report HW](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) · [evidenze e SHA256](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
 - **Gemello MuJoCo V1, offline:** [rapporto M5](../06_Software/Matdog_MuJoCo/REPORT_M5.md).
 
@@ -26,8 +45,8 @@ automatically describe the robot after a later rebuild or architecture change.
 
 | Area | Purpose |
 |---|---|
-| [History index](HISTORY_INDEX.md) | Chronology June–November 2026; dated checkpoints, evidence and published v1.0.1 |
-| [Open items](OPEN_ITEMS.md) | Current overview as of 10/11/2026 (`1.0.2-dev.6` ACC 220 installed); previous dated states in historical reports |
+| [History index](HISTORY_INDEX.md) | Chronology June–November 2026; dated checkpoints, evidence and the published Stables v1.0.1 and v1.0.2 |
+| [Open items](OPEN_ITEMS.md) | Current overview as of 19/11/2026 (Stable `v1.0.2`): closed, suspended and still to be qualified, next milestone; earlier dated states kept below it |
 | [Commit provenance map](COMMIT_PROVENANCE_MAP.md) | PR #37–#41 merge SHAs; original SHA to recreated SHA for PR-2 and PR-3 (PR #38 merged with original SHAs; PR #41 is documentation only) |
 | [External archives](EXTERNAL_ARCHIVES.md) | Deleted branches (last tips), remaining tags, the non-public archive status and recovery steps; items without evidence stay `EXTERNAL_ARCHIVE_PENDING_VERIFICATION` |
 | [ST3215 evidence index](ST3215_EVIDENCE_INDEX.md) | Canonical navigation for bench QC, source survey, provisioning and frozen-tool evidence |

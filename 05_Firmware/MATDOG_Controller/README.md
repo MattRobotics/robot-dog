@@ -1,6 +1,13 @@
 # MATDOG Controller
 
-> **STATO CORRENTE — 10/11/2026:** su MATDOG è installata la build di sviluppo **`1.0.2-dev.6` ACC 220**.
+> **STATO CORRENTE — 19/11/2026:** su MATDOG è installata la **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, `1.0.2-dev.7`.
+> - **Identità:** build `1314bc411c58`; commit `1314bc411c589c4216e95629f4665d9d01f05781` (tag `v1.0.2`); APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
+> - **Qualifica sulla fixture** ([dossier](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest e rollback](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md)):
+>   - catena 8/8, D1/D2, blocco D, S9;
+>   - Motion Timing P0 CLOSED nel perimetro delle prove ([ADR-008](../../09_Logs/Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md));
+>   - terra non qualificata.
+>
+> **Storico 10/11/2026:** era installata la build di sviluppo `1.0.2-dev.6` ACC 220.
 > - **Identità:** build `450d2c793dcb`; commit sorgente `450d2c793dcb76d08ea341eb5c4b1e50215cee40`, in `main` dalla PR #67; APP SHA256 `82122e06b6708a9d687f4525f612182c227134f3abcac27f32ed7e266be04256`.
 > - **Riferimenti:** [validazione hardware](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) · [evidenze, manifest e rollback](../../09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md).
 > - **Validazione:** Motion via `src/simple`. Fixture Q1–Q8 qualificata: SLOW, STANDARD e FAST, cambi di profilo in camminata, STOP nelle transizioni, joystick in avanti. 14/14 STOP verificati. A terra verifica positiva ma fuori protocollo G0–G5. NVS gen-1 conservata.

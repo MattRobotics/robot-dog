@@ -1,9 +1,11 @@
 # MATDOG history index — June to November 2026
 
-> **Stato corrente (10/11/2026).**
-> - **Firmware:** installata la build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`), [validazione hardware](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md); fixture Q1–Q8 qualificata, terra fuori protocollo.
-> - **Gemello:** MuJoCo V1 offline integrato (tag `matdog-mujoco-v1-20261110`).
-> - **Cronologia:** sezione 11.
+> **Stato corrente (19/11/2026).**
+> - **Firmware:** installata la Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) (`1.0.2-dev.7` `1314bc411c58`, APP `dd16bd62…`), qualificata sulla fixture ([dossier](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
+> - **P0 e DALY:** Motion Timing P0 CLOSED nel perimetro delle prove; RCA DALY congelata.
+> - **Cronologia:** sezione 12.
+>
+> **Storico (10/11/2026):** era installata la build di sviluppo `1.0.2-dev.6` ACC 220 (`450d2c7`, APP `82122e06…`), [validazione hardware](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md). Gemello MuJoCo V1 offline integrato (tag `matdog-mujoco-v1-20261110`); cronologia nella sezione 11.
 >
 > **Storico (07/11/2026):** [prima Stable `v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1), firmware `1.0.1-dev.17` `17db0efe2324`, [validazione dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) e [manifest](Validation_Reports/Dev17_HW_2026-11-07/RELEASE_MANIFEST.md). Cronologia delle ultime fasi: [dev.15](Validation_Reports/Dev15_HW_2026-11-06/REPORT.md) → [dev.16](Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) → [dev.17](Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) → PR #64/#65 MERGED in `main` → Stable `v1.0.1`. I paragrafi datati sotto sono **fotografie storiche**, non stato corrente.
 
@@ -18,7 +20,7 @@ says so instead of describing it.
 > Open blockers: [`OPEN_ITEMS.md`](OPEN_ITEMS.md). Commits and recreated SHAs:
 > [`COMMIT_PROVENANCE_MAP.md`](COMMIT_PROVENANCE_MAP.md). Material outside `main`:
 > [`EXTERNAL_ARCHIVES.md`](EXTERNAL_ARCHIVES.md).
-> Le condizioni operative delle sezioni storiche valgono per le date riportate. Stato corrente e limiti della **dev.17 Stable v1.0.1**: [README](../README.md) e [OPEN_ITEMS](OPEN_ITEMS.md). Le note dev.15 prima di questa riga sono storiche.
+> Le condizioni operative delle sezioni storiche valgono per le date riportate. Stato corrente e limiti (dal 19/11/2026 la **Stable v1.0.2**; prima, dal 07/11, la v1.0.1 dev.17): [README](../README.md) e [OPEN_ITEMS](OPEN_ITEMS.md). Le note dev.15 prima di questa riga sono storiche.
 
 > **Historical branch status (2026-10-09; not current inventory).** The 13 historical branches recorded by the consolidation have been deleted
 > from GitHub; 9 tags remain. While Draft PR #42 is open the branch `docs/c2-final-sync` also exists; the
@@ -179,3 +181,18 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | 2026-11-10 | #67 `450d2c7` | [**dev.6 ACC 220 hardware validation**](Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md) and [evidence manifest](Validation_Reports/Dev6_ACC220_HW_2026-11-10/EVIDENCE_MANIFEST.md) | VERIFIED HARDWARE: fixture Q1–Q8 qualified, 14/14 STOP, ground positive but out of protocol; installed |
 | 2026-11-10 | #67 merge `66cc102` | Integration of the installed source into `main` | Merged; no rebuild or flash |
 | 2026-11-10 | #68 merge `aa058a2`, tag `matdog-mujoco-v1-20261110` | [MuJoCo twin V1: M5 report](../06_Software/Matdog_MuJoCo/REPORT_M5.md), [package](../06_Software/Matdog_MuJoCo/README.md) | VERIFIED OFFLINE; simulation, not a hardware qualification |
+
+## 12. Update 2026-11-19 — the `1.0.2` line from `main` (10/11) to the Stable `v1.0.2` (added; the sections above are unchanged)
+
+| Date | Commit | Document | Status |
+|---|---|---|---|
+| 2026-11-11 | `b561062` | [`1.0.2-dev.7` hardware report](Validation_Reports/MATDOG_DEV7_HW_2026-11-11/HW_REPORT.md) (Motion vNext + Battery P1) | VALIDATED HARDWARE in the tested scope, NOT STABLE |
+| 2026-11-14 | `integ/matdog-unified-operational-20261114` | [Unified operational branch handoff](Validation_Reports/Unified_Operational_2026-11-14/HANDOFF.md) | Git consolidation, no flash |
+| 2026-11-14/16 | diagnostic `1.0.2-dev.8` builds `8530d3a`, `e321e86`, `46b3175`, `82c1af9`, `2638204`, `a86c680`, `6be4690` | Hardware validations and offline P0 work, indexed in [Validation_Reports](Validation_Reports/README.md) | Fixture-validated diagnostics; Motion Timing P0 open |
+| 2026-11-17 | `06b6db0` | [P0 campaign, HTTP A/B](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/REPORT.md) | HTTP status load the dominant amplifier; P0 open |
+| 2026-11-18 | `85bad0e`, `30c894a` | [`30c894a` hardware qualification](Validation_Reports/Motion_30c894a_HW_2026-11-18/README.md) and [session handoff](Development_Log/2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md) | VERIFIED HARDWARE on the fixture; P0 open (20 761 µs, 2 overruns); rollback image of `v1.0.2` |
+| 2026-11-18 | `eb1ba28`, `05e1214`, `1314bc4` | [FP32 and P1](Validation_Reports/Motion_FP32_2026-11-18/REPORT.md), [`kSteer` certificate](Validation_Reports/Motion_SteerSlow_Recert_2026-11-18/README.md) | VERIFIED OFFLINE |
+| 2026-11-18/19 | — | [A/B DALY](Validation_Reports/BMS_DALY_AB_2026-11-18/REPORT_AB.md), [B2 cold start](Validation_Reports/BMS_DALY_B2_2026-11-19/README.md) | INCONCLUSIVE, then CLEAN; cause UNKNOWN, RCA frozen |
+| 2026-11-19 | `1314bc4`, docs `e6825f1` | [Integrated build](Validation_Reports/Motion_Integrated_1314bc4_2026-11-19/REPORT.md) | CLEAN build, offline checks PASS |
+| 2026-11-19 | `1314bc4` | [**Hardware qualification and completion**](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md), [release manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md), [ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md) | VERIFIED HARDWARE on the fixture; Motion Timing P0 CLOSED in that scope; KEEP |
+| 2026-11-19 | consolidation merge into `main`, tag `v1.0.2` on `1314bc4` | [Release `v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) | Stable, Motion fixture-qualified; `v1.0.1` unchanged |
