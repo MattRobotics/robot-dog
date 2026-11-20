@@ -229,10 +229,11 @@ motion::MotionAck MotionService::command(const motion::MotionCommand& c,uint32_t
  // joystick walk takes it at its handover back to the forward regime, without
  // stopping (vNext: WALK_MODE_AFTER_STEERING, a forward one only: a steered
  // backward walk returns to a backward walk); otherwise the next walk takes it
- // (a WALK STOP, a STOP recovery and a backward walk keep their law).
+ // (a WALK STOP, a STOP recovery and a backward walk keep their law; TROT and the
+ // crawl never change into each other inside a walk, SimpleMotion::walkModeFollows).
  if(c.intent==motion::Intent::GAIT_SELECT){simple::WalkMode m;if(!simple::parseWalkMode(c.gait,m))return result("WALK_MODE_UNKNOWN");
    if(const char* r=motion_->selectWalkMode(m))return result(r);const auto st=motion_->state();
-   return result(nullptr,motion_->walkModeLive()?"WALK_MODE_CHANGING":motion_->walkModeAtHandover()?"WALK_MODE_AFTER_STEERING":
+   return result(nullptr,motion_->walkModeFollows()?"WALK_MODE_CHANGING":motion_->walkModeAtHandover()?"WALK_MODE_AFTER_STEERING":
                          st==simple::State::WALKING||st==simple::State::MOVING?"WALK_MODE_NEXT_WALK":"WALK_MODE_SELECTED");}
  if(c.intent==motion::Intent::BASE_VELOCITY&&c.vx==0&&c.vy==0&&c.yaw_rate==0){
    // Nothing to stop at the PRONE rest: never take over the active command.
@@ -270,9 +271,9 @@ bool MotionService::capabilitiesJson(char* out,size_t cap) const {
  // vNext, backward, lateral and yaw at that mode's own limits (JoystickSpec;
  // the top-level "joystick" object keeps the SLOW values for older pages).
  size_t used=static_cast<size_t>(n)-1;  // reopen the object
- for(unsigned i=0;i<3;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
+ for(unsigned i=0;i<simple::kWalkModeCount;++i){const auto& w=simple::walkModeSpec(static_cast<simple::WalkMode>(i));
    const auto& j=simple::joystickSpec(static_cast<simple::WalkMode>(i));
-   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.0f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s,"
+   const int k=snprintf(out+used,cap-used,"%s{\"name\":\"%s\",\"period_s\":%.3f,\"strides_mm\":[%.0f,%.0f,%.0f],\"top_speed_mm_s\":%.1f,\"height_mm\":%.0f,\"lift_mm\":%.1f,\"duty\":%.3f,\"drive\":{\"speed\":%u,\"acc\":%u},\"stop_brake_acc\":%u,\"hardware_qualified\":%s,"
      "\"joystick\":{\"vx_back_max_m_s\":%.17g,\"vy_max_m_s\":%.17g,\"yaw_rate_max_rad_s\":%.17g,\"vx_steered_max_m_s\":%.17g}}",  // round-trip exact: full stick = the Controller's range
      i?",":",\"walk_mode_default\":\"SLOW\",\"walk_modes\":[",w.name,w.periodS,w.strideM[0]*1e3,w.strideM[1]*1e3,w.strideM[2]*1e3,w.strideM[2]/w.periodS*1e3,w.heightM*1e3,w.liftM*1e3,w.duty,
      unsigned(w.drive.speed),unsigned(w.drive.acc),unsigned(w.drive.acc<simple::kStopBrakeAcc?w.drive.acc:simple::kStopBrakeAcc),boolean(w.hardwareQualified),

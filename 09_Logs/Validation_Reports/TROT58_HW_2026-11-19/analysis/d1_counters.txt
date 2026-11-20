@@ -1,0 +1,7 @@
+edges: 2026-11-19T21:30:25.025+00:00 READY/IDLE (rest True) -> 2026-11-19T21:34:00.810+00:00 READY/IDLE (rest True)
+releases 10789, missed 0, overruns 0
+max_release_work_us since boot 11629 -> 11629: block maximum <= 11629 us (not resolved: not above the earlier since-boot maximum)
+last armed window at the end (command_timing): {"missed": 0, "first_miss_phase": "", "first_miss_lateness_us": 0, "max_work_us": 8687, "max_work_phase": "PRONE_LIFT", "max_compensate_us": 2570, "max_work_solves": 2, "overruns": 0}
+heap 2026-11-19T21:30:26.062+00:00 heap_free=75216 heap_min_free=39772
+heap 2026-11-19T21:34:01.856+00:00 heap_free=74504 heap_min_free=39772
+D1_P0_COUNTERS = PASS (criterion: both edges at rest, 0 missed, 0 overruns, since-boot maximum <= 16000 us; a since-boot maximum above 16000 us from an earlier run leaves the block maximum unresolved = not PASS)

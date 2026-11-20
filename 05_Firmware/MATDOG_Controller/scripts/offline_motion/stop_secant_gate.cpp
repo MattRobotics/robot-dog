@@ -98,7 +98,7 @@ int main(int argc,char** argv){
   const bool verbose=argc>1&&!std::strcmp(argv[1],"--verbose");unsigned faults=0,fails=0;
   std::map<std::string,Worst> groups;
   auto record=[&](Run& r){if(r.fault())++faults;};
-  for(unsigned mi=0;mi<3;++mi){
+  for(unsigned mi=0;mi<simple::kWalkModeCount;++mi){
     const auto mode=static_cast<simple::WalkMode>(mi);const auto& law=simple::walkModeSpec(mode);const auto& js=simple::joystickSpec(mode);
     const double T=law.periodS,top=law.strideM[2]/T;const std::string mn=law.name;
     for(const auto& c:kConds){
@@ -114,7 +114,7 @@ int main(int argc,char** argv){
       {Run r(c,groups,mn+" transitions",mn+" preset1to2",verbose);
         if(r.stand()){r.m.selectWalkMode(mode);r.m.walk(1,uint64_t(clock_us));for(unsigned k=0;k<300&&!r.fault();++k)r.tick();
           r.m.walk(2,uint64_t(clock_us));for(unsigned k=0;k<600&&!r.fault();++k)r.tick();r.m.walkStop();r.settle();}record(r);
-        if(mi<2){Run q(c,groups,mn+" transitions",mn+" to "+simple::walkModeSpec(static_cast<simple::WalkMode>(mi+1)).name,verbose);
+        if(mi<2){Run q(c,groups,mn+" transitions",mn+" to "+simple::walkModeSpec(static_cast<simple::WalkMode>(mi+1)).name,verbose);  // the crawl chain
           if(q.stand()){q.m.selectWalkMode(mode);q.m.walk(2,uint64_t(clock_us));for(unsigned k=0;k<300&&!q.fault();++k)q.tick();
             q.m.selectWalkMode(static_cast<simple::WalkMode>(mi+1));for(unsigned k=0;k<900&&!q.fault();++k)q.tick();q.m.walkStop();q.settle();}record(q);}
         if(mi>0){Run q(c,groups,mn+" transitions",mn+" to lower",verbose);
@@ -122,6 +122,18 @@ int main(int argc,char** argv){
             q.m.selectWalkMode(static_cast<simple::WalkMode>(mi-1));for(unsigned k=0;k<900&&!q.fault();++k)q.tick();q.m.walkStop();q.settle();}record(q);}}
     }
   }
+  // TROT (2026-11-19): a selection of the other family during a walk is the next
+  // walk's. A crawl walk with TROT selected keeps its law to its WALK STOP, then
+  // the next walk trots; a TROT walk with a crawl mode selected, the same way back.
+  for(const auto& c:kConds)for(unsigned mi=0;mi<simple::kWalkModeCount;++mi){
+    const auto mode=static_cast<simple::WalkMode>(mi),other=mode==simple::WalkMode::TROT?simple::WalkMode::STANDARD:simple::WalkMode::TROT;
+    Run r(c,groups,"family change",std::string(simple::walkModeSpec(mode).name)+" then "+simple::walkModeSpec(other).name,verbose);
+    if(r.stand()){r.m.selectWalkMode(mode);r.m.walk(2,uint64_t(clock_us));for(unsigned k=0;k<300&&!r.fault();++k)r.tick();
+      r.m.selectWalkMode(other);for(unsigned k=0;k<600&&!r.fault();++k)r.tick();
+      if(r.m.walkMode()!=mode){std::printf("family change: %s walk took %s live\n",simple::walkModeSpec(mode).name,simple::walkModeSpec(other).name);++fails;}
+      r.m.walkStop();r.settle();r.m.walk(2,uint64_t(clock_us));for(unsigned k=0;k<900&&!r.fault();++k)r.tick();
+      if(r.m.walkMode()!=other){std::printf("family change: the next walk is %s, not %s\n",simple::walkModeSpec(r.m.walkMode()).name,simple::walkModeSpec(other).name);++fails;}
+      r.m.walkStop();r.settle();}record(r);}
   // The fixture suite's block E then F1-F3 (16/11 FAULT): STANDARD preset 1, MODE SLOW, MODE STANDARD, WALK STOP, FAST preset 2.
   for(const auto& c:kConds){Run r(c,groups,"E->F3","E->F3",verbose);
     if(r.stand()){r.m.selectWalkMode(simple::WalkMode::STANDARD);r.m.walk(1,uint64_t(clock_us));for(unsigned k=0;k<300;++k)r.tick();

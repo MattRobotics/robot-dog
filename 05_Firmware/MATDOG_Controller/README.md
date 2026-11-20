@@ -1,6 +1,11 @@
 # MATDOG Controller
 
-> **STATO CORRENTE — 19/11/2026:** su MATDOG è installata la **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, `1.0.2-dev.7`.
+> **STATO CORRENTE — 20/11/2026:** su MATDOG è installata la build di sviluppo **`1.0.3-dev.2`** (TROT58), non una release.
+> - **Identità:** build `3152e880c3cc`; commit `3152e880c3cc2453ba1513a652b730670e0d0dd5`, in `main` con lo SHA originale, senza tag; APP SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`.
+> - **Qualifica sulla fixture, 19/11 sera** ([rapporto](../../09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)): KEEP, criteri C1–C10 PASS. Terra non qualificata.
+> - **Rollback:** la Stable pubblicata `v1.0.2`.
+>
+> **Stable pubblicata — 19/11/2026:** [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2), `1.0.2-dev.7`, installata fino al 19/11 sera.
 > - **Identità:** build `1314bc411c58`; commit `1314bc411c589c4216e95629f4665d9d01f05781` (tag `v1.0.2`); APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
 > - **Qualifica sulla fixture** ([dossier](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest e rollback](../../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md)):
 >   - catena 8/8, D1/D2, blocco D, S9;

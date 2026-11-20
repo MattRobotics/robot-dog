@@ -1,0 +1,47 @@
+# Candidato `3152e880c3cc` contro riferimento 19/11 `1314bc411c58` (generato da `MATDOG_REF=1911 cand_vs_ref.py 2109`)
+
+Criteri di `HW_TEST_PLAN.md` (fissati il 17/11), codificati in questo script il 18/11 prima della prova. Stessa catena ABBA, stessi profili HTTP A e B.
+
+## 1. Per prova
+
+| Prova | Build | Passi | Release | ≥15 ms | ≥20 ms | Max µs | Overrun | Perse comando / riposo | heap_min_free | Esito P0 |
+|---|---|---|---:|---:|---:|---:|---:|---|---:|---|
+| settle_A | 3152e88 | 12/12 | 3109 | 0 | 0 | 11147 | 0 | 0 / 0 | 39772 | PASS |
+| settle_B | 3152e88 | 12/12 | 4984 | 0 | 0 | 11067 | 0 | 0 / 0 | 39772 | PASS |
+| ab_B | 3152e88 | 18/18 | 6605 | 0 | 0 | 10028 | 0 | 0 / 0 | 39772 | PASS |
+| ab_A | 3152e88 | 18/18 | 6341 | 0 | 0 | 11629 | 0 | 0 / 1 | 39772 | PASS |
+| efg_A | 3152e88 | 20/20 | 6263 | 0 | 0 | 10961 | 0 | 0 / 0 | 39772 | PASS |
+| efg_B | 3152e88 | 20/20 | 6237 | 0 | 0 | 10264 | 0 | 0 / 0 | 39772 | PASS |
+| h_B | 3152e88 | 20/20 | 4572 | 0 | 0 | 10644 | 0 | 0 / 0 | 39772 | PASS |
+| h_A | 3152e88 | 20/20 | 4515 | 0 | 0 | 11419 | 0 | 0 / 0 | 39772 | PASS |
+| settle_A | 1314bc4 | 12/12 | 3166 | 0 | 0 | 10928 | 0 | 0 / 0 | 44592 | PASS |
+| settle_B | 1314bc4 | 12/12 | 4835 | 0 | 0 | 9936 | 0 | 0 / 0 | 44592 | PASS |
+| ab_B | 1314bc4 | 18/18 | 6522 | 0 | 0 | 10822 | 0 | 0 / 0 | 44592 | PASS |
+| ab_A | 1314bc4 | 18/18 | 6386 | 0 | 0 | 10548 | 0 | 0 / 0 | 44592 | PASS |
+| efg_A | 1314bc4 | 20/20 | 6066 | 0 | 0 | 11012 | 0 | 0 / 0 | 44592 | PASS |
+| efg_B | 1314bc4 | 20/20 | 6033 | 0 | 0 | 10979 | 0 | 0 / 0 | 44592 | PASS |
+| h_B | 1314bc4 | 20/20 | 4548 | 0 | 0 | 9883 | 0 | 0 / 0 | 44592 | PASS |
+| h_A | 1314bc4 | 20/20 | 4564 | 0 | 0 | 10829 | 0 | 0 / 0 | 44592 | PASS |
+
+## 2. Effetto dello scrittore (W1, W2)
+
+| Profilo | ≥15 ms candidato | IC 95 % | ≥15 ms riferimento | IC 95 % | Rapporto | Release (esposizione) cand. / rif. | Intervalli disgiunti |
+|---|---:|---|---:|---|---:|---|---|
+| A | 0 | [0.0, 3.7] | 0 | [0.0, 3.7] | – | 20228 / 20182 | no |
+| B | 0 | [0.0, 3.7] | 0 | [0.0, 3.7] | – | 22398 / 21938 | no |
+
+W1 (profilo A): riduzione **NON dimostrata**.
+W2 (profilo B): nessuna differenza dimostrata.
+Il confronto è fra build diverse; le release di avvio F6/H18 sono più leggere nel candidato (PlanSplit V2), quindi W1/W2 misurano lo scrittore insieme a V2 e `validDefinition`.
+
+## 3. Prima STAND dopo il boot (`settle_A`, prima finestra)
+
+- Finestra da release 23559, stato iniziale READY/IDLE; massimo 9053 µs (STAND_LIFT); overrun 0; perse 0.
+- Release perse a comando in `settle_A`: 0 (nessuna).
+
+
+## 5. Verdetti
+
+- **W1 scrittore:** NON DIMOSTRATO.
+- **P0:** APERTO (catena 8/8 prove PASS, prove con la dashboard non fornite; sola dashboard D1 mancante (analysis/d1_counters.txt)).
+- **Sicurezza:** PASS (passi falliti o abort: 0; heap_min_free minimo 39772 B, soglia 24576 B).

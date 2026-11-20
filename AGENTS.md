@@ -1,11 +1,11 @@
 # AGENTS.md — MATDOG
 
-> **Baseline attuale (19/11/2026): Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) su `main`.**
-> - **Installato:** `1.0.2-dev.7`, build `1314bc411c58`, commit `1314bc4`, APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`. Il tag `v1.0.2` punta a quel commit.
-> - **Qualifica:** solo sulla fixture ([dossier](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
+> **Baseline attuale (20/11/2026): installata `1.0.3-dev.2` (TROT58, build di sviluppo) su `main`; Stable pubblicata [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2).**
+> - **Installato:** `1.0.3-dev.2`, build `3152e880c3cc`, commit `3152e88`, APP SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`. Nessun tag né release.
+> - **Qualifica:** solo sulla fixture, il 19/11 sera. KEEP, C1–C10 PASS ([rapporto](09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)). Locomozione a terra **non** qualificata.
+> - **Stable/Latest:** `v1.0.2` (`1314bc4`, APP `dd16bd62…`), invariata; è il rollback ([dossier](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
 >   - Motion Timing P0 CLOSED e congelato ([ADR-008](09_Logs/Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md)).
->   - Locomozione a terra **non** qualificata.
-> - **Rollback:** `30c894a`. **Stable storica:** `v1.0.1`, immutabile.
+> - **Stable storica:** `v1.0.1`, immutabile.
 > - **Silenzi DALY:** causa UNKNOWN, RCA congelata.
 > - **Prossima milestone:** Ground Locomotion & Gait Performance ([OPEN_ITEMS](09_Logs/OPEN_ITEMS.md)).
 > - **Sessioni hardware** ([ADR-007](09_Logs/Architecture_Decisions/ADR-007_Motion_Timing_Integration_and_Heap_Margin.md)):

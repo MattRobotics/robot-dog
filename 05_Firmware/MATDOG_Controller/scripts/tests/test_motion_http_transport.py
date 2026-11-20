@@ -166,7 +166,7 @@ int main() {
   g.headers["X-Csrf-Token"]=std::string(64,'0');runMotion(g);check(g.status==200&&g.response.find("\"admin_session\":false")!=std::string::npos,"invalid CSRF cannot renew session");
   g.headers["X-Csrf-Token"]=s.portal_.csrf();runMotion(g);check(g.status==200&&g.response.find("\"admin_session\":true")!=std::string::npos,"authenticated Dashboard poll renews session");}
  expectReject(s,"POSTURE.STAND","{\"target_height_m\":0.15}","NOT_READY",2);
- expectReject(s,"GAIT.SELECT","{\"gait\":\"TROT\"}","WALK_MODE_UNKNOWN",3);  // walk modes 2026-11-09: GAIT.SELECT names SLOW|STANDARD|FAST
+ expectReject(s,"GAIT.SELECT","{\"gait\":\"PACE\"}","WALK_MODE_UNKNOWN",3);  // walk modes 2026-11-09: GAIT.SELECT names SLOW|STANDARD|FAST (TROT too since 2026-11-19)
  expectReject(s,"ACTION.EXECUTE","{\"action_id\":\"action.wave\"}","COMMAND_NOT_IN_SIMPLE_V1",4);
  expectReject(s,"BASE_VELOCITY","{\"vx\":0.1,\"vy\":0,\"yaw_rate\":0}","NOT_READY",5);
  expectReject(s,"BODY_POSE","{\"x\":0.01}","COMMAND_NOT_IN_SIMPLE_V1",6);

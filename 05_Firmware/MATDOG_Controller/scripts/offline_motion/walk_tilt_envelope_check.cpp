@@ -79,7 +79,7 @@ std::vector<std::vector<Sample>> segments(const Law& L){
   // secant of WALK100 depends on it by one tick).
   for(unsigned k=0;k<gPhases;++k){const double o=k*.02/L.period/gPhases;
     if(k){std::vector<Sample> s;for(double c=g.startCycles+1+o;c<g.startCycles+2+o;c+=.02/L.period)s.push_back({c,1/L.period,0,-1});out.push_back(s);}
-    for(double q=0;q<1.5;q+=.25){const double stopCycle=g.startCycles+q,terminal=stopCycle+g.stopCycles;
+    for(double q=0;q<1.5;q+=simple::walkTouchdownStep(g)){const double stopCycle=g.startCycles+q,terminal=stopCycle+g.stopCycles;  // TROT: pair touchdowns
       std::vector<Sample> s;for(double c=std::fmax(0.,terminal-g.stopCycles-.3)+o;c<=terminal+settle+1e-12;c+=.02/L.period)s.push_back({std::fmin(c,terminal+settle),1/L.period,0,terminal});out.push_back(s);}}
   return out;
 }
@@ -145,9 +145,9 @@ int main(int argc,char** argv){
   unsigned stride=2,search=0;Law L{simple::walkGait(2),simple::kWalkPeriodS,simple::kWalkDrive.speed*simple::kTickRad,simple::kWalkDrive.acc*100*simple::kTickRad,simple::kWalkDrive.acc*100*simple::kTickRad};
   // What-if flags reshape the production law (model only; the firmware law is SimpleMotion.h).
   struct Opt{const char* name;double* value;double scale;};
-  unsigned modeIndex=0;  // --mode 0|1|2: SLOW, STANDARD, FAST (SimpleMotion.h WalkModeSpec)
+  unsigned modeIndex=0;  // --mode 0|1|2|3: SLOW, STANDARD, FAST, TROT (SimpleMotion.h WalkModeSpec)
   for(int i=1;i+1<argc;i+=2){if(!std::strcmp(argv[i],"--stride"))stride=std::atoi(argv[i+1]);if(!std::strcmp(argv[i],"--mode"))modeIndex=std::atoi(argv[i+1]);}
-  if(stride>2||modeIndex>2)return 2;
+  if(stride>2||modeIndex>=simple::kWalkModeCount)return 2;
   const auto mode=static_cast<simple::WalkMode>(modeIndex);const auto& spec=simple::walkModeSpec(mode);
   GaitParameters g=simple::walkGait(stride,mode);
   double period=spec.periodS,driveSpeed=spec.drive.speed,driveAcc=spec.drive.acc,proofAcc=-1,height=spec.heightM,reverse=0;
@@ -195,7 +195,7 @@ int main(int argc,char** argv){
     // proof is not monotone in the tilt: shrink until vertices, midpoints and
     // quarter points all pass.
     for(unsigned it=0;it<40;++it){Stats s;if(run(L,withMidpoints(withMidpoints(poly)),s,false))break;for(auto& p:poly){p.roll*=.97;p.pitch*=.97;}std::fprintf(stderr,"edge failure: polygon x0.97\n");}
-    std::printf("constexpr TiltVertex k%sTilt%s[]={",modeIndex==0?"Walk":modeIndex==1?"Standard":"Fast",modeIndex==0?(stride==2?"100":"75"):(stride==2?"Top":"Short"));
+    std::printf("constexpr TiltVertex k%sTilt%s[]={",modeIndex==0?"Walk":modeIndex==1?"Standard":modeIndex==2?"Fast":"Trot",modeIndex==0?(stride==2?"100":"75"):(stride==2?"Top":"Short"));
     for(size_t i=0;i<poly.size();++i)std::printf("%s{%.6f,%.6f}",i?",":"",poly[i].roll,poly[i].pitch);std::printf("};\n");
   }else if(!single.empty()){
     // --ray roll,pitch: these rays alone (attribution of a single direction).

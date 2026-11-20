@@ -145,7 +145,17 @@ constexpr const char* kFirmwareDescription = "Embedded Motion & Robot Control Fi
 //   from pack and cell voltages with the DALY SOC as an estimate; the SOC x
 //   nominal Ah estimate removed. Geometry, calibration, NVS, limits, STOP and
 //   SAFE_OFF unchanged. Offline candidate.
-constexpr const char* kFirmwareVersion = "1.0.2-dev.7"; // Offline candidate; hardware qualification pending
+// 1.0.3-dev.2 (2026-11-19): TROT58 on Stable v1.0.2 (main 7c7c4e2). TROT, a
+//   fourth WALK mode on the same Gait generator and Motion pipeline: diagonal
+//   pairs with four feet down at every pair change (duty .60), 58 mm per 0.9 s
+//   (64.4 mm/s nominal), 115 mm, lift 8.5 mm, drive {1950,220}, its own IMU
+//   envelope kTrotTilt; forward only (backward, lateral and yaw not yet certified).
+//   TROT and the crawl never change into each other inside a walk: a selection
+//   of the other family is the next walk's. Supersedes the offline-only TROT46
+//   candidate 1.0.3-dev.1 (ee0756b, never flashed). SLOW, STANDARD and FAST
+//   unchanged; geometry, calibration, NVS, mapping, limits and STOP unchanged.
+//   Offline candidate.
+constexpr const char* kFirmwareVersion = "1.0.3-dev.2"; // Offline candidate; hardware qualification pending
 constexpr const char* kBoardName       = "YD-ESP32-S3 N16R8";
 constexpr const char* kBuildId         = MATDOG_BUILD_ID;
 constexpr const char* kGitSha          = MATDOG_GIT_SHA;

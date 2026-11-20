@@ -143,6 +143,7 @@ The hardware and offline evidence of 14–19/11/2026 was produced on the operato
 | 17/11 | [P0 campaign evidence manifest](Validation_Reports/MATDOG_1_0_2_P0_2026-11-17/EVIDENCE_MANIFEST.md) |
 | 18/11 | [`LOCAL_ARCHIVES.sha256.txt`](Validation_Reports/Motion_FP32_2026-11-18/LOCAL_ARCHIVES.sha256.txt) |
 | 19/11 (Stable `v1.0.2`) | [Evidence manifest](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md), with the seal check of all 29 sealed folders of 17–19/11 |
+| 19/11 evening (`1.0.3-dev.2`, TROT58) | [Hardware report §6](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md#6-evidenze-e-archivi): session folder seal, second copy (`.tar.gz`, restore-tested), installed APP image, source bundle and test kit, with their SHA256 |
 
 Originals and second copies share one physical disk. No independent physical copy is declared for them.
 

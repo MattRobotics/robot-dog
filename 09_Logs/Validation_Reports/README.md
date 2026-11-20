@@ -1,4 +1,10 @@
-> **Stable corrente (19/11/2026) — `v1.0.2`: firmware `1.0.2-dev.7` / `1314bc411c58` (APP `dd16bd62…`), Motion fixture-qualified.** [Indice della qualifica](Motion_1314bc4_HW_2026-11-19/README.md) · [rapporto del collaudo](Motion_1314bc4_HW_2026-11-19/qualification/REPORT_HW.md) · [blocco D e S9](Motion_1314bc4_HW_2026-11-19/completion/REPORT_HW_COMPLETION.md) · [manifest della release](Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md) · [evidenze](Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md).
+> **Firmware installato (dal 19/11/2026 sera) — `1.0.3-dev.2` / `3152e880c3cc` (APP `3c8774a9…`), TROT58, build di sviluppo:** [qualifica sulla fixture](TROT58_HW_2026-11-19/REPORT.md).
+> - **Esito:** KEEP, criteri C1–C10 PASS — VERIFIED HARDWARE sulla fixture.
+> - **Prove:** catena A/B 8/8, blocco TROT58 37/37, D1 con STOP HTTP; massimo 11 629 µs, 0 overrun.
+> - **Terra:** non qualificata. La prova esplorativa a terra del 19/11 sera non è una qualifica.
+> - **Nessuna release:** la Stable pubblicata resta `v1.0.2`, rollback del firmware installato.
+
+> **Stable pubblicata (19/11/2026) — `v1.0.2`: firmware `1.0.2-dev.7` / `1314bc411c58` (APP `dd16bd62…`), Motion fixture-qualified, installata fino al 19/11 sera.** [Indice della qualifica](Motion_1314bc4_HW_2026-11-19/README.md) · [rapporto del collaudo](Motion_1314bc4_HW_2026-11-19/qualification/REPORT_HW.md) · [blocco D e S9](Motion_1314bc4_HW_2026-11-19/completion/REPORT_HW_COMPLETION.md) · [manifest della release](Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md) · [evidenze](Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md).
 > - **Prove:** catena 8/8, D1/D2 con STOP HTTP, blocco D 27/27, S9 15/15.
 > - **Motion Timing P0 CLOSED — VERIFIED HARDWARE nel perimetro delle prove:** massimo 12 729 µs, 0 overrun, 0 perse ([ADR-008](../Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md)). La locomozione a terra non è qualificata.
 > - **Prima della qualifica:**
@@ -63,7 +69,7 @@
 
 # Validation reports — index
 
-**Latest hardware checkpoint: 19/11/2026 — [Stable `v1.0.2`, `1314bc4`](Motion_1314bc4_HW_2026-11-19/README.md)** (fixture: catena 8/8, D1/D2, blocco D, S9; P0 CLOSED nel perimetro delle prove; terra non qualificata). Checkpoint precedenti: 10/11/2026 [`1.0.2-dev.6` ACC 220](Dev6_ACC220_HW_2026-11-10/REPORT.md). **Stable storica:** 07/11/2026, [dev.17, prima Stable v1.0.1](Dev17_HW_2026-11-07/REPORT.md). Per la sequenza precedente: [dev.16](Dev16_HW_2026-11-07/REPORT.md) → [dev.15](Dev15_HW_2026-11-06/REPORT.md) → [dev.14](Dev14_HW_2026-11-05/REPORT.md). Il [tag storico dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) è soltanto un checkpoint passato.
+**Latest hardware checkpoint: 19/11/2026 sera — [`1.0.3-dev.2` TROT58, `3152e88`](TROT58_HW_2026-11-19/REPORT.md)** (fixture: KEEP, C1–C10 PASS; catena 8/8, blocco TROT58 37/37, D1 con STOP HTTP; terra non qualificata; build di sviluppo, non una release). Checkpoint precedenti: 19/11/2026 mattina, [Stable `v1.0.2`, `1314bc4`](Motion_1314bc4_HW_2026-11-19/README.md) (catena 8/8, D1/D2, blocco D, S9; P0 CLOSED nel perimetro delle prove); 10/11/2026 [`1.0.2-dev.6` ACC 220](Dev6_ACC220_HW_2026-11-10/REPORT.md). **Stable storica:** 07/11/2026, [dev.17, prima Stable v1.0.1](Dev17_HW_2026-11-07/REPORT.md). Per la sequenza precedente: [dev.16](Dev16_HW_2026-11-07/REPORT.md) → [dev.15](Dev15_HW_2026-11-06/REPORT.md) → [dev.14](Dev14_HW_2026-11-05/REPORT.md). Il [tag storico dev.14](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105) è soltanto un checkpoint passato.
 
 Historical scoped closure (11/10/2026): [MATDOG hardware non-motion 2026-10-11](MATDOG_HW_NON_MOTION_CLOSEOUT_2026-10-11.md) — baseline validated, motion not validated; final flash/NVS/STA traced to original operator-pasted output recovered from conversation; [privacy-audited appendix](HW_Closeout_2026-10-11/MATDOG_2026-10-11_EVIDENCE_APPENDIX.md).
 

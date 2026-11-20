@@ -154,7 +154,7 @@ async function boot(initialStatus = fx.status_ready, withGround = false) {
     const radios = [...p.dom.window.document.querySelectorAll('input[name="simple-walk-mode"]')];
     // Icon and name over the speed (modeLabels updates only the speed element).
     assert.deepStrictEqual(radios.map(r => r.value + ':' + r.nextElementSibling.querySelector('.mode-name').textContent + '|' + r.nextElementSibling.querySelector('.mode-speed').textContent),
-      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|30 mm/s']);
+      ['SLOW:🐢 SLOW|20 mm/s', 'STANDARD:🐾 STANDARD|30 mm/s', 'FAST:🐇 FAST|29,6 mm/s']);
     assert(radios[0].checked && !q('#simple-stride') && /WALK · modalità/.test(q('#simple-walk-mode').closest('fieldset').textContent));
     await settle();
     assert.strictEqual(p.calls.filter(c => c.url === '/api/motion/command').length, before, 'no command on a height change');

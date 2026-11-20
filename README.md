@@ -2,7 +2,25 @@
 
 MATDOG è un quadrupede costruito da zero. Il Controller ESP32-S3 è l'unica autorità su Motion, servomotori, cinematica, limiti e STOP; la dashboard invia comandi ad alto livello e mostra telemetria e Digital Twin.
 
-## Stato corrente — 19/11/2026: Stable `v1.0.2`
+## Stato corrente — 20/11/2026: installata `1.0.3-dev.2` (TROT58); Stable `v1.0.2`
+
+| | |
+|---|---|
+| **Firmware installato** | `MATDOG Controller 1.0.3-dev.2`, build `3152e880c3cc`: **build di sviluppo, non una release**. Flash APP-only del 19/11 sera |
+| **Commit sorgente** | [`3152e880c3cc2453ba1513a652b730670e0d0dd5`](https://github.com/MattRobotics/robot-dog/commit/3152e880c3cc2453ba1513a652b730670e0d0dd5), in `main` con lo SHA originale: un commit sopra `7c7c4e2`, seguito da un commit di sola documentazione. Nessun tag |
+| **APP verificata** | 1 784 928 B, SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`, `ROBOT_POWERED`, CLEAN; digest corrispondente al flash. NVS gen-1 e calibrazione `be8d5902bb4e37da` 12/12 invariate. Nessun asset pubblicato: APP, manifest e checksum sono conservati in locale ([rapporto §6](09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md#6-evidenze-e-archivi)) |
+| **Qualifica hardware del 19/11 sera (fixture)** | **KEEP, criteri C1–C10 PASS — VERIFIED HARDWARE sulla fixture:** catena A/B della `v1.0.2` 8/8 (140 passi), blocco TROT58 37/37, dashboard D1 con STOP HTTP. Massimo 11 629 µs su 16 000, 0 overrun, 0 release operative perse; STOP USB 16/16 e HTTP 1/1 verificati |
+| **Modalità** | WALK SLOW 20, STANDARD 30 e FAST 29,6 mm/s: crawl invariati. **TROT58** 64,4 mm/s nominali (39/49/58 mm ogni 0,9 s, alzata 8,5 mm), solo avanti. WALK FAST 40 non integrato: resta uno studio |
+| **Non qualificato** | Locomozione a terra e velocità reale di tutte le modalità (`hardware_qualified=false`); TROT58 indietro, laterale e in rotazione. La prova esplorativa a terra del 19/11 sera non è una qualifica |
+| **Stable pubblicata (Latest)** | [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) (`1.0.2-dev.7`, `1314bc4`, APP `dd16bd62…`), invariata: è il rollback del firmware installato |
+| **DALY** | Silenzi all'accensione di causa UNKNOWN, RCA congelata. Il 19/11 sera i due gate DALY (QON + 6 min) sono passati senza errori |
+| **Prossima fase** | Locomozione a terra e Motion Go2-like: [attività aperte](09_Logs/OPEN_ITEMS.md#prossima-milestone-ground-locomotion--gait-performance) |
+
+[Qualifica TROT58 del 19/11](09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md) · [Changelog del Controller](05_Firmware/MATDOG_Controller/CHANGELOG.md) · [Problemi aperti](09_Logs/OPEN_ITEMS.md) · [Test](08_Tests/README.md)
+
+**Una ricompilazione di `main` non è l'APP installata:** l'APP si identifica da manifest e SHA256.
+
+## Stato al 19/11/2026 mattina: Stable `v1.0.2` (storico; resta la Stable pubblicata)
 
 | | |
 |---|---|
@@ -98,7 +116,7 @@ Il [report dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) doc
 | Controller | ESP32-S3, unica autorità su Motion, bus servo e sicurezza runtime |
 | Attuatori | 12 ST3215 delle zampe più collo ID51: 13 installati, 17 posizioni canoniche allocate |
 | Sensori | IMU BNO085, BMS DALY, feedback di posizione, carico, tensione e temperatura dei servo |
-| Interfaccia | Dashboard web dell'ESP32; comandi semantici STAND, PRONE, WALK SLOW/STANDARD/FAST, joystick e STOP; Twin in sola lettura |
+| Interfaccia | Dashboard web dell'ESP32; comandi semantici STAND, PRONE, WALK SLOW/STANDARD/FAST, TROT58, joystick e STOP; Twin in sola lettura |
 | Motion | Stack SIMPLE: gait, cinematica inversa, compensazione IMU, frame coordinati e feedback asincrono |
 | Geometria | URDF operativo REV01-FIX; mapping e calibrazione persistente gen-1 preservati |
 | Alto livello | Jetson Orin Nano Super previsto per integrazioni successive; nessuna autorità diretta browser → servo |
@@ -107,9 +125,10 @@ Il [report dev.16](09_Logs/Validation_Reports/Dev16_HW_2026-11-07/REPORT.md) doc
 
 | Linea | Significato |
 |---|---|
-| **1.0.2-dev.7 `1314bc4` — Stable `v1.0.2`** | **Installata dal 19/11/2026 e rilasciata.** Commit `1314bc411c589c4216e95629f4665d9d01f05781`, build `1314bc411c58`, APP `dd16bd62…`. Tag [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) sullo stesso commit; asset con APP originale, manifest e SHA256. Fixture: catena 8/8, D1/D2, blocco D, S9; P0 CLOSED nel perimetro delle prove ([qualifica](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md)). Rollback `30c894a` |
+| **1.0.3-dev.2 `3152e88` — TROT58** | **Installata dal 19/11/2026 sera; build di sviluppo, non una release.** Commit `3152e880c3cc2453ba1513a652b730670e0d0dd5` in `main` con lo SHA originale, build `3152e880c3cc`, APP `3c8774a9…`. Nessun tag né asset: APP, manifest e checksum sono conservati in locale. Fixture: KEEP, C1–C10 PASS ([rapporto](09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)). Terra non qualificata. Rollback: `v1.0.2` |
+| **1.0.2-dev.7 `1314bc4` — Stable `v1.0.2`** | **Rilasciata il 19/11/2026: è la Stable pubblicata (Latest).** Installata dal 19/11 mattina al 19/11 sera; oggi è il rollback di `1.0.3-dev.2`. Commit `1314bc411c589c4216e95629f4665d9d01f05781`, build `1314bc411c58`, APP `dd16bd62…`. Tag [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) sullo stesso commit; asset con APP originale, manifest e SHA256. Fixture: catena 8/8, D1/D2, blocco D, S9; P0 CLOSED nel perimetro delle prove ([qualifica](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest](09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md)). Rollback `30c894a` |
 | **1.0.2-dev.6 ACC 220** | **Storica**, installata dal 10/11/2026 all'11/11: sorgente `450d2c7`, build `450d2c793dcb`, APP `82122e06…`, in `main` dalla [PR #67](https://github.com/MattRobotics/robot-dog/pull/67). Fixture Q1–Q8 qualificata, terra fuori protocollo ([validazione](09_Logs/Validation_Reports/Dev6_ACC220_HW_2026-11-10/REPORT.md)). Build di sviluppo, non una release. |
-| **main** | **Sorgente canonica.** Dal 19/11/2026 contiene la Stable `v1.0.2` (`1314bc4`), con le leggi Motion del 14–18/11 e la loro documentazione (merge di consolidamento). Dal 10/11 conteneva `450d2c7` (PR #67) e il gemello MuJoCo V1 (PR #68); in precedenza, dal merge della [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (07/11/2026), dev.15, dev.16 e dev.17. Il tag [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) punta al commit di merge; il tag `v1.0.2` punta al commit firmware `1314bc4`. Non flashare una ricompilazione di `main` al posto dell'asset verificato. |
+| **main** | **Sorgente canonica.** Contiene anche `3152e88` (`1.0.3-dev.2`, TROT58), il firmware installato, con lo SHA originale, seguito dalla documentazione della sua qualifica. Dal 19/11/2026 contiene la Stable `v1.0.2` (`1314bc4`), con le leggi Motion del 14–18/11 e la loro documentazione (merge di consolidamento). Dal 10/11 conteneva `450d2c7` (PR #67) e il gemello MuJoCo V1 (PR #68); in precedenza, dal merge della [PR #64](https://github.com/MattRobotics/robot-dog/pull/64) (07/11/2026), dev.15, dev.16 e dev.17. Il tag [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1) punta al commit di merge; il tag `v1.0.2` punta al commit firmware `1314bc4`. Non flashare una ricompilazione di `main` al posto dell'asset verificato. |
 | **dev.14** | Firmware installato e validato parzialmente **il 05/11**, ora storico; sorgente sul [checkpoint](https://github.com/MattRobotics/robot-dog/tree/checkpoint/matdog-dev14-hw-20261105). |
 | **dev.15** | Validata parzialmente il 06/11/2026; PRONE allora intermittente. Sorgente `7997ad4` incluso nella storia oggi mergiata su `main` con PR #64. Non è il firmware attualmente installato. [Dossier storico](09_Logs/Validation_Reports/Dev15_HW_2026-11-06/REPORT.md). |
 | **dev.17** | **Stable storica, non più installata dall'08/11.** Allora installata, VERIFIED HARDWARE nel perimetro qualificato e rilasciata come prima Stable [`v1.0.1`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.1)** (07/11/2026): commit `17db0ef`, build `17db0efe2324`, APP `14e055a0bfa2adcab8f87df29ece0a0cf01a6e9e13b99aee1c94bda59ba84a83`. HTTP di stato senza slack, letture oltre il recupero TCP, joystick stabile e in ordine, Twin dopo refresh con coppia ON, WALK diretto dopo STOP, Motion Cockpit e ViewCube. [Dossier HW](09_Logs/Validation_Reports/Dev17_HW_2026-11-07/REPORT.md) · [candidata](09_Logs/Validation_Reports/Dev17_Candidate_2026-11-07/REPORT.md). La build `7503bfc` è superata e non rilasciata. |
@@ -120,7 +139,7 @@ Identità storica dev.14 (05/11): commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5dec
 
 ## Priorità aperte
 
-- **Prossima milestone: Ground Locomotion & Gait Performance.** Non è ancora iniziata. Dalla base `v1.0.2` qualificata sulla fixture si misureranno a terra:
+- **Prossima milestone: Ground Locomotion & Gait Performance.** Non è ancora iniziata. Dalla base `1.0.3-dev.2` (TROT58), qualificata sulla fixture, si misureranno a terra:
   - velocità reale;
   - fluidità;
   - ampiezza dell'alzata;
@@ -134,7 +153,7 @@ Identità storica dev.14 (05/11): commit `4ff2aadf4ed907d39f2b3ad4f9e6af54db5dec
 - **Sospeso:** RCA dei silenzi DALY all'accensione. Causa UNKNOWN; si riapre su una nuova anomalia documentata.
 - **Gemello MuJoCo:** discrepanza residua dei carichi a terra (rapporto M5). Per calibrarla servono misure nuove, come le forze ai piedi.
 
-- **[#52 — Motion](https://github.com/MattRobotics/robot-dog/issues/52):** timing risolto nella build corrente. Il prossimo lavoro riguarda velocità, fluidità, ampiezza dell'alzata, tracking, stabilità e prova a terra. Per lo sway del joystick, WALK_SETTLE e la risposta ROLL vedi l'issue.
+- **[#52 — Motion](https://github.com/MattRobotics/robot-dog/issues/52):** timing risolto nella build corrente; TROT58 integrato e qualificato sulla fixture, non a terra. Il prossimo lavoro riguarda velocità, fluidità, ampiezza dell'alzata, tracking, stabilità e prova a terra. Per lo sway del joystick, WALK_SETTLE e la risposta ROLL vedi l'issue.
 - **[#62 — Dashboard, Twin e LED](https://github.com/MattRobotics/robot-dog/issues/62):** HTTP/Twin/ViewCube migliorati e provati in dev.17; restano la causa delle perdite TCP con coppia ON, la misura dello STOP su telefono durante il caricamento a freddo del Twin, l'overlay trasparente dei comandi nel Twin, il pavimento del Twin in PRONE e la qualificazione dei LED.
 - **[#48 — RESTORE e manutenzione](https://github.com/MattRobotics/robot-dog/issues/48):** RESTORE automatico gen-1 verificato a ogni boot; RESTORE manuale da dashboard, rifiuti per giunto, modalità manutenzione e multigenerazione ancora da qualificare.
 

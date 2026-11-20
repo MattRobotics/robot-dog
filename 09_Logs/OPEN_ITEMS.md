@@ -1,12 +1,23 @@
-# Stato operativo corrente — 19/11/2026: Stable `v1.0.2` (`1314bc4`)
+# Stato operativo corrente — 20/11/2026: installata `1.0.3-dev.2` (TROT58, `3152e88`); Stable `v1.0.2`
 
-**Installata e rilasciata:** `1.0.2-dev.7`, build `1314bc411c58`, commit `1314bc411c589c4216e95629f4665d9d01f05781`, APP SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
-- È promossa senza ricompilazione come GitHub Release [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2): Stable, Motion fixture-qualified.
-- **Rollback:** `30c894a`, APP `03c863cc…`.
+**Installata (build di sviluppo, non una release):** `1.0.3-dev.2`, build `3152e880c3cc`, commit `3152e880c3cc2453ba1513a652b730670e0d0dd5`, APP SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`.
+- **Flash:** APP-only il 19/11 sera; NVS gen-1 e calibrazione `be8d5902bb4e37da` invariate.
+- **Evidenze:** [TROT58_HW_2026-11-19](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md).
+- **Stable pubblicata (Latest):** [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) (`1.0.2-dev.7`, `1314bc4`, APP `dd16bd62…`), invariata. È il rollback del firmware installato.
 - **Stable precedente:** `v1.0.1`, immutabile.
-- **Evidenze:** [Motion_1314bc4_HW_2026-11-19](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest della release](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md) · [ADR-008](Architecture_Decisions/ADR-008_Motion_Timing_P0_Closure_and_Freeze.md).
 
-## Chiusi (VERIFIED HARDWARE sulla fixture, 19/11/2026)
+## Chiusi (VERIFIED HARDWARE sulla fixture, 19/11/2026 sera — `3152e88`)
+
+| Area | Stato |
+|---|---|
+| Qualifica di `1.0.3-dev.2` | **KEEP, criteri C1–C10 PASS**, fissati prima della prova. Flash e boot, identità, `capabilities`, salute e memoria (`heap_min_free` 39 772 B) |
+| TROT58 | Integrato come quarta modalità WALK, solo avanti: 39/49/58 mm ogni 0,9 s, alzata 8,5 mm. Blocco T 37/37: legge esatta (54,44 / 64,44 mm/s), indipendenza fra le andature (`WALK_MODE_NEXT_WALK`), STOP in trotto 2,2 / 2,4 s con ripresa STAND e WALK |
+| Regressione crawl | Catena A/B della `v1.0.2` 8/8 (140 passi). SLOW, STANDARD e FAST invariati |
+| Motion Timing sul candidato | Massimo 11 629 µs su 16 000, 0 overrun, 0 release operative perse. Una release IDLE saltata a riposo, riportata a parte |
+| STOP | USB 16/16 (14 in movimento, verificati in 2,0–3,0 s, e 2 a riposo); HTTP dalla dashboard 1/1 con ripresa STAND |
+| Joystick dalla dashboard (pressione tenuta) | Avanti in TROT58 a fondo corsa, tenuto dall'operatore, in D1 |
+
+## Chiusi (VERIFIED HARDWARE sulla fixture, 19/11/2026 mattina — Stable `v1.0.2`, `1314bc4`)
 
 | Area | Stato |
 |---|---|
@@ -28,13 +39,13 @@
 
 | Area | Stato | Issue |
 |---|---|---|
-| Locomozione a terra G0–G5 | Mai qualificata. STANDARD e FAST hanno `hardware_qualified=false`; la v1.0.2 è qualificata solo sulla fixture | #52 |
+| Locomozione a terra G0–G5 | Mai qualificata. STANDARD, FAST e TROT58 hanno `hardware_qualified=false`; `1.0.3-dev.2` e `v1.0.2` sono qualificate solo sulla fixture. La prova esplorativa a terra del 19/11 sera, dalla dashboard, non è una qualifica: il trace è conservato in locale e va analizzato a parte | #52 |
 | STOP a terra a fine swing anteriore; camminate lunghe a terra; frenata sotto carico | Non provati | #52 |
 | Condizione `random_3` di `kSteer` (beccheggio ≈ +55 mrad, passo 40 mm) | Certificata solo offline; S9 è rimasto entro ±31 mrad | #52 |
 | Ground Contact sensorless, Fase 1 | Diagnostica passiva `GROUND_CONTACT.OBSERVE` (scheda Calibration & Maintenance) presente nel firmware `v1.0.2`: VERIFIED OFFLINE, mai provata sul robot. Probing e trasferimento del carico non disponibili (`THREE_SUPPORT_TRANSFER_UNAVAILABLE`); **nessuna misura assoluta del terreno** (`ground_height_available=false`). [Rapporto](Validation_Reports/Ground_Contact_Phase1_2026-11-13/REPORT.md) | #52 |
 | Ciclo a freddo S7 su `1314bc4` (ACQUIRE B dopo freddo) | Non eseguito il 19/11; ACQUIRE è invariato rispetto a `30c894a` | — |
 | Temperature spurie | Picchi isolati di un campione (fino a 65–69 °C) su giunti diversi, in `1314bc4` come in `30c894a`; nessuna protezione scattata | #52 |
-| Joystick dalla dashboard (pressione tenuta) | Non provato il 19/11; via USB è coperto | #62 |
+| Joystick dalla dashboard (pressione tenuta) | Sulla fixture provato solo in avanti (TROT58, D1 del 19/11 sera); indietro, laterale e rotazione sono coperti via USB | #62 |
 | HTTP con coppia ON, STOP su telefono durante il caricamento del Twin, UX del Twin, LED | Come al 07/11 | #62 |
 | RESTORE manuale e manutenzione | Come al 07/11 | #48 |
 | Gemello MuJoCo: carichi a terra | Come al 10/11 | — |
@@ -43,22 +54,32 @@
 
 **Non è sviluppata oggi:** qui si registrano solo il punto di partenza e i limiti da misurare.
 
-**Punto di partenza (`v1.0.2`, solo fixture):**
+**Punto di partenza (`1.0.3-dev.2`, solo fixture; velocità nominali, non misurate a terra):**
 
 | Modo | Velocità massima | Alzata del piede |
 |---|---|---|
 | SLOW | 20 mm/s | 8 mm |
 | STANDARD | 30 mm/s | 8 mm |
 | FAST | 29,6 mm/s | 6 mm |
+| TROT58 | 64,4 mm/s, solo avanti | 8,5 mm |
 
-- Joystick in avanti, indietro, laterale e in rotazione.
-- Margine P0 di 3,3 ms, con READ e FRAME come costi principali.
+- **Joystick:** in avanti, indietro, laterale e in rotazione nei crawl; TROT58 solo in avanti.
+- **Margine P0:** 3,3 ms, con READ e FRAME come costi principali. Il massimo resta 12 729 µs della `v1.0.2`; su `3152e88` il massimo nelle prove eseguite è 11 629 µs.
 
-**Da sviluppare o qualificare, con criteri da fissare prima delle prove:**
-- **locomozione reale a terra:** prova G0–G5 con batteria ≥ 11,0 V e anticaduta, STOP a terra, stabilità e margine di supporto;
+**Da sviluppare o qualificare** (NOT VALIDATED, criteri da fissare prima delle prove):
+- **locomozione reale a terra:** prova G0–G5 con batteria ≥ 11,0 V e anticaduta, STOP a terra, stabilità e margine di supporto, per i crawl e per TROT58. Prima: COM reale e offset di montaggio dell'IMU. Da analizzare a parte la prova esplorativa del 19/11 sera;
 - **velocità e fluidità del gait:** velocità reale rispetto a quella comandata, per modo; oscillazioni del corpo e continuità dei frame;
-- **FAST fino a 40 mm/s:** valutazione mantenendo STOP, stabilità e limiti. Offline, il 16/11, risultava non certificabile con i box e la frenata attuali ([valutazione](Validation_Reports/Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/LOCO_EVAL.md));
-- **WALK TROT:** non supportato dalle evidenze attuali (stessa valutazione);
+- **prestazioni WALK FAST:** 40 mm/s non raggiunti. Lo studio offline del 19/11 (non pubblicato) dice due cose:
+  - il crawl non li raggiunge entro i limiti di STOP, drive e cattura;
+  - la camminata a coppie diagonali sfasate supera legge e plant, ma non i criteri dinamici registrati nel gemello.
+  
+  Non è integrata: FAST resta 29,6 mm/s. Valutazione precedente del 16/11: [LOCO_EVAL](Validation_Reports/Unified_Operational_2026-11-14/P0_Peaks_2026-11-16/LOCO_EVAL.md);
+- **TROT multidirezionale:** TROT58 va solo in avanti. Indietro, laterale e rotazione richiedono inviluppo IMU e box sterzati propri;
+- **locomozione omnidirezionale Go2-like:** non iniziata;
+- **joystick proporzionali:** oggi il joystick è proporzionale entro la legge della modalità scelta. L'estensione al controllo omnidirezionale è da definire;
+- **Kinect v2:** misura esterna per le prove a terra. Non ancora configurata: scopo, montaggio, calibrazione e sincronizzazione da definire;
+- **MuJoCo:** gemello V1 offline; discrepanza dei carichi a terra (rapporto M5) da calibrare con misure nuove;
+- **valutazione RL:** non iniziata;
 - **alzata effettiva delle zampe e distanza dal terreno:** nel gemello il piede in swing tocca;
 - **tracking e frenata sotto carico,** cedimento delle anche;
 - **sway e traiettorie;**

@@ -1,6 +1,11 @@
 # MATDOG Firmware
 
-> **STATO CORRENTE — 19/11/2026:** è installata la **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, `MATDOG Controller 1.0.2-dev.7`.
+> **STATO CORRENTE — 20/11/2026:** è installata la build di sviluppo **`MATDOG Controller 1.0.3-dev.2`** (TROT58), non una release.
+> - **Identità:** commit `3152e880c3cc2453ba1513a652b730670e0d0dd5`, in `main` con lo SHA originale, senza tag; build `3152e880c3cc`. APP 1 784 928 byte, SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`, `ROBOT_POWERED`, CLEAN. NVS gen-1 preservata.
+> - **Validazione:** fixture, 19/11 sera: KEEP, criteri C1–C10 PASS. Catena A/B 8/8, blocco TROT58 37/37, D1 con STOP HTTP; massimo 11 629 µs, 0 overrun. Terra non qualificata. [Rapporto](../09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md).
+> - **Rollback:** la Stable pubblicata `v1.0.2`.
+>
+> **Stable pubblicata — 19/11/2026:** [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2), `MATDOG Controller 1.0.2-dev.7`, installata fino al 19/11 sera.
 > - **Identità:** commit `1314bc411c589c4216e95629f4665d9d01f05781` (tag `v1.0.2`), build `1314bc411c58`. APP 1 777 952 byte, SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`, `ROBOT_POWERED`. NVS gen-1 preservata.
 > - **Validazione:** fixture, 19/11. Catena 8/8, D1/D2, blocco D 27/27, S9 15/15; Motion Timing P0 CLOSED nel perimetro delle prove. Terra non qualificata. [Qualifica](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md) · [manifest](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md).
 > - **Rollback:** `30c894a` (APP `03c863cc…`).
