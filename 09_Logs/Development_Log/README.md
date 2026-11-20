@@ -1,6 +1,6 @@
 # Development Log — index
 
-Latest: [closeout 2026-10-11](2026-10-11_HW_NON_MOTION_CLOSEOUT.md) · [Motion handoff 2026-10-12](2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
+Latest: [TROT58 fixture closeout 2026-11-19](../Validation_Reports/TROT58_HW_2026-11-19/REPORT.md) (`1.0.3-dev.2`: KEEP, C1–C10 PASS) · [session handoff 2026-11-18](2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md). Earlier: [closeout 2026-10-11](2026-10-11_HW_NON_MOTION_CLOSEOUT.md) · [Motion handoff 2026-10-12](2026-10-12_MOTION_ENABLEMENT_HANDOFF.md).
 
 Chronological handoffs and milestone records. A log states what was current **on its date**; its
 "next steps" are historical. Status of a result is whatever the log itself records for its scope; this
@@ -129,4 +129,13 @@ M0.4 P1 closure log.
 | [`2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION`](2026-10-08_PR2_SELECTIVE_DEV1_INTEGRATION.md) | MATDOG — PR-2: selective integration of the dev.1 line (2026-10-08) |
 | [`2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION`](2026-10-08_PR3_DEV2_DEV3_SELECTIVE_INTEGRATION.md) | MATDOG — PR-3: selective integration of the dev.2/dev.3 source delta (2026-10-08) |
 
-Total: 64 logs.
+## November 2026 (added 2026-11-20)
+
+| Log | Title |
+|---|---|
+| [`2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF`](2026-11-18_MATDOG_SESSION_CLOSE_HANDOFF.md) | MATDOG — handoff 18/11/2026 (chiusura sessione) |
+| [`2026-11-18_MATDOG_BMS_DALY_HANDOFF_ADDENDUM`](2026-11-18_MATDOG_BMS_DALY_HANDOFF_ADDENDUM.md) | MATDOG — BMS DALY: aggiunta all'handoff del 18/11/2026 |
+
+Milestone record of 2026-11-19, kept with its evidence instead of being copied here: [TROT58 fixture qualification](../Validation_Reports/TROT58_HW_2026-11-19/REPORT.md). Positive closure of `1.0.3-dev.2` on the fixture (KEEP, C1–C10 PASS); ground not qualified.
+
+Total: 66 logs.

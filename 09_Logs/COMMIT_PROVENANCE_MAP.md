@@ -120,3 +120,13 @@ All these commits are reachable from `main` after the consolidation merge, and n
 ## Local-only commits archived on 2026-11-19 (added)
 
 The local branches of the operator's workstation were deleted on 19/11, after all 125 local references were bundled and test-recovered. The commits below existed in no published branch. Their meaning and status are in [EXTERNAL_ARCHIVES §10](EXTERNAL_ARCHIVES.md#10-local-worktrees-and-branches-consolidated-on-2026-11-19): `bc1679f` (HostLink report, recovered into `main`), `76c5f8f` (dev.8 P0 timing report, recovered into `main`), `7118f7b` and `6c5cffc` (rc.10 snapshot and PRONE line), `a289e73`, `d5471b2`, `9cfd86b`, `43fa92a`.
+
+## `1.0.3-dev.2` TROT58, the installed build (added 2026-11-20)
+
+| Item | SHA | Note |
+|---|---|---|
+| Installed firmware commit | `3152e880c3cc2453ba1513a652b730670e0d0dd5` | The **source of the installed APP** (build ID `3152e880c3cc`, APP SHA256 `3c8774a9…`). One commit on `7c7c4e2`, in `main` with its original SHA: no squash, rebase or rewrite. No tag, no release ([hardware report](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)) |
+| Documentation on top of `3152e88` | the commit that adds this section | Documentation only: no change under `src/` or to scripts |
+| Not published (study artifacts, kept locally) | `ee0756b` (TROT46, `1.0.3-dev.1`), `170def8` (FAST40 study) | Never flashed. `ee0756b` was superseded by `3152e88`; FAST40 failed its registered dynamic criteria in the closed-loop twin |
+
+The Stable tag `v1.0.2` still points to `1314bc4`. A build of `main` is not the installed APP: that is identified by its manifest and SHA256.

@@ -1,7 +1,9 @@
 # MATDOG logs and evidence
 
-Stato corrente 19/11/2026: **Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, installata e qualificata sulla fixture. Firmware `1.0.2-dev.7` `1314bc411c58`, commit `1314bc4`, APP `dd16bd62…`.
-- **Evidenze correnti:**
+Stato corrente 20/11/2026: installata la build di sviluppo **`1.0.3-dev.2` (TROT58)**, `3152e880c3cc`, commit `3152e88`, APP `3c8774a9…`, qualificata sulla fixture il 19/11 sera: KEEP, C1–C10 PASS ([rapporto](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)). Terra non qualificata.
+
+Stable pubblicata (Latest): **[`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2)**, invariata, rollback del firmware installato. Firmware `1.0.2-dev.7` `1314bc411c58`, commit `1314bc4`, APP `dd16bd62…`, installata e qualificata sulla fixture il 19/11 mattina.
+- **Evidenze della Stable:**
   - [qualifica HW del 19/11](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md): catena 8/8, D1/D2, blocco D, S9;
   - [manifest della release](Validation_Reports/Motion_1314bc4_HW_2026-11-19/RELEASE_MANIFEST.md);
   - [evidenze, archivi locali e SHA256](Validation_Reports/Motion_1314bc4_HW_2026-11-19/EVIDENCE_MANIFEST.md).

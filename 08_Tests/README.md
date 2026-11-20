@@ -8,7 +8,7 @@
 - Un test passato vale nel perimetro e alla data registrati nel suo rapporto.
 - Un risultato offline non è un risultato hardware.
 
-Stato corrente: Stable `v1.0.2` ([qualifica](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
+Stato corrente: installata `1.0.3-dev.2` TROT58 ([qualifica sulla fixture](../09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)); Stable pubblicata `v1.0.2` ([qualifica](../09_Logs/Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
 
 ## Dove sono i test
 

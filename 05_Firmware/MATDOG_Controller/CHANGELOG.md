@@ -1,9 +1,11 @@
 # MATDOG Controller — Changelog
 
-> **Current as of 2026-11-19: Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2).**
-> - **Installed APP:** `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781` (the tag points to that commit), SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`.
-> - **Fixture-qualified on 19/11.** Motion Timing P0 is CLOSED in the scope of those tests; ground locomotion is not qualified.
-> - **Rollback:** `30c894a`. See the entry below.
+> **Current as of 2026-11-20: installed `1.0.3-dev.2` (TROT58), a development build; the published Stable is still [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2).**
+> - **Installed APP:** `1.0.3-dev.2`, build `3152e880c3cc`, source `3152e880c3cc2453ba1513a652b730670e0d0dd5` (in `main` with this SHA; no tag, no release), SHA256 `3c8774a9f9d0facfc0cb65af67ad4745c10bd9b2a2a9e906cbb8b0d9802f8c68`, `ROBOT_POWERED`, CLEAN.
+> - **Fixture-qualified on 19/11 evening:** KEEP, criteria C1–C10 PASS ([hardware report](../../09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)). Ground stability and performance are not qualified.
+> - **Stable / Latest:** `v1.0.2` (`1.0.2-dev.7`, `1314bc4`, APP `dd16bd62…`), unchanged. It is the rollback of the installed build.
+>
+> **Historical, 2026-11-19 morning:** the installed APP was the Stable `v1.0.2` itself: `1.0.2-dev.7`, build `1314bc411c58`, source `1314bc411c589c4216e95629f4665d9d01f05781` (the tag points to that commit), SHA256 `dd16bd6215d836f8dae6389df7b13b8fcdcff20bdec06ca9948a34ae9b0dd82a`. It was fixture-qualified on 19/11, with Motion Timing P0 CLOSED in the scope of those tests; ground locomotion was not qualified. Its rollback was `30c894a`. See its entry below.
 >
 > **Historical, 2026-11-16 evening (branch `integ/matdog-unified-operational-20261114`):** the diagnostic `1.0.2-dev.8` build `6be46906d069` was installed (`a86c680` + F3 + IRAM G2s, APP SHA256 `be678d83037451d7937783e70d443a83612cbc992005a9f0cac9561ad0a13b68`), validated on the fixture. The verification build `33134ae28260` was never installed.
 >
@@ -16,9 +18,16 @@
 > **Historical note (written 2026-10-08):** the dev.3, PR-1/PR-2/PR-3 and blocked 2026-10-07 validation entries below describe their own dated state, not the current firmware. `Unreleased` in older entry headings denotes the state when originally authored; the dev.17 candidate was later released unchanged as `v1.0.1`.
 > Records are newest-integration first. For early history and SHA mapping see [`HISTORY_INDEX.md`](../../09_Logs/HISTORY_INDEX.md) and [`COMMIT_PROVENANCE_MAP.md`](../../09_Logs/COMMIT_PROVENANCE_MAP.md).
 
-## Unreleased — 1.0.3-dev.2: TROT58, a fourth WALK mode (offline candidate, not flashed) — 2026-11-19
+## Unreleased — 1.0.3-dev.2: TROT58, a fourth WALK mode (installed and fixture-qualified on 19/11; not a release) — 2026-11-19
 
-> **Offline only.** Built on Stable `v1.0.2` (`main` `7c7c4e2`). Not merged, not flashed, not qualified on hardware: every result below is host, QEMU or twin evidence. It supersedes the offline TROT46 candidate `1.0.3-dev.1` (`ee0756b`), which was never flashed and stays a study artifact.
+> **Installed on 19/11/2026 evening; not a GitHub release.** Source `3152e88`, built on Stable `v1.0.2` (`main` `7c7c4e2`), in `main` with its original SHA. APP `3c8774a9…`, build `3152e880c3cc`, flashed APP-only after a device check that `1314bc4` was installed; NVS gen-1 and calibration `be8d5902bb4e37da` unchanged.
+> - **VERIFIED HARDWARE (fixture only):** KEEP, criteria C1–C10 PASS ([hardware report](../../09_Logs/Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)).
+>   - v1.0.2 A/B chain 8/8 (140 steps), TROT58 block 37/37, dashboard D1 with HTTP STOP.
+>   - Maximum release 11 629 µs, 0 overruns, 0 operative missed releases.
+>   - USB STOPs 16/16 and HTTP STOP 1/1 verified.
+> - **VERIFIED OFFLINE before the flash:** the results listed below (host, gates, QEMU, closed-loop twin).
+> - **NOT VALIDATED:** ground stability and real ground speed of every mode; TROT58 backward, lateral and yaw.
+> - **Supersedes** the offline TROT46 candidate `1.0.3-dev.1` (`ee0756b`), never flashed and not published.
 
 - **TROT** (`WalkMode::TROT`, table row 4): the diagonal law of the same `Gait` generator through the same Motion pipeline (walk clock, IMU correction, `compensationSafe`, StopPlan, WALK STOP, STOP recovery).
   - Diagonal pairs LF+RH / RF+LH with four feet down at every pair change (duty 0.60); 39 / 49 / 58 mm per 0.9 s cycle (43.3 / 54.4 / 64.4 mm/s nominal); 115 mm; lift 8.5 mm (closed-loop twin swing clearance p10 3.0 mm; at 7.5 mm one swing in ten peaked under 1.7 mm).

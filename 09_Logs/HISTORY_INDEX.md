@@ -1,7 +1,8 @@
 # MATDOG history index — June to November 2026
 
-> **Stato corrente (19/11/2026).**
-> - **Firmware:** installata la Stable [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) (`1.0.2-dev.7` `1314bc411c58`, APP `dd16bd62…`), qualificata sulla fixture ([dossier](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
+> **Stato corrente (20/11/2026).**
+> - **Firmware:** installata la build di sviluppo `1.0.3-dev.2` (TROT58, `3152e880c3cc`, APP `3c8774a9…`), qualificata sulla fixture il 19/11 sera: KEEP, C1–C10 PASS ([rapporto](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md)). Terra non qualificata.
+> - **Stable pubblicata:** [`v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) (`1.0.2-dev.7` `1314bc411c58`, APP `dd16bd62…`), invariata, rollback; installata e qualificata sulla fixture il 19/11 mattina ([dossier](Validation_Reports/Motion_1314bc4_HW_2026-11-19/README.md)).
 > - **P0 e DALY:** Motion Timing P0 CLOSED nel perimetro delle prove; RCA DALY congelata.
 > - **Cronologia:** sezione 12.
 >
@@ -199,3 +200,11 @@ Titles are paraphrased from the GitHub PR list (#15 is not described here); the 
 | 2026-11-19 | consolidation merge into `main`, tag `v1.0.2` on `1314bc4` | [Release `v1.0.2`](https://github.com/MattRobotics/robot-dog/releases/tag/v1.0.2) | Stable, Motion fixture-qualified; `v1.0.1` unchanged |
 | 2026-11-19 | seven candidate, documentation and release branches | Deleted from GitHub after verification: 0 commits outside `main` ([EXTERNAL_ARCHIVES §9](EXTERNAL_ARCHIVES.md#9-remote-branches-deleted-on-2026-11-19)) | Only `main` remains; tags kept |
 | 2026-11-19 | local worktrees and branches on the Asus | 63 → 3 checkouts; 81 local branches deleted after a verified, test-recovered bundle of all 125 local references ([EXTERNAL_ARCHIVES §10](EXTERNAL_ARCHIVES.md#10-local-worktrees-and-branches-consolidated-on-2026-11-19)). Recovered from local-only commits: [HostLink report (06/11)](Validation_Reports/HostLink_2026-11-06/REPORT.md) and [dev.8 P0 timing report (12/11)](Validation_Reports/MATDOG_DEV8_P0_TIMING_2026-11-12/REPORT.md) | Historical documents only; no firmware change |
+
+## 13. Update 2026-11-20 — `1.0.3-dev.2` TROT58 (added; the sections above are unchanged)
+
+| Date | Commit | Document | Status |
+|---|---|---|---|
+| 2026-11-19 | `3152e88` (`1.0.3-dev.2`) | [**TROT58 fixture qualification**](Validation_Reports/TROT58_HW_2026-11-19/REPORT.md) | VERIFIED HARDWARE on the fixture: KEEP, C1–C10 PASS; installed. Ground NOT VALIDATED |
+| 2026-11-19 | study commits `ee0756b` (TROT46), `170def8` (FAST40) | Not published: local study artifacts | TROT46 superseded before any flash; FAST40 failed its registered dynamic criteria in the twin |
+| 2026-11-20 | `3152e88` and a documentation commit | Source of the installed build into `main` with its original SHA | No tag, no release; Stable `v1.0.2` unchanged |
